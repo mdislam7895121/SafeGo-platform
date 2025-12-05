@@ -313,6 +313,12 @@ import DriverViolations from "@/pages/admin/driver-violations";
 import TrustSafety from "@/pages/admin/trust-safety";
 import PolicyEngine from "@/pages/admin/policy-engine";
 import ActivityMonitor from "@/pages/admin/activity-monitor";
+import RatingsCenter from "@/pages/admin/ratings-center";
+import EarningsDisputes from "@/pages/admin/earnings-disputes";
+import RideTimeline from "@/pages/admin/ride-timeline";
+import NotificationRules from "@/pages/admin/notification-rules";
+import PaymentIntegrity from "@/pages/admin/payment-integrity";
+import GlobalSearch from "@/pages/admin/global-search";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -2329,6 +2335,55 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Admin Activity Monitor">
             <ActivityMonitor />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ratings-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ratings & Review Center">
+            <RatingsCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/earnings-disputes">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Earnings Dispute Resolution">
+            <EarningsDisputes />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ride-timeline">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ride Timeline Viewer">
+            <RideTimeline />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ride-timeline/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ride Timeline Viewer">
+            <RideTimeline />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/notification-rules">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Notification Rules Engine">
+            <NotificationRules />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payment-integrity">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Payment Integrity Dashboard">
+            <PaymentIntegrity />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/global-search">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Global Search">
+            <GlobalSearch />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

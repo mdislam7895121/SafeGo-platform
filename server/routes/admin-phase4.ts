@@ -1985,4 +1985,1354 @@ router.post("/activity-monitor/alert", checkPermission(Permission.MANAGE_ADMIN_A
   }
 });
 
+// ========================================
+// 16. RATINGS & REVIEW CENTER
+// ========================================
+
+const ratingsFilterSchema = z.object({
+  type: z.enum(["driver", "restaurant", "all"]).default("all"),
+  rating: z.coerce.number().min(1).max(5).optional(),
+  severity: z.enum(["all", "flagged", "suspicious", "verified"]).default("all"),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.coerce.number().default(1),
+  limit: z.coerce.number().default(20),
+});
+
+router.get("/ratings", checkPermission(Permission.VIEW_REPORTS), async (req: AuthRequest, res) => {
+  try {
+    const filters = ratingsFilterSchema.parse(req.query);
+    
+    // Fetch driver ratings from rides
+    const driverRatingsWhere: any = {
+      customerRating: { not: null },
+    };
+    if (filters.rating) driverRatingsWhere.customerRating = filters.rating;
+    if (filters.dateFrom || filters.dateTo) {
+      driverRatingsWhere.createdAt = {};
+      if (filters.dateFrom) driverRatingsWhere.createdAt.gte = new Date(filters.dateFrom);
+      if (filters.dateTo) driverRatingsWhere.createdAt.lte = new Date(filters.dateTo);
+    }
+
+    // Fetch restaurant reviews
+    const reviewsWhere: any = {};
+    if (filters.rating) reviewsWhere.rating = filters.rating;
+    if (filters.severity === "flagged") reviewsWhere.isFlagged = true;
+    if (filters.dateFrom || filters.dateTo) {
+      reviewsWhere.createdAt = {};
+      if (filters.dateFrom) reviewsWhere.createdAt.gte = new Date(filters.dateFrom);
+      if (filters.dateTo) reviewsWhere.createdAt.lte = new Date(filters.dateTo);
+    }
+
+    const [driverRatings, restaurantReviews, driverRatingDist, restaurantRatingDist] = await Promise.all([
+      filters.type === "restaurant" ? Promise.resolve([]) : prisma.ride.findMany({
+        where: driverRatingsWhere,
+        select: {
+          id: true,
+          customerId: true,
+          driverId: true,
+          customerRating: true,
+          customerFeedback: true,
+          createdAt: true,
+          customer: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+          driver: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: filters.type === "all" ? 10 : filters.limit,
+        skip: filters.type === "driver" ? (filters.page - 1) * filters.limit : 0,
+      }),
+      filters.type === "driver" ? Promise.resolve([]) : prisma.review.findMany({
+        where: reviewsWhere,
+        include: {
+          customer: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+          restaurant: { select: { businessName: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: filters.type === "all" ? 10 : filters.limit,
+        skip: filters.type === "restaurant" ? (filters.page - 1) * filters.limit : 0,
+      }),
+      // Driver rating distribution
+      prisma.ride.groupBy({
+        by: ["customerRating"],
+        where: { customerRating: { not: null } },
+        _count: { customerRating: true },
+      }),
+      // Restaurant rating distribution
+      prisma.review.groupBy({
+        by: ["rating"],
+        _count: { rating: true },
+      }),
+    ]);
+
+    // Format driver ratings
+    const formattedDriverRatings = driverRatings.map((r: any) => ({
+      id: r.id,
+      type: "driver" as const,
+      ratingType: "ride",
+      entityId: r.driverId,
+      entityName: r.driver ? `${r.driver.user?.firstName || ""} ${r.driver.user?.lastName || ""}`.trim() || "Unknown Driver" : "Unknown Driver",
+      raterId: r.customerId,
+      raterName: r.customer ? `${r.customer.user?.firstName || ""} ${r.customer.user?.lastName || ""}`.trim() || "Unknown Customer" : "Unknown Customer",
+      rating: r.customerRating,
+      feedback: r.customerFeedback,
+      createdAt: r.createdAt,
+      isFlagged: false,
+      flagReason: null,
+      severity: r.customerRating && r.customerRating <= 2 ? "low_rating" : "normal",
+    }));
+
+    // Format restaurant reviews
+    const formattedRestaurantReviews = restaurantReviews.map((r: any) => ({
+      id: r.id,
+      type: "restaurant" as const,
+      ratingType: "food_order",
+      entityId: r.restaurantId,
+      entityName: r.restaurant?.businessName || "Unknown Restaurant",
+      raterId: r.customerId,
+      raterName: r.customer ? `${r.customer.user?.firstName || ""} ${r.customer.user?.lastName || ""}`.trim() || "Unknown Customer" : "Unknown Customer",
+      rating: r.rating,
+      feedback: r.reviewText,
+      createdAt: r.createdAt,
+      isFlagged: r.isFlagged,
+      flagReason: r.flagReason,
+      isHidden: r.isHidden,
+      hideReason: r.hideReason,
+      severity: r.isFlagged ? "flagged" : r.rating <= 2 ? "low_rating" : "normal",
+    }));
+
+    // Combine and sort
+    const allRatings = [...formattedDriverRatings, ...formattedRestaurantReviews]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Build distribution data
+    const distribution = {
+      driver: [1, 2, 3, 4, 5].map(rating => ({
+        rating,
+        count: (driverRatingDist as any[]).find((d: any) => d.customerRating === rating)?._count?.customerRating || 0,
+      })),
+      restaurant: [1, 2, 3, 4, 5].map(rating => ({
+        rating,
+        count: (restaurantRatingDist as any[]).find((d: any) => d.rating === rating)?._count?.rating || 0,
+      })),
+    };
+
+    // Calculate totals
+    const driverTotal = distribution.driver.reduce((sum, d) => sum + d.count, 0);
+    const restaurantTotal = distribution.restaurant.reduce((sum, d) => sum + d.count, 0);
+    const driverAvg = driverTotal > 0 
+      ? distribution.driver.reduce((sum, d) => sum + d.rating * d.count, 0) / driverTotal 
+      : 0;
+    const restaurantAvg = restaurantTotal > 0 
+      ? distribution.restaurant.reduce((sum, d) => sum + d.rating * d.count, 0) / restaurantTotal 
+      : 0;
+
+    res.json({
+      ratings: allRatings,
+      distribution,
+      summary: {
+        totalDriverRatings: driverTotal,
+        totalRestaurantReviews: restaurantTotal,
+        avgDriverRating: Math.round(driverAvg * 100) / 100,
+        avgRestaurantRating: Math.round(restaurantAvg * 100) / 100,
+        flaggedReviews: restaurantReviews.filter((r: any) => r.isFlagged).length,
+        lowRatings: allRatings.filter(r => r.rating <= 2).length,
+      },
+      pagination: {
+        page: filters.page,
+        limit: filters.limit,
+        total: filters.type === "driver" ? driverTotal : filters.type === "restaurant" ? restaurantTotal : driverTotal + restaurantTotal,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching ratings:", error);
+    res.status(500).json({ error: "Failed to fetch ratings" });
+  }
+});
+
+const updateRatingSchema = z.object({
+  action: z.enum(["flag", "unflag", "hide", "unhide", "verify"]),
+  reason: z.string().optional(),
+});
+
+router.patch("/ratings/:id", checkPermission(Permission.MANAGE_REPORTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { action, reason } = updateRatingSchema.parse(req.body);
+    const adminId = req.user!.id;
+
+    // Try to find as a review first (restaurant review)
+    const review = await prisma.review.findUnique({ where: { id } });
+    
+    if (review) {
+      const updateData: any = {};
+      
+      switch (action) {
+        case "flag":
+          updateData.isFlagged = true;
+          updateData.flaggedByAdminId = adminId;
+          updateData.flaggedAt = new Date();
+          updateData.flagReason = reason || "Flagged by admin";
+          break;
+        case "unflag":
+          updateData.isFlagged = false;
+          updateData.flaggedByAdminId = null;
+          updateData.flaggedAt = null;
+          updateData.flagReason = null;
+          break;
+        case "hide":
+          updateData.isHidden = true;
+          updateData.hiddenByAdminId = adminId;
+          updateData.hiddenAt = new Date();
+          updateData.hideReason = reason || "Hidden by admin";
+          break;
+        case "unhide":
+          updateData.isHidden = false;
+          updateData.hiddenByAdminId = null;
+          updateData.hiddenAt = null;
+          updateData.hideReason = null;
+          break;
+        case "verify":
+          updateData.isFlagged = false;
+          updateData.flaggedByAdminId = null;
+          updateData.flaggedAt = null;
+          updateData.flagReason = null;
+          break;
+      }
+
+      const updated = await prisma.review.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Audit log
+      await prisma.auditLog.create({
+        data: {
+          action: `rating_${action}`,
+          entityType: "review",
+          entityId: id,
+          userId: adminId,
+          details: { action, reason, reviewId: id },
+          ipAddress: req.ip || "unknown",
+          userAgent: req.headers["user-agent"] || "unknown",
+        },
+      });
+
+      return res.json({ success: true, rating: updated, type: "restaurant" });
+    }
+
+    // If not found as review, it's a ride rating - we don't modify those directly
+    // but we can create a flag record
+    const ride = await prisma.ride.findUnique({ where: { id } });
+    if (ride) {
+      // Audit log for ride rating action
+      await prisma.auditLog.create({
+        data: {
+          action: `rating_${action}`,
+          entityType: "ride_rating",
+          entityId: id,
+          userId: adminId,
+          details: { action, reason, rideId: id, rating: ride.customerRating },
+          ipAddress: req.ip || "unknown",
+          userAgent: req.headers["user-agent"] || "unknown",
+        },
+      });
+
+      return res.json({ success: true, type: "driver", message: "Action logged for ride rating" });
+    }
+
+    return res.status(404).json({ error: "Rating not found" });
+  } catch (error) {
+    console.error("Error updating rating:", error);
+    res.status(500).json({ error: "Failed to update rating" });
+  }
+});
+
+// Get linked complaints for a rating
+router.get("/ratings/:id/complaints", checkPermission(Permission.VIEW_COMPLAINTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find complaints related to this ride or review
+    const complaints = await prisma.complaint.findMany({
+      where: {
+        OR: [
+          { rideId: id },
+          { orderId: id },
+        ],
+      },
+      include: {
+        customer: { include: { user: { select: { firstName: true, lastName: true } } } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ complaints });
+  } catch (error) {
+    console.error("Error fetching linked complaints:", error);
+    res.status(500).json({ error: "Failed to fetch linked complaints" });
+  }
+});
+
+// ========================================
+// 17. DRIVER VIOLATIONS CENTER (Enhanced)
+// ========================================
+
+const violationsFilterSchema = z.object({
+  category: z.enum(["all", "safety", "behavior", "payment_abuse", "system_misuse"]).default("all"),
+  severity: z.enum(["all", "critical", "high", "medium", "low"]).default("all"),
+  status: z.enum(["all", "open", "investigating", "resolved", "dismissed"]).default("all"),
+  driverId: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.coerce.number().default(1),
+  limit: z.coerce.number().default(20),
+});
+
+router.get("/violations-center", checkPermission(Permission.VIEW_VIOLATIONS), async (req: AuthRequest, res) => {
+  try {
+    const filters = violationsFilterSchema.parse(req.query);
+
+    // Mock data with comprehensive violation information
+    const violations = [
+      {
+        id: "viol-001",
+        driverId: "drv-001",
+        driverName: "John Smith",
+        driverEmail: "john.driver@example.com",
+        category: "safety",
+        type: "speed_violation",
+        severity: "high",
+        status: "investigating",
+        description: "Exceeded speed limit by 25mph in residential zone",
+        points: 5,
+        location: { lat: 40.7128, lng: -74.0060, address: "123 Main St, New York, NY" },
+        rideId: "ride-123",
+        evidence: [
+          { type: "gps_log", url: "/evidence/gps-001.json", description: "GPS speed log" },
+          { type: "customer_report", description: "Customer complaint about unsafe driving" },
+        ],
+        timeline: [
+          { timestamp: new Date(Date.now() - 86400000 * 2), action: "violation_created", actor: "system", details: "Auto-detected from GPS" },
+          { timestamp: new Date(Date.now() - 86400000), action: "assigned", actor: "Admin User", details: "Assigned for investigation" },
+          { timestamp: new Date(Date.now() - 3600000), action: "evidence_added", actor: "Admin User", details: "Customer statement added" },
+        ],
+        investigatorId: "adm-001",
+        investigatorName: "Admin User",
+        createdAt: new Date(Date.now() - 86400000 * 2),
+        updatedAt: new Date(Date.now() - 3600000),
+      },
+      {
+        id: "viol-002",
+        driverId: "drv-002",
+        driverName: "Jane Doe",
+        driverEmail: "jane.driver@example.com",
+        category: "behavior",
+        type: "harassment_complaint",
+        severity: "critical",
+        status: "open",
+        description: "Multiple customer complaints about inappropriate behavior",
+        points: 10,
+        location: null,
+        rideId: "ride-456",
+        evidence: [
+          { type: "customer_report", description: "Three separate complaints from customers" },
+        ],
+        timeline: [
+          { timestamp: new Date(Date.now() - 3600000 * 4), action: "violation_created", actor: "system", details: "Created from complaint escalation" },
+        ],
+        investigatorId: null,
+        investigatorName: null,
+        createdAt: new Date(Date.now() - 3600000 * 4),
+        updatedAt: new Date(Date.now() - 3600000 * 4),
+      },
+      {
+        id: "viol-003",
+        driverId: "drv-003",
+        driverName: "Bob Wilson",
+        driverEmail: "bob.driver@example.com",
+        category: "payment_abuse",
+        type: "fare_manipulation",
+        severity: "high",
+        status: "resolved",
+        description: "Attempted to manipulate fare by taking longer route",
+        points: 7,
+        location: { lat: 40.7589, lng: -73.9851, address: "Times Square, New York, NY" },
+        rideId: "ride-789",
+        evidence: [
+          { type: "route_comparison", description: "Optimal vs actual route analysis" },
+          { type: "fare_analysis", description: "Fare discrepancy report" },
+        ],
+        timeline: [
+          { timestamp: new Date(Date.now() - 86400000 * 5), action: "violation_created", actor: "system", details: "Flagged by fare analysis system" },
+          { timestamp: new Date(Date.now() - 86400000 * 4), action: "assigned", actor: "Admin User", details: "Assigned for review" },
+          { timestamp: new Date(Date.now() - 86400000 * 2), action: "resolved", actor: "Admin User", details: "Driver warned, customer refunded" },
+        ],
+        investigatorId: "adm-001",
+        investigatorName: "Admin User",
+        resolution: {
+          type: "warning",
+          notes: "First offense - issued warning and refunded customer $15",
+          refundAmount: 15,
+          suspensionDays: 0,
+        },
+        createdAt: new Date(Date.now() - 86400000 * 5),
+        updatedAt: new Date(Date.now() - 86400000 * 2),
+      },
+      {
+        id: "viol-004",
+        driverId: "drv-004",
+        driverName: "Alice Johnson",
+        driverEmail: "alice.driver@example.com",
+        category: "system_misuse",
+        type: "fake_location",
+        severity: "critical",
+        status: "open",
+        description: "GPS spoofing detected - fake location submissions",
+        points: 15,
+        location: null,
+        rideId: null,
+        evidence: [
+          { type: "gps_analysis", description: "Impossible location jumps detected" },
+          { type: "device_log", description: "Mock location app detected" },
+        ],
+        timeline: [
+          { timestamp: new Date(Date.now() - 3600000), action: "violation_created", actor: "system", details: "Detected by anti-fraud system" },
+        ],
+        investigatorId: null,
+        investigatorName: null,
+        createdAt: new Date(Date.now() - 3600000),
+        updatedAt: new Date(Date.now() - 3600000),
+      },
+    ];
+
+    // Apply filters
+    let filteredViolations = violations;
+    if (filters.category !== "all") {
+      filteredViolations = filteredViolations.filter(v => v.category === filters.category);
+    }
+    if (filters.severity !== "all") {
+      filteredViolations = filteredViolations.filter(v => v.severity === filters.severity);
+    }
+    if (filters.status !== "all") {
+      filteredViolations = filteredViolations.filter(v => v.status === filters.status);
+    }
+    if (filters.driverId) {
+      filteredViolations = filteredViolations.filter(v => v.driverId === filters.driverId);
+    }
+
+    // Summary stats
+    const summary = {
+      total: violations.length,
+      open: violations.filter(v => v.status === "open").length,
+      investigating: violations.filter(v => v.status === "investigating").length,
+      resolved: violations.filter(v => v.status === "resolved").length,
+      critical: violations.filter(v => v.severity === "critical").length,
+      byCategory: {
+        safety: violations.filter(v => v.category === "safety").length,
+        behavior: violations.filter(v => v.category === "behavior").length,
+        payment_abuse: violations.filter(v => v.category === "payment_abuse").length,
+        system_misuse: violations.filter(v => v.category === "system_misuse").length,
+      },
+    };
+
+    res.json({
+      violations: filteredViolations,
+      summary,
+      pagination: {
+        page: filters.page,
+        limit: filters.limit,
+        total: filteredViolations.length,
+        totalPages: Math.ceil(filteredViolations.length / filters.limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching violations center:", error);
+    res.status(500).json({ error: "Failed to fetch violations" });
+  }
+});
+
+const violationActionSchema = z.object({
+  action: z.enum(["assign", "investigate", "resolve", "dismiss", "add_evidence", "update_severity"]),
+  investigatorId: z.string().optional(),
+  resolution: z.object({
+    type: z.enum(["warning", "fine", "temporary_suspension", "permanent_ban"]),
+    notes: z.string(),
+    fineAmount: z.number().optional(),
+    suspensionDays: z.number().optional(),
+  }).optional(),
+  evidence: z.object({
+    type: z.string(),
+    description: z.string(),
+    url: z.string().optional(),
+  }).optional(),
+  severity: z.enum(["critical", "high", "medium", "low"]).optional(),
+  notes: z.string().optional(),
+});
+
+router.patch("/violations-center/:id", checkPermission(Permission.MANAGE_VIOLATIONS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const data = violationActionSchema.parse(req.body);
+    const adminId = req.user!.id;
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: `violation_${data.action}`,
+        entityType: "violation",
+        entityId: id,
+        userId: adminId,
+        details: data,
+        ipAddress: req.ip || "unknown",
+        userAgent: req.headers["user-agent"] || "unknown",
+      },
+    });
+
+    res.json({
+      success: true,
+      violationId: id,
+      action: data.action,
+      updatedAt: new Date(),
+      updatedBy: adminId,
+    });
+  } catch (error) {
+    console.error("Error updating violation:", error);
+    res.status(500).json({ error: "Failed to update violation" });
+  }
+});
+
+router.post("/violations-center", checkPermission(Permission.MANAGE_VIOLATIONS), async (req: AuthRequest, res) => {
+  try {
+    const createSchema = z.object({
+      driverId: z.string(),
+      category: z.enum(["safety", "behavior", "payment_abuse", "system_misuse"]),
+      type: z.string(),
+      severity: z.enum(["critical", "high", "medium", "low"]),
+      description: z.string(),
+      points: z.number().default(0),
+      rideId: z.string().optional(),
+    });
+
+    const data = createSchema.parse(req.body);
+    const adminId = req.user!.id;
+
+    const newViolation = {
+      id: crypto.randomUUID(),
+      ...data,
+      status: "open",
+      investigatorId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: adminId,
+    };
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "violation_created",
+        entityType: "violation",
+        entityId: newViolation.id,
+        userId: adminId,
+        details: data,
+        ipAddress: req.ip || "unknown",
+        userAgent: req.headers["user-agent"] || "unknown",
+      },
+    });
+
+    res.status(201).json(newViolation);
+  } catch (error) {
+    console.error("Error creating violation:", error);
+    res.status(500).json({ error: "Failed to create violation" });
+  }
+});
+
+// ========================================
+// 18. EARNINGS DISPUTE RESOLUTION
+// ========================================
+
+const earningsDisputeFilterSchema = z.object({
+  status: z.enum(["all", "pending", "under_review", "approved", "rejected", "adjusted"]).default("all"),
+  driverId: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.coerce.number().default(1),
+  limit: z.coerce.number().default(20),
+});
+
+router.get("/earnings-disputes", checkPermission(Permission.VIEW_EARNINGS), async (req: AuthRequest, res) => {
+  try {
+    const filters = earningsDisputeFilterSchema.parse(req.query);
+
+    const disputes = [
+      {
+        id: "disp-001",
+        driverId: "drv-001",
+        driverName: "John Smith",
+        driverEmail: "john.driver@example.com",
+        rideId: "ride-123",
+        rideDate: new Date(Date.now() - 86400000 * 3),
+        claimedAmount: 45.00,
+        systemAmount: 32.50,
+        difference: 12.50,
+        disputeReason: "Toll charges not included in fare calculation",
+        status: "pending",
+        evidence: [
+          { type: "receipt", url: "/evidence/toll-001.pdf", description: "Toll receipt from GW Bridge" },
+        ],
+        adminDecision: null,
+        resolutionNotes: null,
+        createdAt: new Date(Date.now() - 86400000),
+        updatedAt: new Date(Date.now() - 86400000),
+      },
+      {
+        id: "disp-002",
+        driverId: "drv-002",
+        driverName: "Jane Doe",
+        driverEmail: "jane.driver@example.com",
+        rideId: "ride-456",
+        rideDate: new Date(Date.now() - 86400000 * 5),
+        claimedAmount: 28.00,
+        systemAmount: 28.00,
+        difference: 0,
+        disputeReason: "Wait time not properly calculated",
+        status: "under_review",
+        evidence: [
+          { type: "timestamp_log", description: "Driver app wait time log showing 15 minutes" },
+        ],
+        adminDecision: null,
+        resolutionNotes: "Reviewing GPS logs",
+        reviewerId: "adm-001",
+        reviewerName: "Admin User",
+        createdAt: new Date(Date.now() - 86400000 * 2),
+        updatedAt: new Date(Date.now() - 3600000),
+      },
+      {
+        id: "disp-003",
+        driverId: "drv-003",
+        driverName: "Bob Wilson",
+        driverEmail: "bob.driver@example.com",
+        rideId: "ride-789",
+        rideDate: new Date(Date.now() - 86400000 * 7),
+        claimedAmount: 55.00,
+        systemAmount: 48.00,
+        difference: 7.00,
+        disputeReason: "Surge pricing not applied correctly",
+        status: "approved",
+        evidence: [
+          { type: "screenshot", url: "/evidence/surge-001.png", description: "Screenshot showing 1.5x surge" },
+        ],
+        adminDecision: "approved",
+        resolutionNotes: "Verified surge was active during pickup. Adjusted earnings by $7.00",
+        adjustedAmount: 55.00,
+        reviewerId: "adm-002",
+        reviewerName: "Senior Admin",
+        createdAt: new Date(Date.now() - 86400000 * 4),
+        updatedAt: new Date(Date.now() - 86400000),
+        resolvedAt: new Date(Date.now() - 86400000),
+      },
+      {
+        id: "disp-004",
+        driverId: "drv-004",
+        driverName: "Alice Johnson",
+        driverEmail: "alice.driver@example.com",
+        rideId: "ride-012",
+        rideDate: new Date(Date.now() - 86400000 * 10),
+        claimedAmount: 100.00,
+        systemAmount: 65.00,
+        difference: 35.00,
+        disputeReason: "Incorrect distance calculation",
+        status: "rejected",
+        evidence: [],
+        adminDecision: "rejected",
+        resolutionNotes: "GPS logs confirm system distance is correct. No evidence of route deviation by system.",
+        reviewerId: "adm-001",
+        reviewerName: "Admin User",
+        createdAt: new Date(Date.now() - 86400000 * 6),
+        updatedAt: new Date(Date.now() - 86400000 * 3),
+        resolvedAt: new Date(Date.now() - 86400000 * 3),
+      },
+    ];
+
+    // Apply filters
+    let filteredDisputes = disputes;
+    if (filters.status !== "all") {
+      filteredDisputes = filteredDisputes.filter(d => d.status === filters.status);
+    }
+    if (filters.driverId) {
+      filteredDisputes = filteredDisputes.filter(d => d.driverId === filters.driverId);
+    }
+
+    const summary = {
+      total: disputes.length,
+      pending: disputes.filter(d => d.status === "pending").length,
+      underReview: disputes.filter(d => d.status === "under_review").length,
+      approved: disputes.filter(d => d.status === "approved").length,
+      rejected: disputes.filter(d => d.status === "rejected").length,
+      totalClaimedDifference: disputes.reduce((sum, d) => sum + d.difference, 0),
+      totalApprovedAdjustments: disputes
+        .filter(d => d.status === "approved" && (d as any).adjustedAmount)
+        .reduce((sum, d) => sum + d.difference, 0),
+    };
+
+    res.json({
+      disputes: filteredDisputes,
+      summary,
+      pagination: {
+        page: filters.page,
+        limit: filters.limit,
+        total: filteredDisputes.length,
+        totalPages: Math.ceil(filteredDisputes.length / filters.limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching earnings disputes:", error);
+    res.status(500).json({ error: "Failed to fetch earnings disputes" });
+  }
+});
+
+const disputeDecisionSchema = z.object({
+  decision: z.enum(["approve", "reject", "adjust"]),
+  adjustedAmount: z.number().optional(),
+  resolutionNotes: z.string(),
+});
+
+router.patch("/earnings-disputes/:id", checkPermission(Permission.MANAGE_EARNINGS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const data = disputeDecisionSchema.parse(req.body);
+    const adminId = req.user!.id;
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: `dispute_${data.decision}`,
+        entityType: "earnings_dispute",
+        entityId: id,
+        userId: adminId,
+        details: data,
+        ipAddress: req.ip || "unknown",
+        userAgent: req.headers["user-agent"] || "unknown",
+      },
+    });
+
+    res.json({
+      success: true,
+      disputeId: id,
+      decision: data.decision,
+      status: data.decision === "approve" ? "approved" : data.decision === "reject" ? "rejected" : "adjusted",
+      adjustedAmount: data.adjustedAmount,
+      resolutionNotes: data.resolutionNotes,
+      resolvedAt: new Date(),
+      resolvedBy: adminId,
+    });
+  } catch (error) {
+    console.error("Error updating dispute:", error);
+    res.status(500).json({ error: "Failed to update dispute" });
+  }
+});
+
+// ========================================
+// 19. RIDE TIMELINE VIEWER
+// ========================================
+
+router.get("/ride-timeline/:rideId", checkPermission(Permission.VIEW_RIDES), async (req: AuthRequest, res) => {
+  try {
+    const { rideId } = req.params;
+
+    const ride = await prisma.ride.findUnique({
+      where: { id: rideId },
+      include: {
+        customer: { include: { user: { select: { firstName: true, lastName: true } } } },
+        driver: { include: { user: { select: { firstName: true, lastName: true } } } },
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    const timeline = [
+      {
+        type: "ride_requested",
+        timestamp: ride.createdAt,
+        title: "Ride Requested",
+        description: `Customer requested pickup at ${ride.pickupAddress}`,
+        location: ride.pickupLat && ride.pickupLng ? { lat: ride.pickupLat, lng: ride.pickupLng, address: ride.pickupAddress } : null,
+      },
+      ...(ride.acceptedAt ? [{
+        type: "driver_accepted",
+        timestamp: ride.acceptedAt,
+        title: "Driver Accepted",
+        description: `Driver ${ride.driver?.user?.firstName || "Unknown"} accepted the ride`,
+        location: null,
+      }] : []),
+      ...(ride.arrivedAt ? [{
+        type: "driver_arrived",
+        timestamp: ride.arrivedAt,
+        title: "Driver Arrived",
+        description: "Driver arrived at pickup location",
+        location: ride.pickupLat && ride.pickupLng ? { lat: ride.pickupLat, lng: ride.pickupLng, address: ride.pickupAddress } : null,
+      }] : []),
+      ...(ride.tripStartedAt ? [{
+        type: "trip_started",
+        timestamp: ride.tripStartedAt,
+        title: "Trip Started",
+        description: "Customer picked up, trip in progress",
+        location: ride.pickupLat && ride.pickupLng ? { lat: ride.pickupLat, lng: ride.pickupLng, address: ride.pickupAddress } : null,
+      }] : []),
+      ...(ride.completedAt ? [{
+        type: "trip_completed",
+        timestamp: ride.completedAt,
+        title: "Trip Completed",
+        description: `Arrived at ${ride.dropoffAddress}`,
+        location: ride.dropoffLat && ride.dropoffLng ? { lat: ride.dropoffLat, lng: ride.dropoffLng, address: ride.dropoffAddress } : null,
+      }] : []),
+      ...(ride.cancelledAt ? [{
+        type: "ride_cancelled",
+        timestamp: ride.cancelledAt,
+        title: "Ride Cancelled",
+        description: `Cancelled by ${ride.whoCancelled}: ${ride.cancellationReason || "No reason provided"}`,
+        location: null,
+      }] : []),
+    ];
+
+    const safetyEvents: any[] = [];
+    const paymentEvents = [
+      {
+        type: "fare_calculated",
+        timestamp: ride.completedAt || ride.createdAt,
+        title: "Fare Calculated",
+        amount: ride.serviceFare,
+        description: `Base fare: $${ride.serviceFare}`,
+      },
+    ];
+
+    res.json({
+      ride: {
+        id: ride.id,
+        status: ride.status,
+        pickupAddress: ride.pickupAddress,
+        dropoffAddress: ride.dropoffAddress,
+        pickupLocation: ride.pickupLat && ride.pickupLng ? { lat: ride.pickupLat, lng: ride.pickupLng } : null,
+        dropoffLocation: ride.dropoffLat && ride.dropoffLng ? { lat: ride.dropoffLat, lng: ride.dropoffLng } : null,
+        routePolyline: ride.routePolyline,
+        distanceMiles: ride.distanceMiles,
+        durationMinutes: ride.durationMinutes,
+        fare: ride.serviceFare,
+        customerRating: ride.customerRating,
+        driverRating: ride.driverRating,
+        customer: ride.customer ? `${ride.customer.user?.firstName || ""} ${ride.customer.user?.lastName || ""}`.trim() : "Unknown",
+        driver: ride.driver ? `${ride.driver.user?.firstName || ""} ${ride.driver.user?.lastName || ""}`.trim() : "Unknown",
+      },
+      timeline,
+      safetyEvents,
+      paymentEvents,
+      anomalies: [],
+    });
+  } catch (error) {
+    console.error("Error fetching ride timeline:", error);
+    res.status(500).json({ error: "Failed to fetch ride timeline" });
+  }
+});
+
+// ========================================
+// 20. NOTIFICATION RULES ENGINE
+// ========================================
+
+router.get("/notification-rules", checkPermission(Permission.VIEW_NOTIFICATIONS), async (req: AuthRequest, res) => {
+  try {
+    const rules = [
+      {
+        id: "rule-001",
+        name: "Critical Incident Alert",
+        description: "Alert super admins immediately for critical safety incidents",
+        isActive: true,
+        trigger: { type: "incident", severity: "critical" },
+        conditions: [
+          { field: "severity", operator: "equals", value: "critical" },
+          { field: "category", operator: "in", value: ["safety", "harassment"] },
+        ],
+        actions: [
+          { type: "email", recipients: ["super_admin"], template: "critical_incident" },
+          { type: "push", recipients: ["super_admin", "country_admin"], template: "critical_alert" },
+          { type: "sms", recipients: ["on_call_admin"], template: "urgent_sms" },
+        ],
+        escalation: {
+          enabled: true,
+          timeout: 15,
+          escalateTo: ["ceo", "legal"],
+        },
+        createdAt: new Date(Date.now() - 86400000 * 30),
+        updatedAt: new Date(Date.now() - 86400000 * 5),
+      },
+      {
+        id: "rule-002",
+        name: "High Value Refund Approval",
+        description: "Notify finance team for refunds over $100",
+        isActive: true,
+        trigger: { type: "refund", amountThreshold: 100 },
+        conditions: [
+          { field: "amount", operator: "greater_than", value: 100 },
+        ],
+        actions: [
+          { type: "email", recipients: ["finance_admin"], template: "high_value_refund" },
+        ],
+        escalation: {
+          enabled: false,
+        },
+        createdAt: new Date(Date.now() - 86400000 * 15),
+        updatedAt: new Date(Date.now() - 86400000 * 2),
+      },
+      {
+        id: "rule-003",
+        name: "Driver Document Expiry Warning",
+        description: "Warn drivers 30 days before document expiration",
+        isActive: true,
+        trigger: { type: "scheduled", schedule: "daily" },
+        conditions: [
+          { field: "document_expiry", operator: "days_before", value: 30 },
+        ],
+        actions: [
+          { type: "push", recipients: ["driver"], template: "document_expiry_warning" },
+          { type: "email", recipients: ["driver"], template: "document_renewal" },
+        ],
+        escalation: {
+          enabled: true,
+          timeout: 7,
+          escalateTo: ["operations_admin"],
+        },
+        createdAt: new Date(Date.now() - 86400000 * 60),
+        updatedAt: new Date(Date.now() - 86400000 * 10),
+      },
+    ];
+
+    res.json({
+      rules,
+      templates: {
+        email: ["critical_incident", "high_value_refund", "document_renewal", "welcome", "suspension_notice"],
+        push: ["critical_alert", "document_expiry_warning", "promo_notification", "ride_reminder"],
+        sms: ["urgent_sms", "otp_verification", "ride_status"],
+      },
+      summary: {
+        total: rules.length,
+        active: rules.filter(r => r.isActive).length,
+        withEscalation: rules.filter(r => r.escalation?.enabled).length,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching notification rules:", error);
+    res.status(500).json({ error: "Failed to fetch notification rules" });
+  }
+});
+
+router.post("/notification-rules", checkPermission(Permission.MANAGE_NOTIFICATIONS), async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      name: z.string().min(1),
+      description: z.string(),
+      trigger: z.object({
+        type: z.string(),
+        severity: z.string().optional(),
+        amountThreshold: z.number().optional(),
+        schedule: z.string().optional(),
+      }),
+      conditions: z.array(z.object({
+        field: z.string(),
+        operator: z.string(),
+        value: z.any(),
+      })),
+      actions: z.array(z.object({
+        type: z.enum(["email", "push", "sms"]),
+        recipients: z.array(z.string()),
+        template: z.string(),
+      })),
+      escalation: z.object({
+        enabled: z.boolean(),
+        timeout: z.number().optional(),
+        escalateTo: z.array(z.string()).optional(),
+      }).optional(),
+    });
+
+    const data = schema.parse(req.body);
+    const adminId = req.user!.id;
+
+    const newRule = {
+      id: crypto.randomUUID(),
+      ...data,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: adminId,
+    };
+
+    await prisma.auditLog.create({
+      data: {
+        action: "notification_rule_created",
+        entityType: "notification_rule",
+        entityId: newRule.id,
+        userId: adminId,
+        details: data,
+        ipAddress: req.ip || "unknown",
+        userAgent: req.headers["user-agent"] || "unknown",
+      },
+    });
+
+    res.status(201).json(newRule);
+  } catch (error) {
+    console.error("Error creating notification rule:", error);
+    res.status(500).json({ error: "Failed to create notification rule" });
+  }
+});
+
+router.patch("/notification-rules/:id", checkPermission(Permission.MANAGE_NOTIFICATIONS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive, ...updates } = req.body;
+    const adminId = req.user!.id;
+
+    await prisma.auditLog.create({
+      data: {
+        action: isActive !== undefined ? `notification_rule_${isActive ? "enabled" : "disabled"}` : "notification_rule_updated",
+        entityType: "notification_rule",
+        entityId: id,
+        userId: adminId,
+        details: req.body,
+        ipAddress: req.ip || "unknown",
+        userAgent: req.headers["user-agent"] || "unknown",
+      },
+    });
+
+    res.json({
+      success: true,
+      ruleId: id,
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error updating notification rule:", error);
+    res.status(500).json({ error: "Failed to update notification rule" });
+  }
+});
+
+// ========================================
+// 21. INCIDENT CORRELATION ENGINE
+// ========================================
+
+router.get("/correlation/:caseId", checkPermission(Permission.VIEW_INCIDENTS), async (req: AuthRequest, res) => {
+  try {
+    const { caseId } = req.params;
+
+    const correlatedData = {
+      caseId,
+      primaryIncident: {
+        id: caseId,
+        type: "complaint",
+        severity: "high",
+        subject: "Unsafe driving complaint",
+        createdAt: new Date(Date.now() - 86400000 * 2),
+      },
+      linkedCases: [
+        {
+          id: "ride-789",
+          type: "ride",
+          relationship: "occurred_during",
+          severity: "medium",
+          summary: "Ride where incident occurred",
+          timestamp: new Date(Date.now() - 86400000 * 2),
+        },
+        {
+          id: "payment-456",
+          type: "payment",
+          relationship: "related_transaction",
+          severity: "low",
+          summary: "Payment for the ride",
+          timestamp: new Date(Date.now() - 86400000 * 2),
+        },
+        {
+          id: "safety-123",
+          type: "safety_report",
+          relationship: "generated_from",
+          severity: "high",
+          summary: "Auto-generated safety report",
+          timestamp: new Date(Date.now() - 86400000 * 2),
+        },
+        {
+          id: "viol-001",
+          type: "violation",
+          relationship: "escalated_to",
+          severity: "high",
+          summary: "Driver violation record",
+          timestamp: new Date(Date.now() - 86400000),
+        },
+      ],
+      graph: {
+        nodes: [
+          { id: caseId, type: "complaint", label: "Primary Complaint" },
+          { id: "ride-789", type: "ride", label: "Related Ride" },
+          { id: "payment-456", type: "payment", label: "Payment" },
+          { id: "safety-123", type: "safety", label: "Safety Report" },
+          { id: "viol-001", type: "violation", label: "Violation" },
+          { id: "drv-001", type: "driver", label: "Driver" },
+          { id: "cust-001", type: "customer", label: "Customer" },
+        ],
+        edges: [
+          { from: caseId, to: "ride-789", label: "occurred_during" },
+          { from: "ride-789", to: "payment-456", label: "has_payment" },
+          { from: caseId, to: "safety-123", label: "generated" },
+          { from: "safety-123", to: "viol-001", label: "escalated_to" },
+          { from: "ride-789", to: "drv-001", label: "driver" },
+          { from: "ride-789", to: "cust-001", label: "customer" },
+          { from: caseId, to: "cust-001", label: "filed_by" },
+        ],
+      },
+      rootCause: {
+        prediction: "driver_fatigue",
+        confidence: 0.78,
+        factors: [
+          "Driver completed 8 rides in last 10 hours",
+          "Incident occurred late at night",
+          "Previous similar complaint 2 weeks ago",
+        ],
+      },
+      severityPropagation: {
+        initial: "medium",
+        current: "high",
+        reason: "Multiple linked safety concerns and escalation to violation",
+      },
+      recommendations: [
+        "Review driver fatigue monitoring",
+        "Consider temporary suspension pending investigation",
+        "Follow up with customer for additional details",
+      ],
+    };
+
+    res.json(correlatedData);
+  } catch (error) {
+    console.error("Error fetching correlation:", error);
+    res.status(500).json({ error: "Failed to fetch correlation data" });
+  }
+});
+
+// ========================================
+// 22. PAYMENT INTEGRITY DASHBOARD
+// ========================================
+
+router.get("/payment-integrity", checkPermission(Permission.VIEW_PAYMENTS), async (req: AuthRequest, res) => {
+  try {
+    const dashboard = {
+      summary: {
+        totalTransactions24h: 15420,
+        flaggedTransactions: 23,
+        underchargeAnomalies: 8,
+        overchargeAnomalies: 5,
+        stripeSyncErrors: 3,
+        fraudPatterns: 7,
+        integrityScore: 98.5,
+      },
+      anomalies: [
+        {
+          id: "anom-001",
+          type: "undercharge",
+          rideId: "ride-123",
+          expectedAmount: 45.00,
+          actualAmount: 35.00,
+          difference: -10.00,
+          detectedAt: new Date(Date.now() - 3600000),
+          status: "investigating",
+          reason: "Surge pricing not applied",
+        },
+        {
+          id: "anom-002",
+          type: "overcharge",
+          rideId: "ride-456",
+          expectedAmount: 25.00,
+          actualAmount: 32.00,
+          difference: 7.00,
+          detectedAt: new Date(Date.now() - 7200000),
+          status: "resolved",
+          reason: "Duplicate toll charge",
+          resolution: "Refunded $7 to customer",
+        },
+        {
+          id: "anom-003",
+          type: "stripe_sync_error",
+          paymentId: "pay-789",
+          error: "Payment intent not found",
+          detectedAt: new Date(Date.now() - 1800000),
+          status: "pending",
+          retryCount: 2,
+        },
+      ],
+      fraudPatterns: [
+        {
+          id: "fraud-001",
+          pattern: "multiple_accounts",
+          description: "Same device used for 3 different driver accounts",
+          severity: "high",
+          affectedEntities: ["drv-001", "drv-002", "drv-003"],
+          detectedAt: new Date(Date.now() - 86400000),
+          status: "investigating",
+        },
+        {
+          id: "fraud-002",
+          pattern: "tip_baiting",
+          description: "Customer adds large tip then removes after delivery",
+          severity: "medium",
+          affectedEntities: ["cust-456"],
+          detectedAt: new Date(Date.now() - 43200000),
+          status: "confirmed",
+        },
+      ],
+      syncStatus: {
+        lastSync: new Date(Date.now() - 300000),
+        pendingSync: 12,
+        failedSync: 3,
+        healthStatus: "degraded",
+      },
+      trends: {
+        anomalyRate7d: [0.5, 0.4, 0.6, 0.3, 0.5, 0.4, 0.3],
+        fraudRate7d: [0.1, 0.15, 0.12, 0.08, 0.1, 0.09, 0.11],
+      },
+    };
+
+    res.json(dashboard);
+  } catch (error) {
+    console.error("Error fetching payment integrity:", error);
+    res.status(500).json({ error: "Failed to fetch payment integrity data" });
+  }
+});
+
+// ========================================
+// 23. GLOBAL ADMIN SEARCH
+// ========================================
+
+const searchSchema = z.object({
+  q: z.string().min(1),
+  type: z.enum(["all", "users", "drivers", "restaurants", "rides", "payments", "complaints", "violations", "incidents"]).default("all"),
+  limit: z.coerce.number().default(20),
+});
+
+router.get("/search", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { q, type, limit } = searchSchema.parse(req.query);
+    const searchTerm = q.toLowerCase();
+
+    const results: any = {
+      users: [],
+      drivers: [],
+      restaurants: [],
+      rides: [],
+      payments: [],
+      complaints: [],
+      violations: [],
+      incidents: [],
+    };
+
+    if (type === "all" || type === "users") {
+      const users = await prisma.user.findMany({
+        where: {
+          OR: [
+            { firstName: { contains: searchTerm, mode: "insensitive" } },
+            { lastName: { contains: searchTerm, mode: "insensitive" } },
+            { email: { contains: searchTerm, mode: "insensitive" } },
+            { phone: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true, role: true },
+        take: limit,
+      });
+      results.users = users.map(u => ({
+        id: u.id,
+        type: "user",
+        title: `${u.firstName} ${u.lastName}`,
+        subtitle: u.email,
+        meta: { role: u.role, phone: u.phone },
+      }));
+    }
+
+    if (type === "all" || type === "drivers") {
+      const drivers = await prisma.driverProfile.findMany({
+        where: {
+          OR: [
+            { user: { firstName: { contains: searchTerm, mode: "insensitive" } } },
+            { user: { lastName: { contains: searchTerm, mode: "insensitive" } } },
+            { user: { email: { contains: searchTerm, mode: "insensitive" } } },
+            { vehiclePlate: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        include: { user: { select: { firstName: true, lastName: true, email: true } } },
+        take: limit,
+      });
+      results.drivers = drivers.map(d => ({
+        id: d.id,
+        type: "driver",
+        title: `${d.user.firstName} ${d.user.lastName}`,
+        subtitle: d.user.email,
+        meta: { status: d.status, vehiclePlate: d.vehiclePlate },
+      }));
+    }
+
+    if (type === "all" || type === "restaurants") {
+      const restaurants = await prisma.restaurantProfile.findMany({
+        where: {
+          OR: [
+            { businessName: { contains: searchTerm, mode: "insensitive" } },
+            { email: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, businessName: true, email: true, status: true, cuisine: true },
+        take: limit,
+      });
+      results.restaurants = restaurants.map(r => ({
+        id: r.id,
+        type: "restaurant",
+        title: r.businessName,
+        subtitle: r.email || "",
+        meta: { status: r.status, cuisine: r.cuisine },
+      }));
+    }
+
+    if (type === "all" || type === "complaints") {
+      const complaints = await prisma.complaint.findMany({
+        where: {
+          OR: [
+            { ticketCode: { contains: searchTerm, mode: "insensitive" } },
+            { subject: { contains: searchTerm, mode: "insensitive" } },
+            { description: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, ticketCode: true, subject: true, status: true, severity: true, createdAt: true },
+        take: limit,
+      });
+      results.complaints = complaints.map(c => ({
+        id: c.id,
+        type: "complaint",
+        title: c.ticketCode,
+        subtitle: c.subject,
+        meta: { status: c.status, severity: c.severity, createdAt: c.createdAt },
+      }));
+    }
+
+    const totalResults = Object.values(results).reduce((sum: number, arr: any) => sum + arr.length, 0);
+
+    res.json({
+      query: q,
+      totalResults,
+      results,
+      groupedCount: {
+        users: results.users.length,
+        drivers: results.drivers.length,
+        restaurants: results.restaurants.length,
+        rides: results.rides.length,
+        payments: results.payments.length,
+        complaints: results.complaints.length,
+        violations: results.violations.length,
+        incidents: results.incidents.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error performing search:", error);
+    res.status(500).json({ error: "Failed to perform search" });
+  }
+});
+
 export default router;

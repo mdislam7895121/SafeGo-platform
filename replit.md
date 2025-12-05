@@ -12,145 +12,36 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 
 **Key Architectural and Feature Highlights:**
 
-*   **UI/UX Decisions**: Custom HSL color palette, Inter/Manrope typography, mobile-first responsive design, WCAG 2.1 AA compliance, and an Enterprise Admin Component Library. Supports Dark/Light/System modes, accessibility modes (high-contrast, reduced-motion, large-text), responsive typography, and optimized touch targets.
-*   **Security & Compliance**: Implements HTTP security headers, rate limiting, 2FA, device/session security, AES-256-GCM encryption, tamper-proof audit logs, account lockout, phone masking, proxy calling, enhanced SOS, route deviation detection, device binding, admin 2FA, IP whitelisting, activity monitoring, developer access control with mTLS, payout audit trails, and NYC TLC regulatory compliance. Includes fraud detection dashboard, session security management, and emergency controls.
-*   **Financial Systems**: Comprehensive Wallet & Earnings, Tax & Fees, and Unified Payout systems, managing commissions, negative balances, multi-country taxes, and enterprise-grade payment/payout rails. Includes a payment verification console.
-*   **Customer & Partner Onboarding**: Features multi-step onboarding and country-specific KYC with real-time ID verification, background checks, facial recognition, and a multi-stage review queue.
-*   **Service Offerings**: Supports Food Delivery (Restaurant Management, Unified Eats, Driver Flow), Ride-Hailing (Rider Booking, Multi-Route Fare Engine, Multi-Category Vehicle System, Driver Workflow), and Parcel Delivery (scheduled pickup, Proof-of-Delivery, dynamic pricing).
+*   **UI/UX Decisions**: Custom HSL color palette, Inter/Manrope typography, mobile-first responsive design, WCAG 2.1 AA compliance, Enterprise Admin Component Library, Dark/Light/System modes, accessibility modes, responsive typography, and optimized touch targets.
+*   **Security & Compliance**: Implements HTTP security headers, rate limiting, 2FA, device/session security, AES-256-GCM encryption, tamper-proof audit logs, account lockout, phone masking, proxy calling, enhanced SOS, route deviation detection, device binding, admin 2FA, IP whitelisting, activity monitoring, developer access control with mTLS, payout audit trails, NYC TLC regulatory compliance, fraud detection dashboard, session security management, and emergency controls.
+*   **Financial Systems**: Comprehensive Wallet & Earnings, Tax & Fees, and Unified Payout systems, managing commissions, negative balances, multi-country taxes, and enterprise-grade payment/payout rails, including a payment verification console.
+*   **Customer & Partner Onboarding**: Multi-step onboarding and country-specific KYC with real-time ID verification, background checks, facial recognition, and a multi-stage review queue.
+*   **Service Offerings**: Supports Food Delivery, Ride-Hailing, and Parcel Delivery with features like restaurant management, multi-route fare engine, and dynamic pricing.
 *   **Loyalty & Incentives**: SafeGo Points System, Opportunity Bonus Management System, and Driver Incentive Engine.
 *   **Real-Time & Optimization**: AI Marketplace Balancer, Real-Time Dispatch System (WebSocket-based, proximity matching), Experience Intelligence with real-time ETA refinement, dynamic routing optimization, personalized push notifications, and Admin Notifications WebSocket.
-*   **Profit-Focused Automation Systems**: A suite of 32 services covering core automation (e.g., Auto Assignment, Surge Pricing), security & fraud prevention, risk intelligence (e.g., Driver Fatigue Detection), experience optimization, and platform operations.
+*   **Profit-Focused Automation Systems**: A suite of 32 services covering core automation, security & fraud prevention, risk intelligence, experience optimization, and platform operations.
 *   **Regional Expansion**: Supports specific roles and KYC for Bangladesh with Bangla UX.
 *   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, Zod schema validation, atomic transactions, and consistent error handling.
 *   **Database Schema**: Utilizes UUID primary keys, indexed foreign keys, decimal types for monetary values, and comprehensive models.
-*   **Role-Based Access Control (RBAC)**: Comprehensive 8-role admin system with granular permissions, permission bundles, emergency lockdown controls, admin impersonation mode, and secure internal messaging. Includes role visualization and permission matrix.
-*   **Global Audit Engine**: Tamper-proof logging with hash chain verification, evidence packets, and regulator export mode, with an expanded full audit console.
+*   **Role-Based Access Control (RBAC)**: Comprehensive 8-role admin system with granular permissions, permission bundles, emergency lockdown controls, admin impersonation mode, secure internal messaging, role visualization, and permission matrix.
+*   **Global Audit Engine**: Tamper-proof logging with hash chain verification, evidence packets, regulator export mode, and an expanded full audit console.
 *   **Enterprise Administration**: Features such as Feature Flags Management, Enterprise Search Engine, Data Export Center, Incident Response Playbook, Customer Support Panel, Partner Compliance Center, System Health Monitor, Push Notifications, Policy Manager, Backup & Recovery, and an Intelligence Dashboard with service analytics, driver performance, customer satisfaction, and automated insights.
-
-## Phase 3: Enterprise Admin Dashboard Upgrade (December 2025)
-
-### Phase 3A - Enterprise Admin Tools (Completed)
-All 14 Enterprise Admin tools implemented in Operations Center (`/admin/operations-center`):
-- **Scheduled Reports**: Daily/weekly/monthly CSV/JSON exports with scheduling
-- **Live Admin Presence**: Real-time online/offline status with heartbeat tracking
-- **Admin Productivity Logs**: Actions per minute, resolved items, efficiency metrics
-- **Failed Login Monitor**: IP addresses, user agents, timestamps, lockout tracking
-- **Admin Activity Heatmap**: Visual representation of admin activity over time
-- **Data Quality Monitor**: Missing fields, invalid KYC, orphaned records detection
-- **Quarantine Vault**: Flagged or suspicious items management with bulk actions
-- **Admin Notes System**: Timestamped notes on entities with admin attribution
-- **Configuration Preview**: Real-time feature flag preview before deployment
-- **API Usage Graphs**: Endpoint analytics, latency tracking, error rates
-- **Country Compliance Settings**: Read-only for non-country-admins, compliance metrics
-
-### Phase 3B - UI/UX Polish + Real-Time Analytics (Completed)
-- **WCAG 2.1 AA Compliance**: Full accessibility with proper ARIA labels, keyboard navigation, color contrast
-- **Live Error Panel**: Real-time backend exception monitoring with severity levels
-- **Consolidated Notification Timeline**: Unified view of all platform events and notifications
-- **Virtual Scrolling**: Optimized rendering for large admin tables using ScrollArea
-- **Real-Time Analytics Component**: WebSocket-based metrics with REST polling fallback (10s intervals)
-
-### Phase 3C - Intelligence Layer (Completed)
-Enhanced Intelligence Dashboard (`/admin/intelligence`) with advanced analytics:
-- **Service Analytics**: Rides, Eats, Parcel deep analytics with period filtering (7d/30d/90d)
-- **Driver Performance Intelligence**: Rankings, performance scores, needs attention alerts
-- **Customer Satisfaction**: NPS scoring, CSAT, rating distribution, low-rating alerts
-- **Fraud Detection Dashboard**: Suspicious trips, multi-account detection, platform risk scoring
-- **Platform Health Monitor**: CPU, memory, database latency, service health, queue statistics
-- **Automated Insights**: AI-generated recommendations with actionable items
-- **Earnings Irregularity Monitor**: Flagged drivers with unusual earning patterns
-- **Customer Complaint Patterns**: Category analysis, trending issues, resolution metrics
-- **AI Summary**: Text-based auto insight generator for executive summaries
-- **Platform Rankings**: Top drivers, high-risk cases, high-impact events
-
-### Phase 3 API Routes
-```
-Phase 3A Routes (/api/admin/phase3a/):
-- GET /reports/schedule, POST /reports/schedule, GET /reports/generate
-- GET /presence/heartbeat, POST /presence/heartbeat, GET /presence/online-admins
-- GET /productivity/stats
-- GET /logins/failed
-- GET /activity/heatmap
-- GET /data-quality/issues
-- GET /quarantine, POST /quarantine/:id/action
-- GET /notes/:entityType/:entityId, POST /notes
-- GET /config/preview
-- GET /api-usage/stats
-- GET /compliance/:countryCode
-
-Phase 3C Routes (/api/admin/phase3c/):
-- GET /analytics/rides, /analytics/eats, /analytics/parcel
-- GET /intelligence/drivers, /intelligence/satisfaction, /intelligence/fraud
-- GET /intelligence/health, /intelligence/insights, /intelligence/incidents
-- GET /intelligence/earnings-irregularities, /intelligence/complaint-patterns
-- GET /intelligence/ai-summary, /intelligence/rankings
-- GET /errors/live, /notifications/timeline
-- POST /intelligence/actions/:actionType
-```
-
-## Phase 4: Enterprise Admin Features (December 2025)
-
-### Phase 4A - Complaint Resolution Center (Completed)
-Enhanced complaint resolution system (`/admin/complaint-resolution`):
-- **SLA Timer System**: Real-time SLA calculations with severity-based deadlines (Critical: 4h, High: 12h, Medium: 24h, Low: 72h)
-- **SLA Status Indicators**: Visual status for breached, critical, on-track, and completed SLAs
-- **AI Summary Generation**: Automated complaint analysis with issue type, severity assessment, recommended actions, and risk assessment
-- **Multi-Filter System**: Filter by category, severity, status, date range with search
-- **Triage Notes**: Add notes during complaint processing
-- **Resolution Workflow**: Assign to admins, update status, resolve with resolution types
-
-### Phase 4B - Driver Violation Management (Completed)
-Comprehensive driver violation tracking (`/admin/driver-violations`):
-- **Violation Types**: Speed violations, harassment complaints, safety violations, fraud, no-shows, route deviations, vehicle condition, documentation issues
-- **Severity Levels**: Critical, high, medium, low with visual indicators
-- **Point System**: Violation points tracking per driver
-- **Penalty Management**: Warning, fine, temporary suspension, permanent ban
-- **Appeal Processing**: Track and process driver appeals with decision workflow
-
-### Phase 4C - Customer Trust & Safety Review Board (Completed)
-Committee-based safety case review (`/admin/trust-safety`):
-- **Case Types**: Safety incidents, fraud investigations, harassment cases, accident reviews, dispute resolution
-- **Priority Levels**: Critical, high, medium, low with visual indicators
-- **Committee Decision Workflow**: In favor of customer/driver, split decision, insufficient evidence, both at fault
-- **Multi-Language Support**: English and Bangla decision letters
-- **Action Tracking**: Warning, suspension, ban, refund, compensation, legal escalation, law enforcement referral
-
-### Phase 4D - Policy Enforcement Engine (Completed)
-Platform policy configuration (`/admin/policy-engine`):
-- **Policy Types**: Rides, Eats, Parcel, General policies
-- **Rule Engine**: Condition-based rules with priority ordering
-- **Policy Lifecycle**: Draft, active, paused, deprecated states
-- **Version Control**: Policy versioning with effective dates
-
-### Phase 4E - Global Export Center (Enhanced)
-Data export with integrity verification (`/admin/export-center`):
-- **Export Types**: Complaints, refunds, violations, rides, orders, audit logs, users, drivers
-- **Format Support**: CSV, JSON, Excel (XLSX)
-- **SHA-256 Checksums**: Tamper-proof verification for all exports
-- **Date Range Filtering**: Filter exports by date range
-- **Processing Queue**: Queued, processing, completed, expired status tracking
-
-### Phase 4F - Admin Activity Monitor (Completed)
-Real-time admin activity tracking (`/admin/activity-monitor`):
-- **Live Activity Feed**: Real-time admin actions with auto-refresh (10s intervals)
-- **Risk Scoring**: 0-100% risk assessment per action
-- **Anomaly Detection**: Unusual volume, new IP address, policy violations
-- **Geo-Location Tracking**: IP address, city, country for each action
-- **Security Alerts**: Create and send alerts for suspicious activities
-
-### Phase 4 API Routes
-```
-Phase 4 Routes (/api/admin/phase4/):
-- GET /complaints, GET /complaints/:id, PATCH /complaints/:id, POST /complaints/export
-- GET /refunds, GET /refunds/:id, PATCH /refunds/:id, POST /refunds/batch
-- GET /legal-requests, PATCH /legal-requests/:id
-- GET /violations, PATCH /violations/:id
-- GET /trust-safety/cases, POST /trust-safety/cases/:id/decision
-- GET /policies, POST /policies, PATCH /policies/:id
-- GET /exports, POST /exports, GET /exports/:id/download
-- GET /activity-monitor, POST /activity-monitor/alert
-- GET /documents/expiring
-```
+*   **Enterprise Admin Dashboard**: Includes tools for scheduled reports, live admin presence, productivity logs, failed login monitoring, admin activity heatmap, data quality monitoring, quarantine vault, admin notes, configuration preview, API usage graphs, and country compliance settings.
+*   **Real-Time Analytics**: WCAG 2.1 AA compliance, live error panel, consolidated notification timeline, virtual scrolling, and real-time analytics component using WebSockets.
+*   **Intelligence Layer**: Enhanced Intelligence Dashboard with service analytics, driver performance intelligence, customer satisfaction, fraud detection, platform health monitoring, automated insights, earnings irregularity monitoring, customer complaint patterns, AI summary, and platform rankings.
+*   **Complaint Resolution Center**: SLA timer system, SLA status indicators, AI summary generation, multi-filter system, triage notes, and resolution workflow.
+*   **Driver Violation Management**: Violation types, severity levels, point system, penalty management, and appeal processing.
+*   **Customer Trust & Safety Review Board**: Case types, priority levels, committee decision workflow, multi-language support for decision letters, and action tracking.
+*   **Policy Enforcement Engine**: Policy types, rule engine, policy lifecycle management, and version control.
+*   **Global Export Center**: Export types (CSV, JSON, XLSX), SHA-256 checksums, date range filtering, and processing queue.
+*   **Admin Activity Monitor**: Live activity feed, risk scoring, anomaly detection, geo-location tracking, and security alerts.
+*   **Ratings & Review Center**: Driver and restaurant ratings aggregation, fraud detection, and review details panel.
+*   **Driver Violations Center Enhanced**: Category filters, create violation dialog, investigator assignment, violation timeline, evidence tab, and resolution workflow.
+*   **Earnings Dispute Resolution**: Dispute list with status filtering, amount comparison, evidence review, decision workflow, and summary dashboard.
+*   **Ride Timeline Viewer**: Event timeline, location markers, payment events, safety events, and anomaly detection.
+*   **Notification Rules Engine**: Rule management, trigger configuration, action types (email, push, SMS), escalation settings, and template library.
+*   **Payment Integrity Dashboard**: Integrity score, anomaly detection, fraud patterns, Stripe sync status, and 7-day trends.
+*   **Global Admin Search**: Multi-entity search, type filters, debounced search, result grouping, and quick navigation.
 
 ## External Dependencies
 

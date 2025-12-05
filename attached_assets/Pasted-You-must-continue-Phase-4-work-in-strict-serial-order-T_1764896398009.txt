@@ -1,0 +1,173 @@
+You must continue Phase-4 work in strict serial order. 
+Tasks 1–10 are already completed. Now complete tasks 11–20 exactly as described below. 
+No skipping, no re-ordering, no asking questions. 
+Implement each task fully with backend + frontend + validation + null-safety + audit-logging. 
+After each task, update replit.md and refresh all types.
+
+-------------------------
+TASK 11 — Ratings & Review Center (Admin)
+-------------------------
+Build a full admin page to view, filter, and manage:
+- Driver Ratings
+- Customer Complaints tied to reviews
+- Fraudulent review detection
+- Rating distribution charts (1–5 stars)
+- API: GET /admin/ratings, PATCH /admin/ratings/{id}
+Add:
+- Severity tags
+- Auto-flag suspicious reviews
+- Audit log for every admin action
+Make UI mobile-responsive and match SafeGo Admin theme.
+
+-------------------------
+TASK 12 — Driver Violations Center
+-------------------------
+Create the Violations Center page with:
+- Categories: Safety, Behavior, Payment Abuse, System Misuse
+- CRUD operations
+- Assign investigator admin
+- Violation timeline display
+Backend:
+- driverViolations model enhancements
+- Queries optimized with indexes
+Frontend:
+- Dialogs for Create/Edit/Resolve
+- Filter by severity/date/driver
+All updates must sync with real-time notifications.
+
+-------------------------
+TASK 13 — Earnings Dispute Resolution
+-------------------------
+Admin must resolve earning disputes from drivers:
+Fields:
+- disputeId
+- driverId
+- rideId
+- claimedAmount
+- systemAmount
+- adminDecision
+- resolutionNotes
+UI Requirements:
+- Dispute detail drawer
+- Evidence attachments viewer
+- Decision buttons (Approve, Reject, Adjust)
+Backend:
+- PATCH /admin/earnings-disputes/{id}
+- Validation and permission guards
+Add full audit logging.
+
+-------------------------
+TASK 14 — Ride Timeline Viewer
+-------------------------
+Add a visual timeline for each ride:
+- Pickup
+- Dropoff
+- Route trace
+- Driver actions (arrived, start, end)
+- Payment events
+- Safety events (if any)
+Integrate maps component (existing SafeGo Map SDK).
+Add an Intelligence overlay for anomaly detection.
+
+-------------------------
+TASK 15 — Refund Automation System
+-------------------------
+Enhance Refund Center with:
+- Automatic refund eligibility detection
+- Fraud detection triggers
+- Refund reason categories
+- Partial refund option
+Backend:
+- refundRules engine
+- Full test suite
+Admin UI:
+- One-click refund
+- Show financial impact summary
+
+-------------------------
+TASK 16 — Notification Rules Engine
+-------------------------
+Create admin-configurable rules for notifications:
+- When to alert admins (severity, country, time)
+- Auto-escalation logic
+- Driver & Customer push notification templates
+Backend:
+- rulesEngine module
+- DB table: notificationRules
+Frontend:
+- Rule builder UI with conditions + actions
+
+-------------------------
+TASK 17 — Incident Correlation Engine
+-------------------------
+Link incidents across:
+- Rides
+- Payments
+- Safety reports
+- Complaints
+Admin must see:
+- Linked case graph
+- Root cause prediction
+- Severity propagation
+Backend:
+- correlationEngine service
+- Expose API: GET /admin/correlation/{caseId}
+Frontend:
+- Graph visualization (force layout)
+Add caching + performance optimizations.
+
+-------------------------
+TASK 18 — Payment Integrity Dashboard
+-------------------------
+Build a dashboard showing:
+- Under-charge anomalies
+- Over-charge anomalies
+- Stripe sync errors
+- Fraud patterns
+Backend:
+- integrityCheck service
+- nightlySyncJob
+Frontend:
+- Charts, tables, filters
+All data must auto-update with WebSocket fallback → polling.
+
+-------------------------
+TASK 19 — Global Search (Admin-Wide)
+-------------------------
+Add a universal admin search bar:
+Search across:
+- Users
+- Drivers
+- Restaurants
+- Rides
+- Payments
+- Complaints
+- Violations
+- Incidents
+Backend:
+- unifiedSearchIndex builder
+- GET /admin/search?q=
+Frontend:
+- Fast type-ahead
+- Result grouping
+Permission-aware: Only show items admin is allowed to see.
+
+-------------------------
+TASK 20 — Phase-4 Final Regression + Hardening
+-------------------------
+Perform:
+- Full regression test suite
+- Strict type-checking
+- Security validation
+- Permission matrix validation
+- Fix all null-state render issues
+- Optimize all queries
+- Add missing indexes
+- Compress bundle size for admin panel
+- Update all documentation in replit.md + docs/PHASE4_REPORT.md
+After completion:
+Mark Phase-4 as COMPLETE.
+
+-------------------------
+END OF PHASE-4 INSTRUCTIONS
+-------------------------
