@@ -684,17 +684,17 @@ export default function SafePilotIntelligence() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-4">
-        <ScrollArea className="w-full">
-          <TabsList className="inline-flex w-auto min-w-full sm:w-auto gap-1 p-1 h-auto">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-overview">Overview</TabsTrigger>
-            <TabsTrigger value="growth" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-growth">Growth</TabsTrigger>
-            <TabsTrigger value="operations" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-operations">Ops</TabsTrigger>
-            <TabsTrigger value="security" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-security">Security</TabsTrigger>
-            <TabsTrigger value="automation" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-automation">Auto</TabsTrigger>
-            <TabsTrigger value="advisor" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-advisor">Coach</TabsTrigger>
-            <TabsTrigger value="actions" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-actions">Actions</TabsTrigger>
+        <div className="w-full overflow-x-auto pb-1 -mb-1 scrollbar-none">
+          <TabsList className="inline-flex w-max gap-1 p-1 h-auto">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="growth" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-growth">Growth</TabsTrigger>
+            <TabsTrigger value="operations" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-operations">Ops</TabsTrigger>
+            <TabsTrigger value="security" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-security">Security</TabsTrigger>
+            <TabsTrigger value="automation" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-automation">Auto</TabsTrigger>
+            <TabsTrigger value="advisor" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-advisor">Coach</TabsTrigger>
+            <TabsTrigger value="actions" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-actions">Actions</TabsTrigger>
           </TabsList>
-        </ScrollArea>
+        </div>
 
         <TabsContent value="overview" className="space-y-3 sm:space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
