@@ -279,6 +279,7 @@ import AdminFeatureFlags from "@/pages/admin/feature-flags";
 import AdminGlobalSettings from "@/pages/admin/global-settings";
 import AdminAccessGovernance from "@/pages/admin/access-governance";
 import ComplianceExportCenter from "@/pages/admin/compliance-export-center";
+import OperationsConsole from "@/pages/admin/operations-console";
 
 // Phase 3A: Enterprise Admin Features
 import EnterpriseSearch from "@/pages/admin/enterprise-search";
@@ -2094,6 +2095,11 @@ function Router() {
       <Route path="/admin/compliance-exports">
         <ProtectedRoute allowedRoles={["admin"]}>
           <ComplianceExportCenter />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/operations-console">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <OperationsConsole />
         </ProtectedRoute>
       </Route>
       

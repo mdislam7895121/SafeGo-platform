@@ -42,6 +42,7 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Notification Rules Engine**: Rule management, trigger configuration, action types (email, push, SMS), escalation settings, and template library.
 *   **Payment Integrity Dashboard**: Integrity score, anomaly detection, fraud patterns, Stripe sync status, and 7-day trends.
 *   **Global Admin Search**: Multi-entity search, type filters, debounced search, result grouping, and quick navigation.
+*   **Operations Console**: System job monitoring with status tracking (RUNNING, SUCCESS, FAILED, PARTIAL, CANCELLED), service health checks (database, Stripe, Google Maps, Twilio, email, Redis, WebSocket, file storage), error logging with severity levels (DEBUG, INFO, WARNING, ERROR, CRITICAL), and resolution workflow. Includes auto-refresh, filtering, and trend visualization.
 
 ## External Dependencies
 
