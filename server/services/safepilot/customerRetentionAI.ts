@@ -353,14 +353,14 @@ export const customerRetentionAI = {
       prisma.foodOrder.groupBy({
         by: ['customerId'],
         where: { customerId: { in: customerIds }, status: 'delivered' },
-        _sum: { total: true },
+        _sum: { serviceFare: true },
       }),
     ]);
 
     const lastFoodOrderMap = new Map(lastFoodOrders.map(o => [o.customerId, o.createdAt]));
     const lastRideMap = new Map(lastRides.map(r => [r.customerId, r.createdAt]));
     const orderCountMap = new Map(orderCounts.map(o => [o.customerId, o._count.id]));
-    const orderTotalMap = new Map(orderTotals.map(o => [o.customerId, o._sum.total?.toNumber() || 0]));
+    const orderTotalMap = new Map(orderTotals.map(o => [o.customerId, o._sum.serviceFare?.toNumber() || 0]));
 
     for (const customer of customers) {
       const customerId = customer.userId;

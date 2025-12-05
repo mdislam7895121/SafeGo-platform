@@ -406,7 +406,7 @@ export const fraudShield = {
 
     const sosAlerts = await prisma.sOSAlert.findMany({
       where: {
-        triggeredAt: { gte: since },
+        createdAt: { gte: since },
       },
       include: {
         ride: {
@@ -433,7 +433,7 @@ export const fraudShield = {
         driverId: sos.ride?.driverId || undefined,
         customerId: sos.ride?.customerId || undefined,
         description: `SOS triggered - Status: ${sos.status}`,
-        timestamp: sos.triggeredAt,
+        timestamp: sos.createdAt,
         isRepeat: (driverId && (driverIncidents.get(driverId) || 0) > 1) || false,
         recommendation: sos.status !== 'resolved' 
           ? 'Immediate response required'
@@ -461,16 +461,16 @@ export const fraudShield = {
       },
       include: {
         user: true,
-        documents: true,
+        vehicleDocuments: true,
       },
     });
 
     const documentHashes = new Map<string, string[]>();
 
     for (const driver of recentDrivers) {
-      for (const doc of driver.documents) {
-        if (doc.fileUrl) {
-          const hash = doc.fileUrl.split('/').pop() || '';
+      for (const doc of driver.vehicleDocuments) {
+        if (doc.documentUrl) {
+          const hash = doc.documentUrl.split('/').pop() || '';
           const existing = documentHashes.get(hash) || [];
           existing.push(driver.userId);
           documentHashes.set(hash, existing);

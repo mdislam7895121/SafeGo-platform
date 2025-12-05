@@ -331,28 +331,29 @@ export const partnerSuccessCoach = {
 
     const drivers = await prisma.driverProfile.findMany({
       where: {
-        rating: { lt: 4.0 },
+        driverStats: { rating: { lt: 4.0 } },
         ...(countryCode ? { user: { countryCode } } : {}),
       },
       include: {
         user: true,
+        driverStats: true,
       },
     });
 
     for (const driver of drivers) {
       const [rideCount, cancelCount, complaintCount] = await Promise.all([
         prisma.ride.count({
-          where: { driverId: driver.userId, createdAt: { gte: last30d }, status: 'completed' },
+          where: { driverId: driver.id, createdAt: { gte: last30d }, status: 'completed' },
         }),
         prisma.ride.count({
-          where: { driverId: driver.userId, createdAt: { gte: last30d }, status: { contains: 'cancelled_by_driver' } },
+          where: { driverId: driver.id, createdAt: { gte: last30d }, status: { contains: 'cancelled_by_driver' } },
         }),
         prisma.supportTicket.count({
           where: { relatedUserId: driver.userId, createdAt: { gte: last30d }, category: 'complaint' },
         }),
       ]);
 
-      const rating = driver.rating?.toNumber() || 0;
+      const rating = driver.driverStats?.rating?.toNumber() || 0;
       const cancellationRate = rideCount > 0 ? cancelCount / (rideCount + cancelCount) : 0;
 
       const issues: string[] = [];

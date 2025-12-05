@@ -51,17 +51,14 @@ export const complianceGuard = {
       },
       include: {
         user: true,
-        documents: true,
+        vehicleDocuments: true,
       },
     });
 
     for (const driver of bdDrivers) {
-      const nidDoc = driver.documents.find(d => 
-        d.documentType?.toLowerCase().includes('nid') || 
-        d.documentType?.toLowerCase().includes('national id')
-      );
+      const hasNid = driver.nidNumber || driver.nidImageUrl || driver.nidFrontImageUrl;
 
-      if (!nidDoc) {
+      if (!hasNid) {
         violations.push({
           id: `bd-nid-missing-${driver.userId}`,
           entityType: 'DRIVER',
@@ -78,12 +75,9 @@ export const complianceGuard = {
         });
       }
 
-      const drivingLicense = driver.documents.find(d =>
-        d.documentType?.toLowerCase().includes('license') ||
-        d.documentType?.toLowerCase().includes('driving')
-      );
+      const hasLicense = driver.driverLicenseNumber || driver.driverLicenseImageUrl;
 
-      if (!drivingLicense) {
+      if (!hasLicense) {
         violations.push({
           id: `bd-license-missing-${driver.userId}`,
           entityType: 'DRIVER',
@@ -100,7 +94,7 @@ export const complianceGuard = {
         });
       }
 
-      if (drivingLicense?.expiryDate && new Date(drivingLicense.expiryDate) < new Date()) {
+      if (driver.driverLicenseExpiry && new Date(driver.driverLicenseExpiry) < new Date()) {
         violations.push({
           id: `bd-license-expired-${driver.userId}`,
           entityType: 'DRIVER',
@@ -125,17 +119,13 @@ export const complianceGuard = {
       },
       include: {
         user: true,
-        documents: true,
       },
     });
 
     for (const restaurant of bdRestaurants) {
-      const tradeLicense = restaurant.documents.find(d =>
-        d.documentType?.toLowerCase().includes('trade') ||
-        d.documentType?.toLowerCase().includes('business')
-      );
+      const hasTradeLicense = restaurant.tradeLicenseNumber || restaurant.tradeLicenseImageUrl;
 
-      if (!tradeLicense) {
+      if (!hasTradeLicense) {
         violations.push({
           id: `bd-trade-missing-${restaurant.userId}`,
           entityType: 'RESTAURANT',
@@ -169,17 +159,15 @@ export const complianceGuard = {
       },
       include: {
         user: true,
-        documents: true,
+        vehicleDocuments: true,
+        backgroundChecks: true,
       },
     });
 
     for (const driver of usDrivers) {
-      const ssnDoc = driver.documents.find(d =>
-        d.documentType?.toLowerCase().includes('ssn') ||
-        d.documentType?.toLowerCase().includes('social security')
-      );
+      const hasSsn = driver.ssnLast4 || driver.ssnEncrypted;
 
-      if (!ssnDoc && driver.taxFormStatus !== 'submitted') {
+      if (!hasSsn && driver.w9Status !== 'submitted') {
         violations.push({
           id: `us-tax-missing-${driver.userId}`,
           entityType: 'DRIVER',
@@ -196,11 +184,9 @@ export const complianceGuard = {
         });
       }
 
-      const backgroundCheck = driver.documents.find(d =>
-        d.documentType?.toLowerCase().includes('background')
-      );
+      const hasBackgroundCheck = driver.backgroundChecks?.length > 0 || driver.backgroundCheckStatus === 'approved';
 
-      if (!backgroundCheck) {
+      if (!hasBackgroundCheck) {
         violations.push({
           id: `us-background-missing-${driver.userId}`,
           entityType: 'DRIVER',
@@ -217,7 +203,7 @@ export const complianceGuard = {
         });
       }
 
-      const vehicleInspection = driver.documents.find(d =>
+      const vehicleInspection = driver.vehicleDocuments.find(d =>
         d.documentType?.toLowerCase().includes('inspection')
       );
 
