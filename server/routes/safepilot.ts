@@ -2970,4 +2970,545 @@ router.get(
   }
 );
 
+// ============================================
+// ULTRA ENHANCEMENT PACK (PHASE-3) ROUTES
+// ============================================
+
+/**
+ * GET /api/admin/safepilot/ultra/anomaly-radar
+ * 1. Real-Time Anomaly Radar - Live detection every 10 seconds
+ */
+router.get(
+  '/ultra/anomaly-radar',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      console.log('[SafePilot Ultra] Anomaly Radar scan requested');
+      
+      const result = await safePilotService.runAnomalyRadar(countryCode);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Anomaly Radar error:', error);
+      res.status(500).json({
+        mode: 'GUARD',
+        summary: ['Anomaly radar scan failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        anomalies: [],
+        radarScore: 0,
+        lastScanAt: new Date().toISOString(),
+        nextScanIn: 10000,
+        error: 'Anomaly radar scan failed',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/ultra/correlation
+ * 2. Cross-Module Correlation Engine
+ */
+router.get(
+  '/ultra/correlation',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const entityId = req.query.entityId as string | undefined;
+      const entityType = req.query.entityType as 'driver' | 'customer' | 'restaurant' | undefined;
+      console.log('[SafePilot Ultra] Cross-Module Correlation requested');
+      
+      const result = await safePilotService.runCrossModuleCorrelation(entityId, entityType);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Correlation error:', error);
+      res.status(500).json({
+        mode: 'WATCH',
+        summary: ['Correlation engine failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        correlations: [],
+        combinedRiskScore: 0,
+        riskBreakdown: {},
+        linkedCauses: [],
+        confidence: 0,
+        error: 'Correlation engine failed',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/ultra/generate-report
+ * 3. Auto-Generated Admin Reports (Daily/Weekly PDF)
+ */
+router.post(
+  '/ultra/generate-report',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { reportType = 'daily' } = req.body;
+      console.log(`[SafePilot Ultra] Generating ${reportType} admin report`);
+      
+      const report = await safePilotService.generateAdminReport(reportType as 'daily' | 'weekly');
+      res.json(report);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Report generation error:', error);
+      res.status(500).json({
+        mode: 'ASK',
+        summary: ['Report generation failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        reportId: '',
+        reportType: 'daily',
+        generatedAt: new Date().toISOString(),
+        periodStart: '',
+        periodEnd: '',
+        sections: {},
+        downloadUrl: '',
+        error: 'Report generation failed',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/ultra/reports/:reportId/download
+ * Download generated report
+ */
+router.get(
+  '/ultra/reports/:reportId/download',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { reportId } = req.params;
+      console.log(`[SafePilot Ultra] Report download requested: ${reportId}`);
+      
+      // In production, this would serve the actual PDF file
+      res.json({
+        message: 'PDF download feature coming soon',
+        reportId,
+        status: 'pending',
+        estimatedAvailability: 'Q1 2025',
+      });
+    } catch (error) {
+      console.error('[SafePilot Ultra] Report download error:', error);
+      res.status(500).json({ error: 'Report download failed' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/ultra/auto-guard
+ * 4. SafePilot Auto-Guard - Auto actions on HIGH RISK events
+ */
+router.post(
+  '/ultra/auto-guard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { entityId, entityType, riskLevel } = req.body;
+      
+      if (!entityId || !entityType || !riskLevel) {
+        res.status(400).json({ error: 'Missing required fields: entityId, entityType, riskLevel' });
+        return;
+      }
+      
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      
+      console.log(`[SafePilot Ultra] Auto-Guard executing for ${entityType} ${entityId}`);
+      
+      const result = await safePilotService.executeAutoGuard(
+        entityId,
+        entityType as 'driver' | 'customer' | 'restaurant',
+        riskLevel as 'HIGH' | 'CRITICAL',
+        req.user.id
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Auto-Guard error:', error);
+      res.status(500).json({
+        mode: 'GUARD',
+        summary: ['Auto-Guard execution failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        actionsExecuted: [],
+        entityId: '',
+        entityType: '',
+        approvalRequired: true,
+        escalatedTo: null,
+        error: 'Auto-Guard execution failed',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/ultra/biometrics
+ * 5. Behavioral Biometrics Engine - Bot/suspicious behavior detection
+ */
+router.post(
+  '/ultra/biometrics',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { userId, sessionData } = req.body;
+      
+      if (!userId || !sessionData) {
+        res.status(400).json({ error: 'Missing required fields: userId, sessionData' });
+        return;
+      }
+      
+      console.log(`[SafePilot Ultra] Biometrics analysis for user ${userId}`);
+      
+      const result = await safePilotService.analyzeBehavioralBiometrics(userId, sessionData);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Biometrics error:', error);
+      res.status(500).json({
+        mode: 'GUARD',
+        summary: ['Biometrics analysis failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        userId: '',
+        biometricsScore: 0,
+        isBotBehavior: false,
+        isSuspiciousHuman: false,
+        signals: {},
+        recommendation: 'ALLOW',
+        confidence: 0,
+        error: 'Biometrics analysis failed',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/ultra/lost-revenue
+ * 6. Lost Revenue Detector - Identify revenue leakage
+ */
+router.get(
+  '/ultra/lost-revenue',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const periodDays = parseInt(req.query.periodDays as string) || 30;
+      console.log(`[SafePilot Ultra] Lost Revenue detection for last ${periodDays} days`);
+      
+      const result = await safePilotService.detectLostRevenue(countryCode, periodDays);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Lost Revenue error:', error);
+      res.status(500).json({
+        mode: 'OPTIMIZE',
+        summary: ['Lost revenue detection failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        lostRevenue: { total: 0, currency: 'USD', breakdown: {} },
+        recoveryOpportunities: [],
+        trends: { vsLastPeriod: 0, direction: 'STABLE' },
+        error: 'Lost revenue detection failed',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/ultra/explain-decision
+ * 7. Explainable AI (X-AI Mode) - Decision explanation with confidence
+ */
+router.post(
+  '/ultra/explain-decision',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { decisionId, decisionType, context = {} } = req.body;
+      
+      if (!decisionId || !decisionType) {
+        res.status(400).json({ error: 'Missing required fields: decisionId, decisionType' });
+        return;
+      }
+      
+      console.log(`[SafePilot Ultra] Explaining decision: ${decisionId}`);
+      
+      const result = await safePilotService.explainDecision(decisionId, decisionType, context);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Explain decision error:', error);
+      res.status(500).json({
+        mode: 'ASK',
+        summary: ['Decision explanation failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        decisionId: '',
+        decisionType: '',
+        explanation: {
+          reasoning: [],
+          confidencePercent: 0,
+          confidenceLevel: 'LOW',
+          dataSources: [],
+          alternatives: [],
+          uncertainties: [],
+        },
+        humanReadableSummary: 'Unable to explain this decision',
+        appealGuidance: 'Please contact support for assistance',
+        error: 'Decision explanation failed',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/ultra/silent-monitoring
+ * 8. Silent Monitoring Mode - Background monitoring with threshold alerts
+ */
+router.post(
+  '/ultra/silent-monitoring',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { thresholds = { minRiskLevel: 'MEDIUM', categories: [] } } = req.body;
+      console.log('[SafePilot Ultra] Silent Monitoring scan');
+      
+      const result = await safePilotService.runSilentMonitoring(thresholds);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Silent Monitoring error:', error);
+      res.status(500).json({
+        mode: 'WATCH',
+        summary: ['Silent monitoring failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        silentMode: true,
+        alertsFiltered: 0,
+        alertsShown: 0,
+        activeAlerts: [],
+        backgroundMetrics: { totalScans: 0, anomaliesDetected: 0, autoResolved: 0 },
+        nextScanAt: new Date(Date.now() + 10000).toISOString(),
+        error: 'Silent monitoring failed',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/ultra/memory/:entityType/:entityId
+ * 9. Long-Term Memory Engine - Get lifetime patterns
+ */
+router.get(
+  '/ultra/memory/:entityType/:entityId',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      console.log(`[SafePilot Ultra] Long-Term Memory lookup for ${entityType} ${entityId}`);
+      
+      const result = await safePilotService.getLongTermMemory(
+        entityId,
+        entityType as 'driver' | 'customer' | 'restaurant'
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Memory lookup error:', error);
+      res.status(500).json({
+        mode: 'ASK',
+        summary: ['Memory lookup failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        entityId: req.params.entityId,
+        entityType: req.params.entityType,
+        memory: {
+          lifetimeRiskScore: 0,
+          riskTrend: 'STABLE',
+          flagHistory: [],
+          qualityScore: 0,
+          behaviorPatterns: [],
+          fraudIndicators: 0,
+          positiveSignals: 0,
+          lastUpdated: new Date().toISOString(),
+        },
+        recommendations: [],
+        retentionPeriod: '5 years',
+        error: 'Memory lookup failed',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/ultra/memory/:entityType/:entityId
+ * 9. Long-Term Memory Engine - Update memory
+ */
+router.post(
+  '/ultra/memory/:entityType/:entityId',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const { event, riskImpact = 0, qualityImpact = 0 } = req.body;
+      
+      if (!event) {
+        res.status(400).json({ error: 'Missing required field: event' });
+        return;
+      }
+      
+      console.log(`[SafePilot Ultra] Long-Term Memory update for ${entityType} ${entityId}`);
+      
+      const result = await safePilotService.updateLongTermMemory(
+        entityId,
+        entityType as 'driver' | 'customer' | 'restaurant',
+        { event, riskImpact, qualityImpact }
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] Memory update error:', error);
+      res.status(500).json({
+        success: false,
+        updatedAt: new Date().toISOString(),
+        error: 'Memory update failed',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/ultra/voicepilot
+ * 10. VoicePilot - Enhanced voice command processing
+ */
+router.post(
+  '/ultra/voicepilot',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { command, pageKey = 'admin.dashboard' } = req.body;
+      
+      if (!command) {
+        res.status(400).json({ error: 'Missing required field: command' });
+        return;
+      }
+      
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      
+      console.log(`[SafePilot Ultra] VoicePilot processing: "${command}"`);
+      
+      const result = await safePilotService.processVoicePilotCommand(
+        req.user.id,
+        command,
+        pageKey
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot Ultra] VoicePilot error:', error);
+      res.status(500).json({
+        mode: 'ASK',
+        summary: ['VoicePilot processing failed'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        voicePilot: {
+          enabled: true,
+          transcribedCommand: '',
+          recognizedIntent: null,
+          mappedFunction: null,
+          executionStatus: 'NOT_SUPPORTED',
+          availableCommands: [],
+        },
+        response: null,
+        error: 'VoicePilot processing failed',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/ultra/voicepilot/commands
+ * 10. VoicePilot - Get available voice commands
+ */
+router.get(
+  '/ultra/voicepilot/commands',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      res.json({
+        commands: safePilotService.voicePilotCommands,
+        enabled: true,
+        version: '1.0.0',
+        supportedLanguages: ['en'],
+      });
+    } catch (error) {
+      console.error('[SafePilot Ultra] VoicePilot commands error:', error);
+      res.status(500).json({
+        commands: {},
+        enabled: false,
+        version: '1.0.0',
+        supportedLanguages: ['en'],
+        error: 'Failed to get commands',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/ultra/status
+ * Get Ultra Enhancement Pack status
+ */
+router.get(
+  '/ultra/status',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      res.json({
+        version: '3.0.0-ultra',
+        enabled: true,
+        features: {
+          anomalyRadar: { enabled: true, scanInterval: 10000 },
+          crossModuleCorrelation: { enabled: true },
+          autoGeneratedReports: { enabled: true, types: ['daily', 'weekly'] },
+          autoGuard: { enabled: true, riskLevels: ['HIGH', 'CRITICAL'] },
+          behavioralBiometrics: { enabled: true },
+          lostRevenueDetector: { enabled: true },
+          explainableAI: { enabled: true },
+          silentMonitoring: { enabled: true },
+          longTermMemory: { enabled: true, retentionPeriod: '5 years' },
+          voicePilot: { enabled: true, status: 'beta' },
+        },
+        lastUpdated: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('[SafePilot Ultra] Status error:', error);
+      res.status(500).json({ error: 'Failed to get Ultra status' });
+    }
+  }
+);
+
 export default router;

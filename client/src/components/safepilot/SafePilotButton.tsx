@@ -37,6 +37,16 @@ import {
   XCircle,
   Info,
   Eye,
+  Radio,
+  Layers,
+  FileDown,
+  ShieldAlert,
+  Fingerprint,
+  TrendingDown,
+  Brain,
+  BellOff,
+  Database,
+  Volume2,
 } from 'lucide-react';
 import { SafePilotIcon } from './SafePilotLogo';
 import { Button } from '@/components/ui/button';
@@ -173,6 +183,81 @@ interface AutonomousScanData {
   nextScanRecommended: string;
 }
 
+interface UltraAnomalyRadarData {
+  mode: 'GUARD';
+  summary: string[];
+  keySignals: string[];
+  actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' }>;
+  monitor: string[];
+  anomalies: Array<{
+    type: 'LOGIN_SPIKE' | 'PAYOUT_ANOMALY' | 'SUSPICIOUS_ORDER' | 'RATING_MANIPULATION';
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    description: string;
+    affectedEntities: number;
+    detectedAt: string;
+  }>;
+  radarScore: number;
+  lastScanAt: string;
+  nextScanIn: number;
+}
+
+interface UltraLostRevenueData {
+  mode: 'OPTIMIZE';
+  summary: string[];
+  keySignals: string[];
+  actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' }>;
+  monitor: string[];
+  lostRevenue: {
+    total: number;
+    currency: string;
+    breakdown: {
+      uncompletedRides?: { count: number; amount: number };
+      abandonedOrders?: { count: number; amount: number };
+      payoutGaps?: { count: number; amount: number };
+      delayRefunds?: { count: number; amount: number };
+    };
+  };
+  recoveryOpportunities: Array<{
+    category: string;
+    potentialRecovery: number;
+    effort: 'LOW' | 'MEDIUM' | 'HIGH';
+    recommendation: string;
+  }>;
+}
+
+interface UltraCorrelationData {
+  mode: 'WATCH';
+  summary: string[];
+  keySignals: string[];
+  actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' }>;
+  monitor: string[];
+  correlations: Array<{
+    module1: string;
+    module2: string;
+    correlationType: 'STRONG' | 'MODERATE' | 'WEAK';
+    riskImpact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+    description: string;
+    linkedEntities: number;
+  }>;
+  combinedRiskScore: number;
+  riskBreakdown: Record<string, number>;
+  linkedCauses: string[];
+  confidence: number;
+}
+
+interface UltraVoicePilotData {
+  mode: 'ASK';
+  voicePilot: {
+    enabled: boolean;
+    transcribedCommand: string;
+    recognizedIntent: string | null;
+    mappedFunction: string | null;
+    executionStatus: 'SUCCESS' | 'PENDING' | 'NOT_SUPPORTED';
+    availableCommands: string[];
+  };
+  response: SafePilotQueryResponse | null;
+}
+
 const getPageKeyFromPath = (pathname: string): string => {
   const path = pathname.replace(/^\/+/, '');
   const segments = path.split('/').filter(Boolean);
@@ -298,6 +383,14 @@ export function SafePilotButton() {
   const [isScanLoading, setIsScanLoading] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  
+  const [ultraAnomalyData, setUltraAnomalyData] = useState<UltraAnomalyRadarData | null>(null);
+  const [isAnomalyLoading, setIsAnomalyLoading] = useState(false);
+  const [ultraLostRevenueData, setUltraLostRevenueData] = useState<UltraLostRevenueData | null>(null);
+  const [isLostRevenueLoading, setIsLostRevenueLoading] = useState(false);
+  const [ultraCorrelationData, setUltraCorrelationData] = useState<UltraCorrelationData | null>(null);
+  const [isCorrelationLoading, setIsCorrelationLoading] = useState(false);
+  const [voiceCommand, setVoiceCommand] = useState('');
 
   const pageKey = getPageKeyFromPath(location);
 
@@ -561,6 +654,113 @@ export function SafePilotButton() {
     }
   };
 
+  const handleAnomalyRadar = async () => {
+    setIsAnomalyLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/safepilot/ultra/anomaly-radar');
+      if (res.ok) {
+        const data = await res.json() as UltraAnomalyRadarData;
+        setUltraAnomalyData(data);
+        toast({
+          title: 'Anomaly Radar',
+          description: `Score: ${data.radarScore}. ${data.anomalies.length} anomalies detected.`,
+        });
+      } else {
+        throw new Error('Radar scan failed');
+      }
+    } catch (error) {
+      toast({
+        title: 'Radar Error',
+        description: 'Failed to run anomaly radar scan.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAnomalyLoading(false);
+    }
+  };
+
+  const handleLostRevenue = async () => {
+    setIsLostRevenueLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/safepilot/ultra/lost-revenue');
+      if (res.ok) {
+        const data = await res.json() as UltraLostRevenueData;
+        setUltraLostRevenueData(data);
+        toast({
+          title: 'Lost Revenue Analysis',
+          description: `$${data.lostRevenue.total.toLocaleString()} in lost revenue detected.`,
+        });
+      } else {
+        throw new Error('Analysis failed');
+      }
+    } catch (error) {
+      toast({
+        title: 'Analysis Error',
+        description: 'Failed to analyze lost revenue.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLostRevenueLoading(false);
+    }
+  };
+
+  const handleCorrelation = async () => {
+    setIsCorrelationLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/safepilot/ultra/correlation');
+      if (res.ok) {
+        const data = await res.json() as UltraCorrelationData;
+        setUltraCorrelationData(data);
+        toast({
+          title: 'Cross-Module Correlation',
+          description: `Risk Score: ${data.combinedRiskScore}. ${data.correlations.length} correlations found.`,
+        });
+      } else {
+        throw new Error('Correlation failed');
+      }
+    } catch (error) {
+      toast({
+        title: 'Correlation Error',
+        description: 'Failed to run cross-module correlation.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCorrelationLoading(false);
+    }
+  };
+
+  const handleVoicePilotCommand = async (command: string) => {
+    if (!command.trim()) return;
+    
+    try {
+      const res = await apiRequest('POST', '/api/admin/safepilot/ultra/voicepilot', {
+        command: command.trim(),
+        pageKey,
+      });
+      
+      if (res.ok) {
+        const data = await res.json() as UltraVoicePilotData;
+        if (data.voicePilot.executionStatus === 'SUCCESS' && data.response) {
+          setQueryResponse(data.response);
+          setActiveTab('response');
+        }
+        toast({
+          title: 'VoicePilot',
+          description: data.voicePilot.recognizedIntent 
+            ? `Executing: ${data.voicePilot.recognizedIntent}`
+            : 'Command not recognized. Try: "show anomalies", "check risks", "show lost revenue"',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'VoicePilot Error',
+        description: 'Failed to process command.',
+        variant: 'destructive',
+      });
+    }
+    setVoiceCommand('');
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'P0': return 'bg-red-500 text-white';
@@ -651,7 +851,11 @@ export function SafePilotButton() {
                   <span className="truncate">Chat</span>
                 </TabsTrigger>
               </TabsList>
-              <TabsList className="grid grid-cols-3 w-full mt-1">
+              <TabsList className="grid grid-cols-4 w-full mt-1">
+                <TabsTrigger value="ultra" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-ultra">
+                  <Zap className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0 text-yellow-500" />
+                  <span className="truncate">Ultra</span>
+                </TabsTrigger>
                 <TabsTrigger value="crisis" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-crisis">
                   <AlertTriangle className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">Crisis</span>
@@ -1087,6 +1291,265 @@ export function SafePilotButton() {
                     </p>
                   </div>
                 )}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="ultra" className="flex-1 flex flex-col mt-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 sm:p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-yellow-500" />
+                      Ultra Enhancement Pack
+                    </h3>
+                    <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-xs">
+                      v3.0
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <Card className="p-3 hover-elevate cursor-pointer" onClick={handleAnomalyRadar} data-testid="card-ultra-anomaly">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+                          <Radio className="h-4 w-4 text-red-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Real-Time Anomaly Radar</div>
+                          <div className="text-xs text-muted-foreground">Live detection every 10 seconds</div>
+                        </div>
+                        {isAnomalyLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : ultraAnomalyData ? (
+                          <Badge className={ultraAnomalyData.radarScore > 50 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}>
+                            {ultraAnomalyData.radarScore}
+                          </Badge>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </Card>
+
+                    <Card className="p-3 hover-elevate cursor-pointer" onClick={handleCorrelation} data-testid="card-ultra-correlation">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                          <Layers className="h-4 w-4 text-purple-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Cross-Module Correlation</div>
+                          <div className="text-xs text-muted-foreground">Combined risk scoring</div>
+                        </div>
+                        {isCorrelationLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : ultraCorrelationData ? (
+                          <Badge className={ultraCorrelationData.combinedRiskScore > 50 ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'}>
+                            {ultraCorrelationData.combinedRiskScore}
+                          </Badge>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </Card>
+
+                    <Card className="p-3 hover-elevate cursor-pointer" onClick={handleLostRevenue} data-testid="card-ultra-lost-revenue">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-green-500/10 flex items-center justify-center">
+                          <TrendingDown className="h-4 w-4 text-green-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Lost Revenue Detector</div>
+                          <div className="text-xs text-muted-foreground">Identify revenue leakage</div>
+                        </div>
+                        {isLostRevenueLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : ultraLostRevenueData ? (
+                          <Badge className="bg-green-500 text-white">
+                            ${ultraLostRevenueData.lostRevenue.total.toLocaleString()}
+                          </Badge>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </Card>
+
+                    <Card className="p-3" data-testid="card-ultra-auto-guard">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                          <ShieldAlert className="h-4 w-4 text-orange-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">SafePilot Auto-Guard</div>
+                          <div className="text-xs text-muted-foreground">Auto actions on HIGH RISK</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">Active</Badge>
+                      </div>
+                    </Card>
+
+                    <Card className="p-3" data-testid="card-ultra-biometrics">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <Fingerprint className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Behavioral Biometrics</div>
+                          <div className="text-xs text-muted-foreground">Bot detection engine</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">Passive</Badge>
+                      </div>
+                    </Card>
+
+                    <Card className="p-3" data-testid="card-ultra-xai">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                          <Brain className="h-4 w-4 text-cyan-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Explainable AI (X-AI)</div>
+                          <div className="text-xs text-muted-foreground">WHY + confidence %</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">Enabled</Badge>
+                      </div>
+                    </Card>
+
+                    <Card className="p-3" data-testid="card-ultra-silent">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-gray-500/10 flex items-center justify-center">
+                          <BellOff className="h-4 w-4 text-gray-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Silent Monitoring</div>
+                          <div className="text-xs text-muted-foreground">Low-noise background alerts</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">Active</Badge>
+                      </div>
+                    </Card>
+
+                    <Card className="p-3" data-testid="card-ultra-memory">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                          <Database className="h-4 w-4 text-indigo-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Long-Term Memory</div>
+                          <div className="text-xs text-muted-foreground">Lifetime patterns (5 years)</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">5Y Retention</Badge>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <Volume2 className="h-4 w-4" />
+                      VoicePilot Commands
+                    </h4>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Try: show anomalies, check risks..."
+                        value={voiceCommand}
+                        onChange={(e) => setVoiceCommand(e.target.value)}
+                        className="flex-1 text-sm"
+                        data-testid="input-voicepilot"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleVoicePilotCommand(voiceCommand);
+                          }
+                        }}
+                      />
+                      <Button
+                        size="icon"
+                        onClick={() => handleVoicePilotCommand(voiceCommand)}
+                        disabled={!voiceCommand.trim()}
+                        data-testid="button-voicepilot-execute"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {['show anomalies', 'check risks', 'show lost revenue', 'crisis report'].map((cmd) => (
+                        <Badge
+                          key={cmd}
+                          variant="outline"
+                          className="text-xs cursor-pointer hover-elevate"
+                          onClick={() => handleVoicePilotCommand(cmd)}
+                          data-testid={`badge-cmd-${cmd.replace(' ', '-')}`}
+                        >
+                          {cmd}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {ultraAnomalyData && (
+                    <Card className="p-3 bg-red-500/5 border-red-500/20">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        <Radio className="h-4 w-4 text-red-500" />
+                        Anomaly Radar Results
+                      </h4>
+                      <div className="space-y-2">
+                        {ultraAnomalyData.anomalies.length > 0 ? (
+                          ultraAnomalyData.anomalies.slice(0, 3).map((a, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">{a.description}</span>
+                              <Badge className={getSeverityColor(a.severity)}>{a.severity}</Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No anomalies detected</p>
+                        )}
+                      </div>
+                    </Card>
+                  )}
+
+                  {ultraCorrelationData && (
+                    <Card className="p-3 bg-purple-500/5 border-purple-500/20">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-purple-500" />
+                        Correlation Results
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Combined Risk Score</span>
+                          <Badge className={ultraCorrelationData.combinedRiskScore > 50 ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'}>
+                            {ultraCorrelationData.combinedRiskScore}/100
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Correlations Found</span>
+                          <span className="text-muted-foreground">{ultraCorrelationData.correlations.length}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Confidence</span>
+                          <span className="text-muted-foreground">{ultraCorrelationData.confidence}%</span>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  {ultraLostRevenueData && (
+                    <Card className="p-3 bg-green-500/5 border-green-500/20">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        <TrendingDown className="h-4 w-4 text-green-500" />
+                        Lost Revenue Analysis
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Total Lost Revenue</span>
+                          <Badge className="bg-green-500 text-white">
+                            ${ultraLostRevenueData.lostRevenue.total.toLocaleString()}
+                          </Badge>
+                        </div>
+                        {ultraLostRevenueData.recoveryOpportunities.slice(0, 2).map((opp, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">{opp.category}</span>
+                            <span className="text-green-600">${opp.potentialRecovery.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+                </div>
               </ScrollArea>
             </TabsContent>
 
