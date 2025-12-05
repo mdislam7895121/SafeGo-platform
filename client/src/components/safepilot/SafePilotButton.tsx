@@ -218,18 +218,34 @@ export function SafePilotButton() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: contextData, isLoading: contextLoading, refetch: refetchContext } = useQuery<SafePilotContextResponse>({
+  const { data: contextData, isLoading: contextLoading, error: contextError, refetch: refetchContext } = useQuery<SafePilotContextResponse>({
     queryKey: ['/api/admin/safepilot/context', pageKey],
     queryFn: async () => {
       const params = new URLSearchParams({ pageKey });
+      const token = localStorage.getItem('token');
       const res = await fetch(`/api/admin/safepilot/context?${params}`, {
         credentials: 'include',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
       });
-      if (!res.ok) throw new Error('Failed to fetch context');
+      if (!res.ok) {
+        console.error('[SafePilot] Context fetch failed:', res.status);
+        return {
+          pageKey,
+          summary: { title: pageKey.replace('admin.', '').replace(/-/g, ' '), description: 'Context unavailable' },
+          metrics: {},
+          alerts: [],
+          quickActions: [],
+        };
+      }
       return res.json();
     },
-    enabled: isOpen,
+    enabled: isOpen && location.startsWith('/admin'),
     staleTime: 30 * 1000,
+    retry: 2,
+    retryDelay: 500,
   });
 
   const { data: historyData, refetch: refetchHistory } = useQuery<{ interactions: SafePilotHistoryItem[] }>({
@@ -631,15 +647,20 @@ export function SafePilotButton() {
                 {contextLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Loading context...</span>
                   </div>
-                ) : contextData ? (
+                ) : (
                   <div className="space-y-6">
                     <div>
-                      <h3 className="font-semibold text-lg">{contextData.summary.title}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">{contextData.summary.description}</p>
+                      <h3 className="font-semibold text-lg">
+                        {contextData?.summary?.title || pageKey.replace('admin.', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {contextData?.summary?.description || 'Page-specific insights and actions'}
+                      </p>
                     </div>
 
-                    {Object.keys(contextData.metrics).length > 0 && (
+                    {contextData && Object.keys(contextData.metrics || {}).length > 0 && (
                       <div>
                         <h4 className="font-medium text-sm mb-3">Key Metrics</h4>
                         <div className="grid grid-cols-2 gap-3">
@@ -653,7 +674,7 @@ export function SafePilotButton() {
                       </div>
                     )}
 
-                    {contextData.alerts.length > 0 && (
+                    {contextData?.alerts && contextData.alerts.length > 0 && (
                       <div>
                         <h4 className="font-medium text-sm mb-3">Active Alerts</h4>
                         <div className="space-y-2">
@@ -674,7 +695,7 @@ export function SafePilotButton() {
                       </div>
                     )}
 
-                    {contextData.quickActions.length > 0 && (
+                    {contextData?.quickActions && contextData.quickActions.length > 0 && (
                       <div>
                         <h4 className="font-medium text-sm mb-3">Quick Actions</h4>
                         <div className="space-y-2">
@@ -693,10 +714,14 @@ export function SafePilotButton() {
                         </div>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <p>Unable to load page context.</p>
+                    {(!contextData?.metrics || Object.keys(contextData.metrics).length === 0) && 
+                     (!contextData?.alerts || contextData.alerts.length === 0) && 
+                     (!contextData?.quickActions || contextData.quickActions.length === 0) && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">Ask SafePilot a question to get context-aware insights</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </ScrollArea>
