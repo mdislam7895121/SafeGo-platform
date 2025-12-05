@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { Permission, canPerform, AdminRole } from "../utils/permissions";
 import {
   ComplianceExportService,
@@ -106,6 +107,16 @@ router.get("/retention-policies", async (req: AuthenticatedRequest, res: Respons
   }
 });
 
+const retentionPolicySchema = z.object({
+  dataRetentionDays: z.number().int().min(30).max(3650),
+  exportRetentionDays: z.number().int().min(7).max(365),
+  piiRetentionDays: z.number().int().min(30).max(3650),
+  auditLogRetentionDays: z.number().int().min(365).max(7300),
+  autoAnonymizeAfterDays: z.number().int().min(0).max(3650).nullable().optional(),
+  requiresApproval: z.boolean().optional(),
+  maxExportsPerDay: z.number().int().min(1).max(1000).optional(),
+});
+
 router.put("/retention-policies/:countryCode", async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!checkPermission(req, Permission.MANAGE_RETENTION_POLICIES)) {
@@ -113,10 +124,27 @@ router.put("/retention-policies/:countryCode", async (req: AuthenticatedRequest,
     }
 
     const { countryCode } = req.params;
+    
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+      return res.status(400).json({ error: "Invalid country code format (must be 2 uppercase letters)" });
+    }
+
+    const validation = retentionPolicySchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: validation.error.errors.map(e => `${e.path.join(".")}: ${e.message}`) 
+      });
+    }
+
     const policy = await ComplianceExportService.upsertRetentionPolicy(
       countryCode,
-      req.body,
-      req.user!.id
+      validation.data,
+      req.user!.id,
+      req.user!.email,
+      req.user!.role || "ADMIN",
+      getClientIp(req) || undefined,
+      req.headers["user-agent"] || undefined
     );
 
     return res.json({ success: true, policy });

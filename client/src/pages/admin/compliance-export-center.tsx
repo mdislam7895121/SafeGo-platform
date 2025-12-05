@@ -172,6 +172,7 @@ function CreateExportDialog({
     mutationFn: async (data: any) => {
       return apiRequest("/api/admin/compliance-exports", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
     },
@@ -180,7 +181,10 @@ function CreateExportDialog({
         title: "Export Created",
         description: "Your compliance export has been queued for processing.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/compliance-exports"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/admin/compliance-exports"],
+        exact: false,
+      });
       onOpenChange(false);
       resetForm();
     },
@@ -521,7 +525,10 @@ function ExportDetailsDialog({
         title: "Download Started",
         description: "Your export file is being downloaded.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/compliance-exports"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/admin/compliance-exports"],
+        exact: false,
+      });
     },
     onError: (error: any) => {
       toast({
@@ -679,8 +686,18 @@ function ExportList({
   const [statusFilter, setStatusFilter] = useState<ComplianceExportStatus | "">("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const queryKey = ["/api/admin/compliance-exports", { category, status: statusFilter || undefined }];
+
   const { data, isLoading } = useQuery<{ exports: ComplianceExport[]; total: number }>({
-    queryKey: ["/api/admin/compliance-exports", { category, status: statusFilter || undefined }],
+    queryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("category", category);
+      if (statusFilter) params.set("status", statusFilter);
+      const response = await fetch(`/api/admin/compliance-exports?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch exports");
+      return response.json();
+    },
   });
 
   const cancelMutation = useMutation({
@@ -690,7 +707,10 @@ function ExportList({
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/compliance-exports"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/admin/compliance-exports", { category }],
+        exact: false,
+      });
     },
   });
 

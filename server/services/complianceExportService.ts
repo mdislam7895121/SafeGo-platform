@@ -468,34 +468,110 @@ async function collectAuditLogsData(exportRecord: any): Promise<any> {
 function anonymizeData(data: any, level: AnonymizationLevel, excludedFields: string[]): any {
   const anonymized = JSON.parse(JSON.stringify(data));
 
-  const sensitiveFields = ["email", "phone", "firstName", "lastName", "pickupAddress", "dropoffAddress", "deliveryAddress"];
+  const piiFields = new Set([
+    "email", "phone", "firstName", "lastName", "fullName", "name",
+    "pickupAddress", "dropoffAddress", "deliveryAddress", "address",
+    "streetAddress", "city", "zipCode", "postalCode", "origin", "destination",
+    "nationalId", "passportNumber", "licenseNumber", "ssn", "taxId", "nid",
+    "bankAccount", "bankAccountNumber", "routingNumber", "iban", "bkashNumber", "nagadNumber",
+    "cardNumber", "cardLast4", "accountNumber", "last4", "fingerprint",
+    "dateOfBirth", "dob", "birthDate",
+    "ipAddress", "deviceId", "userAgent", "deviceFingerprint",
+    "emergencyContactName", "emergencyContactPhone",
+    "recipientName", "recipientPhone", "recipientEmail",
+    "senderName", "senderPhone", "senderEmail",
+    "actorEmail", "requestedByEmail", "changedByEmail", "verifiedByEmail",
+    "driverName", "customerName", "restaurantName", "ownerName",
+    "vehiclePlate", "plateNumber", "licensePlate", "vehicleRegistration",
+    "contactPhone", "contactEmail", "alternatePhone",
+    "homeAddress", "workAddress", "billingAddress", "shippingAddress",
+    "description", "notes", "comments", "feedback", "reviewText",
+    "documents", "documentUrl", "photoUrl", "profilePicture", "avatar",
+  ]);
 
-  function anonymizeValue(value: string, field: string): string {
+  const locationFields = new Set([
+    "pickupLat", "pickupLng", "dropoffLat", "dropoffLng",
+    "latitude", "longitude", "lat", "lng", "currentLat", "currentLng",
+    "startLat", "startLng", "endLat", "endLng",
+    "originLat", "originLng", "destLat", "destLng",
+    "coordinates", "waypoints", "route", "routePolyline",
+  ]);
+  
+  const metadataFields = new Set(["metadata", "evidence", "evidencePacket", "auditMetadata"]);
+
+  function anonymizeValue(value: string, field: string, fieldType: "pii" | "location"): string {
     if (level === AnonymizationLevel.FULL) {
-      return crypto.createHash("sha256").update(value).digest("hex").substring(0, 16);
+      return crypto.createHash("sha256").update(String(value)).digest("hex").substring(0, 16);
     }
-    if (field === "email") {
-      const [local, domain] = value.split("@");
-      return `${local.substring(0, 2)}***@${domain}`;
+    
+    if (fieldType === "location") {
+      const num = parseFloat(String(value));
+      if (!isNaN(num)) {
+        return String(Math.round(num * 10) / 10);
+      }
+      return "[REDACTED]";
     }
-    if (field === "phone") {
-      return value.substring(0, 4) + "****" + value.substring(value.length - 2);
+
+    if (field.toLowerCase().includes("email") && String(value).includes("@")) {
+      const [local, domain] = String(value).split("@");
+      if (local && domain) {
+        return `${local.substring(0, 2)}***@${domain}`;
+      }
     }
-    return value.substring(0, 2) + "***";
+    if (field.toLowerCase().includes("phone")) {
+      const str = String(value);
+      if (str.length > 6) {
+        return str.substring(0, 4) + "****" + str.substring(str.length - 2);
+      }
+    }
+    const str = String(value);
+    if (str.length > 2) {
+      return str.substring(0, 2) + "***";
+    }
+    return "[REDACTED]";
   }
 
   function processObject(obj: any): any {
     if (Array.isArray(obj)) {
       return obj.map(item => processObject(item));
     }
-    if (obj && typeof obj === "object") {
+    if (obj && typeof obj === "object" && !(obj instanceof Date)) {
       const result: any = {};
       for (const [key, value] of Object.entries(obj)) {
         if (excludedFields.includes(key)) {
           continue;
         }
-        if (sensitiveFields.includes(key) && typeof value === "string") {
-          result[key] = anonymizeValue(value, key);
+        
+        const lowerKey = key.toLowerCase();
+        
+        if (metadataFields.has(key) && value && typeof value === "object") {
+          if (level === AnonymizationLevel.FULL) {
+            result[key] = "[REDACTED_METADATA]";
+          } else {
+            result[key] = processObject(value);
+          }
+        } else if (piiFields.has(key) || piiFields.has(lowerKey) || 
+                   lowerKey.includes("email") || lowerKey.includes("phone") ||
+                   lowerKey.includes("address") || lowerKey.includes("name") && !lowerKey.includes("typename")) {
+          if (value !== null && value !== undefined) {
+            result[key] = anonymizeValue(String(value), key, "pii");
+          } else {
+            result[key] = null;
+          }
+        } else if (locationFields.has(key) || locationFields.has(lowerKey) ||
+                   lowerKey.includes("lat") || lowerKey.includes("lng") ||
+                   lowerKey.includes("coord") || lowerKey.includes("location")) {
+          if (value !== null && value !== undefined) {
+            if (typeof value === "number") {
+              result[key] = level === AnonymizationLevel.FULL 
+                ? 0 
+                : Math.round(value * 10) / 10;
+            } else {
+              result[key] = anonymizeValue(String(value), key, "location");
+            }
+          } else {
+            result[key] = null;
+          }
         } else {
           result[key] = processObject(value);
         }
@@ -721,31 +797,118 @@ export async function getRetentionPolicies(): Promise<any[]> {
 export async function upsertRetentionPolicy(
   countryCode: string,
   data: {
-    rideDataRetentionDays?: number;
-    paymentDataRetentionDays?: number;
-    kycDataRetentionDays?: number;
+    dataRetentionDays?: number;
+    exportRetentionDays?: number;
+    piiRetentionDays?: number;
     auditLogRetentionDays?: number;
-    complaintRetentionDays?: number;
-    allowUserDeletionRequest?: boolean;
-    softDeleteOnly?: boolean;
-    archivedDataAccessible?: boolean;
-    legalBasis?: string;
+    autoAnonymizeAfterDays?: number | null;
+    requiresApproval?: boolean;
+    maxExportsPerDay?: number;
   },
-  updatedBy: string
+  updatedBy: string,
+  updatedByEmail?: string,
+  updatedByRole?: string,
+  ipAddress?: string,
+  userAgent?: string
 ): Promise<any> {
-  return prisma.dataRetentionPolicy.upsert({
+  const existingPolicy = await prisma.dataRetentionPolicy.findUnique({
+    where: { countryCode },
+  });
+
+  const mappedData = {
+    rideDataRetentionDays: data.dataRetentionDays,
+    paymentDataRetentionDays: data.dataRetentionDays,
+    kycDataRetentionDays: data.piiRetentionDays,
+    auditLogRetentionDays: data.auditLogRetentionDays,
+    complaintRetentionDays: data.dataRetentionDays,
+    allowUserDeletionRequest: true,
+    softDeleteOnly: true,
+    archivedDataAccessible: false,
+  };
+
+  const policy = await prisma.dataRetentionPolicy.upsert({
     where: { countryCode },
     create: {
       countryCode,
-      ...data,
+      ...mappedData,
       updatedBy,
     },
     update: {
-      ...data,
+      ...mappedData,
       updatedBy,
       lastUpdated: new Date(),
     },
   });
+
+  const changedFields: Record<string, { before: any; after: any }> = {};
+  if (existingPolicy) {
+    if (existingPolicy.rideDataRetentionDays !== mappedData.rideDataRetentionDays) {
+      changedFields.rideDataRetentionDays = { 
+        before: existingPolicy.rideDataRetentionDays, 
+        after: mappedData.rideDataRetentionDays 
+      };
+    }
+    if (existingPolicy.paymentDataRetentionDays !== mappedData.paymentDataRetentionDays) {
+      changedFields.paymentDataRetentionDays = { 
+        before: existingPolicy.paymentDataRetentionDays, 
+        after: mappedData.paymentDataRetentionDays 
+      };
+    }
+    if (existingPolicy.kycDataRetentionDays !== mappedData.kycDataRetentionDays) {
+      changedFields.kycDataRetentionDays = { 
+        before: existingPolicy.kycDataRetentionDays, 
+        after: mappedData.kycDataRetentionDays 
+      };
+    }
+    if (existingPolicy.auditLogRetentionDays !== mappedData.auditLogRetentionDays) {
+      changedFields.auditLogRetentionDays = { 
+        before: existingPolicy.auditLogRetentionDays, 
+        after: mappedData.auditLogRetentionDays 
+      };
+    }
+    if (existingPolicy.complaintRetentionDays !== mappedData.complaintRetentionDays) {
+      changedFields.complaintRetentionDays = { 
+        before: existingPolicy.complaintRetentionDays, 
+        after: mappedData.complaintRetentionDays 
+      };
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: updatedBy,
+      actorEmail: updatedByEmail || "unknown",
+      actorRole: updatedByRole || "ADMIN",
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+      actionType: existingPolicy ? "UPDATE_RETENTION_POLICY" : "CREATE_RETENTION_POLICY",
+      entityType: "DataRetentionPolicy",
+      entityId: countryCode,
+      description: `${existingPolicy ? "Updated" : "Created"} retention policy for ${countryCode}`,
+      metadata: {
+        countryCode,
+        isUpdate: !!existingPolicy,
+        changedFields: Object.keys(changedFields).length > 0 ? changedFields : null,
+        previousValues: existingPolicy ? {
+          rideDataRetentionDays: existingPolicy.rideDataRetentionDays,
+          paymentDataRetentionDays: existingPolicy.paymentDataRetentionDays,
+          kycDataRetentionDays: existingPolicy.kycDataRetentionDays,
+          auditLogRetentionDays: existingPolicy.auditLogRetentionDays,
+          complaintRetentionDays: existingPolicy.complaintRetentionDays,
+          allowUserDeletionRequest: existingPolicy.allowUserDeletionRequest,
+          softDeleteOnly: existingPolicy.softDeleteOnly,
+          updatedBy: existingPolicy.updatedBy,
+          lastUpdated: existingPolicy.lastUpdated,
+        } : null,
+        newValues: mappedData,
+        inputData: data,
+        timestamp: new Date().toISOString(),
+      },
+      success: true,
+    },
+  });
+
+  return policy;
 }
 
 export const ComplianceExportService = {
