@@ -35,6 +35,7 @@ import {
   DollarSign,
   Route,
   ChevronDown,
+  Rocket,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -171,6 +172,12 @@ const configNavItems: NavItem[] = [
     title: "Global Settings",
     href: "/admin/global-settings",
     icon: Shield,
+    navKey: "settings",
+  },
+  {
+    title: "Releases & Publish",
+    href: "/admin/releases",
+    icon: Rocket,
     navKey: "settings",
   },
   {
