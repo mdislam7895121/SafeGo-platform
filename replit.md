@@ -56,6 +56,16 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
     
     Features include a dedicated Intelligence dashboard page (/admin/safepilot-intelligence), enhanced SafePilot drawer with Intelligence tab, 60+ API endpoints with RBAC (USE_SAFEPILOT permission), and production-safe queries with country-scoping and bulk aggregations.
 
+*   **SafePilot Master Upgrade (v2.0)**: Enterprise-grade intelligence enhancements added December 2025:
+    - **One-Click Crisis Report**: Real-time platform status with top 5 risks, opportunities, urgent fixes, financial/operational impact analysis, and recommended next steps via `/api/admin/safepilot/crisis-report`
+    - **Explain This Decision Mode**: Transparent AI decision-making showing data sources, reasoning chain, confidence levels (LOW/MEDIUM/HIGH/VERY_HIGH), alternatives, and appeal guidance via `/api/admin/safepilot/explain-decision`
+    - **Background Autonomous Monitoring**: Continuous platform scanning detecting fraud spikes, driver anomalies, account registration surges, refund increases, payment failures, and safety incidents with health score (0-100) via `/api/admin/safepilot/autonomous-scan`
+    - **Company Survival Mode**: Startup-focused cost optimization with automation opportunities (FULL/PARTIAL/ASSISTED), cost-cutting options with risk assessment, growth opportunities with effort/timeframe, weekly focus areas, human-required vs. automatable tasks via `/api/admin/safepilot/survival-mode`
+    - **Voice Command UI**: Placeholder for future voice-to-text integration with microphone button and visual feedback
+    - **Enhanced Mobile Responsiveness**: 6-tab layout (Intel, Context, Chat, Crisis, Survival, History), touch-optimized controls (44px minimum), quick action buttons, health score indicator, and safe-area padding
+    - **Context Debug Mode**: Enhanced debugging with handler existence checks, data source validation, fallback tracking, and load time metrics via `/api/admin/safepilot/context-debug`
+    - **Health & Metrics APIs**: System health dashboard (`/health`) and performance metrics (`/metrics`) with uptime, query counts, and response times
+
 ## External Dependencies
 
 *   **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.

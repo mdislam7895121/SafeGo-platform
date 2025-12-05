@@ -2902,4 +2902,822 @@ export const safePilotService = {
       topQuestions,
     };
   },
+
+  // ============================================
+  // MASTER UPGRADE: One-Click Crisis Report
+  // ============================================
+
+  /**
+   * Generate comprehensive crisis report: "What is happening right now?"
+   * Returns top 5 risks, opportunities, urgent fixes, financial/operational impact
+   */
+  async generateCrisisReport(countryCode?: string): Promise<{
+    timestamp: string;
+    mode: 'CRISIS_REPORT';
+    summary: string;
+    topRisks: Array<{ title: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; detail: string; impact: string; action: string }>;
+    topOpportunities: Array<{ title: string; potential: string; timeframe: string; action: string }>;
+    urgentFixes: Array<{ issue: string; priority: 'P0' | 'P1' | 'P2'; estimatedImpact: string; suggestedAction: string }>;
+    financialImpact: { totalAtRisk: number; potentialSavings: number; revenueOpportunity: number };
+    operationalImpact: { affectedUsers: number; affectedDrivers: number; affectedOrders: number };
+    recommendedNextSteps: string[];
+  }> {
+    console.log('[SafePilot] Generating Crisis Report...');
+    const startTime = Date.now();
+    const where = countryCode ? { user: { countryCode } } : {};
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    try {
+      const [
+        pendingFraud,
+        activeSOSAlerts,
+        failedPayouts,
+        pendingRefunds,
+        negativeWallets,
+        pendingKYC,
+        lowRatingDrivers,
+        blockedUsers,
+        recentRides,
+        recentOrders,
+        totalRevenue7d,
+        totalRefunds7d,
+      ] = await Promise.all([
+        prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
+        prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } }),
+        prisma.payout.count({ where: { status: 'failed' } }),
+        prisma.refundRequest.count({ where: { status: 'pending' } }),
+        prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
+        prisma.driverProfile.count({ where: { ...where, verificationStatus: 'pending' } }),
+        prisma.driverStats.count({ where: { rating: { lt: 3.0 } } }),
+        prisma.user.count({ where: { isBlocked: true } }),
+        prisma.ride.count({ where: { createdAt: { gte: since24h } } }),
+        prisma.foodOrder.count({ where: { createdAt: { gte: since24h } } }),
+        prisma.ride.aggregate({ where: { createdAt: { gte: since7d }, status: 'completed' }, _sum: { finalFare: true } }),
+        prisma.refundRequest.aggregate({ where: { createdAt: { gte: since7d }, status: 'approved' }, _sum: { amount: true } }),
+      ]);
+
+      // Build top risks
+      const topRisks: Array<{ title: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; detail: string; impact: string; action: string }> = [];
+      
+      if (activeSOSAlerts > 0) {
+        topRisks.push({
+          title: 'Active SOS Alerts',
+          severity: 'CRITICAL',
+          detail: `${activeSOSAlerts} unresolved SOS alerts require immediate attention`,
+          impact: 'Safety risk, potential liability, user trust',
+          action: 'Review and resolve all SOS alerts immediately',
+        });
+      }
+      
+      if (pendingFraud > 10) {
+        topRisks.push({
+          title: 'High Fraud Alert Backlog',
+          severity: pendingFraud > 50 ? 'CRITICAL' : 'HIGH',
+          detail: `${pendingFraud} pending fraud alerts need review`,
+          impact: `Potential financial loss of $${(pendingFraud * 50).toLocaleString()}+`,
+          action: 'Prioritize fraud review queue',
+        });
+      }
+      
+      if (failedPayouts > 5) {
+        topRisks.push({
+          title: 'Failed Payouts',
+          severity: failedPayouts > 20 ? 'HIGH' : 'MEDIUM',
+          detail: `${failedPayouts} payouts have failed`,
+          impact: 'Driver dissatisfaction, potential churn',
+          action: 'Investigate and retry failed payouts',
+        });
+      }
+      
+      if (negativeWallets > 10) {
+        topRisks.push({
+          title: 'Negative Wallet Balances',
+          severity: 'MEDIUM',
+          detail: `${negativeWallets} drivers have negative wallet balances`,
+          impact: 'Revenue recovery needed',
+          action: 'Initiate balance recovery process',
+        });
+      }
+      
+      if (pendingRefunds > 20) {
+        topRisks.push({
+          title: 'Refund Backlog',
+          severity: 'MEDIUM',
+          detail: `${pendingRefunds} refund requests pending`,
+          impact: 'Customer satisfaction, potential chargebacks',
+          action: 'Process pending refunds within SLA',
+        });
+      }
+
+      // Build top opportunities
+      const topOpportunities: Array<{ title: string; potential: string; timeframe: string; action: string }> = [
+        {
+          title: 'Driver Onboarding Pipeline',
+          potential: `${pendingKYC} drivers awaiting verification`,
+          timeframe: '24-48 hours',
+          action: 'Fast-track KYC reviews to expand supply',
+        },
+        {
+          title: 'Low-Rating Driver Recovery',
+          potential: `${lowRatingDrivers} drivers need coaching`,
+          timeframe: '1-2 weeks',
+          action: 'Launch driver improvement program',
+        },
+        {
+          title: 'Reactivation Campaign',
+          potential: `${blockedUsers} blocked accounts for review`,
+          timeframe: '1 week',
+          action: 'Review and potentially reactivate compliant users',
+        },
+        {
+          title: 'Peak Hour Optimization',
+          potential: `${recentRides + recentOrders} orders in 24h - analyze patterns`,
+          timeframe: 'Ongoing',
+          action: 'Implement surge pricing during peak demand',
+        },
+        {
+          title: 'Fraud Prevention Savings',
+          potential: `Up to $${(pendingFraud * 75).toLocaleString()} in prevented losses`,
+          timeframe: 'Immediate',
+          action: 'Resolve pending fraud cases',
+        },
+      ];
+
+      // Build urgent fixes
+      const urgentFixes: Array<{ issue: string; priority: 'P0' | 'P1' | 'P2'; estimatedImpact: string; suggestedAction: string }> = [];
+      
+      if (activeSOSAlerts > 0) {
+        urgentFixes.push({
+          issue: 'Unresolved SOS alerts',
+          priority: 'P0',
+          estimatedImpact: 'Safety liability',
+          suggestedAction: 'Assign dedicated team to resolve all SOS',
+        });
+      }
+      
+      if (failedPayouts > 5) {
+        urgentFixes.push({
+          issue: 'Payout failures blocking driver earnings',
+          priority: 'P1',
+          estimatedImpact: 'Driver churn risk',
+          suggestedAction: 'Debug payment gateway integration',
+        });
+      }
+      
+      if (pendingKYC > 50) {
+        urgentFixes.push({
+          issue: 'KYC backlog slowing growth',
+          priority: 'P1',
+          estimatedImpact: 'Lost supply acquisition',
+          suggestedAction: 'Add temporary KYC reviewers',
+        });
+      }
+
+      const revenue7d = totalRevenue7d._sum.finalFare?.toNumber() || 0;
+      const refunds7d = totalRefunds7d._sum.amount?.toNumber() || 0;
+
+      const report = {
+        timestamp: new Date().toISOString(),
+        mode: 'CRISIS_REPORT' as const,
+        summary: `Platform Status: ${activeSOSAlerts > 0 ? 'CRITICAL' : pendingFraud > 20 ? 'WARNING' : 'STABLE'}. ` +
+          `${recentRides + recentOrders} orders in last 24h. ` +
+          `${topRisks.filter(r => r.severity === 'CRITICAL' || r.severity === 'HIGH').length} high-priority issues require attention.`,
+        topRisks: topRisks.slice(0, 5),
+        topOpportunities: topOpportunities.slice(0, 5),
+        urgentFixes: urgentFixes.slice(0, 5),
+        financialImpact: {
+          totalAtRisk: pendingFraud * 50 + failedPayouts * 100 + negativeWallets * 25,
+          potentialSavings: pendingFraud * 75 + pendingRefunds * 5,
+          revenueOpportunity: pendingKYC * 200 + lowRatingDrivers * 50,
+        },
+        operationalImpact: {
+          affectedUsers: blockedUsers + pendingRefunds,
+          affectedDrivers: failedPayouts + negativeWallets + pendingKYC,
+          affectedOrders: recentRides + recentOrders,
+        },
+        recommendedNextSteps: [
+          activeSOSAlerts > 0 ? 'URGENT: Resolve all active SOS alerts immediately' : null,
+          pendingFraud > 10 ? 'Review and clear fraud alert queue today' : null,
+          failedPayouts > 5 ? 'Investigate payout failures and retry' : null,
+          pendingKYC > 20 ? 'Accelerate KYC review to expand driver supply' : null,
+          'Monitor key metrics on observability dashboard',
+        ].filter(Boolean) as string[],
+      };
+
+      console.log(`[SafePilot] Crisis Report generated in ${Date.now() - startTime}ms`);
+      return report;
+    } catch (error) {
+      console.error('[SafePilot] Crisis Report generation failed:', error);
+      throw error;
+    }
+  },
+
+  // ============================================
+  // MASTER UPGRADE: Explain This Decision
+  // ============================================
+
+  /**
+   * Explain why SafePilot made a specific recommendation
+   * Provides data sources, reasoning, and confidence level
+   */
+  async explainDecision(
+    decisionType: 'BLOCK_USER' | 'FLAG_FRAUD' | 'REJECT_KYC' | 'SUSPEND_DRIVER' | 'DENY_REFUND' | 'RECOMMENDATION',
+    entityId: string,
+    context?: Record<string, any>
+  ): Promise<{
+    decision: string;
+    reasoning: string[];
+    dataPoints: Array<{ source: string; value: string | number; weight: string }>;
+    confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+    alternatives: string[];
+    appealGuidance: string;
+  }> {
+    console.log(`[SafePilot] Explaining decision: ${decisionType} for entity ${entityId}`);
+    
+    const dataPoints: Array<{ source: string; value: string | number; weight: string }> = [];
+    const reasoning: string[] = [];
+    let confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' = 'MEDIUM';
+
+    try {
+      switch (decisionType) {
+        case 'BLOCK_USER': {
+          const user = await prisma.user.findUnique({
+            where: { id: entityId },
+            include: { customerProfile: true, driverProfile: { include: { stats: true } } },
+          });
+          
+          if (user) {
+            const complaints = await prisma.complaint.count({ where: { userId: entityId } });
+            const fraudAlerts = await prisma.fraudAlert.count({ where: { userId: entityId } });
+            
+            dataPoints.push(
+              { source: 'Complaint History', value: complaints, weight: 'HIGH' },
+              { source: 'Fraud Alerts', value: fraudAlerts, weight: 'CRITICAL' },
+              { source: 'Account Age', value: Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24)) + ' days', weight: 'MEDIUM' },
+            );
+            
+            if (fraudAlerts > 0) reasoning.push(`User has ${fraudAlerts} fraud alert(s) on record`);
+            if (complaints > 5) reasoning.push(`User has ${complaints} complaints exceeding threshold`);
+            
+            confidenceLevel = fraudAlerts > 2 ? 'VERY_HIGH' : fraudAlerts > 0 ? 'HIGH' : 'MEDIUM';
+          }
+          break;
+        }
+        
+        case 'FLAG_FRAUD': {
+          const fraudAlert = await prisma.fraudAlert.findFirst({
+            where: { userId: entityId },
+            orderBy: { createdAt: 'desc' },
+          });
+          
+          if (fraudAlert) {
+            dataPoints.push(
+              { source: 'Alert Type', value: fraudAlert.alertType, weight: 'HIGH' },
+              { source: 'Risk Score', value: fraudAlert.riskScore || 0, weight: 'CRITICAL' },
+              { source: 'Detection Time', value: fraudAlert.createdAt.toISOString(), weight: 'LOW' },
+            );
+            
+            reasoning.push(`Fraud pattern detected: ${fraudAlert.alertType}`);
+            if (fraudAlert.riskScore && fraudAlert.riskScore > 80) {
+              reasoning.push(`High risk score: ${fraudAlert.riskScore}/100`);
+              confidenceLevel = 'VERY_HIGH';
+            } else {
+              confidenceLevel = 'HIGH';
+            }
+          }
+          break;
+        }
+        
+        case 'SUSPEND_DRIVER': {
+          const driver = await prisma.driverProfile.findFirst({
+            where: { userId: entityId },
+            include: { stats: true, user: true },
+          });
+          
+          if (driver) {
+            const rating = driver.stats?.rating || 0;
+            const complaints = await prisma.complaint.count({ where: { userId: entityId } });
+            const violations = await prisma.driverViolation.count({ where: { driverId: driver.id } });
+            
+            dataPoints.push(
+              { source: 'Driver Rating', value: rating.toFixed(2), weight: rating < 3 ? 'CRITICAL' : 'MEDIUM' },
+              { source: 'Complaints', value: complaints, weight: complaints > 5 ? 'HIGH' : 'MEDIUM' },
+              { source: 'Violations', value: violations, weight: violations > 0 ? 'CRITICAL' : 'LOW' },
+            );
+            
+            if (rating < 3) reasoning.push(`Rating ${rating.toFixed(2)} below minimum threshold of 3.0`);
+            if (violations > 0) reasoning.push(`${violations} safety violation(s) on record`);
+            if (complaints > 5) reasoning.push(`${complaints} customer complaints received`);
+            
+            confidenceLevel = violations > 0 ? 'VERY_HIGH' : rating < 2.5 ? 'HIGH' : 'MEDIUM';
+          }
+          break;
+        }
+        
+        default:
+          reasoning.push('Decision based on platform policies and risk assessment');
+          dataPoints.push({ source: 'Policy Engine', value: 'Standard rules applied', weight: 'MEDIUM' });
+      }
+
+      return {
+        decision: decisionType.replace(/_/g, ' '),
+        reasoning: reasoning.length > 0 ? reasoning : ['Based on automated risk assessment and platform policies'],
+        dataPoints,
+        confidenceLevel,
+        alternatives: [
+          'Request manual review by senior admin',
+          'Add temporary restriction instead of full action',
+          'Gather additional evidence before finalizing',
+        ],
+        appealGuidance: 'User may appeal this decision within 30 days by contacting support with additional documentation.',
+      };
+    } catch (error) {
+      console.error('[SafePilot] Explain decision failed:', error);
+      return {
+        decision: decisionType.replace(/_/g, ' '),
+        reasoning: ['Unable to retrieve full reasoning - using fallback'],
+        dataPoints: [{ source: 'System', value: 'Fallback mode', weight: 'LOW' }],
+        confidenceLevel: 'LOW',
+        alternatives: ['Request manual review'],
+        appealGuidance: 'Contact support for more information.',
+      };
+    }
+  },
+
+  // ============================================
+  // MASTER UPGRADE: Background Autonomous Monitoring
+  // ============================================
+
+  /**
+   * Run background autonomous scan for platform issues
+   * Detects fraud, driver anomalies, account spikes, refund increases, payment issues
+   */
+  async runAutonomousScan(countryCode?: string): Promise<{
+    timestamp: string;
+    scanDuration: number;
+    findings: Array<{
+      category: 'FRAUD' | 'DRIVER_ANOMALY' | 'ACCOUNT_SPIKE' | 'REFUND_SPIKE' | 'PAYMENT_ISSUE' | 'SAFETY';
+      severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      title: string;
+      detail: string;
+      affectedCount: number;
+      recommendedAction: string;
+      autoActionAvailable: boolean;
+    }>;
+    healthScore: number;
+    nextScanRecommended: string;
+  }> {
+    console.log('[SafePilot] Starting autonomous background scan...');
+    const startTime = Date.now();
+    const findings: Array<{
+      category: 'FRAUD' | 'DRIVER_ANOMALY' | 'ACCOUNT_SPIKE' | 'REFUND_SPIKE' | 'PAYMENT_ISSUE' | 'SAFETY';
+      severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      title: string;
+      detail: string;
+      affectedCount: number;
+      recommendedAction: string;
+      autoActionAvailable: boolean;
+    }> = [];
+
+    const since1h = new Date(Date.now() - 60 * 60 * 1000);
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    try {
+      // 1. Fraud Detection
+      const pendingFraud = await prisma.fraudAlert.count({ where: { status: 'PENDING' } });
+      const newFraud1h = await prisma.fraudAlert.count({ where: { createdAt: { gte: since1h } } });
+      
+      if (newFraud1h > 5) {
+        findings.push({
+          category: 'FRAUD',
+          severity: newFraud1h > 20 ? 'CRITICAL' : 'HIGH',
+          title: 'Fraud Alert Spike Detected',
+          detail: `${newFraud1h} new fraud alerts in the last hour (above normal)`,
+          affectedCount: newFraud1h,
+          recommendedAction: 'Investigate fraud patterns immediately. Consider temporarily restricting high-risk activities.',
+          autoActionAvailable: true,
+        });
+      }
+
+      // 2. Driver Behavior Anomalies
+      const suspiciousTrips = await prisma.ride.count({
+        where: {
+          createdAt: { gte: since24h },
+          OR: [
+            { distanceKm: { gt: 200 } },
+            { finalFare: { gt: 500 } },
+          ],
+        },
+      });
+      
+      if (suspiciousTrips > 10) {
+        findings.push({
+          category: 'DRIVER_ANOMALY',
+          severity: 'MEDIUM',
+          title: 'Unusual Trip Patterns',
+          detail: `${suspiciousTrips} trips with anomalous distance/fare in 24h`,
+          affectedCount: suspiciousTrips,
+          recommendedAction: 'Review flagged trips for potential fare manipulation.',
+          autoActionAvailable: false,
+        });
+      }
+
+      // 3. Account Registration Spike
+      const newUsers24h = await prisma.user.count({ where: { createdAt: { gte: since24h } } });
+      const newUsers7dAvg = await prisma.user.count({ where: { createdAt: { gte: since7d } } });
+      const avgDaily = newUsers7dAvg / 7;
+      
+      if (newUsers24h > avgDaily * 3) {
+        findings.push({
+          category: 'ACCOUNT_SPIKE',
+          severity: 'HIGH',
+          title: 'Abnormal Account Registration Spike',
+          detail: `${newUsers24h} new accounts in 24h (${Math.round((newUsers24h / avgDaily - 1) * 100)}% above average)`,
+          affectedCount: newUsers24h,
+          recommendedAction: 'Review new registrations for bot activity. Enable additional verification if needed.',
+          autoActionAvailable: true,
+        });
+      }
+
+      // 4. Refund Increase Detection
+      const refunds24h = await prisma.refundRequest.count({ where: { createdAt: { gte: since24h } } });
+      const refunds7dAvg = await prisma.refundRequest.count({ where: { createdAt: { gte: since7d } } });
+      const avgRefundsDaily = refunds7dAvg / 7;
+      
+      if (refunds24h > avgRefundsDaily * 2 && refunds24h > 5) {
+        findings.push({
+          category: 'REFUND_SPIKE',
+          severity: 'MEDIUM',
+          title: 'Refund Request Spike',
+          detail: `${refunds24h} refund requests in 24h (${Math.round((refunds24h / avgRefundsDaily - 1) * 100)}% above average)`,
+          affectedCount: refunds24h,
+          recommendedAction: 'Investigate common reasons. Check for service quality issues or abuse patterns.',
+          autoActionAvailable: false,
+        });
+      }
+
+      // 5. Payment Integrity Issues
+      const failedPayments = await prisma.payout.count({ where: { status: 'failed', updatedAt: { gte: since24h } } });
+      
+      if (failedPayments > 10) {
+        findings.push({
+          category: 'PAYMENT_ISSUE',
+          severity: 'HIGH',
+          title: 'Payment Processing Failures',
+          detail: `${failedPayments} failed payments in last 24h`,
+          affectedCount: failedPayments,
+          recommendedAction: 'Check payment gateway status. Review error logs for common failure patterns.',
+          autoActionAvailable: true,
+        });
+      }
+
+      // 6. Safety Monitoring
+      const activeSOSAlerts = await prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } });
+      
+      if (activeSOSAlerts > 0) {
+        findings.push({
+          category: 'SAFETY',
+          severity: 'CRITICAL',
+          title: 'Active SOS Alerts',
+          detail: `${activeSOSAlerts} unresolved SOS alerts require immediate attention`,
+          affectedCount: activeSOSAlerts,
+          recommendedAction: 'Respond to all active SOS alerts. Contact emergency services if needed.',
+          autoActionAvailable: false,
+        });
+      }
+
+      // Calculate health score (0-100)
+      let healthScore = 100;
+      for (const finding of findings) {
+        if (finding.severity === 'CRITICAL') healthScore -= 25;
+        else if (finding.severity === 'HIGH') healthScore -= 15;
+        else if (finding.severity === 'MEDIUM') healthScore -= 8;
+        else healthScore -= 3;
+      }
+      healthScore = Math.max(0, healthScore);
+
+      const scanDuration = Date.now() - startTime;
+      console.log(`[SafePilot] Autonomous scan completed in ${scanDuration}ms. Health score: ${healthScore}. Findings: ${findings.length}`);
+
+      return {
+        timestamp: new Date().toISOString(),
+        scanDuration,
+        findings,
+        healthScore,
+        nextScanRecommended: findings.some(f => f.severity === 'CRITICAL') ? '5 minutes' : findings.some(f => f.severity === 'HIGH') ? '15 minutes' : '1 hour',
+      };
+    } catch (error) {
+      console.error('[SafePilot] Autonomous scan failed:', error);
+      return {
+        timestamp: new Date().toISOString(),
+        scanDuration: Date.now() - startTime,
+        findings: [{
+          category: 'PAYMENT_ISSUE',
+          severity: 'MEDIUM',
+          title: 'Scan Error',
+          detail: 'Autonomous scan encountered an error. Using partial data.',
+          affectedCount: 0,
+          recommendedAction: 'Retry scan or check system logs.',
+          autoActionAvailable: false,
+        }],
+        healthScore: 50,
+        nextScanRecommended: '5 minutes',
+      };
+    }
+  },
+
+  // ============================================
+  // MASTER UPGRADE: Company Survival Mode
+  // ============================================
+
+  /**
+   * Generate cost optimization and automation recommendations for startups
+   * Identifies where human admin is not required and suggests cost-cutting
+   */
+  async generateSurvivalModeReport(countryCode?: string): Promise<{
+    timestamp: string;
+    automationOpportunities: Array<{
+      area: string;
+      currentCost: string;
+      savingsEstimate: string;
+      automationLevel: 'FULL' | 'PARTIAL' | 'ASSISTED';
+      implementation: string;
+      priority: 'HIGH' | 'MEDIUM' | 'LOW';
+    }>;
+    costCuttingOptions: Array<{
+      category: string;
+      currentSpend: string;
+      potentialSavings: string;
+      risk: 'LOW' | 'MEDIUM' | 'HIGH';
+      recommendation: string;
+    }>;
+    growthOpportunities: Array<{
+      opportunity: string;
+      potentialRevenue: string;
+      effort: 'LOW' | 'MEDIUM' | 'HIGH';
+      timeToValue: string;
+    }>;
+    weeklyFocusAreas: string[];
+    humanRequired: string[];
+    canAutomate: string[];
+  }> {
+    console.log('[SafePilot] Generating Survival Mode report...');
+    
+    try {
+      const [
+        totalDrivers,
+        pendingKYC,
+        totalRefunds,
+        pendingComplaints,
+        totalRides7d,
+      ] = await Promise.all([
+        prisma.driverProfile.count(),
+        prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }),
+        prisma.refundRequest.count({ where: { status: 'pending' } }),
+        prisma.complaint.count({ where: { status: 'open' } }),
+        prisma.ride.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
+      ]);
+
+      return {
+        timestamp: new Date().toISOString(),
+        automationOpportunities: [
+          {
+            area: 'KYC Document Review',
+            currentCost: `${Math.round(pendingKYC * 0.5)} hours/week manual review`,
+            savingsEstimate: '70% time reduction',
+            automationLevel: 'PARTIAL',
+            implementation: 'Use AI document verification for initial screening',
+            priority: 'HIGH',
+          },
+          {
+            area: 'Refund Processing',
+            currentCost: `${Math.round(totalRefunds * 0.25)} hours/week`,
+            savingsEstimate: '85% automation rate',
+            automationLevel: 'FULL',
+            implementation: 'Auto-approve refunds under $10 with valid reason codes',
+            priority: 'HIGH',
+          },
+          {
+            area: 'Customer Support Tier 1',
+            currentCost: 'Manual response to common queries',
+            savingsEstimate: '60% query deflection',
+            automationLevel: 'ASSISTED',
+            implementation: 'Deploy AI chatbot for FAQs and order status',
+            priority: 'MEDIUM',
+          },
+          {
+            area: 'Driver Dispute Resolution',
+            currentCost: `${pendingComplaints} pending reviews`,
+            savingsEstimate: '50% faster resolution',
+            automationLevel: 'PARTIAL',
+            implementation: 'Auto-resolve disputes with clear evidence',
+            priority: 'MEDIUM',
+          },
+          {
+            area: 'Fraud Detection',
+            currentCost: 'Manual review of alerts',
+            savingsEstimate: '90% false positive reduction',
+            automationLevel: 'FULL',
+            implementation: 'ML-based fraud scoring with auto-actions',
+            priority: 'HIGH',
+          },
+        ],
+        costCuttingOptions: [
+          {
+            category: 'Customer Acquisition',
+            currentSpend: 'Referral bonuses, promotions',
+            potentialSavings: '30-40%',
+            risk: 'MEDIUM',
+            recommendation: 'Focus on organic growth and driver referrals instead of paid ads',
+          },
+          {
+            category: 'Driver Incentives',
+            currentSpend: 'Surge bonuses, guarantees',
+            potentialSavings: '20-30%',
+            risk: 'MEDIUM',
+            recommendation: 'Use dynamic incentives based on real-time demand',
+          },
+          {
+            category: 'Support Staff',
+            currentSpend: 'Full-time support team',
+            potentialSavings: '40-50%',
+            risk: 'LOW',
+            recommendation: 'Implement self-service and AI support first',
+          },
+          {
+            category: 'Infrastructure',
+            currentSpend: 'Fixed server costs',
+            potentialSavings: '15-25%',
+            risk: 'LOW',
+            recommendation: 'Use auto-scaling and serverless where possible',
+          },
+        ],
+        growthOpportunities: [
+          {
+            opportunity: 'Activate pending drivers',
+            potentialRevenue: `$${pendingKYC * 500}/month`,
+            effort: 'LOW',
+            timeToValue: '1-2 weeks',
+          },
+          {
+            opportunity: 'Peak hour pricing optimization',
+            potentialRevenue: '15-20% revenue increase',
+            effort: 'MEDIUM',
+            timeToValue: '1 week',
+          },
+          {
+            opportunity: 'Corporate accounts',
+            potentialRevenue: 'High-value recurring revenue',
+            effort: 'HIGH',
+            timeToValue: '1-2 months',
+          },
+          {
+            opportunity: 'Restaurant commission increase',
+            potentialRevenue: '5-10% margin improvement',
+            effort: 'LOW',
+            timeToValue: 'Immediate',
+          },
+        ],
+        weeklyFocusAreas: [
+          'Clear KYC backlog to increase driver supply',
+          'Process pending refunds to improve customer satisfaction',
+          'Review top 10 complaints for service improvement',
+          'Analyze ride patterns for pricing optimization',
+          'Monitor fraud alerts and payment failures',
+        ],
+        humanRequired: [
+          'Complex fraud investigation',
+          'High-value refund approvals (>$100)',
+          'Driver suspension appeals',
+          'Partnership negotiations',
+          'Safety incident response',
+        ],
+        canAutomate: [
+          'Basic KYC document verification',
+          'Small refund processing (<$10)',
+          'Order status inquiries',
+          'Driver payment calculations',
+          'Routine fraud pattern detection',
+          'Performance report generation',
+          'Email notifications and reminders',
+        ],
+      };
+    } catch (error) {
+      console.error('[SafePilot] Survival Mode report failed:', error);
+      throw error;
+    }
+  },
+
+  // ============================================
+  // MASTER UPGRADE: Voice Command Support (Placeholder)
+  // ============================================
+
+  /**
+   * Process voice command (placeholder for future implementation)
+   * Converts voice query to text and routes to appropriate handler
+   */
+  async processVoiceCommand(
+    adminId: string,
+    audioData: string,
+    pageKey: string
+  ): Promise<{
+    transcribedText: string;
+    response: SafePilotQueryResponse;
+    voiceEnabled: boolean;
+  }> {
+    console.log('[SafePilot] Voice command received (placeholder mode)');
+    
+    // Placeholder: In production, this would use speech-to-text
+    const transcribedText = 'Voice commands will be available in a future update.';
+    
+    const response = await this.processQuery(
+      adminId,
+      pageKey,
+      'What are the top 3 things I should know right now?',
+      undefined,
+      undefined
+    );
+
+    return {
+      transcribedText,
+      response,
+      voiceEnabled: false,
+    };
+  },
+
+  // ============================================
+  // Enhanced Debug Logging
+  // ============================================
+
+  /**
+   * Get detailed debug information for context loading
+   */
+  async getContextDebugInfo(pageKey: string): Promise<{
+    pageKey: string;
+    timestamp: string;
+    contextHandlerExists: boolean;
+    fallbackUsed: boolean;
+    dataSourcesChecked: string[];
+    errors: string[];
+    loadTimeMs: number;
+  }> {
+    const startTime = Date.now();
+    const errors: string[] = [];
+    const dataSourcesChecked: string[] = [];
+    let fallbackUsed = false;
+    let contextHandlerExists = false;
+
+    // Check if handler exists for this page
+    const knownHandlers = [
+      'admin.drivers', 'admin.customers', 'admin.restaurants',
+      'admin.rides', 'admin.food-orders', 'admin.payouts',
+      'admin.safety', 'admin.ratings', 'admin.reviews',
+      'admin.refunds', 'admin.disputes', 'admin.kyc',
+      'admin.fraud', 'admin.safepilot', 'admin.analytics',
+      'admin.complaints', 'admin.dashboard', 'admin.payment-integrity',
+      'admin.earnings-disputes', 'admin.driver-violations',
+      'admin.operations-console', 'admin.trust-safety',
+      'admin.policy-engine', 'admin.export-center',
+      'admin.activity-monitor', 'admin.notification-rules',
+      'admin.global-search', 'admin.backup-recovery', 'admin.commissions',
+    ];
+
+    contextHandlerExists = knownHandlers.some(h => 
+      pageKey === h || pageKey.startsWith(h + '.')
+    );
+
+    if (!contextHandlerExists) {
+      errors.push(`No specific handler for pageKey: ${pageKey}`);
+      fallbackUsed = true;
+    }
+
+    // Check data sources
+    try {
+      await prisma.user.count();
+      dataSourcesChecked.push('users: OK');
+    } catch (e) {
+      errors.push('users: FAILED');
+      dataSourcesChecked.push('users: FAILED');
+    }
+
+    try {
+      await prisma.safePilotInteraction.count();
+      dataSourcesChecked.push('safepilot_interactions: OK');
+    } catch (e) {
+      errors.push('safepilot_interactions: FAILED');
+      dataSourcesChecked.push('safepilot_interactions: FAILED');
+    }
+
+    return {
+      pageKey,
+      timestamp: new Date().toISOString(),
+      contextHandlerExists,
+      fallbackUsed,
+      dataSourcesChecked,
+      errors,
+      loadTimeMs: Date.now() - startTime,
+    };
+  },
 };

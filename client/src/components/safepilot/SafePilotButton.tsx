@@ -22,6 +22,20 @@ import {
   Scale,
   ExternalLink,
   Zap,
+  Mic,
+  MicOff,
+  FileText,
+  Activity,
+  LifeBuoy,
+  Bug,
+  RefreshCw,
+  Target,
+  Rocket,
+  Clock,
+  HelpCircle,
+  CheckCircle2,
+  XCircle,
+  Info,
 } from 'lucide-react';
 import { SafePilotIcon } from './SafePilotLogo';
 import { Button } from '@/components/ui/button';
@@ -100,6 +114,62 @@ interface SafePilotHistoryItem {
   riskLevel: string;
   timestamp: string;
   selectedActionKey?: string;
+}
+
+interface CrisisReportData {
+  timestamp: string;
+  mode: 'CRISIS_REPORT';
+  summary: string;
+  topRisks: Array<{ title: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; detail: string; impact: string; action: string }>;
+  topOpportunities: Array<{ title: string; potential: string; timeframe: string; action: string }>;
+  urgentFixes: Array<{ issue: string; priority: 'P0' | 'P1' | 'P2'; estimatedImpact: string; suggestedAction: string }>;
+  financialImpact: { totalAtRisk: number; potentialSavings: number; revenueOpportunity: number };
+  operationalImpact: { affectedUsers: number; affectedDrivers: number; affectedOrders: number };
+  recommendedNextSteps: string[];
+}
+
+interface SurvivalModeData {
+  timestamp: string;
+  automationOpportunities: Array<{
+    area: string;
+    currentCost: string;
+    savingsEstimate: string;
+    automationLevel: 'FULL' | 'PARTIAL' | 'ASSISTED';
+    implementation: string;
+    priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  }>;
+  costCuttingOptions: Array<{
+    category: string;
+    currentSpend: string;
+    potentialSavings: string;
+    risk: 'LOW' | 'MEDIUM' | 'HIGH';
+    recommendation: string;
+  }>;
+  growthOpportunities: Array<{
+    opportunity: string;
+    potentialRevenue: string;
+    effort: 'LOW' | 'MEDIUM' | 'HIGH';
+    timeToValue: string;
+  }>;
+  weeklyFocusAreas: string[];
+  humanRequired: string[];
+  canAutomate: string[];
+}
+
+interface AutonomousScanData {
+  timestamp: string;
+  scanDuration: number;
+  findings: Array<{
+    category: 'FRAUD' | 'DRIVER_ANOMALY' | 'ACCOUNT_SPIKE' | 'REFUND_SPIKE' | 'PAYMENT_ISSUE' | 'SAFETY';
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    title: string;
+    detail: string;
+    affectedCount: number;
+    recommendedAction: string;
+    autoActionAvailable: boolean;
+  }>;
+  healthScore: number;
+  nextScanRecommended: string;
 }
 
 const getPageKeyFromPath = (pathname: string): string => {
@@ -218,6 +288,15 @@ export function SafePilotButton() {
   const [activeTab, setActiveTab] = useState('intelligence');
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  const [crisisReport, setCrisisReport] = useState<CrisisReportData | null>(null);
+  const [isCrisisLoading, setIsCrisisLoading] = useState(false);
+  const [survivalData, setSurvivalData] = useState<SurvivalModeData | null>(null);
+  const [isSurvivalLoading, setIsSurvivalLoading] = useState(false);
+  const [scanData, setScanData] = useState<AutonomousScanData | null>(null);
+  const [isScanLoading, setIsScanLoading] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const pageKey = getPageKeyFromPath(location);
 
@@ -395,6 +474,113 @@ export function SafePilotButton() {
     }
   };
 
+  const handleCrisisReport = async () => {
+    setIsCrisisLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/safepilot/crisis-report');
+      if (res.ok) {
+        const data = await res.json() as CrisisReportData;
+        setCrisisReport(data);
+        setActiveTab('crisis');
+      } else {
+        throw new Error('Failed to generate crisis report');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to generate crisis report. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCrisisLoading(false);
+    }
+  };
+
+  const handleSurvivalMode = async () => {
+    setIsSurvivalLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/safepilot/survival-mode');
+      if (res.ok) {
+        const data = await res.json() as SurvivalModeData;
+        setSurvivalData(data);
+        setActiveTab('survival');
+      } else {
+        throw new Error('Failed to generate survival mode report');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to generate survival mode report. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSurvivalLoading(false);
+    }
+  };
+
+  const handleAutonomousScan = async () => {
+    setIsScanLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/safepilot/autonomous-scan');
+      if (res.ok) {
+        const data = await res.json() as AutonomousScanData;
+        setScanData(data);
+        toast({
+          title: 'Scan Complete',
+          description: `Health Score: ${data.healthScore}%. ${data.findings.length} findings.`,
+        });
+      } else {
+        throw new Error('Scan failed');
+      }
+    } catch (error) {
+      toast({
+        title: 'Scan Error',
+        description: 'Failed to run autonomous scan.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsScanLoading(false);
+    }
+  };
+
+  const handleVoiceCommand = () => {
+    if (isListening) {
+      setIsListening(false);
+      toast({
+        title: 'Voice Mode',
+        description: 'Voice commands will be available in a future update.',
+      });
+    } else {
+      setIsListening(true);
+      toast({
+        title: 'Voice Mode',
+        description: 'Voice recognition is coming soon! Type your question for now.',
+      });
+      setTimeout(() => setIsListening(false), 2000);
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'P0': return 'bg-red-500 text-white';
+      case 'P1': return 'bg-orange-500 text-white';
+      case 'P2': return 'bg-yellow-500 text-black';
+      case 'HIGH': return 'bg-red-500/10 text-red-500 border-red-500/20';
+      case 'MEDIUM': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'LOW': return 'bg-green-500/10 text-green-500 border-green-500/20';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getAutomationColor = (level: string) => {
+    switch (level) {
+      case 'FULL': return 'bg-green-500 text-white';
+      case 'PARTIAL': return 'bg-blue-500 text-white';
+      case 'ASSISTED': return 'bg-purple-500 text-white';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
   if (!location.startsWith('/admin')) {
     return null;
   }
@@ -449,24 +635,36 @@ export function SafePilotButton() {
           </SheetHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid grid-cols-4 mx-4 sm:mx-6 mt-3 sm:mt-4 shrink-0">
-              <TabsTrigger value="intelligence" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-intelligence">
-                <SafePilotIcon size="xs" className="mr-0.5 sm:mr-1.5 shrink-0" />
-                <span className="truncate">Intel</span>
-              </TabsTrigger>
-              <TabsTrigger value="context" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-context">
-                <BarChart3 className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
-                <span className="truncate">Context</span>
-              </TabsTrigger>
-              <TabsTrigger value="response" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-response">
-                <MessageSquare className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
-                <span className="truncate">Chat</span>
-              </TabsTrigger>
-              <TabsTrigger value="history" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-history">
-                <History className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
-                <span className="truncate">History</span>
-              </TabsTrigger>
-            </TabsList>
+            <div className="px-4 sm:px-6 mt-3 sm:mt-4 shrink-0">
+              <TabsList className="grid grid-cols-3 w-full">
+                <TabsTrigger value="intelligence" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-intelligence">
+                  <SafePilotIcon size="xs" className="mr-0.5 sm:mr-1.5 shrink-0" />
+                  <span className="truncate">Intel</span>
+                </TabsTrigger>
+                <TabsTrigger value="context" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-context">
+                  <BarChart3 className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                  <span className="truncate">Context</span>
+                </TabsTrigger>
+                <TabsTrigger value="response" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-response">
+                  <MessageSquare className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                  <span className="truncate">Chat</span>
+                </TabsTrigger>
+              </TabsList>
+              <TabsList className="grid grid-cols-3 w-full mt-1">
+                <TabsTrigger value="crisis" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-crisis">
+                  <AlertTriangle className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                  <span className="truncate">Crisis</span>
+                </TabsTrigger>
+                <TabsTrigger value="survival" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-survival">
+                  <LifeBuoy className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                  <span className="truncate">Survival</span>
+                </TabsTrigger>
+                <TabsTrigger value="history" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-history">
+                  <History className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                  <span className="truncate">History</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="intelligence" className="flex-1 flex flex-col mt-0 min-h-0">
               <ScrollArea className="flex-1 p-4 sm:p-6">
@@ -930,10 +1128,334 @@ export function SafePilotButton() {
                 )}
               </ScrollArea>
             </TabsContent>
+
+            <TabsContent value="crisis" className="flex-1 flex flex-col mt-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 sm:p-6">
+                {crisisReport ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge className={crisisReport.summary.includes('CRITICAL') ? 'bg-red-500 text-white' : crisisReport.summary.includes('WARNING') ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'}>
+                        {crisisReport.summary.includes('CRITICAL') ? 'CRITICAL' : crisisReport.summary.includes('WARNING') ? 'WARNING' : 'STABLE'}
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={handleCrisisReport} disabled={isCrisisLoading}>
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isCrisisLoading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    <Card className="p-3 bg-muted/50">
+                      <p className="text-sm">{crisisReport.summary}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Last updated: {new Date(crisisReport.timestamp).toLocaleTimeString()}
+                      </p>
+                    </Card>
+
+                    {crisisReport.topRisks.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                          Top Risks
+                        </h4>
+                        <div className="space-y-2">
+                          {crisisReport.topRisks.map((risk, idx) => (
+                            <Card key={idx} className={`p-3 border ${getSeverityColor(risk.severity)}`}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{risk.title}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{risk.detail}</p>
+                                  <p className="text-xs mt-1"><span className="font-medium">Impact:</span> {risk.impact}</p>
+                                </div>
+                                <Badge className={getSeverityColor(risk.severity)}>{risk.severity}</Badge>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {crisisReport.urgentFixes.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                          <Target className="h-4 w-4 text-orange-500" />
+                          Urgent Fixes
+                        </h4>
+                        <div className="space-y-2">
+                          {crisisReport.urgentFixes.map((fix, idx) => (
+                            <Card key={idx} className="p-3">
+                              <div className="flex items-start gap-2">
+                                <Badge className={getPriorityColor(fix.priority)}>{fix.priority}</Badge>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{fix.issue}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{fix.suggestedAction}</p>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {crisisReport.topOpportunities.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                          <Rocket className="h-4 w-4 text-green-500" />
+                          Opportunities
+                        </h4>
+                        <div className="space-y-2">
+                          {crisisReport.topOpportunities.map((opp, idx) => (
+                            <Card key={idx} className="p-3 bg-green-500/5 border-green-500/20">
+                              <p className="text-sm font-medium">{opp.title}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{opp.potential}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {opp.timeframe}
+                                </Badge>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Card className="p-3">
+                      <h4 className="font-medium text-sm mb-2">Financial Impact</h4>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="p-2 bg-red-500/10 rounded">
+                          <p className="text-xs text-muted-foreground">At Risk</p>
+                          <p className="text-sm font-semibold text-red-500">${crisisReport.financialImpact.totalAtRisk.toLocaleString()}</p>
+                        </div>
+                        <div className="p-2 bg-green-500/10 rounded">
+                          <p className="text-xs text-muted-foreground">Potential Savings</p>
+                          <p className="text-sm font-semibold text-green-500">${crisisReport.financialImpact.potentialSavings.toLocaleString()}</p>
+                        </div>
+                        <div className="p-2 bg-blue-500/10 rounded">
+                          <p className="text-xs text-muted-foreground">Revenue Opp.</p>
+                          <p className="text-sm font-semibold text-blue-500">${crisisReport.financialImpact.revenueOpportunity.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {crisisReport.recommendedNextSteps.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Next Steps</h4>
+                        <div className="space-y-1">
+                          {crisisReport.recommendedNextSteps.map((step, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                              <span>{step}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <AlertTriangle className="h-12 w-12 mb-4 text-muted-foreground opacity-30" />
+                    <p className="text-muted-foreground mb-4">Generate a real-time crisis report to see platform status.</p>
+                    <Button onClick={handleCrisisReport} disabled={isCrisisLoading} data-testid="button-generate-crisis">
+                      {isCrisisLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Generate Crisis Report
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="survival" className="flex-1 flex flex-col mt-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 sm:p-6">
+                {survivalData ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">Company Survival Mode</h3>
+                      <Button variant="ghost" size="sm" onClick={handleSurvivalMode} disabled={isSurvivalLoading}>
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isSurvivalLoading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-green-500" />
+                        Automation Opportunities
+                      </h4>
+                      <div className="space-y-2">
+                        {survivalData.automationOpportunities.map((opp, idx) => (
+                          <Card key={idx} className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium">{opp.area}</p>
+                                  <Badge className={getAutomationColor(opp.automationLevel)} variant="secondary">
+                                    {opp.automationLevel}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">Current: {opp.currentCost}</p>
+                                <p className="text-xs text-green-600 mt-0.5">Savings: {opp.savingsEstimate}</p>
+                              </div>
+                              <Badge className={getPriorityColor(opp.priority)}>{opp.priority}</Badge>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-blue-500" />
+                        Cost Cutting Options
+                      </h4>
+                      <div className="space-y-2">
+                        {survivalData.costCuttingOptions.map((opt, idx) => (
+                          <Card key={idx} className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{opt.category}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{opt.currentSpend}</p>
+                                <p className="text-xs text-green-600 mt-0.5">Potential savings: {opt.potentialSavings}</p>
+                              </div>
+                              <Badge className={getPriorityColor(opt.risk)}>Risk: {opt.risk}</Badge>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-purple-500" />
+                        Growth Opportunities
+                      </h4>
+                      <div className="space-y-2">
+                        {survivalData.growthOpportunities.map((opp, idx) => (
+                          <Card key={idx} className="p-3 bg-purple-500/5 border-purple-500/20">
+                            <p className="text-sm font-medium">{opp.opportunity}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-purple-600">{opp.potentialRevenue}</span>
+                              <Badge variant="outline" className="text-xs">Effort: {opp.effort}</Badge>
+                              <Badge variant="outline" className="text-xs">{opp.timeToValue}</Badge>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Card className="p-3">
+                      <h4 className="font-medium text-sm mb-2">Weekly Focus Areas</h4>
+                      <div className="space-y-1">
+                        {survivalData.weeklyFocusAreas.map((area, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-xs">
+                            <Target className="h-3 w-3 text-primary mt-0.5 shrink-0" />
+                            <span>{area}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Card className="p-3 bg-red-500/5 border-red-500/20">
+                        <h5 className="text-xs font-medium mb-2 flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          Human Required
+                        </h5>
+                        <ul className="space-y-1">
+                          {survivalData.humanRequired.slice(0, 4).map((item, idx) => (
+                            <li key={idx} className="text-xs text-muted-foreground">{item}</li>
+                          ))}
+                        </ul>
+                      </Card>
+                      <Card className="p-3 bg-green-500/5 border-green-500/20">
+                        <h5 className="text-xs font-medium mb-2 flex items-center gap-1">
+                          <Zap className="h-3 w-3" />
+                          Can Automate
+                        </h5>
+                        <ul className="space-y-1">
+                          {survivalData.canAutomate.slice(0, 4).map((item, idx) => (
+                            <li key={idx} className="text-xs text-muted-foreground">{item}</li>
+                          ))}
+                        </ul>
+                      </Card>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <LifeBuoy className="h-12 w-12 mb-4 text-muted-foreground opacity-30" />
+                    <p className="text-muted-foreground mb-4">Get startup survival recommendations and cost optimization insights.</p>
+                    <Button onClick={handleSurvivalMode} disabled={isSurvivalLoading} data-testid="button-survival-mode">
+                      {isSurvivalLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <LifeBuoy className="h-4 w-4 mr-2" />
+                          Enter Survival Mode
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
           </Tabs>
 
           <Separator className="shrink-0" />
           <div className="p-3 sm:p-4 shrink-0 bg-background safe-area-bottom">
+            <div className="flex items-center gap-1 mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCrisisReport}
+                disabled={isCrisisLoading}
+                className="text-xs min-h-[36px] flex-1"
+                data-testid="button-quick-crisis"
+              >
+                {isCrisisLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <AlertTriangle className="h-3 w-3 mr-1" />}
+                Crisis
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleAutonomousScan}
+                disabled={isScanLoading}
+                className="text-xs min-h-[36px] flex-1"
+                data-testid="button-quick-scan"
+              >
+                {isScanLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Activity className="h-3 w-3 mr-1" />}
+                Scan
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSurvivalMode}
+                disabled={isSurvivalLoading}
+                className="text-xs min-h-[36px] flex-1"
+                data-testid="button-quick-survival"
+              >
+                {isSurvivalLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <LifeBuoy className="h-3 w-3 mr-1" />}
+                Optimize
+              </Button>
+            </div>
+            {scanData && (
+              <div className="mb-2 p-2 rounded-lg bg-muted/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${scanData.healthScore >= 80 ? 'bg-green-500' : scanData.healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                  <span className="text-xs">Health: {scanData.healthScore}%</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{scanData.findings.length} findings</span>
+              </div>
+            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -941,6 +1463,17 @@ export function SafePilotButton() {
               }}
               className="flex gap-2"
             >
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={handleVoiceCommand}
+                disabled={isSubmitting}
+                className={`min-h-[44px] min-w-[44px] shrink-0 ${isListening ? 'bg-red-500/10 text-red-500' : ''}`}
+                data-testid="button-voice-command"
+              >
+                {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              </Button>
               <Input
                 data-testid="input-safepilot-question"
                 placeholder="Ask about drivers, fraud, KYC..."
