@@ -281,6 +281,7 @@ import AdminAccessGovernance from "@/pages/admin/access-governance";
 import ComplianceExportCenter from "@/pages/admin/compliance-export-center";
 import OperationsConsole from "@/pages/admin/operations-console";
 import BackupsDRPage from "@/pages/admin/backups-dr";
+import AccessReviewsPage from "@/pages/admin/access-reviews";
 
 // Phase 3A: Enterprise Admin Features
 import EnterpriseSearch from "@/pages/admin/enterprise-search";
@@ -2106,6 +2107,11 @@ function Router() {
       <Route path="/admin/backups-dr">
         <ProtectedRoute allowedRoles={["admin"]}>
           <BackupsDRPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/access-reviews">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AccessReviewsPage />
         </ProtectedRoute>
       </Route>
       

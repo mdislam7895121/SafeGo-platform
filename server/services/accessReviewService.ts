@@ -1,4 +1,4 @@
-import { prisma } from '../prisma';
+import { prisma } from '../db';
 import { ReviewCycleStatus, ReviewDecision } from '@prisma/client';
 
 export interface CreateCycleInput {

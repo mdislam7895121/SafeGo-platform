@@ -152,6 +152,12 @@ const securityNavItems: NavItem[] = [
     icon: ScrollText,
     navKey: "auditLog",
   },
+  {
+    title: "Access Reviews",
+    href: "/admin/access-reviews",
+    icon: FileCheck,
+    navKey: "safetyCenter",
+  },
 ];
 
 const configNavItems: NavItem[] = [
