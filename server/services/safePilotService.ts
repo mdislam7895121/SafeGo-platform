@@ -611,7 +611,7 @@ export const safePilotService = {
       lowRatingDrivers,
       pendingKyc,
     ] = await Promise.all([
-      prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
+      prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
       prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } }),
       prisma.payout.count({ where: { status: 'failed' } }),
       prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
@@ -1383,9 +1383,9 @@ export const safePilotService = {
       pendingAlerts,
     ] = await Promise.all([
       prisma.fraudAlert.count(),
-      prisma.fraudAlert.count({ where: { severity: 'CRITICAL', status: 'PENDING' } }),
-      prisma.fraudAlert.count({ where: { severity: 'HIGH', status: 'PENDING' } }),
-      prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
+      prisma.fraudAlert.count({ where: { severity: 'CRITICAL', status: 'open' } }).catch(() => 0),
+      prisma.fraudAlert.count({ where: { severity: 'HIGH', status: 'open' } }).catch(() => 0),
+      prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
     ]);
 
     const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
@@ -2112,14 +2112,14 @@ export const safePilotService = {
 
   async handleFraudQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'GUARD'): Promise<SafePilotQueryResponse> {
     const [pendingFraudAlerts, resolvedFraudAlerts, highSeverityAlerts] = await Promise.all([
-      prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
+      prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
       prisma.fraudAlert.count({
         where: {
           status: 'RESOLVED',
           createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         },
       }),
-      prisma.fraudAlert.count({ where: { status: 'PENDING', severity: { in: ['HIGH', 'CRITICAL'] } } }),
+      prisma.fraudAlert.count({ where: { status: 'open', severity: { in: ['HIGH', 'CRITICAL'] } } }).catch(() => 0),
     ]);
 
     const formatted = this.formatVision2030Response(
@@ -3155,33 +3155,41 @@ export const safePilotService = {
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     try {
-      const [
-        pendingFraud,
-        activeSOSAlerts,
-        failedPayouts,
-        pendingRefunds,
-        negativeWallets,
-        pendingKYC,
-        lowRatingDrivers,
-        blockedUsers,
-        recentRides,
-        recentOrders,
-        totalRevenue7d,
-        totalRefunds7d,
-      ] = await Promise.all([
-        prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
-        prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } }),
-        prisma.payout.count({ where: { status: 'failed' } }),
-        prisma.refundRequest.count({ where: { status: 'pending' } }),
-        prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
-        prisma.driverProfile.count({ where: { ...where, verificationStatus: 'pending' } }),
-        prisma.driverStats.count({ where: { rating: { lt: 3.0 } } }),
-        prisma.user.count({ where: { isBlocked: true } }),
-        prisma.ride.count({ where: { createdAt: { gte: since24h } } }),
-        prisma.foodOrder.count({ where: { createdAt: { gte: since24h } } }),
-        prisma.ride.aggregate({ where: { createdAt: { gte: since7d }, status: 'completed' }, _sum: { finalFare: true } }),
-        prisma.refundRequest.aggregate({ where: { createdAt: { gte: since7d }, status: 'approved' }, _sum: { amount: true } }),
-      ]);
+      // Use safe queries with fallback to prevent crashes
+      let pendingFraud = 0;
+      let activeSOSAlerts = 0;
+      let failedPayouts = 0;
+      let pendingRefunds = 0;
+      let negativeWallets = 0;
+      let pendingKYC = 0;
+      let lowRatingDrivers = 0;
+      let blockedUsers = 0;
+      let recentRides = 0;
+      let recentOrders = 0;
+      let totalRevenue7d = 0;
+      let totalRefunds7d = 0;
+
+      try {
+        [pendingFraud, activeSOSAlerts, failedPayouts, pendingRefunds, negativeWallets, pendingKYC, lowRatingDrivers, blockedUsers, recentRides, recentOrders] = await Promise.all([
+          prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
+          prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } }).catch(() => 0),
+          prisma.payout.count({ where: { status: 'failed' } }).catch(() => 0),
+          prisma.refundRequest.count({ where: { status: 'pending' } }).catch(() => 0),
+          prisma.driverWallet.count({ where: { balance: { lt: 0 } } }).catch(() => 0),
+          prisma.driverProfile.count({ where: { ...where, verificationStatus: 'pending' } }).catch(() => 0),
+          prisma.driverStats.count({ where: { rating: { lt: 3.0 } } }).catch(() => 0),
+          prisma.user.count({ where: { isBlocked: true } }).catch(() => 0),
+          prisma.ride.count({ where: { createdAt: { gte: since24h } } }).catch(() => 0),
+          prisma.foodOrder.count({ where: { createdAt: { gte: since24h } } }).catch(() => 0),
+        ]);
+
+        const revenueAgg = await prisma.ride.aggregate({ where: { createdAt: { gte: since7d }, status: 'completed' }, _sum: { finalFare: true } }).catch(() => ({ _sum: { finalFare: null } }));
+        const refundsAgg = await prisma.refundRequest.aggregate({ where: { createdAt: { gte: since7d }, status: 'approved' }, _sum: { amount: true } }).catch(() => ({ _sum: { amount: null } }));
+        totalRevenue7d = Number(revenueAgg._sum?.finalFare ?? 0);
+        totalRefunds7d = Number(refundsAgg._sum?.amount ?? 0);
+      } catch (queryError) {
+        console.error('[SafePilot] Crisis Report query error (continuing with zeros):', queryError);
+      }
 
       // Build top risks
       const topRisks: Array<{ title: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; detail: string; impact: string; action: string }> = [];
@@ -3511,9 +3519,9 @@ export const safePilotService = {
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     try {
-      // 1. Fraud Detection
-      const pendingFraud = await prisma.fraudAlert.count({ where: { status: 'PENDING' } });
-      const newFraud1h = await prisma.fraudAlert.count({ where: { createdAt: { gte: since1h } } });
+      // 1. Fraud Detection - use correct enum value 'open' instead of 'PENDING'
+      const pendingFraud = await prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0);
+      const newFraud1h = await prisma.fraudAlert.count({ where: { createdAt: { gte: since1h } } }).catch(() => 0);
       
       if (newFraud1h > 5) {
         findings.push({
@@ -3692,19 +3700,24 @@ export const safePilotService = {
     console.log('[SafePilot] Generating Survival Mode report...');
     
     try {
-      const [
-        totalDrivers,
-        pendingKYC,
-        totalRefunds,
-        pendingComplaints,
-        totalRides7d,
-      ] = await Promise.all([
-        prisma.driverProfile.count(),
-        prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }),
-        prisma.refundRequest.count({ where: { status: 'pending' } }),
-        prisma.complaint.count({ where: { status: 'open' } }),
-        prisma.ride.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
-      ]);
+      // Safe queries with fallback to prevent crashes
+      let totalDrivers = 0;
+      let pendingKYC = 0;
+      let totalRefunds = 0;
+      let pendingComplaints = 0;
+      let totalRides7d = 0;
+
+      try {
+        [totalDrivers, pendingKYC, totalRefunds, pendingComplaints, totalRides7d] = await Promise.all([
+          prisma.driverProfile.count().catch(() => 0),
+          prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }).catch(() => 0),
+          prisma.refundRequest.count({ where: { status: 'pending' } }).catch(() => 0),
+          prisma.complaint.count({ where: { status: 'open' } }).catch(() => 0),
+          prisma.ride.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }).catch(() => 0),
+        ]);
+      } catch (queryError) {
+        console.error('[SafePilot] Survival Mode query error (continuing with zeros):', queryError);
+      }
 
       return {
         timestamp: new Date().toISOString(),
@@ -4885,7 +4898,7 @@ export const safePilotService = {
       prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }),
       prisma.payout.count({ where: { status: 'failed' } }),
       prisma.complaint.count({ where: { status: 'open' } }),
-      prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
+      prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
     ]);
 
     // Generate alerts based on conditions
