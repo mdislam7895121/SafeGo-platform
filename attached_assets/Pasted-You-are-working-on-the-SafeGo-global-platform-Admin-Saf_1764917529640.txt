@@ -1,0 +1,377 @@
+You are working on the SafeGo global platform (Admin + SafePilot).  
+The current problems are:
+
+1) The admin dashboard is NOT device-friendly (cannot be used properly on mobile).  
+2) SafePilot does NOT respond or perform actions when asked questions.  
+3) The whole system must be made production/publish-ready.
+
+Your job in this task is to FIX ALL THREE completely.
+
+You must follow every SafeGo rule below and MUST NOT break any existing features.
+
+====================================
+0. SAFEGO CORE RULES (DO NOT BREAK)
+====================================
+
+Roles (must all remain intact and separate):
+1) customer
+2) driver
+3) restaurant / merchant (SafeGo Eats + shop partner)
+4) admin
+
++ (shop / parcel partners, ticket/rental partners) where already implemented.
+
+Each role has:
+- its own signup or onboarding,
+- its own dashboard,
+- its own permissions.
+Do NOT mix their access.
+
+GLOBAL SERVICES (MUST KEEP):
+- Ride-hailing
+- Food delivery (SafeGo Eats)
+- Parcel / shop delivery
+- Ticket / rental flows (where implemented)
+
+KYC (country-specific, do NOT weaken):
+
+Bangladesh (BD):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front/back images)
+- emergency contact details
+- verification_status + is_verified
+
+United States (US):
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- drivers: driver_license + image + expiry
+- drivers: ssn_last4 (optional)
+- verification_status + is_verified
+
+ADMIN PANEL MUST SUPPORT:
+- Verify customers, drivers, restaurants, partners
+- Approve/reject KYC with rejection_reason
+- Update pricing, fees, commissions
+- Block/unblock users
+- Manage payouts + see negative balances
+- View driver & restaurant negative wallet balance
+- See fraud / safety / disputes where implemented
+
+CORE COLLECTIONS (DO NOT CHANGE IN BREAKING WAY):
+- rides
+- food_orders
+- deliveries
+
+Each must keep:
+- identity fields (customer_id, driver_id, restaurant_id, driver_id, etc.)
+- pickup/dropoff addresses + geolocation
+- fees + SafeGo commission
+- payment details (cash/online)
+- timestamps
+- full status flows
+- rating and feedback
+
+COMMISSION & PAYOUT LOGIC (MUST REMAIN TRUE):
+1) CASH (rides):
+   - Driver receives full cash from customer.
+   - SafeGo commission becomes NEGATIVE BALANCE in driver_wallet_balance.
+   - Driver must settle weekly; admin can settle and mark paid.
+
+2) CASH (food):
+   - Restaurant receives full cash.
+   - SafeGo commission becomes NEGATIVE BALANCE in restaurant_wallet.
+
+3) ONLINE payments:
+   - SafeGo keeps commission automatically (no negative wallet).
+
+4) Admin can settle balances and mark paid.
+
+SECURITY RULES:
+- Customers cannot view driver documents (NID, license).
+- Drivers cannot view customer NID or sensitive info.
+- Restaurants/shops cannot see other restaurants/shops.
+- Only admin can:
+  - change pricing,
+  - modify commissions,
+  - change verification,
+  - block/unblock users.
+- Users can only update their own profile.
+- Respect all existing RBAC and audit logging.
+
+STATUS FLOWS (DON’T CHANGE NAMES OR MEANING):
+
+Rides:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+Food:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+Parcel:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+ONBOARDING (MUST KEEP RULE):
+- Simple, secure customer-only signup.
+- All other roles (driver, restaurant, shop, ticket, admin) created later via onboarding.
+- Each onboarding:
+  - Basic info
+  - Address
+  - ID/KYC upload (per country rules)
+  - Emergency contact
+  - verification_status = "pending"
+  - Block access until approved by admin.
+
+NOTIFICATIONS:
+- New ride alert for drivers
+- Order updates
+- Parcel updates
+- Verification approval/rejection
+- Important admin notifications
+
+DO NOT REMOVE OR BREAK ANY OF THE ABOVE.  
+Only extend the system safely.
+
+====================================
+1. MAKE ADMIN DASHBOARD DEVICE-FRIENDLY
+====================================
+
+Goal: The entire admin dashboard (including SafePilot, Intelligence, Safety Center, People & KYC, Finance, Legal, etc.) must be fully usable on:
+
+- Small phones (~360–400px width)
+- Larger phones
+- Tablets
+- Desktops and laptops
+
+Desktop design MUST remain intact or improved.  
+Responsive work must be additive, not destructive.
+
+1.1 Global Layout & Navigation
+- Find the main admin layout (e.g. AdminLayout.tsx or similar).
+- Ensure sidebar behaves like this:
+  - Desktop: fixed left sidebar as it is now.
+  - Tablet/Mobile: collapsible sidebar:
+    - Show a hamburger/menu button in the top bar.
+    - Menu slides in/out.
+    - Sidebar items scroll if they overflow vertically.
+
+- Top bar on mobile must show:
+  - Current page title
+  - Optional back button (if nested)
+  - Global search / command button (if available)
+  - SafePilot icon (see section 2)
+
+- Test navigation on mobile for:
+  - Dashboard
+  - People & KYC
+  - Drivers / customers / restaurants / partners
+  - Safety & Risk Center
+  - Ratings & Violations
+  - Refund / Payout / Finance
+  - Intelligence / Operations / Logs
+  - Legal & Compliance / Exports
+  - Releases & Publish
+
+1.2 Responsive Content (Cards, Tables, Filters)
+- For all major admin pages that use tables or wide grids:
+  - Keep wide table layout on desktop.
+  - On mobile:
+    - Convert tables into stacked cards OR
+    - Use horizontal scroll with clear indicators and minimum necessary columns.
+- Ensure:
+  - Tap targets ≥ 44x44px.
+  - No critical text is cut off.
+  - Filters and search controls stack vertically on mobile rather than overflow horizontally.
+
+Pages to fix explicitly:
+- People & KYC Center (user list, KYC stages)
+- Safety & Risk Center (incidents, cases, flags)
+- Ratings, Reviews, Driver Violations
+- Earnings Disputes, Refund Center
+- Ride Timeline, Payment Integrity
+- Intelligence dashboards (earnings, complaints, rankings, etc.)
+- Legal & Compliance Export Center
+- Operations (jobs, health, errors/logs)
+- Releases & Publish Console
+- Any SafePilot-specific analytics views.
+
+1.3 Dialogs, Drawers, Forms
+- Fix all admin dialogs so they work on mobile:
+  - Full-width or near-full-width on phones.
+  - Scrollable content inside the dialog.
+  - Action buttons (Save, Approve, Reject, Close) must remain visible above the mobile keyboard.
+- No overflow off-screen.  
+- No dialog that cannot be closed or scrolled on phone.
+
+1.4 Performance & Accessibility
+- Avoid heavy charts that freeze small devices:
+  - Simplify or lazy load on mobile.
+- Make sure:
+  - No horizontal scroll on main content area on small devices.
+  - Proper color contrast and readable text.
+  - Keyboard and screen-reader compatibility not broken.
+
+====================================
+2. MAKE SAFEPILOT FULLY WORKING (NOT JUST UI)
+====================================
+
+Current problem:  
+SafePilot exists visually (or partially) but when you ask something, it does NOT “work” (no meaningful answers, no actions).
+
+You must make SafePilot end-to-end functional and ready for real use.
+
+2.1 SafePilot Visibility
+- Ensure SafePilot is visible and usable on **all admin pages**:
+  - Floating button (bottom-right) for desktop and mobile.
+  - Sidebar entry “SafePilot” under “Intelligence” or similar.
+- The floating button must NOT be hidden by z-index, opacity, or feature flags.
+- Ensure any feature flag like `SAFE_PILOT_ENABLED` is ON in this environment.
+
+2.2 SafePilot UI Behavior
+- Clicking the floating button must open a SafePilot panel:
+  - Desktop:
+    - Right-side drawer or panel.
+  - Mobile:
+    - Bottom sheet or full-height slide-up panel.
+
+Panel must contain:
+- “Page Summary” section:
+  - Shows info based on current page (e.g. in KYC page: counts of pending, rejected, etc.).
+- “Ask SafePilot” section:
+  - Text input to type questions/commands.
+  - Message list showing:
+    - Admin messages
+    - SafePilot responses
+- “Quick Actions” section:
+  - Shortcuts relevant to the current page:
+    - Example: on Drivers page → “Show drivers with 3+ complaints”
+    - On Safety Center → “Show today’s high-risk incidents”
+    - On Finance → “Show abnormal payouts this week”
+
+2.3 SafePilot Backend Wiring
+You must wire SafePilot frontend to real backend logic, NOT fake/stub data.
+
+Implement or fix backend endpoints such as:
+- `POST /api/admin/safepilot/query`
+- `POST /api/admin/safepilot/context`
+- `POST /api/admin/safepilot/suggest-actions`
+
+These endpoints MUST:
+- Read from real data:
+  - rides, food_orders, deliveries
+  - customers, drivers, restaurants, partners
+  - complaints, ratings, safety incidents, violations
+  - payouts, wallets, refunds, disputes
+  - KYC status tables
+- Apply simple but clear business rules (no hallucinations, no random mock).
+
+For each SafePilot query:
+- Use pageKey (e.g. "admin.drivers", "admin.kyc", "admin.safety") + filters (e.g. country BD/US, date range).
+- Return:
+  - `answerText`: short human-readable summary.
+  - `insights[]`: high-level items (type: cost, risk, growth, etc., with metrics).
+  - `actions[]`: safe suggested actions:
+    - e.g. open a filtered list
+    - open an incident detail
+    - navigate to refunds that need review
+- Log interaction in a SafePilotInteraction model/table with:
+  - adminId, pageKey, question, responseSummary, createdAt, riskLevel.
+
+2.4 SafePilot Must Actually “Do Something Useful”
+For example, SafePilot must be able to:
+
+- On Drivers page:
+  - show list of high-risk drivers (low rating + many complaints).
+- On KYC page:
+  - highlight customers with KYC pending too long.
+- On Safety Center:
+  - show last 24 hours high severity incidents.
+- On Finance/Payout:
+  - show payouts that look abnormal (large amount, frequent same destination, etc.)
+- On Complaints/Refund:
+  - show top reasons and suggest where policy improvement needed.
+
+You must implement enough real logic so that when the admin asks:
+- “Show me risky drivers in Bangladesh in the last 7 days”
+- “Which customers have the most refunds in the US?”
+- “Where are we losing the most money this week?”
+
+SafePilot responds with meaningful, data-backed summaries and links or actions.
+
+2.5 SafePilot Security & RBAC
+- SafePilot is ADMIN-only.
+- Respect existing role & permission system:
+  - Only admins with SafePilot permission (e.g. `admin.safepilot.use`) can see and use it.
+- SafePilot must NOT:
+  - Expose hidden PII.
+  - Show internal notes to wrong roles.
+  - Execute destructive actions automatically.
+  - Bypass KYC, payouts, or commission rules.
+
+Any risky action must still go through existing confirm flows and backend mutations with audit logs.
+
+====================================
+3. MAKE THE SYSTEM PUBLISH-READY
+====================================
+
+The final state must be strong enough to publish as a real product demo / MVP.
+
+3.1 No Broken Flows
+- Test that all major admin flows still work on desktop + mobile:
+  - Login / logout
+  - Navigate all admin sections
+  - Filter and search lists
+  - View & approve/reject KYC
+  - View & manage safety incidents
+  - View refunds, disputes, payouts
+  - Use Intelligence / Ops / Logs
+  - Use SafePilot from multiple pages
+
+3.2 No Console Errors
+- Open browser dev tools.
+- Navigate through all main pages.
+- Fix any React warnings, TypeScript errors, missing keys, missing dependencies, and network errors.
+- No “Unhandled Promise rejection”, “404 for internal API”, “500 error” from admin endpoints that SafePilot or dashboards rely on.
+
+3.3 Complete Error States & Loading States
+- For all SafePilot calls + important admin listings:
+  - Show loading spinners or skeletons.
+  - Show friendly error messages on failure.
+  - Do NOT leave blank screens.
+
+3.4 Feature Flags & Config
+- Ensure any flags that must be ON for production-like demo are enabled:
+  - SafePilot main feature flag.
+  - Intelligence dashboards.
+  - Operations dashboard (jobs, health, logs).
+- Ensure dev-only features are either:
+  - clearly marked as experimental, or
+  - disabled in the main UI.
+
+3.5 Documentation
+- Update or create a short admin README / replit.md that explains:
+  - How to access the admin dashboard.
+  - How to use it on desktop vs mobile.
+  - How to open and use SafePilot.
+  - Which pages SafePilot supports specially.
+  - Any known limitations.
+
+====================================
+4. EXECUTION RULES
+====================================
+
+- Do NOT ask me any follow-up questions.
+- Make reasonable assumptions consistent with the existing codebase.
+- Do NOT simplify or remove SafeGo rules.
+- Do NOT change or break any core role, KYC, commission, or status flow logic.
+- Only ADD safe, backward-compatible code and wiring.
+- When you finish, the admin dashboard must:
+  - Work properly on mobile, tablet, and desktop.
+  - Show a working SafePilot that responds with real insights and suggestions.
+  - Have no obvious errors that block us from publishing it as a demo/MVP.
+
+Just implement everything end-to-end and fix all related issues.

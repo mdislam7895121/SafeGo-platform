@@ -326,7 +326,7 @@ export function SafePilotButton() {
       <Button
         data-testid="button-safepilot-launcher"
         size="icon"
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 bg-primary hover:bg-primary/90"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-14 w-14 sm:h-14 sm:w-14 rounded-full shadow-lg z-50 bg-primary hover:bg-primary/90 touch-manipulation"
         onClick={() => setIsOpen(true)}
       >
         <Sparkles className="h-6 w-6" />
@@ -338,48 +338,57 @@ export function SafePilotButton() {
       </Button>
 
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent className="w-full sm:max-w-lg p-0 flex flex-col" data-testid="panel-safepilot">
-          <SheetHeader className="p-6 pb-4 border-b">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-primary" />
+        <SheetContent 
+          className="w-full sm:max-w-lg p-0 flex flex-col h-[100dvh] sm:h-full" 
+          data-testid="panel-safepilot"
+          side="right"
+        >
+          <SheetHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 </div>
-                <div>
-                  <SheetTitle>SafePilot</SheetTitle>
-                  <SheetDescription className="text-xs">
+                <div className="min-w-0">
+                  <SheetTitle className="text-base sm:text-lg">SafePilot</SheetTitle>
+                  <SheetDescription className="text-xs truncate">
                     AI-powered admin assistant
                   </SheetDescription>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                <X className="h-4 w-4" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsOpen(false)}
+                className="min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9 shrink-0"
+              >
+                <X className="h-5 w-5 sm:h-4 sm:w-4" />
               </Button>
             </div>
           </SheetHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="grid grid-cols-4 mx-6 mt-4">
-              <TabsTrigger value="intelligence" className="text-xs" data-testid="tab-safepilot-intelligence">
-                <Brain className="h-3.5 w-3.5 mr-1.5" />
-                Intel
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid grid-cols-4 mx-4 sm:mx-6 mt-3 sm:mt-4 shrink-0">
+              <TabsTrigger value="intelligence" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-intelligence">
+                <Brain className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                <span className="truncate">Intel</span>
               </TabsTrigger>
-              <TabsTrigger value="context" className="text-xs" data-testid="tab-safepilot-context">
-                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
-                Context
+              <TabsTrigger value="context" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-context">
+                <BarChart3 className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                <span className="truncate">Context</span>
               </TabsTrigger>
-              <TabsTrigger value="response" className="text-xs" data-testid="tab-safepilot-response">
-                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                Response
+              <TabsTrigger value="response" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-response">
+                <MessageSquare className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                <span className="truncate">Chat</span>
               </TabsTrigger>
-              <TabsTrigger value="history" className="text-xs" data-testid="tab-safepilot-history">
-                <History className="h-3.5 w-3.5 mr-1.5" />
-                History
+              <TabsTrigger value="history" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-history">
+                <History className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                <span className="truncate">History</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="intelligence" className="flex-1 flex flex-col mt-0">
-              <ScrollArea className="flex-1 p-6">
+            <TabsContent value="intelligence" className="flex-1 flex flex-col mt-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 sm:p-6">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold">Intelligence Modules</h3>
@@ -578,8 +587,8 @@ export function SafePilotButton() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="context" className="flex-1 flex flex-col mt-0">
-              <ScrollArea className="flex-1 p-6">
+            <TabsContent value="context" className="flex-1 flex flex-col mt-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 sm:p-6">
                 {contextLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -654,8 +663,8 @@ export function SafePilotButton() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="response" className="flex-1 flex flex-col mt-0">
-              <ScrollArea className="flex-1 p-6">
+            <TabsContent value="response" className="flex-1 flex flex-col mt-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 sm:p-6">
                 {queryResponse ? (
                   <div className="space-y-6">
                     <Card>
@@ -732,8 +741,8 @@ export function SafePilotButton() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="history" className="flex-1 flex flex-col mt-0">
-              <ScrollArea className="flex-1 p-6">
+            <TabsContent value="history" className="flex-1 flex flex-col mt-0 min-h-0">
+              <ScrollArea className="flex-1 p-4 sm:p-6">
                 {historyData?.interactions?.length ? (
                   <div className="space-y-3">
                     {historyData.interactions.map((item) => (
@@ -773,8 +782,8 @@ export function SafePilotButton() {
             </TabsContent>
           </Tabs>
 
-          <Separator />
-          <div className="p-4">
+          <Separator className="shrink-0" />
+          <div className="p-3 sm:p-4 shrink-0 bg-background safe-area-bottom">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -784,22 +793,23 @@ export function SafePilotButton() {
             >
               <Input
                 data-testid="input-safepilot-question"
-                placeholder="Ask about drivers, customers, fraud, KYC..."
+                placeholder="Ask about drivers, fraud, KYC..."
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 disabled={isSubmitting}
-                className="flex-1"
+                className="flex-1 min-h-[44px] text-base sm:text-sm"
               />
               <Button
                 type="submit"
                 size="icon"
                 disabled={!question.trim() || isSubmitting}
                 data-testid="button-safepilot-submit"
+                className="min-h-[44px] min-w-[44px]"
               >
                 {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <Send className="h-5 w-5" />
                 )}
               </Button>
             </form>
