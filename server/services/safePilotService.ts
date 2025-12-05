@@ -537,45 +537,62 @@ export const safePilotService = {
     // Get final response (with fallback if needed)
     let response = result.success && result.data ? result.data : result.fallback!;
 
-    // HIGH RISK auto-alert preparation
-    if (response.riskLevel === 'HIGH' || response.riskLevel === 'CRITICAL') {
-      const highRiskInsights = response.insights.filter(i => 
-        i.severity === 'HIGH' || i.severity === 'CRITICAL'
-      );
-      
-      if (highRiskInsights.length > 0) {
-        const alertPrep = this.prepareHighRiskAlert(
-          highRiskInsights[0].type,
-          highRiskInsights[0].detail,
-          Object.entries(highRiskInsights[0].metrics || {}).map(([field, value]) => ({
-            field,
-            value,
-          })),
-          response.suggestions[0]?.label || 'Review and take action'
+    // CRITICAL: Ensure response has all required arrays to prevent runtime crashes
+    if (!response.insights) response.insights = [];
+    if (!response.suggestions) response.suggestions = [];
+    if (!response.summary) response.summary = ['Analysis complete.'];
+    if (!response.keySignals) response.keySignals = [];
+    if (!response.actions) response.actions = [];
+    if (!response.monitor) response.monitor = [];
+
+    // HIGH RISK auto-alert preparation - only if insights array exists and has data
+    try {
+      if ((response.riskLevel === 'HIGH' || response.riskLevel === 'CRITICAL') && response.insights.length > 0) {
+        const highRiskInsights = response.insights.filter(i => 
+          i.severity === 'HIGH' || i.severity === 'CRITICAL'
         );
+        
+        if (highRiskInsights.length > 0) {
+          const alertPrep = this.prepareHighRiskAlert(
+            highRiskInsights[0].type,
+            highRiskInsights[0].detail,
+            Object.entries(highRiskInsights[0].metrics || {}).map(([field, value]) => ({
+              field,
+              value,
+            })),
+            response.suggestions[0]?.label || 'Review and take action'
+          );
 
-        // Add alert preparation to response
-        response.insights.unshift({
-          type: 'safety',
-          title: 'HIGH RISK ALERT PREPARED',
-          detail: `Auto-generated alert ready for: ${alertPrep.alert.riskType}. Evidence packet attached.`,
-          metrics: { alertId: alertPrep.alert.timestamp },
-          severity: 'CRITICAL',
-        });
+          // Add alert preparation to response
+          response.insights.unshift({
+            type: 'safety',
+            title: 'HIGH RISK ALERT PREPARED',
+            detail: `Auto-generated alert ready for: ${alertPrep.alert.riskType}. Evidence packet attached.`,
+            metrics: { alertId: alertPrep.alert.timestamp },
+            severity: 'CRITICAL',
+          });
 
-        // Add notification suggestion
-        response.suggestions.unshift({
-          key: 'notify_senior',
-          label: 'Notify Senior Admin',
-          actionType: 'BULK_ACTION',
-          payload: { action: 'notify', alertData: alertPrep.alert },
-          permission: 'MANAGE_ROLES',
-        });
+          // Add notification suggestion
+          response.suggestions.unshift({
+            key: 'notify_senior',
+            label: 'Notify Senior Admin',
+            actionType: 'BULK_ACTION',
+            payload: { action: 'notify', alertData: alertPrep.alert },
+            permission: 'MANAGE_ROLES',
+          });
+        }
       }
+    } catch (alertError) {
+      console.error('[SafePilot] Alert preparation error (non-fatal):', alertError);
+      // Don't fail the entire response for alert preparation errors
     }
 
-    // Log interaction
-    await this.logInteraction(adminId, pageKey, question, response, countryCode, Date.now() - startTime);
+    // Log interaction (wrapped in try/catch to prevent logging failures from breaking response)
+    try {
+      await this.logInteraction(adminId, pageKey, question, response, countryCode, Date.now() - startTime);
+    } catch (logError) {
+      console.error('[SafePilot] Logging error (non-fatal):', logError);
+    }
 
     return response;
   },
