@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { 
   Sparkles, 
   Send, 
@@ -39,6 +40,7 @@ import {
   Radio,
   ShieldCheck,
   Gauge,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -111,7 +113,7 @@ const intelligenceModules = [
     icon: TrendingUp, 
     color: 'bg-green-500/10 text-green-600',
     description: 'Revenue optimization & market expansion',
-    href: '/admin/safepilot-intelligence'
+    query: 'What are the top growth opportunities right now?'
   },
   { 
     id: 'cost', 
@@ -119,7 +121,7 @@ const intelligenceModules = [
     icon: DollarSign, 
     color: 'bg-blue-500/10 text-blue-600',
     description: 'Detect abuse & reduce operational costs',
-    href: '/admin/safepilot-intelligence'
+    query: 'How can we reduce operational costs this month?'
   },
   { 
     id: 'fraud', 
@@ -127,7 +129,7 @@ const intelligenceModules = [
     icon: Shield, 
     color: 'bg-red-500/10 text-red-600',
     description: 'Real-time fraud detection & prevention',
-    href: '/admin/safepilot-intelligence'
+    query: 'Show me current fraud alerts and suspicious activities'
   },
   { 
     id: 'partner', 
@@ -135,7 +137,7 @@ const intelligenceModules = [
     icon: Users, 
     color: 'bg-purple-500/10 text-purple-600',
     description: 'Partner performance & coaching',
-    href: '/admin/safepilot-intelligence'
+    query: 'Which partners need attention or coaching?'
   },
   { 
     id: 'retention', 
@@ -143,7 +145,7 @@ const intelligenceModules = [
     icon: Heart, 
     color: 'bg-pink-500/10 text-pink-600',
     description: 'Churn prediction & win-back strategies',
-    href: '/admin/safepilot-intelligence'
+    query: 'Which customers are at risk of churning?'
   },
   { 
     id: 'marketing', 
@@ -151,7 +153,7 @@ const intelligenceModules = [
     icon: Megaphone, 
     color: 'bg-orange-500/10 text-orange-600',
     description: 'Campaign optimization & segmentation',
-    href: '/admin/safepilot-intelligence'
+    query: 'What marketing campaigns should we run this week?'
   },
   { 
     id: 'finance', 
@@ -159,7 +161,7 @@ const intelligenceModules = [
     icon: PieChart, 
     color: 'bg-emerald-500/10 text-emerald-600',
     description: 'Revenue forecasting & profitability',
-    href: '/admin/safepilot-intelligence'
+    query: 'What is the revenue forecast for this month?'
   },
   { 
     id: 'compliance', 
@@ -167,7 +169,7 @@ const intelligenceModules = [
     icon: Scale, 
     color: 'bg-slate-500/10 text-slate-600',
     description: 'Regulatory monitoring & audit prep',
-    href: '/admin/safepilot-intelligence'
+    query: 'Are there any compliance issues I need to address?'
   },
 ];
 
@@ -279,8 +281,8 @@ export default function SafePilotPage() {
               <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-safepilot-title">SafePilot AI</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">Your intelligent admin copilot</p>
+              <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-safepilot-title">SafePilot</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">AI-powered business automation</p>
             </div>
           </div>
           <Badge variant="secondary" className="gap-1 self-start sm:self-auto">
@@ -454,20 +456,26 @@ export default function SafePilotPage() {
               <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   {intelligenceModules.map((module) => (
-                    <Link key={module.id} href={module.href}>
-                      <Card className="p-2.5 sm:p-3 cursor-pointer hover-elevate transition-all">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg ${module.color} flex items-center justify-center shrink-0`}>
-                            <module.icon className="h-4 w-4 sm:h-4 sm:w-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-xs sm:text-sm truncate">{module.name}</div>
-                            <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{module.description}</div>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+                    <Card 
+                      key={module.id}
+                      className="p-2.5 sm:p-3 cursor-pointer hover-elevate transition-all touch-manipulation"
+                      onClick={() => {
+                        setQuestion(module.query);
+                        queryMutation.mutate(module.query);
+                      }}
+                      data-testid={`module-${module.id}`}
+                    >
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg ${module.color} flex items-center justify-center shrink-0`}>
+                          <module.icon className="h-4 w-4 sm:h-4 sm:w-4" />
                         </div>
-                      </Card>
-                    </Link>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-xs sm:text-sm truncate">{module.name}</div>
+                          <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{module.description}</div>
+                        </div>
+                        <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+                      </div>
+                    </Card>
                   ))}
                 </div>
               </CardContent>
@@ -564,10 +572,10 @@ export default function SafePilotPage() {
                     <span className="text-xs sm:text-sm font-medium">Loading...</span>
                   </div>
                   <Separator />
-                  <Link href="/admin/safepilot-intelligence">
-                    <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm">
-                      View Full Dashboard
-                      <ExternalLink className="h-3 w-3 sm:h-3.5 sm:w-3.5 ml-2" />
+                  <Link href="/admin/safepilot/analytics">
+                    <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm touch-manipulation">
+                      View Analytics Dashboard
+                      <BarChart3 className="h-3 w-3 sm:h-3.5 sm:w-3.5 ml-2" />
                     </Button>
                   </Link>
                 </div>

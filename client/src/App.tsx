@@ -2253,7 +2253,14 @@ function Router() {
 
       <Route path="/admin/safepilot-intelligence">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminLayout pageTitle="SafePilot Intelligence">
+          <AdminLayout pageTitle="SafePilot Analytics">
+            <SafePilotIntelligence />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/safepilot/analytics">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="SafePilot Analytics">
             <SafePilotIntelligence />
           </AdminLayout>
         </ProtectedRoute>

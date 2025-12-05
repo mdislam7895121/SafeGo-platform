@@ -308,15 +308,9 @@ const phase3cNavItems: NavItem[] = [
 
 const phase4NavItems: NavItem[] = [
   {
-    title: "SafePilot AI",
+    title: "SafePilot",
     href: "/admin/safepilot",
     icon: Sparkles,
-    navKey: "dashboard",
-  },
-  {
-    title: "SafePilot Intelligence",
-    href: "/admin/safepilot-intelligence",
-    icon: BrainCircuit,
     navKey: "dashboard",
   },
   {
