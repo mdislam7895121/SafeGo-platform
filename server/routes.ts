@@ -78,11 +78,13 @@ import operationsConsoleRoutes from "./routes/operations-console"; // Operations
 import backupDRRoutes from "./routes/backup-dr"; // Backup & Disaster Recovery
 import accessReviewsRoutes from "./routes/access-reviews"; // Periodic Access Review (Governance)
 import releasesRoutes from "./routes/releases"; // Release & Environment Promotion Console
+import observabilityRoutes from "./routes/observability"; // Phase 5A: Admin Observability Center
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
 import { setupDispatchWebSocket } from "./websocket/dispatchWs";
 import { setupAdminNotificationsWebSocket } from "./websocket/adminNotificationsWs";
+import { setupObservabilityWebSocket } from "./websocket/observabilityWs";
 import { db } from "./db";
 
 // Public Driver Profile Summary Type (D2 Spec)
@@ -386,6 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/backup-dr", backupDRRoutes); // Backup & Disaster Recovery
   app.use("/api/admin/access-reviews", accessReviewsRoutes); // Periodic Access Review (Governance)
   app.use("/api/admin/releases", releasesRoutes); // Release & Environment Promotion Console
+  app.use("/api/admin/observability", observabilityRoutes); // Phase 5A: Admin Observability Center
 
   // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)
   app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)
@@ -525,6 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupFoodOrderNotificationsWebSocket(httpServer);
   setupDispatchWebSocket(httpServer);
   setupAdminNotificationsWebSocket(httpServer);
+  setupObservabilityWebSocket(httpServer);
 
   return httpServer;
 }
