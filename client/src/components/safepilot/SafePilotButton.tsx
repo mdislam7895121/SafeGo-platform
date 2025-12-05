@@ -83,14 +83,65 @@ interface SafePilotHistoryItem {
 }
 
 const getPageKeyFromPath = (pathname: string): string => {
-  const path = pathname.replace('/admin', 'admin').replace(/^\/+/, '');
+  const path = pathname.replace(/^\/+/, '');
   const segments = path.split('/').filter(Boolean);
   
-  if (segments.length === 0 || segments[0] === 'admin') {
+  if (segments.length === 0) {
     return 'admin.dashboard';
   }
   
-  return segments.join('.');
+  if (segments[0] !== 'admin') {
+    return 'admin.dashboard';
+  }
+  
+  if (segments.length === 1) {
+    return 'admin.dashboard';
+  }
+  
+  const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  const isNumericId = (s: string) => /^\d+$/.test(s);
+  
+  const knownRoutes: Record<string, string> = {
+    'drivers': 'admin.drivers',
+    'customers': 'admin.customers', 
+    'restaurants': 'admin.restaurants',
+    'rides': 'admin.rides',
+    'food-orders': 'admin.food-orders',
+    'payouts': 'admin.payouts',
+    'safety': 'admin.safety',
+    'ratings': 'admin.ratings',
+    'reviews': 'admin.reviews',
+    'refunds': 'admin.refunds',
+    'disputes': 'admin.disputes',
+    'kyc': 'admin.kyc',
+    'people': 'admin.people',
+    'wallets': 'admin.wallets',
+    'parcels': 'admin.parcels',
+    'deliveries': 'admin.deliveries',
+    'fraud-detection': 'admin.fraud',
+    'risk-center': 'admin.risk',
+    'observability': 'admin.observability',
+    'analytics': 'admin.analytics',
+    'dashboard': 'admin.dashboard',
+    'home': 'admin.dashboard',
+    'settings': 'admin.settings',
+    'users': 'admin.users',
+    'complaints': 'admin.complaints',
+    'media': 'admin.media',
+    'notifications': 'admin.notifications',
+  };
+  
+  const filteredSegments = segments.filter(s => !isUuid(s) && !isNumericId(s));
+  
+  if (filteredSegments.length > 1) {
+    const primaryRoute = filteredSegments[1];
+    if (knownRoutes[primaryRoute]) {
+      return knownRoutes[primaryRoute];
+    }
+    return `admin.${primaryRoute}`;
+  }
+  
+  return 'admin.dashboard';
 };
 
 const getSeverityColor = (severity: string) => {
