@@ -12,3 +12,9 @@ export * from './systemHealthMonitoring';
 export * from './dynamicPolicyGenerator';
 export * from './supportAutomationAI';
 export * from './growthAdvisor';
+
+export { safetyIncidentDetection } from './safetyIncidentDetection';
+export { locationIntegrity } from './locationIntegrity';
+export { adminInsiderThreat } from './adminInsiderThreat';
+export { predictiveAnalytics } from './predictiveAnalytics';
+export { autoDecisionEngine } from './autoDecisionEngine';

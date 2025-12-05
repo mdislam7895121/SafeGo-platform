@@ -30,6 +30,11 @@ import {
   getGrowthAdvisorDashboard,
   getNextBestAction,
   getRevenueAccelerators,
+  safetyIncidentDetection,
+  locationIntegrity,
+  adminInsiderThreat,
+  predictiveAnalytics,
+  autoDecisionEngine,
 } from '../services/safepilot';
 
 const router = Router();
@@ -1871,6 +1876,11 @@ router.get(
         policySummary,
         supportSummary,
         advisorSummary,
+        safetySummary,
+        locationSummary,
+        insiderSummary,
+        predictiveSummary,
+        autoDecisionSummary,
       ] = await Promise.all([
         growthEngine.getGrowthSummary(countryCode),
         costReductionEngine.getCostSummary(countryCode),
@@ -1885,6 +1895,11 @@ router.get(
         getDynamicPolicyDashboard(countryCode),
         getSupportAutomationDashboard(countryCode),
         getGrowthAdvisorDashboard(countryCode),
+        safetyIncidentDetection.getDashboard(countryCode),
+        locationIntegrity.getDashboard(countryCode),
+        adminInsiderThreat.getDashboard(),
+        predictiveAnalytics.getDashboard(countryCode),
+        autoDecisionEngine.getDashboard(),
       ]);
 
       res.json({
@@ -1901,6 +1916,11 @@ router.get(
         policy: policySummary,
         support: supportSummary,
         advisor: advisorSummary,
+        safety: safetySummary,
+        location: locationSummary,
+        insider: insiderSummary,
+        predictive: predictiveSummary,
+        autoDecision: autoDecisionSummary,
         lastUpdated: new Date().toISOString(),
       });
     } catch (error) {
@@ -1982,6 +2002,510 @@ router.get(
     } catch (error) {
       console.error('[SafePilot] Demo mode error:', error);
       res.status(500).json({ error: 'Failed to get demo mode data' });
+    }
+  }
+);
+
+// ============================================================================
+// SAFETY INCIDENT DETECTION ROUTES
+// ============================================================================
+
+router.get(
+  '/safety/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const dashboard = await safetyIncidentDetection.getDashboard(countryCode);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Safety dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get safety dashboard' });
+    }
+  }
+);
+
+router.get(
+  '/safety/route-deviations',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const days = parseInt(req.query.days as string) || 1;
+      const alerts = await safetyIncidentDetection.detectRouteDeviations(countryCode, days);
+      res.json({ alerts });
+    } catch (error) {
+      console.error('[SafePilot] Route deviations error:', error);
+      res.status(500).json({ error: 'Failed to detect route deviations' });
+    }
+  }
+);
+
+router.get(
+  '/safety/unsafe-driving',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const alerts = await safetyIncidentDetection.detectUnsafeDriving(countryCode);
+      res.json({ alerts });
+    } catch (error) {
+      console.error('[SafePilot] Unsafe driving error:', error);
+      res.status(500).json({ error: 'Failed to detect unsafe driving' });
+    }
+  }
+);
+
+router.get(
+  '/safety/sos-alerts',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const alerts = await safetyIncidentDetection.getActiveSOSAlerts();
+      res.json({ alerts });
+    } catch (error) {
+      console.error('[SafePilot] SOS alerts error:', error);
+      res.status(500).json({ error: 'Failed to get SOS alerts' });
+    }
+  }
+);
+
+router.post(
+  '/safety/sos/:rideId/respond',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { rideId } = req.params;
+      const result = await safetyIncidentDetection.respondToSOS(rideId, req.user?.id || '');
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] SOS respond error:', error);
+      res.status(500).json({ error: 'Failed to respond to SOS' });
+    }
+  }
+);
+
+// ============================================================================
+// LOCATION INTEGRITY ROUTES
+// ============================================================================
+
+router.get(
+  '/location/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const dashboard = await locationIntegrity.getDashboard(countryCode);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Location dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get location dashboard' });
+    }
+  }
+);
+
+router.get(
+  '/location/gps-spoofing',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const days = parseInt(req.query.days as string) || 7;
+      const alerts = await locationIntegrity.detectGPSSpoofing(countryCode, days);
+      res.json({ alerts });
+    } catch (error) {
+      console.error('[SafePilot] GPS spoofing error:', error);
+      res.status(500).json({ error: 'Failed to detect GPS spoofing' });
+    }
+  }
+);
+
+router.get(
+  '/location/teleportation',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const alerts = await locationIntegrity.detectTeleportation(countryCode);
+      res.json({ alerts });
+    } catch (error) {
+      console.error('[SafePilot] Teleportation error:', error);
+      res.status(500).json({ error: 'Failed to detect teleportation' });
+    }
+  }
+);
+
+router.get(
+  '/location/abnormal-patterns',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const alerts = await locationIntegrity.detectAbnormalPatterns(countryCode);
+      res.json({ alerts });
+    } catch (error) {
+      console.error('[SafePilot] Abnormal patterns error:', error);
+      res.status(500).json({ error: 'Failed to detect abnormal patterns' });
+    }
+  }
+);
+
+router.post(
+  '/location/flag/:driverId',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { driverId } = req.params;
+      const { reason } = req.body;
+      const result = await locationIntegrity.flagDriver(driverId, reason, req.user?.id || '');
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Flag driver error:', error);
+      res.status(500).json({ error: 'Failed to flag driver' });
+    }
+  }
+);
+
+// ============================================================================
+// ADMIN INSIDER THREAT ROUTES
+// ============================================================================
+
+router.get(
+  '/insider/dashboard',
+  authenticateToken,
+  requireAdmin('VIEW_SAFEPILOT_ANALYTICS'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const dashboard = await adminInsiderThreat.getDashboard();
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Insider dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get insider threat dashboard' });
+    }
+  }
+);
+
+router.get(
+  '/insider/suspicious-activity',
+  authenticateToken,
+  requireAdmin('VIEW_SAFEPILOT_ANALYTICS'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 1;
+      const activities = await adminInsiderThreat.detectSuspiciousActivity(days);
+      res.json({ activities });
+    } catch (error) {
+      console.error('[SafePilot] Suspicious activity error:', error);
+      res.status(500).json({ error: 'Failed to detect suspicious activity' });
+    }
+  }
+);
+
+router.get(
+  '/insider/access-patterns',
+  authenticateToken,
+  requireAdmin('VIEW_SAFEPILOT_ANALYTICS'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const patterns = await adminInsiderThreat.getAdminAccessPatterns(days);
+      res.json({ patterns });
+    } catch (error) {
+      console.error('[SafePilot] Access patterns error:', error);
+      res.status(500).json({ error: 'Failed to get access patterns' });
+    }
+  }
+);
+
+router.post(
+  '/insider/flag/:adminId',
+  authenticateToken,
+  requireAdmin('MANAGE_SAFEPILOT_CONFIG'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { adminId } = req.params;
+      const { reason } = req.body;
+      const result = await adminInsiderThreat.flagAdmin(adminId, reason, req.user?.id || '');
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Flag admin error:', error);
+      res.status(500).json({ error: 'Failed to flag admin' });
+    }
+  }
+);
+
+router.post(
+  '/insider/lock/:adminId',
+  authenticateToken,
+  requireAdmin('MANAGE_SAFEPILOT_CONFIG'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { adminId } = req.params;
+      const { reason } = req.body;
+      const result = await adminInsiderThreat.lockAdminAccount(adminId, reason, req.user?.id || '');
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Lock admin error:', error);
+      res.status(500).json({ error: 'Failed to lock admin account' });
+    }
+  }
+);
+
+// ============================================================================
+// PREDICTIVE ANALYTICS ROUTES
+// ============================================================================
+
+router.get(
+  '/predictive/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const dashboard = await predictiveAnalytics.getDashboard(countryCode);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Predictive dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get predictive dashboard' });
+    }
+  }
+);
+
+router.get(
+  '/predictive/demand-forecast',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const hours = parseInt(req.query.hours as string) || 24;
+      const forecast = await predictiveAnalytics.getDemandForecast(countryCode, hours);
+      res.json({ forecast });
+    } catch (error) {
+      console.error('[SafePilot] Demand forecast error:', error);
+      res.status(500).json({ error: 'Failed to get demand forecast' });
+    }
+  }
+);
+
+router.get(
+  '/predictive/churn',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const predictions = await predictiveAnalytics.getChurnPredictions(countryCode, limit);
+      res.json({ predictions });
+    } catch (error) {
+      console.error('[SafePilot] Churn predictions error:', error);
+      res.status(500).json({ error: 'Failed to get churn predictions' });
+    }
+  }
+);
+
+router.get(
+  '/predictive/revenue',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const projections = await predictiveAnalytics.getRevenueProjections(countryCode);
+      res.json({ projections });
+    } catch (error) {
+      console.error('[SafePilot] Revenue projections error:', error);
+      res.status(500).json({ error: 'Failed to get revenue projections' });
+    }
+  }
+);
+
+router.get(
+  '/predictive/capacity',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const predictions = await predictiveAnalytics.getCapacityPredictions(countryCode);
+      res.json({ predictions });
+    } catch (error) {
+      console.error('[SafePilot] Capacity predictions error:', error);
+      res.status(500).json({ error: 'Failed to get capacity predictions' });
+    }
+  }
+);
+
+router.get(
+  '/predictive/fraud-risk',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const predictions = await predictiveAnalytics.getFraudRiskPredictions(countryCode);
+      res.json({ predictions });
+    } catch (error) {
+      console.error('[SafePilot] Fraud risk predictions error:', error);
+      res.status(500).json({ error: 'Failed to get fraud risk predictions' });
+    }
+  }
+);
+
+// ============================================================================
+// AUTO-DECISION ENGINE ROUTES
+// ============================================================================
+
+router.get(
+  '/auto-decision/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const dashboard = await autoDecisionEngine.getDashboard();
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Auto-decision dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get auto-decision dashboard' });
+    }
+  }
+);
+
+router.get(
+  '/auto-decision/suggestions',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const suggestions = await autoDecisionEngine.getAutoBlockSuggestions(countryCode);
+      res.json({ suggestions });
+    } catch (error) {
+      console.error('[SafePilot] Auto-block suggestions error:', error);
+      res.status(500).json({ error: 'Failed to get auto-block suggestions' });
+    }
+  }
+);
+
+router.get(
+  '/auto-decision/review-queue',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const queue = await autoDecisionEngine.getReviewQueue(limit);
+      res.json({ queue });
+    } catch (error) {
+      console.error('[SafePilot] Review queue error:', error);
+      res.status(500).json({ error: 'Failed to get review queue' });
+    }
+  }
+);
+
+router.get(
+  '/auto-decision/rules',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const rules = await autoDecisionEngine.getDecisionRules();
+      res.json({ rules });
+    } catch (error) {
+      console.error('[SafePilot] Decision rules error:', error);
+      res.status(500).json({ error: 'Failed to get decision rules' });
+    }
+  }
+);
+
+router.post(
+  '/auto-decision/execute-block',
+  authenticateToken,
+  requireAdmin('MANAGE_SAFEPILOT_CONFIG'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { entityType, entityId, reason } = req.body;
+      const result = await autoDecisionEngine.executeAutoBlock(
+        entityType,
+        entityId,
+        reason,
+        req.user?.id || ''
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Execute block error:', error);
+      res.status(500).json({ error: 'Failed to execute block' });
+    }
+  }
+);
+
+router.post(
+  '/auto-decision/execute-suspend',
+  authenticateToken,
+  requireAdmin('MANAGE_SAFEPILOT_CONFIG'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { entityType, entityId, reason, durationHours } = req.body;
+      const result = await autoDecisionEngine.executeSuspend(
+        entityType,
+        entityId,
+        reason,
+        durationHours || 24,
+        req.user?.id || ''
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Execute suspend error:', error);
+      res.status(500).json({ error: 'Failed to execute suspension' });
+    }
+  }
+);
+
+router.post(
+  '/auto-decision/issue-warning',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { entityType, entityId, warningType, message } = req.body;
+      const result = await autoDecisionEngine.issueWarning(
+        entityType,
+        entityId,
+        warningType,
+        message,
+        req.user?.id || ''
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Issue warning error:', error);
+      res.status(500).json({ error: 'Failed to issue warning' });
+    }
+  }
+);
+
+router.post(
+  '/auto-decision/toggle-rule',
+  authenticateToken,
+  requireAdmin('MANAGE_SAFEPILOT_CONFIG'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { ruleId, enabled } = req.body;
+      const result = await autoDecisionEngine.toggleRule(ruleId, enabled, req.user?.id || '');
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Toggle rule error:', error);
+      res.status(500).json({ error: 'Failed to toggle rule' });
     }
   }
 );
