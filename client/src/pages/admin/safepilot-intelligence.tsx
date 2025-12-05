@@ -443,7 +443,7 @@ export default function SafePilotIntelligence() {
             <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-page-title">SafePilot Intelligence</h1>
+            <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-page-title">SafePilot Analytics</h1>
             <p className="text-xs sm:text-sm text-muted-foreground truncate">
               AI-powered business automation engine
             </p>
