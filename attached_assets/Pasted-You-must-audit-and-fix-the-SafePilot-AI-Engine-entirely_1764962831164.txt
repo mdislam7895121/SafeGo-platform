@@ -1,0 +1,64 @@
+You must audit and fix the SafePilot AI Engine entirely.  
+The UI shows “Error Processing Query – Unable to process your question” which means the AI action pipeline is broken.
+
+You must fix the entire SafePilot AI Engine workflow from source to response.  
+Do not guess. Check every layer, confirm each dependency, and repair the broken link.
+
+Here is the exact checklist you must follow:
+
+1. INPUT ENGINE CHECK  
+   - Verify the Ask SafePilot input box is correctly bound to the API request handler.  
+   - Confirm onChange, onSubmit, and onClick events all route to the same query handler.  
+   - If any event calls a deprecated function, replace with the new unified handler.  
+   - Make sure empty input validation is not blocking correct queries.
+
+2. BACKEND ROUTING  
+   - Confirm the frontend is calling the correct endpoint: `/api/safepilot/query` (or the correct route based on the current backend).  
+   - Ensure the route is enabled in the backend router and not commented, disabled, or throttled.  
+   - Fix CORS or auth-token issues that may silently block the request.
+
+3. AUTH & TOKENS  
+   - Verify the SafePilot internal service key is loaded from environment variables.  
+   - Refresh expired JWT or service tokens.  
+   - Validate that the admin user role has access to SafePilot intelligence modules.
+
+4. AI MODEL EXECUTION  
+   - Make sure the SafePilot AI function exists:  
+     - growthEngine()  
+     - costReductionEngine()  
+     - fraudShieldEngine()  
+     - partnerCoachEngine()  
+   - If any of these modules return null / undefined / throws error, catch it and return a stable fallback response.  
+   - Implement full error logging for failures, not silent breaks.
+
+5. RESPONSE PARSER  
+   - Check that the backend returns structured JSON:  
+     `{ success: true, message: "...", data: {...} }`  
+   - Make sure the frontend is not expecting a different shape than what the backend sends.  
+   - Fix all mismatch between expected keys.
+
+6. UI FEEDBACK  
+   - Remove the generic error message.  
+   - Replace with a visible explanation:  
+     “AI Engine temporarily unavailable. Retrying…”  
+   - Implement auto-retry after 3 seconds.
+
+7. GLOBAL STABILITY FIX  
+   - Add full try/catch around the AI core.  
+   - Fix any unhandled Promise rejection.  
+   - Add fallback: if SafePilot fails, load a backup LLM model.  
+   - Make sure the status shows ✓ Online only when the model is actually reachable.
+
+8. FINAL VERIFICATION  
+   - Run a live query test with at least 5 different questions:  
+     1) "What are the top growth opportunities?"  
+     2) "Show me fraud risk signals."  
+     3) "Optimize driver spending."  
+     4) "Give revenue projections."  
+     5) "Summarize partner performance."
+
+   - All must return correct AI responses with no errors.  
+   - The “Recent Queries” section must update and store the history correctly.
+
+You must perform all fixes completely before saying the system is ready.
+Do not stop after fixing one small part. The entire SafePilot flow must be working end-to-end.

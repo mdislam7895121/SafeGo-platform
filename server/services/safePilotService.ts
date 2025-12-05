@@ -525,6 +525,8 @@ export const safePilotService = {
         response = await this.handleCostQuery(lowercaseQuestion, countryCode, mode);
       } else if (lowercaseQuestion.includes('top 3') || lowercaseQuestion.includes('top risks') || lowercaseQuestion.includes('right now')) {
         response = await this.handleWatchModeQuery(lowercaseQuestion, countryCode);
+      } else if (lowercaseQuestion.includes('growth') || lowercaseQuestion.includes('opportunit') || lowercaseQuestion.includes('revenue')) {
+        response = await this.handleGrowthQuery(lowercaseQuestion, countryCode, mode);
       } else {
         response = await this.handleGeneralQuery(lowercaseQuestion, pageKey, countryCode, mode);
       }
@@ -2715,6 +2717,133 @@ export const safePilotService = {
         },
       ],
       riskLevel: 'MEDIUM',
+    };
+  },
+
+  async handleGrowthQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'OPTIMIZE'): Promise<SafePilotQueryResponse> {
+    const where = countryCode ? { user: { countryCode } } : {};
+    const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const last7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      totalRides,
+      recentRides,
+      totalOrders,
+      recentOrders,
+      newDrivers,
+      newCustomers,
+      activeDrivers,
+      activeCustomers,
+    ] = await Promise.all([
+      prisma.ride.count({ where: countryCode ? { driver: where } : {} }).catch(() => 0),
+      prisma.ride.count({ where: { createdAt: { gte: last7d }, ...(countryCode ? { driver: where } : {}) } }).catch(() => 0),
+      prisma.foodOrder.count({ where: countryCode ? { restaurant: where } : {} }).catch(() => 0),
+      prisma.foodOrder.count({ where: { createdAt: { gte: last7d }, ...(countryCode ? { restaurant: where } : {}) } }).catch(() => 0),
+      prisma.driverProfile.count({ where: { createdAt: { gte: last30d }, ...where } }).catch(() => 0),
+      prisma.customerProfile.count({ where: { createdAt: { gte: last30d }, ...where } }).catch(() => 0),
+      prisma.driverProfile.count({ where: { isOnline: true, ...where } }).catch(() => 0),
+      prisma.user.count({ where: { role: 'customer', lastActive: { gte: last7d }, ...(countryCode ? { countryCode } : {}) } }).catch(() => 0),
+    ]);
+
+    const growthOpportunities = [];
+    
+    if (newDrivers < 10) {
+      growthOpportunities.push({
+        title: 'Driver Acquisition',
+        description: `Only ${newDrivers} new drivers in 30 days. Launch recruitment campaign.`,
+        impact: 'HIGH',
+        action: 'Launch driver referral bonus program',
+      });
+    }
+    
+    if (newCustomers < 50) {
+      growthOpportunities.push({
+        title: 'Customer Acquisition',
+        description: `Only ${newCustomers} new customers in 30 days. Increase marketing.`,
+        impact: 'HIGH',
+        action: 'Launch promotional discounts for new users',
+      });
+    }
+    
+    if (activeDrivers < 20) {
+      growthOpportunities.push({
+        title: 'Driver Engagement',
+        description: `Only ${activeDrivers} drivers online now. Improve driver retention.`,
+        impact: 'MEDIUM',
+        action: 'Offer incentives for peak hour availability',
+      });
+    }
+    
+    if (recentRides < totalRides * 0.05) {
+      growthOpportunities.push({
+        title: 'Ride Volume Growth',
+        description: 'Weekly ride volume is below target. Consider service expansion.',
+        impact: 'HIGH',
+        action: 'Expand service areas or launch marketing campaigns',
+      });
+    }
+
+    if (growthOpportunities.length === 0) {
+      growthOpportunities.push({
+        title: 'Platform Growth Healthy',
+        description: 'All growth metrics are meeting targets. Continue current strategy.',
+        impact: 'LOW',
+        action: 'Monitor metrics and identify new markets',
+      });
+    }
+
+    const formatted = this.formatVision2030Response(
+      growthOpportunities.map(g => `**${g.title}**: ${g.description}`),
+      [
+        `New Drivers (30d): ${newDrivers}`,
+        `New Customers (30d): ${newCustomers}`,
+        `Active Drivers: ${activeDrivers}`,
+        `Weekly Rides: ${recentRides}`,
+        `Weekly Orders: ${recentOrders}`,
+      ],
+      growthOpportunities.map(g => ({
+        label: g.action,
+        risk: g.impact === 'HIGH' ? 'CAUTION' : 'SAFE',
+      })),
+      ['Track weekly user acquisition', 'Monitor driver retention rates', 'Watch order volume trends'],
+      'OPTIMIZE'
+    );
+
+    return {
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
+      insights: growthOpportunities.map(g => ({
+        type: 'performance' as const,
+        title: g.title,
+        detail: g.description,
+        metrics: { impact: g.impact },
+        severity: g.impact === 'HIGH' ? 'HIGH' : g.impact === 'MEDIUM' ? 'MEDIUM' : 'LOW',
+      })),
+      suggestions: [
+        {
+          key: 'growth_dashboard',
+          label: 'Open Growth Dashboard',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/analytics' },
+        },
+        {
+          key: 'driver_recruitment',
+          label: 'Driver Recruitment',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/drivers' },
+        },
+        {
+          key: 'marketing',
+          label: 'Marketing Tools',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/promotions' },
+        },
+      ],
+      riskLevel: growthOpportunities.some(g => g.impact === 'HIGH') ? 'HIGH' : 'MEDIUM',
     };
   },
 
