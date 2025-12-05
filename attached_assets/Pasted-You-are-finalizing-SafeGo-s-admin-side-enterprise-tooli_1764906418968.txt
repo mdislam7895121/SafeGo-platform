@@ -1,0 +1,62 @@
+You are finalizing SafeGo’s admin-side enterprise tooling.
+
+Follow core rules:
+- Safe separation between dev, staging, and production.
+- No destructive deployment actions directly from untrusted UIs.
+- All environment changes must be logged and require explicit confirmation.
+
+TASK GOAL  
+Create an **Environment Promotion & Publish Readiness Console** so that senior admins can:
+- see the status of each environment (dev/staging/prod)
+- confirm checklists before publishing
+- track who approved a release to move forward
+
+REQUIREMENTS  
+
+1. Release & Environment Model
+   - Add `ReleaseVersion`:
+     - id, versionTag (e.g. “v1.0.3”), description, createdAt, createdByAdminId.
+   - Add `ReleaseEnvironmentStatus`:
+     - id, releaseId, environment (DEV, STAGING, PROD)
+     - status (NOT_DEPLOYED, DEPLOYED, VERIFIED, ROLLED_BACK)
+     - checklistStatus (PENDING, PASSED, FAILED)
+     - lastUpdatedByAdminId, lastUpdatedAt.
+
+2. Readiness Checklists
+   - For each environment, define checklist items (hardcoded or data-driven) such as:
+     - Automated tests passed
+     - Security audit completed
+     - KYC & compliance configs verified for BD and US
+     - Backup snapshot taken before deploy
+     - Rollback plan documented
+   - Store checklist results and who marked them completed.
+
+3. Environment Console UI
+   - New sidebar entry: “Releases & Publish”.
+   - Main view:
+     - Table of releases with version tag, description, and status indicators for DEV/STAGING/PROD.
+   - Detail view for a release:
+     - Per-environment cards showing status and checklist.
+     - Buttons:
+       - “Mark deployed to Staging”
+       - “Mark verified in Staging”
+       - “Mark deployed to Production”
+       - “Mark rolled back”
+     - All actions are purely state tracking; they do NOT perform actual deployment but reflect real-world operations.
+
+4. Permissions & Approvals
+   - Only `RELEASE_ADMIN` or `SUPER_ADMIN` can update release statuses.
+   - Optionally allow a “two-step approval”:
+     - One admin proposes promotion; another admin approves.
+     - Design data model with fields `proposedBy`, `approvedBy`.
+
+5. Audit & History
+   - Every state change writes an audit log:
+     - releaseId, environment, oldStatus, newStatus, adminId, timestamp, optional comment.
+   - Provide a simple history panel in the UI to review past changes.
+
+6. Integration with Existing Docs
+   - Link to existing `PHASE2_REPORT`, `PHASE3_REPORT`, etc., from the release detail page so admins can quickly check what’s included.
+   - Show warnings if there are open critical issues in the Operations Console or Security Center before allowing a “Production verified” status.
+
+Deliver the full implementation (backend models, routes, and admin UI) so SafeGo’s leadership can manage releases and prove that publish decisions followed a structured, auditable process.

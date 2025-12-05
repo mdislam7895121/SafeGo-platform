@@ -10814,3 +10814,176 @@ model AccessReviewSummary {
   @@index([cycleCompletedAt])
   @@map("access_review_summaries")
 }
+
+// ============================================
+// Environment Promotion & Publish Readiness Console
+// ============================================
+
+enum ReleaseEnvironment {
+  DEV
+  STAGING
+  PROD
+}
+
+enum ReleaseDeploymentStatus {
+  NOT_DEPLOYED
+  DEPLOYED
+  VERIFIED
+  ROLLED_BACK
+}
+
+enum ReleaseChecklistStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
+enum ReleaseApprovalStatus {
+  NOT_REQUIRED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+// Release Version - Tracks a software release
+model ReleaseVersion {
+  id          String   @id @default(uuid())
+  versionTag  String   @unique // e.g. "v1.0.3"
+  description String?  @db.Text
+  
+  // Metadata
+  releaseNotes    String?  @db.Text
+  includedPhases  String[] @default([]) // PHASE2_REPORT, PHASE3_REPORT, etc.
+  
+  // Creator
+  createdByAdminId   String
+  createdByAdminName String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  environmentStatuses ReleaseEnvironmentStatus[]
+  checklistItems      ReleaseChecklistItem[]
+  auditLogs           ReleaseAuditLog[]
+
+  @@index([versionTag])
+  @@index([createdAt])
+  @@map("release_versions")
+}
+
+// Release Environment Status - Tracks deployment status per environment
+model ReleaseEnvironmentStatus {
+  id String @id @default(uuid())
+  
+  releaseId   String
+  release     ReleaseVersion @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  
+  environment      ReleaseEnvironment
+  deploymentStatus ReleaseDeploymentStatus @default(NOT_DEPLOYED)
+  checklistStatus  ReleaseChecklistStatus  @default(PENDING)
+  
+  // Two-step approval for production
+  approvalStatus     ReleaseApprovalStatus @default(NOT_REQUIRED)
+  proposedByAdminId  String?
+  proposedByAdminName String?
+  proposedAt         DateTime?
+  approvedByAdminId  String?
+  approvedByAdminName String?
+  approvedAt         DateTime?
+  rejectionReason    String? @db.Text
+  
+  // Last update tracking
+  lastUpdatedByAdminId   String?
+  lastUpdatedByAdminName String?
+  lastUpdatedAt          DateTime?
+  
+  // Deployment timestamps
+  deployedAt   DateTime?
+  verifiedAt   DateTime?
+  rolledBackAt DateTime?
+  
+  // Warnings and blockers
+  hasBlockingIssues Boolean @default(false)
+  blockingIssues    String[] @default([])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([releaseId, environment])
+  @@index([releaseId])
+  @@index([environment])
+  @@index([deploymentStatus])
+  @@map("release_environment_statuses")
+}
+
+// Release Checklist Item - Individual checklist items per environment
+model ReleaseChecklistItem {
+  id String @id @default(uuid())
+  
+  releaseId   String
+  release     ReleaseVersion @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  
+  environment ReleaseEnvironment
+  
+  // Checklist item definition
+  itemKey     String  // e.g. "automated_tests", "security_audit"
+  itemLabel   String  // Human readable label
+  description String? @db.Text
+  isRequired  Boolean @default(true)
+  sortOrder   Int     @default(0)
+  
+  // Completion status
+  isCompleted    Boolean   @default(false)
+  completedAt    DateTime?
+  completedByAdminId   String?
+  completedByAdminName String?
+  
+  // Notes and evidence
+  notes      String? @db.Text
+  evidenceUrl String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([releaseId, environment, itemKey])
+  @@index([releaseId])
+  @@index([environment])
+  @@index([isCompleted])
+  @@map("release_checklist_items")
+}
+
+// Release Audit Log - History of all state changes
+model ReleaseAuditLog {
+  id String @id @default(uuid())
+  
+  releaseId   String
+  release     ReleaseVersion @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  
+  environment   ReleaseEnvironment?
+  
+  // Change details
+  action        String  // CREATED, STATUS_CHANGED, CHECKLIST_UPDATED, APPROVED, REJECTED, etc.
+  oldValue      String? @db.Text
+  newValue      String? @db.Text
+  
+  // Actor
+  adminId   String
+  adminName String?
+  
+  // Optional comment
+  comment String? @db.Text
+  
+  // IP and session tracking
+  ipAddress String?
+  userAgent String? @db.Text
+  
+  createdAt DateTime @default(now())
+
+  @@index([releaseId])
+  @@index([environment])
+  @@index([action])
+  @@index([adminId])
+  @@index([createdAt])
+  @@map("release_audit_logs")
+}
