@@ -235,16 +235,16 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
   if (activeSection) {
     const step = activeSection.steps[currentStep];
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="max-w-md w-full mx-4"
+          className="max-w-md w-full"
         >
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex items-center justify-between gap-2">
                 <Badge variant="outline">
                   Step {currentStep + 1} of {activeSection.steps.length}
                 </Badge>
@@ -256,30 +256,33 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
                     setCurrentStep(0);
                   }}
                   data-testid="button-close-tutorial-step"
+                  className="min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9 shrink-0"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <CardTitle className="mt-2">{step.title}</CardTitle>
-              <CardDescription>{step.description}</CardDescription>
+              <CardTitle className="mt-2 text-base sm:text-lg">{step.title}</CardTitle>
+              <CardDescription className="text-sm">{step.description}</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
               <Progress
                 value={((currentStep + 1) / activeSection.steps.length) * 100}
                 className="h-2"
               />
             </CardContent>
-            <CardFooter className="flex justify-between gap-2">
+            <CardFooter className="flex justify-between gap-2 p-4 sm:p-6 pt-0">
               <Button
                 variant="outline"
                 onClick={handlePrevStep}
                 disabled={currentStep === 0}
                 data-testid="button-tutorial-prev"
+                className="min-h-[44px] sm:min-h-9"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
+                <span className="hidden xs:inline">Previous</span>
+                <span className="xs:hidden">Back</span>
               </Button>
-              <Button onClick={handleNextStep} data-testid="button-tutorial-next">
+              <Button onClick={handleNextStep} data-testid="button-tutorial-next" className="min-h-[44px] sm:min-h-9">
                 {currentStep === activeSection.steps.length - 1 ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-1" />
@@ -318,11 +321,11 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Admin Tutorials
+              <Sparkles className="h-5 w-5 text-primary shrink-0" />
+              <span>Admin Tutorials</span>
             </DialogTitle>
             <DialogDescription>
               Learn how to use the SafeGo Admin Console effectively
@@ -330,14 +333,14 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="space-y-1">
                 <p className="text-sm font-medium" data-testid="text-progress-label">Your Progress</p>
                 <p className="text-xs text-muted-foreground" data-testid="text-progress-count">
                   {completedSections.length} of {TUTORIALS.length} sections completed
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleReset} data-testid="button-reset-tutorials">
+              <Button variant="ghost" size="sm" onClick={handleReset} data-testid="button-reset-tutorials" className="self-start sm:self-auto min-h-[44px] sm:min-h-9">
                 Reset Progress
               </Button>
             </div>
@@ -353,10 +356,10 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
                     onClick={() => !isCompleted && handleStartSection(section)}
                     data-testid={`card-tutorial-${section.id}`}
                   >
-                    <CardContent className="p-4">
+                    <CardContent className="p-3 sm:p-4">
                       <div className="flex items-start gap-3">
                         <div
-                          className={`p-2 rounded-lg ${isCompleted ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
+                          className={`p-2 rounded-lg shrink-0 ${isCompleted ? "bg-green-100 dark:bg-green-900" : "bg-muted"}`}
                         >
                           {isCompleted ? (
                             <CheckCircle className="h-5 w-5 text-green-600" />
@@ -364,14 +367,14 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
                             section.icon
                           )}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-medium">{section.title}</h3>
-                            <Badge variant={isCompleted ? "default" : "secondary"}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                            <h3 className="font-medium truncate">{section.title}</h3>
+                            <Badge variant={isCompleted ? "default" : "secondary"} className="self-start sm:self-auto shrink-0">
                               {isCompleted ? "Completed" : `${section.steps.length} steps`}
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                             {section.description}
                           </p>
                         </div>
@@ -383,11 +386,11 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
             </div>
           </div>
 
-          <div className="flex justify-between mt-4">
-            <Button variant="ghost" onClick={handleDismiss} data-testid="button-dismiss-tutorials">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 mt-4">
+            <Button variant="ghost" onClick={handleDismiss} data-testid="button-dismiss-tutorials" className="min-h-[44px] sm:min-h-9">
               Don't show again
             </Button>
-            <Button variant="outline" onClick={() => setIsOpen(false)} data-testid="button-close-tutorials">
+            <Button variant="outline" onClick={() => setIsOpen(false)} data-testid="button-close-tutorials" className="min-h-[44px] sm:min-h-9">
               Close
             </Button>
           </div>
