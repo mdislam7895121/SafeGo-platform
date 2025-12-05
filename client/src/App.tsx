@@ -1684,6 +1684,13 @@ function Router() {
           </AdminLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/admin/dashboard">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Dashboard">
+            <AdminHome />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin/users">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Users">
