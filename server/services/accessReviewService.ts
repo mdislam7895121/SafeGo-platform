@@ -105,13 +105,10 @@ export const accessReviewService = {
   },
 
   async populateCycleItems(cycleId: string, countryScope?: string, roleScope?: string[]) {
-    const where: any = {
-      role: 'admin',
-      adminProfile: { isNot: null },
-    };
-
     const adminUsers = await prisma.user.findMany({
-      where,
+      where: {
+        adminProfile: { isNot: null },
+      },
       include: {
         adminProfile: true,
       },
