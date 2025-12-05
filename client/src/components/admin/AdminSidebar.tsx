@@ -36,6 +36,7 @@ import {
   Route,
   ChevronDown,
   Rocket,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -306,6 +307,18 @@ const phase3cNavItems: NavItem[] = [
 ];
 
 const phase4NavItems: NavItem[] = [
+  {
+    title: "SafePilot AI",
+    href: "/admin/safepilot",
+    icon: Sparkles,
+    navKey: "dashboard",
+  },
+  {
+    title: "SafePilot Intelligence",
+    href: "/admin/safepilot-intelligence",
+    icon: BrainCircuit,
+    navKey: "dashboard",
+  },
   {
     title: "Ratings Center",
     href: "/admin/ratings-center",

@@ -215,7 +215,7 @@ export function SafePilotButton() {
       if (!res.ok) throw new Error('Failed to fetch context');
       return res.json();
     },
-    enabled: isOpen && !!statusData?.enabled,
+    enabled: isOpen,
     staleTime: 30 * 1000,
   });
 
@@ -315,11 +315,7 @@ export function SafePilotButton() {
     }
   };
 
-  if (!location.startsWith('/admin') || statusLoading) {
-    return null;
-  }
-
-  if (!statusData?.enabled || !statusData?.permissions?.canUse) {
+  if (!location.startsWith('/admin')) {
     return null;
   }
 
