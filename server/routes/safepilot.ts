@@ -12,6 +12,24 @@ import {
   marketingAI,
   financialIntelligence,
   complianceGuard,
+  getWorkforceAutomationDashboard,
+  enableAutomationRule,
+  getOneClickAutomations,
+  getSystemHealthDashboard,
+  restartService,
+  getServiceLogs,
+  getDynamicPolicyDashboard,
+  simulatePolicyImpact,
+  activatePolicy,
+  generatePolicyFromDescription,
+  getSupportAutomationDashboard,
+  generateAutoReply,
+  processAutoRefund,
+  resolveDispute,
+  getQuickResponses,
+  getGrowthAdvisorDashboard,
+  getNextBestAction,
+  getRevenueAccelerators,
 } from '../services/safepilot';
 
 const router = Router();
@@ -1447,6 +1465,383 @@ router.get(
 );
 
 // ============================================================================
+// WORKFORCE AUTOMATION ROUTES
+// ============================================================================
+
+/**
+ * GET /api/admin/safepilot/workforce/dashboard
+ * Get workforce automation dashboard
+ */
+router.get(
+  '/workforce/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const dashboard = await getWorkforceAutomationDashboard(countryCode);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Workforce dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get workforce automation dashboard' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/workforce/enable-rule
+ * Enable an automation rule
+ */
+router.post(
+  '/workforce/enable-rule',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { ruleId } = req.body;
+      const result = await enableAutomationRule(ruleId);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Enable rule error:', error);
+      res.status(500).json({ error: 'Failed to enable automation rule' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/workforce/one-click
+ * Get one-click automations
+ */
+router.get(
+  '/workforce/one-click',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const automations = await getOneClickAutomations();
+      res.json({ automations });
+    } catch (error) {
+      console.error('[SafePilot] One-click automations error:', error);
+      res.status(500).json({ error: 'Failed to get one-click automations' });
+    }
+  }
+);
+
+// ============================================================================
+// SYSTEM HEALTH MONITORING ROUTES
+// ============================================================================
+
+/**
+ * GET /api/admin/safepilot/health/dashboard
+ * Get system health monitoring dashboard
+ */
+router.get(
+  '/health/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const dashboard = await getSystemHealthDashboard();
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Health dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get system health dashboard' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/health/restart
+ * Restart a service
+ */
+router.post(
+  '/health/restart',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { serviceName } = req.body;
+      const result = await restartService(serviceName);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Service restart error:', error);
+      res.status(500).json({ error: 'Failed to restart service' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/health/logs/:serviceName
+ * Get service logs
+ */
+router.get(
+  '/health/logs/:serviceName',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { serviceName } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = await getServiceLogs(serviceName, limit);
+      res.json({ logs });
+    } catch (error) {
+      console.error('[SafePilot] Service logs error:', error);
+      res.status(500).json({ error: 'Failed to get service logs' });
+    }
+  }
+);
+
+// ============================================================================
+// DYNAMIC POLICY GENERATOR ROUTES
+// ============================================================================
+
+/**
+ * GET /api/admin/safepilot/policy/dashboard
+ * Get dynamic policy dashboard
+ */
+router.get(
+  '/policy/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const dashboard = await getDynamicPolicyDashboard(countryCode);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Policy dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get policy dashboard' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/policy/simulate
+ * Simulate policy impact
+ */
+router.post(
+  '/policy/simulate',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const policy = req.body;
+      const simulation = await simulatePolicyImpact(policy);
+      res.json(simulation);
+    } catch (error) {
+      console.error('[SafePilot] Policy simulation error:', error);
+      res.status(500).json({ error: 'Failed to simulate policy impact' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/policy/activate
+ * Activate a policy
+ */
+router.post(
+  '/policy/activate',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { policyId } = req.body;
+      const result = await activatePolicy(policyId);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Policy activation error:', error);
+      res.status(500).json({ error: 'Failed to activate policy' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/policy/generate
+ * Generate policy from description
+ */
+router.post(
+  '/policy/generate',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { description } = req.body;
+      const policy = await generatePolicyFromDescription(description);
+      res.json(policy);
+    } catch (error) {
+      console.error('[SafePilot] Policy generation error:', error);
+      res.status(500).json({ error: 'Failed to generate policy' });
+    }
+  }
+);
+
+// ============================================================================
+// SUPPORT AUTOMATION AI ROUTES
+// ============================================================================
+
+/**
+ * GET /api/admin/safepilot/support/dashboard
+ * Get support automation dashboard
+ */
+router.get(
+  '/support/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const dashboard = await getSupportAutomationDashboard(countryCode);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Support dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get support automation dashboard' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/support/auto-reply
+ * Generate auto-reply for a ticket
+ */
+router.post(
+  '/support/auto-reply',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { ticketId, template } = req.body;
+      const result = await generateAutoReply(ticketId, template);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Auto-reply error:', error);
+      res.status(500).json({ error: 'Failed to generate auto-reply' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/support/process-refund
+ * Process auto-refund
+ */
+router.post(
+  '/support/process-refund',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { ticketId, decision, amount } = req.body;
+      const result = await processAutoRefund(ticketId, decision, amount);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Process refund error:', error);
+      res.status(500).json({ error: 'Failed to process refund' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/safepilot/support/resolve-dispute
+ * Resolve dispute automatically
+ */
+router.post(
+  '/support/resolve-dispute',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { disputeId, resolution, compensation } = req.body;
+      const result = await resolveDispute(disputeId, resolution, compensation);
+      res.json(result);
+    } catch (error) {
+      console.error('[SafePilot] Resolve dispute error:', error);
+      res.status(500).json({ error: 'Failed to resolve dispute' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/support/quick-responses
+ * Get quick responses by category
+ */
+router.get(
+  '/support/quick-responses',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const category = req.query.category as string;
+      const responses = await getQuickResponses(category);
+      res.json({ responses });
+    } catch (error) {
+      console.error('[SafePilot] Quick responses error:', error);
+      res.status(500).json({ error: 'Failed to get quick responses' });
+    }
+  }
+);
+
+// ============================================================================
+// GROWTH ADVISOR (BUSINESS COACH) ROUTES
+// ============================================================================
+
+/**
+ * GET /api/admin/safepilot/advisor/dashboard
+ * Get growth advisor dashboard
+ */
+router.get(
+  '/advisor/dashboard',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const countryCode = req.query.countryCode as string | undefined;
+      const dashboard = await getGrowthAdvisorDashboard(countryCode);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('[SafePilot] Advisor dashboard error:', error);
+      res.status(500).json({ error: 'Failed to get growth advisor dashboard' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/advisor/next-action
+ * Get next best action recommendation
+ */
+router.get(
+  '/advisor/next-action',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const action = await getNextBestAction();
+      res.json(action);
+    } catch (error) {
+      console.error('[SafePilot] Next action error:', error);
+      res.status(500).json({ error: 'Failed to get next best action' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/advisor/revenue-accelerators
+ * Get revenue accelerator recommendations
+ */
+router.get(
+  '/advisor/revenue-accelerators',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const accelerators = await getRevenueAccelerators();
+      res.json({ accelerators });
+    } catch (error) {
+      console.error('[SafePilot] Revenue accelerators error:', error);
+      res.status(500).json({ error: 'Failed to get revenue accelerators' });
+    }
+  }
+);
+
+// ============================================================================
 // COMBINED DASHBOARD ROUTE
 // ============================================================================
 
@@ -1471,6 +1866,11 @@ router.get(
         marketingSummary,
         financialSummary,
         complianceSummary,
+        workforceSummary,
+        healthSummary,
+        policySummary,
+        supportSummary,
+        advisorSummary,
       ] = await Promise.all([
         growthEngine.getGrowthSummary(countryCode),
         costReductionEngine.getCostSummary(countryCode),
@@ -1480,6 +1880,11 @@ router.get(
         marketingAI.getMarketingSummary(countryCode),
         financialIntelligence.getFinancialSummary(countryCode),
         complianceGuard.getComplianceSummary(countryCode),
+        getWorkforceAutomationDashboard(countryCode),
+        getSystemHealthDashboard(),
+        getDynamicPolicyDashboard(countryCode),
+        getSupportAutomationDashboard(countryCode),
+        getGrowthAdvisorDashboard(countryCode),
       ]);
 
       res.json({
@@ -1491,11 +1896,92 @@ router.get(
         marketing: marketingSummary,
         financial: financialSummary,
         compliance: complianceSummary,
+        workforce: workforceSummary,
+        health: healthSummary,
+        policy: policySummary,
+        support: supportSummary,
+        advisor: advisorSummary,
         lastUpdated: new Date().toISOString(),
       });
     } catch (error) {
       console.error('[SafePilot] Dashboard error:', error);
       res.status(500).json({ error: 'Failed to get dashboard data' });
+    }
+  }
+);
+
+// ============================================================================
+// TEST MODE ROUTES
+// ============================================================================
+
+/**
+ * GET /api/admin/safepilot/test/preloaded-questions
+ * Get preloaded test questions for demo mode
+ */
+router.get(
+  '/test/preloaded-questions',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const questions = [
+        { id: 'q1', category: 'Growth', question: 'What are the top 3 opportunities to grow revenue this week?' },
+        { id: 'q2', category: 'Cost', question: 'Which expenses can be reduced immediately?' },
+        { id: 'q3', category: 'Fraud', question: 'Show me suspicious activity from the last 24 hours' },
+        { id: 'q4', category: 'Drivers', question: 'Which drivers need immediate attention?' },
+        { id: 'q5', category: 'Customers', question: 'Who are the customers most likely to churn?' },
+        { id: 'q6', category: 'Support', question: 'What are the most common customer complaints?' },
+        { id: 'q7', category: 'Operations', question: 'Are there any system health issues I should know about?' },
+        { id: 'q8', category: 'Policy', question: 'Suggest a new policy to reduce cancellation rates' },
+        { id: 'q9', category: 'Business', question: 'What should be our top priority this month?' },
+        { id: 'q10', category: 'Automation', question: 'What tasks can be automated to save time?' },
+      ];
+      res.json({ questions });
+    } catch (error) {
+      console.error('[SafePilot] Preloaded questions error:', error);
+      res.status(500).json({ error: 'Failed to get preloaded questions' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/safepilot/test/demo-mode
+ * Get demo mode data with sample insights
+ */
+router.get(
+  '/test/demo-mode',
+  authenticateToken,
+  requireAdmin('USE_SAFEPILOT'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const demoData = {
+        enabled: true,
+        sampleInsights: [
+          { type: 'REVENUE', title: 'Revenue Opportunity', detail: 'Surge pricing in Zone A could increase revenue by 15%', severity: 'HIGH' },
+          { type: 'COST', title: 'Cost Savings Found', detail: '3 drivers are receiving excessive bonuses. Save $450/week', severity: 'MEDIUM' },
+          { type: 'FRAUD', title: 'Fraud Alert', detail: '2 accounts flagged for suspicious refund patterns', severity: 'CRITICAL' },
+          { type: 'RETENTION', title: 'Churn Risk', detail: '15 VIP customers haven\'t ordered in 14 days', severity: 'HIGH' },
+          { type: 'HEALTH', title: 'System Warning', detail: 'Redis cache memory usage at 80%', severity: 'MEDIUM' },
+        ],
+        sampleActions: [
+          { key: 'enable-surge', label: 'Enable Surge Pricing', actionType: 'APPLY_POLICY' },
+          { key: 'review-bonuses', label: 'Review Driver Bonuses', actionType: 'NAVIGATE' },
+          { key: 'block-fraud', label: 'Block Suspicious Accounts', actionType: 'EXECUTE' },
+          { key: 'winback-campaign', label: 'Launch Win-Back Campaign', actionType: 'EXECUTE' },
+          { key: 'scale-redis', label: 'Scale Redis Instance', actionType: 'EXECUTE' },
+        ],
+        metrics: {
+          questionsAnswered: 1250,
+          automationsSaved: 45,
+          costSaved: 12500,
+          issuesDetected: 89,
+          issuesResolved: 76,
+        },
+      };
+      res.json(demoData);
+    } catch (error) {
+      console.error('[SafePilot] Demo mode error:', error);
+      res.status(500).json({ error: 'Failed to get demo mode data' });
     }
   }
 );
