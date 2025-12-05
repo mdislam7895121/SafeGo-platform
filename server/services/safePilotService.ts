@@ -126,7 +126,87 @@ export const safePilotService = {
   },
 
   /**
+   * Detect SafePilot operating mode from query
+   * Vision 2030: ASK, WATCH, GUARD, OPTIMIZE
+   */
+  detectMode(question: string): 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' {
+    const q = question.toLowerCase();
+    
+    // WATCH mode: monitoring, alerts, risks, warnings
+    if (q.includes('monitor') || q.includes('alert') || q.includes('top 3 risk') || 
+        q.includes('warning') || q.includes('what should i know') || q.includes('right now')) {
+      return 'WATCH';
+    }
+    
+    // GUARD mode: fraud, security, abuse, compliance
+    if (q.includes('fraud') || q.includes('suspicious') || q.includes('abuse') ||
+        q.includes('security') || q.includes('compliance') || q.includes('block') ||
+        q.includes('ban') || q.includes('suspicious')) {
+      return 'GUARD';
+    }
+    
+    // OPTIMIZE mode: revenue, cost, save, improve, performance
+    if (q.includes('optimiz') || q.includes('revenue') || q.includes('cost') ||
+        q.includes('save') || q.includes('improve') || q.includes('increase') ||
+        q.includes('reduce') || q.includes('efficiency')) {
+      return 'OPTIMIZE';
+    }
+    
+    // Default: ASK mode for questions
+    return 'ASK';
+  },
+
+  /**
+   * Format response in Vision 2030 structured format
+   */
+  formatVision2030Response(
+    summary: string[],
+    keySignals: string[],
+    actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK'; permission?: string }>,
+    monitoring: string[],
+    mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE'
+  ): string {
+    let response = '';
+    
+    // Mode indicator
+    response += `**[${mode} MODE]**\n\n`;
+    
+    // Summary section
+    response += '**Summary:**\n';
+    summary.forEach(s => response += `• ${s}\n`);
+    response += '\n';
+    
+    // Key signals section
+    if (keySignals.length > 0) {
+      response += '**Key signals I used:**\n';
+      keySignals.forEach(s => response += `• ${s}\n`);
+      response += '\n';
+    }
+    
+    // Recommended actions section
+    if (actions.length > 0) {
+      response += '**Recommended actions:**\n';
+      actions.forEach(a => {
+        const riskTag = a.risk === 'SAFE' ? '[SAFE]' : 
+                       a.risk === 'CAUTION' ? '[CAUTION]' : 
+                       '[HIGH RISK – REQUIRE SENIOR APPROVAL]';
+        response += `• ${riskTag} ${a.label}\n`;
+      });
+      response += '\n';
+    }
+    
+    // Monitoring section
+    if (monitoring.length > 0) {
+      response += '**What to monitor next:**\n';
+      monitoring.forEach(m => response += `• ${m}\n`);
+    }
+    
+    return response;
+  },
+
+  /**
    * Process natural language query from admin
+   * Vision 2030: Enhanced with mode detection and structured responses
    */
   async processQuery(
     adminId: string,
@@ -137,6 +217,7 @@ export const safePilotService = {
   ): Promise<SafePilotQueryResponse> {
     const startTime = Date.now();
     const lowercaseQuestion = question.toLowerCase();
+    const mode = this.detectMode(question);
     
     let response: SafePilotQueryResponse = {
       answerText: '',
@@ -145,36 +226,156 @@ export const safePilotService = {
       riskLevel: 'LOW',
     };
 
-    // Pattern matching for common queries
+    // Pattern matching for common queries with Vision 2030 enhancements
     if (lowercaseQuestion.includes('high risk') || lowercaseQuestion.includes('risky')) {
-      response = await this.handleRiskQuery(lowercaseQuestion, countryCode);
+      response = await this.handleRiskQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('fraud') || lowercaseQuestion.includes('suspicious')) {
-      response = await this.handleFraudQuery(lowercaseQuestion, countryCode);
+      response = await this.handleFraudQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('refund') || lowercaseQuestion.includes('dispute')) {
-      response = await this.handleRefundQuery(lowercaseQuestion, countryCode);
+      response = await this.handleRefundQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('payout') || lowercaseQuestion.includes('payment')) {
-      response = await this.handlePayoutQuery(lowercaseQuestion, countryCode);
+      response = await this.handlePayoutQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('driver')) {
-      response = await this.handleDriverQuery(lowercaseQuestion, countryCode);
+      response = await this.handleDriverQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('customer')) {
-      response = await this.handleCustomerQuery(lowercaseQuestion, countryCode);
+      response = await this.handleCustomerQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('restaurant') || lowercaseQuestion.includes('partner')) {
-      response = await this.handleRestaurantQuery(lowercaseQuestion, countryCode);
+      response = await this.handleRestaurantQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('kyc') || lowercaseQuestion.includes('verification')) {
-      response = await this.handleKycQuery(lowercaseQuestion, countryCode);
+      response = await this.handleKycQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('performance') || lowercaseQuestion.includes('metric')) {
-      response = await this.handlePerformanceQuery(lowercaseQuestion, countryCode);
+      response = await this.handlePerformanceQuery(lowercaseQuestion, countryCode, mode);
     } else if (lowercaseQuestion.includes('cost') || lowercaseQuestion.includes('expense') || lowercaseQuestion.includes('save')) {
-      response = await this.handleCostQuery(lowercaseQuestion, countryCode);
+      response = await this.handleCostQuery(lowercaseQuestion, countryCode, mode);
+    } else if (lowercaseQuestion.includes('top 3') || lowercaseQuestion.includes('top risks') || lowercaseQuestion.includes('right now')) {
+      response = await this.handleWatchModeQuery(lowercaseQuestion, countryCode);
     } else {
       // General query handling
-      response = await this.handleGeneralQuery(lowercaseQuestion, pageKey, countryCode);
+      response = await this.handleGeneralQuery(lowercaseQuestion, pageKey, countryCode, mode);
     }
 
     // Log interaction
     await this.logInteraction(adminId, pageKey, question, response, countryCode, Date.now() - startTime);
 
     return response;
+  },
+
+  /**
+   * Handle WATCH mode: Top risks and monitoring
+   */
+  async handleWatchModeQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+    const where = countryCode ? { user: { countryCode } } : {};
+    
+    const [
+      pendingFraudAlerts,
+      unresolvedSOS,
+      failedPayouts,
+      negativeBalances,
+      lowRatingDrivers,
+      pendingKyc,
+    ] = await Promise.all([
+      prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
+      prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } }),
+      prisma.payout.count({ where: { status: 'failed' } }),
+      prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
+      prisma.driverProfile.count({ where: { ...where, rating: { lt: 3.0 } } }),
+      prisma.driverProfile.count({ where: { ...where, verificationStatus: 'pending' } }),
+    ]);
+
+    // Build top risks
+    const risks: Array<{ name: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; area: string; action: string }> = [];
+    
+    if (unresolvedSOS > 0) {
+      risks.push({
+        name: `${unresolvedSOS} Unresolved SOS Alerts`,
+        severity: 'CRITICAL',
+        area: 'Safety',
+        action: 'Review and resolve immediately',
+      });
+    }
+    
+    if (pendingFraudAlerts > 0) {
+      risks.push({
+        name: `${pendingFraudAlerts} Pending Fraud Alerts`,
+        severity: pendingFraudAlerts > 10 ? 'CRITICAL' : 'HIGH',
+        area: 'Security',
+        action: 'Investigate suspicious patterns',
+      });
+    }
+    
+    if (failedPayouts > 0) {
+      risks.push({
+        name: `${failedPayouts} Failed Payouts`,
+        severity: failedPayouts > 10 ? 'HIGH' : 'MEDIUM',
+        area: 'Finance',
+        action: 'Review payment gateway issues',
+      });
+    }
+    
+    if (negativeBalances > 10) {
+      risks.push({
+        name: `${negativeBalances} Negative Balance Accounts`,
+        severity: 'MEDIUM',
+        area: 'Finance',
+        action: 'Schedule balance recovery',
+      });
+    }
+    
+    if (lowRatingDrivers > 5) {
+      risks.push({
+        name: `${lowRatingDrivers} Low-Rating Drivers`,
+        severity: 'MEDIUM',
+        area: 'Quality',
+        action: 'Review for training or suspension',
+      });
+    }
+
+    // Sort by severity
+    const severityOrder = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+    risks.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+    
+    const top3 = risks.slice(0, 3);
+    
+    const summary = top3.length > 0 
+      ? top3.map(r => `**${r.severity}**: ${r.name} (${r.area})`)
+      : ['No critical risks detected. Platform operating normally.'];
+
+    const answerText = this.formatVision2030Response(
+      summary,
+      ['Real-time fraud alerts', 'SOS monitoring', 'Payment gateway status', 'Driver ratings'],
+      top3.map(r => ({
+        label: r.action,
+        risk: r.severity === 'CRITICAL' ? 'HIGH_RISK' : r.severity === 'HIGH' ? 'CAUTION' : 'SAFE',
+      })),
+      ['SOS alert response times', 'Fraud pattern evolution', 'Payment success rates'],
+      'WATCH'
+    );
+
+    return {
+      answerText,
+      insights: top3.map(r => ({
+        type: 'risk' as const,
+        title: r.name,
+        detail: r.action,
+        metrics: { area: r.area },
+        severity: r.severity,
+      })),
+      suggestions: [
+        {
+          key: 'view_safety',
+          label: 'Open Safety Center',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/safety' },
+        },
+        {
+          key: 'view_fraud',
+          label: 'View Fraud Alerts',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/fraud-detection' },
+        },
+      ],
+      riskLevel: top3[0]?.severity || 'LOW',
+    };
   },
 
   /**
@@ -831,10 +1032,10 @@ export const safePilotService = {
   // Query Handlers
   // ============================================
 
-  async handleRiskQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleRiskQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const where = countryCode ? { user: { countryCode } } : {};
     
-    const [highRiskDrivers, lowRatingCustomers] = await Promise.all([
+    const [highRiskDrivers, lowRatingCustomers, blockedAccounts] = await Promise.all([
       prisma.driverProfile.count({
         where: {
           ...where,
@@ -850,10 +1051,36 @@ export const safePilotService = {
           user: { isBlocked: true },
         },
       }),
+      prisma.user.count({ where: { isBlocked: true } }),
     ]);
 
+    const answerText = this.formatVision2030Response(
+      [
+        `${highRiskDrivers} high-risk drivers identified (low rating or blocked)`,
+        `${lowRatingCustomers} flagged customers currently blocked`,
+        `${blockedAccounts} total blocked accounts across platform`,
+      ],
+      [
+        'Driver rating thresholds (<3.0 stars)',
+        'Account block status',
+        'Recent complaint patterns',
+        'Cancellation rate analysis',
+      ],
+      [
+        { label: 'Review high-risk drivers for suspension', risk: highRiskDrivers > 20 ? 'CAUTION' : 'SAFE' },
+        { label: 'Audit blocked customer accounts', risk: 'SAFE' },
+        { label: 'Generate comprehensive risk report', risk: 'SAFE' },
+      ],
+      [
+        'New drivers falling below rating threshold',
+        'Repeat offenders returning after unblock',
+        'Geographic concentration of risk',
+      ],
+      mode
+    );
+
     return {
-      answerText: `I found ${highRiskDrivers} high-risk drivers and ${lowRatingCustomers} flagged customers${countryCode ? ` in ${countryCode}` : ''}.`,
+      answerText,
       insights: [
         {
           type: 'risk',
@@ -888,8 +1115,8 @@ export const safePilotService = {
     };
   },
 
-  async handleFraudQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
-    const [pendingFraudAlerts, resolvedFraudAlerts] = await Promise.all([
+  async handleFraudQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'GUARD'): Promise<SafePilotQueryResponse> {
+    const [pendingFraudAlerts, resolvedFraudAlerts, highSeverityAlerts] = await Promise.all([
       prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
       prisma.fraudAlert.count({
         where: {
@@ -897,16 +1124,44 @@ export const safePilotService = {
           createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         },
       }),
+      prisma.fraudAlert.count({ where: { status: 'PENDING', severity: { in: ['HIGH', 'CRITICAL'] } } }),
     ]);
 
+    const answerText = this.formatVision2030Response(
+      [
+        `${pendingFraudAlerts} pending fraud alerts requiring investigation`,
+        `${highSeverityAlerts} high/critical severity alerts need immediate attention`,
+        `${resolvedFraudAlerts} alerts resolved in the last 7 days`,
+      ],
+      [
+        'Device fingerprint anomalies',
+        'Payment method correlation',
+        'Route and location patterns',
+        'Promo usage and abuse signals',
+        'Dispute and refund patterns',
+      ],
+      [
+        { label: 'Investigate high-severity alerts immediately', risk: highSeverityAlerts > 0 ? 'HIGH_RISK' : 'CAUTION' },
+        { label: 'Review suspicious account clusters', risk: 'CAUTION' },
+        { label: 'Generate fraud pattern analysis', risk: 'SAFE' },
+      ],
+      [
+        'New fraud patterns emerging',
+        'Coordinated fraud ring activity',
+        'Payment gateway anomalies',
+        'Promo abuse spikes',
+      ],
+      'GUARD'
+    );
+
     return {
-      answerText: `There are ${pendingFraudAlerts} pending fraud alerts requiring review.`,
+      answerText,
       insights: [
         {
           type: 'fraud',
           title: 'Pending Fraud Alerts',
           detail: `${pendingFraudAlerts} alerts need investigation`,
-          metrics: { pending: pendingFraudAlerts, resolved_last_week: resolvedFraudAlerts },
+          metrics: { pending: pendingFraudAlerts, resolved_last_week: resolvedFraudAlerts, high_severity: highSeverityAlerts },
           severity: pendingFraudAlerts > 10 ? 'CRITICAL' : pendingFraudAlerts > 5 ? 'HIGH' : 'MEDIUM',
         },
       ],
@@ -928,7 +1183,7 @@ export const safePilotService = {
     };
   },
 
-  async handleRefundQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleRefundQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
     const [pendingRefunds, approvedRefunds, rejectedRefunds] = await Promise.all([
@@ -969,7 +1224,7 @@ export const safePilotService = {
     };
   },
 
-  async handlePayoutQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handlePayoutQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const [pendingPayouts, failedPayouts, negativeBalances] = await Promise.all([
       prisma.payout.count({ where: { status: 'pending' } }),
       prisma.payout.count({ where: { status: 'failed' } }),
@@ -1012,7 +1267,7 @@ export const safePilotService = {
     };
   },
 
-  async handleDriverQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleDriverQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const where = countryCode ? { user: { countryCode } } : {};
     
     const [totalDrivers, onlineDrivers, lowRatingDrivers, pendingKyc] = await Promise.all([
@@ -1051,7 +1306,7 @@ export const safePilotService = {
     };
   },
 
-  async handleCustomerQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleCustomerQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const where = countryCode ? { user: { countryCode } } : {};
     
     const [totalCustomers, blockedCustomers] = await Promise.all([
@@ -1088,7 +1343,7 @@ export const safePilotService = {
     };
   },
 
-  async handleRestaurantQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleRestaurantQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const where = countryCode ? { user: { countryCode } } : {};
     
     const [totalRestaurants, pendingKyc, lowRating] = await Promise.all([
@@ -1120,7 +1375,7 @@ export const safePilotService = {
     };
   },
 
-  async handleKycQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleKycQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const context = await this.getKycContext(countryCode);
     
     return {
@@ -1139,7 +1394,7 @@ export const safePilotService = {
     };
   },
 
-  async handlePerformanceQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handlePerformanceQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
     
     const [completedRides, completedOrders] = await Promise.all([
@@ -1170,7 +1425,7 @@ export const safePilotService = {
     };
   },
 
-  async handleCostQuery(question: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleCostQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'OPTIMIZE'): Promise<SafePilotQueryResponse> {
     const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
     const [refundCount, negativeBalances] = await Promise.all([
@@ -1207,11 +1462,25 @@ export const safePilotService = {
     };
   },
 
-  async handleGeneralQuery(question: string, pageKey: string, countryCode?: string): Promise<SafePilotQueryResponse> {
+  async handleGeneralQuery(question: string, pageKey: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const context = await this.getContext(pageKey, countryCode);
     
+    const answerText = this.formatVision2030Response(
+      [
+        context.summary.description,
+        ...context.alerts.slice(0, 2).map(a => a.message),
+      ],
+      Object.entries(context.metrics).slice(0, 4).map(([k, v]) => `${k}: ${v}`),
+      context.quickActions.slice(0, 3).map(a => ({
+        label: a.label,
+        risk: 'SAFE' as const,
+      })),
+      ['Monitor for changes in key metrics', 'Watch for new alerts'],
+      mode
+    );
+
     return {
-      answerText: `Here's what I found for ${context.summary.title}: ${context.summary.description}`,
+      answerText,
       insights: context.alerts.map(alert => ({
         type: 'performance' as const,
         title: alert.message,
