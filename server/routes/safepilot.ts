@@ -106,8 +106,23 @@ router.get(
 );
 
 /**
+ * Fallback context that is always returned when real context unavailable
+ */
+const FALLBACK_CONTEXT = {
+  pageKey: 'admin.unknown',
+  summary: {
+    title: 'Unknown',
+    description: 'No specific context available for this page',
+  },
+  metrics: {},
+  alerts: [],
+  quickActions: [],
+};
+
+/**
  * GET /api/admin/safepilot/context
  * Get page-aware context and summary
+ * Never returns null or error - always returns valid context with fallback
  */
 router.get(
   '/context',
@@ -115,30 +130,57 @@ router.get(
   requireAdmin('USE_SAFEPILOT'),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const query = contextQuerySchema.parse(req.query);
+      const query = contextQuerySchema.safeParse(req.query);
       
-      const entityContext = {
-        driverId: query.driverId,
-        customerId: query.customerId,
-        restaurantId: query.restaurantId,
-        rideId: query.rideId,
-        orderId: query.orderId,
-      };
-
-      const context = await safePilotService.getContext(
-        query.pageKey,
-        query.countryCode,
-        entityContext
-      );
-
-      res.json(context);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: 'Invalid request parameters', details: error.errors });
+      if (!query.success) {
+        console.warn('[SafePilot] Invalid context query, using fallback:', query.error);
+        res.json(FALLBACK_CONTEXT);
         return;
       }
+      
+      const entityContext = {
+        driverId: query.data.driverId,
+        customerId: query.data.customerId,
+        restaurantId: query.data.restaurantId,
+        rideId: query.data.rideId,
+        orderId: query.data.orderId,
+      };
+
+      try {
+        const context = await safePilotService.getContext(
+          query.data.pageKey,
+          query.data.countryCode,
+          entityContext
+        );
+        
+        if (!context || !context.pageKey) {
+          console.warn('[SafePilot] Empty context returned, using fallback for:', query.data.pageKey);
+          res.json({
+            ...FALLBACK_CONTEXT,
+            pageKey: query.data.pageKey,
+            summary: {
+              title: query.data.pageKey.replace('admin.', '').replace(/-/g, ' '),
+              description: 'Context loading...',
+            },
+          });
+          return;
+        }
+        
+        res.json(context);
+      } catch (serviceError) {
+        console.error('[SafePilot] Service error getting context:', serviceError);
+        res.json({
+          ...FALLBACK_CONTEXT,
+          pageKey: query.data.pageKey,
+          summary: {
+            title: query.data.pageKey.replace('admin.', '').replace(/-/g, ' '),
+            description: 'Unable to load full context',
+          },
+        });
+      }
+    } catch (error) {
       console.error('[SafePilot] Context error:', error);
-      res.status(500).json({ error: 'Failed to get context' });
+      res.json(FALLBACK_CONTEXT);
     }
   }
 );

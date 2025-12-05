@@ -364,12 +364,13 @@ export function SafePilotButton() {
       <Button
         data-testid="button-safepilot-launcher"
         size="icon"
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-14 w-14 sm:h-14 sm:w-14 rounded-full shadow-lg z-50 bg-primary hover:bg-primary/90 touch-manipulation"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-14 w-14 rounded-full shadow-xl z-[9999] bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 touch-manipulation transition-transform active:scale-95 border-2 border-white/20"
         onClick={() => setIsOpen(true)}
+        style={{ WebkitTapHighlightColor: 'transparent' }}
       >
-        <Sparkles className="h-6 w-6" />
+        <Sparkles className="h-6 w-6 text-white" />
         {alertCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium">
+          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium ring-2 ring-white">
             {alertCount > 9 ? '9+' : alertCount}
           </span>
         )}
@@ -377,7 +378,7 @@ export function SafePilotButton() {
 
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent 
-          className="w-full sm:max-w-lg p-0 flex flex-col h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[90vh]" 
+          className="w-full sm:max-w-lg p-0 flex flex-col h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[90vh] z-[10000]" 
           data-testid="panel-safepilot"
           side="right"
         >
