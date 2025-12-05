@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { 
-  Sparkles, 
   X, 
   Send, 
   Loader2, 
@@ -16,7 +15,6 @@ import {
   MessageSquare,
   Lightbulb,
   ArrowRight,
-  Brain,
   Users,
   Heart,
   Megaphone,
@@ -25,6 +23,7 @@ import {
   ExternalLink,
   Zap,
 } from 'lucide-react';
+import { SafePilotIcon } from './SafePilotLogo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -407,11 +406,11 @@ export function SafePilotButton() {
       <Button
         data-testid="button-safepilot-launcher"
         size="icon"
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-14 w-14 rounded-full shadow-xl z-[9999] bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 touch-manipulation transition-transform active:scale-95 border-2 border-white/20"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-14 w-14 rounded-full shadow-xl z-[9999] bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-transform active:scale-95 border-2 border-white/20"
         onClick={() => setIsOpen(true)}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
-        <Sparkles className="h-6 w-6 text-white" />
+        <SafePilotIcon size="sm" className="text-white" />
         {alertCount > 0 && (
           <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium ring-2 ring-white">
             {alertCount > 9 ? '9+' : alertCount}
@@ -428,13 +427,13 @@ export function SafePilotButton() {
           <SheetHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b shrink-0">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-[#2F80ED]/10 to-[#56CCF2]/10 flex items-center justify-center shrink-0">
+                  <SafePilotIcon size="sm" />
                 </div>
                 <div className="min-w-0">
-                  <SheetTitle className="text-base sm:text-lg">SafePilot</SheetTitle>
+                  <SheetTitle className="text-base sm:text-lg bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent font-semibold">SafePilot</SheetTitle>
                   <SheetDescription className="text-xs truncate">
-                    AI-powered admin assistant
+                    AI Intelligence Engine
                   </SheetDescription>
                 </div>
               </div>
@@ -452,7 +451,7 @@ export function SafePilotButton() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
             <TabsList className="grid grid-cols-4 mx-4 sm:mx-6 mt-3 sm:mt-4 shrink-0">
               <TabsTrigger value="intelligence" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-intelligence">
-                <Brain className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                <SafePilotIcon size="xs" className="mr-0.5 sm:mr-1.5 shrink-0" />
                 <span className="truncate">Intel</span>
               </TabsTrigger>
               <TabsTrigger value="context" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-context">

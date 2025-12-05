@@ -1,10 +1,16 @@
 import { cn } from "@/lib/utils";
+import { forwardRef } from "react";
 
 interface SafePilotLogoProps {
   variant?: 'icon' | 'full' | 'app-icon';
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
   animated?: boolean;
+}
+
+interface LucideCompatibleProps {
+  className?: string;
+  size?: number | string;
 }
 
 const sizeMap = {
@@ -169,5 +175,42 @@ export function SafePilotLogo({
       return <SafePilotIcon size={size} className={className} animated={animated} />;
   }
 }
+
+export const SafePilotSidebarIcon = forwardRef<SVGSVGElement, LucideCompatibleProps>(
+  ({ className, size = 16, ...props }, ref) => (
+    <svg 
+      ref={ref}
+      width={size} 
+      height={size} 
+      viewBox="0 0 48 48" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+      className={cn("flex-shrink-0", className)}
+      {...props}
+    >
+      <defs>
+        <linearGradient id="safepilot-sidebar-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#2F80ED"/>
+          <stop offset="100%" stopColor="#56CCF2"/>
+        </linearGradient>
+      </defs>
+      
+      <path 
+        d="M24 4L6 10V22C6 33.05 13.68 43.22 24 46C34.32 43.22 42 33.05 42 22V10L24 4Z" 
+        fill="url(#safepilot-sidebar-gradient)"
+      />
+      
+      <path 
+        d="M12 24H16L18 20L21 28L24 18L27 30L30 22L32 24H36" 
+        fill="none" 
+        stroke="#FFFFFF" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+);
+SafePilotSidebarIcon.displayName = 'SafePilotSidebarIcon';
 
 export default SafePilotLogo;

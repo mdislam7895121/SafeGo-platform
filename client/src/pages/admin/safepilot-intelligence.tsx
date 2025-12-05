@@ -22,7 +22,6 @@ import {
   CheckCircle2,
   ArrowRight,
   RefreshCw,
-  Bot,
   Zap,
   Target,
   Brain,
@@ -34,7 +33,6 @@ import {
   Server,
   Settings,
   MessageSquare,
-  Sparkles,
   TestTube,
   Play,
   Send,
@@ -45,6 +43,7 @@ import {
   LineChart,
   PlayCircle,
 } from "lucide-react";
+import { SafePilotIcon } from "@/components/safepilot/SafePilotLogo";
 import { cn } from "@/lib/utils";
 
 interface DashboardData {
@@ -439,11 +438,11 @@ export default function SafePilotIntelligence() {
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shrink-0">
-            <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+          <div className="p-2 rounded-xl bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] shrink-0">
+            <SafePilotIcon size="sm" className="text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-page-title">SafePilot Analytics</h1>
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent truncate" data-testid="text-page-title">SafePilot Intelligence</h1>
             <p className="text-xs sm:text-sm text-muted-foreground truncate">
               AI-powered business automation engine
             </p>
@@ -461,7 +460,7 @@ export default function SafePilotIntelligence() {
             <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
+                  <SafePilotIcon size="xs" />
                   SafePilot Test Mode
                 </DialogTitle>
                 <DialogDescription className="text-xs sm:text-sm">
@@ -513,9 +512,9 @@ export default function SafePilotIntelligence() {
                             <div className="p-3 bg-muted rounded-lg">
                               <p className="text-sm font-medium">{selectedQuestion.question}</p>
                             </div>
-                            <div className="p-3 bg-gradient-to-br from-purple-500/10 to-blue-500/10 rounded-lg border border-purple-500/20">
+                            <div className="p-3 bg-gradient-to-br from-[#2F80ED]/10 to-[#56CCF2]/10 rounded-lg border border-[#2F80ED]/20">
                               <div className="flex items-start gap-2">
-                                <Bot className="h-4 w-4 text-purple-500 mt-1" />
+                                <SafePilotIcon size="xs" className="mt-1" />
                                 <p className="text-sm">{selectedQuestion.response}</p>
                               </div>
                             </div>
@@ -559,8 +558,8 @@ export default function SafePilotIntelligence() {
                   <TabsContent value="demo" className="h-[400px]">
                     <div className="flex flex-col items-center justify-center h-full space-y-6">
                       <div className="text-center space-y-2">
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center mx-auto">
-                          <Bot className="h-10 w-10 text-purple-500" />
+                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#2F80ED]/20 to-[#56CCF2]/20 flex items-center justify-center mx-auto">
+                          <SafePilotIcon size="lg" />
                         </div>
                         <h3 className="text-lg font-semibold">Auto Demo Mode</h3>
                         <p className="text-sm text-muted-foreground max-w-md">
@@ -1534,7 +1533,7 @@ export default function SafePilotIntelligence() {
                   <h4 className="font-medium">Quick Actions</h4>
                   <div className="space-y-2">
                     <Button variant="outline" className="w-full justify-start" size="sm" data-testid="button-get-next-action">
-                      <Sparkles className="h-4 w-4 mr-2" />
+                      <SafePilotIcon size="xs" className="mr-2" />
                       Get Next Best Action
                     </Button>
                     <Button variant="outline" className="w-full justify-start" size="sm" data-testid="button-revenue-accelerators">

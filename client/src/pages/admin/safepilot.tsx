@@ -2,7 +2,6 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { 
-  Sparkles, 
   Send, 
   Loader2, 
   AlertTriangle, 
@@ -16,7 +15,6 @@ import {
   BarChart3,
   MessageSquare,
   Lightbulb,
-  Brain,
   Users,
   Heart,
   Megaphone,
@@ -40,8 +38,8 @@ import {
   Radio,
   ShieldCheck,
   Gauge,
-  Bot,
 } from 'lucide-react';
+import { SafePilotIcon } from '@/components/safepilot/SafePilotLogo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -277,12 +275,12 @@ export default function SafePilotPage() {
       <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shrink-0">
-              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] flex items-center justify-center shadow-lg shrink-0">
+              <SafePilotIcon size="sm" className="text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-safepilot-title">SafePilot</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">AI-powered business automation</p>
+              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent truncate" data-testid="text-safepilot-title">SafePilot</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">AI Intelligence Engine</p>
             </div>
           </div>
           <Badge variant="secondary" className="gap-1 self-start sm:self-auto">
@@ -446,7 +444,7 @@ export default function SafePilotPage() {
             <Card>
               <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <Brain className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <SafePilotIcon size="xs" />
                   Intelligence Modules
                 </CardTitle>
                 <CardDescription className="text-xs sm:text-sm">

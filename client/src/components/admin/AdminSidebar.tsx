@@ -36,9 +36,9 @@ import {
   Route,
   ChevronDown,
   Rocket,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
+import { SafePilotSidebarIcon } from "@/components/safepilot/SafePilotLogo";
 import {
   Sidebar,
   SidebarContent,
@@ -310,7 +310,7 @@ const phase4NavItems: NavItem[] = [
   {
     title: "SafePilot",
     href: "/admin/safepilot",
-    icon: Sparkles,
+    icon: SafePilotSidebarIcon as unknown as LucideIcon,
     navKey: "dashboard",
   },
   {

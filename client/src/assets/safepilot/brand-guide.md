@@ -132,16 +132,32 @@ import { SafePilotIcon, SafePilotLogoFull, SafePilotAppIcon } from '@/components
 
 ## File Exports
 
-| File | Format | Usage |
-|------|--------|-------|
-| `safepilot-icon.svg` | SVG | Web, scalable icon |
-| `safepilot-icon-dark.svg` | SVG | Dark mode web icon |
-| `safepilot-logo-full.svg` | SVG | Web, full logo |
-| `safepilot-logo-full-dark.svg` | SVG | Dark mode full logo |
-| `safepilot_shield_icon_blue_gradient.png` | PNG | Raster icon |
-| `safepilot_mobile_app_icon.png` | PNG | Mobile app icon |
-| `safepilot_full_logo_light_mode.png` | PNG | Light mode full |
-| `safepilot_full_logo_dark_mode.png` | PNG | Dark mode full |
+### SVG Assets (Vector - Scalable)
+| File | Path | Usage |
+|------|------|-------|
+| `safepilot-icon.svg` | `client/src/assets/safepilot/safepilot-icon.svg` | Web scalable icon (light mode) |
+| `safepilot-icon-dark.svg` | `client/src/assets/safepilot/safepilot-icon-dark.svg` | Web scalable icon (dark mode) |
+| `safepilot-logo-full.svg` | `client/src/assets/safepilot/safepilot-logo-full.svg` | Full logo with text (light mode) |
+| `safepilot-logo-full-dark.svg` | `client/src/assets/safepilot/safepilot-logo-full-dark.svg` | Full logo with text (dark mode) |
+
+### PNG Assets (Raster)
+| File | Path | Usage |
+|------|------|-------|
+| `safepilot_shield_icon_blue_gradient.png` | `attached_assets/generated_images/safepilot_shield_icon_blue_gradient.png` | Shield icon PNG (1024px) |
+| `safepilot_mobile_app_icon.png` | `attached_assets/generated_images/safepilot_mobile_app_icon.png` | iOS/Android app icon |
+| `safepilot_full_logo_light_mode.png` | `attached_assets/generated_images/safepilot_full_logo_light_mode.png` | Full logo for light backgrounds |
+| `safepilot_full_logo_dark_mode.png` | `attached_assets/generated_images/safepilot_full_logo_dark_mode.png` | Full logo for dark backgrounds |
+
+### React Components
+| Component | Path | Usage |
+|-----------|------|-------|
+| `SafePilotIcon` | `@/components/safepilot/SafePilotLogo` | Inline SVG icon with size variants |
+| `SafePilotLogoFull` | `@/components/safepilot/SafePilotLogo` | Full logo with text |
+| `SafePilotAppIcon` | `@/components/safepilot/SafePilotLogo` | Rounded app icon container |
+| `SafePilotSidebarIcon` | `@/components/safepilot/SafePilotLogo` | LucideIcon-compatible for sidebars |
+
+### Asset Index
+Import all assets from: `@/assets/safepilot/index.ts`
 
 ## Color Palette CSS Variables
 
