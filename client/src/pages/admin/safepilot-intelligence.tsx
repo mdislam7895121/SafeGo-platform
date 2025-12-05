@@ -42,9 +42,197 @@ import {
   Eye,
   LineChart,
   PlayCircle,
+  X,
+  Radio,
+  BarChart3,
 } from "lucide-react";
 import { SafePilotIcon } from "@/components/safepilot/SafePilotLogo";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
+
+interface Vision2030ModuleData {
+  mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE';
+  summary: string[];
+  keySignals: string[];
+  actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' }>;
+  monitor: string[];
+  moduleData?: Record<string, unknown>;
+}
+
+type ModuleKey = 'growth' | 'cost-reduction' | 'fraud-shield' | 'partner-coach' | 
+                 'customer-retention' | 'marketing-ai' | 'financial-intelligence' | 'legal-compliance';
+
+const MODULE_CONFIG: Record<ModuleKey, { title: string; icon: typeof TrendingUp; color: string }> = {
+  'growth': { title: 'Growth Engine', icon: TrendingUp, color: 'bg-green-500' },
+  'cost-reduction': { title: 'Cost Reduction', icon: DollarSign, color: 'bg-blue-500' },
+  'fraud-shield': { title: 'Fraud Shield', icon: Shield, color: 'bg-red-500' },
+  'partner-coach': { title: 'Partner Coach', icon: Users, color: 'bg-orange-500' },
+  'customer-retention': { title: 'Customer Retention', icon: Heart, color: 'bg-pink-500' },
+  'marketing-ai': { title: 'Marketing AI', icon: Megaphone, color: 'bg-purple-500' },
+  'financial-intelligence': { title: 'Financial Intelligence', icon: PieChart, color: 'bg-cyan-500' },
+  'legal-compliance': { title: 'Legal & Compliance', icon: Scale, color: 'bg-slate-500' },
+};
+
+function ModuleDetailPanel({ 
+  moduleKey, 
+  data, 
+  isLoading, 
+  onClose 
+}: { 
+  moduleKey: ModuleKey; 
+  data: Vision2030ModuleData | null; 
+  isLoading: boolean;
+  onClose: () => void;
+}) {
+  const config = MODULE_CONFIG[moduleKey];
+  const Icon = config.icon;
+
+  const getModeColor = (mode: string) => {
+    switch (mode) {
+      case 'GUARD': return 'bg-red-500 text-white';
+      case 'WATCH': return 'bg-blue-500 text-white';
+      case 'OPTIMIZE': return 'bg-green-500 text-white';
+      default: return 'bg-purple-500 text-white';
+    }
+  };
+
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case 'HIGH_RISK': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800';
+      case 'CAUTION': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
+      default: return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        </div>
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="text-center py-12 px-4">
+        <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+        <p className="text-muted-foreground">Unable to load module data</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={cn("p-2 rounded-lg", config.color)}>
+            <Icon className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">{config.title}</h3>
+            <Badge className={getModeColor(data.mode)}>{data.mode} MODE</Badge>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-module">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <SafePilotIcon size="xs" />
+            Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {data.summary.map((item, idx) => (
+            <div key={idx} className="flex items-start gap-2 text-sm">
+              <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 shrink-0" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Radio className="h-4 w-4 text-blue-500" />
+            Key Signals
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-1.5">
+            {data.keySignals.map((signal, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {signal}
+              </Badge>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {data.actions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Zap className="h-4 w-4 text-yellow-500" />
+              Recommended Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.actions.map((action, idx) => (
+              <div 
+                key={idx} 
+                className={cn(
+                  "flex items-center justify-between p-2 rounded-lg border text-sm",
+                  getRiskColor(action.risk)
+                )}
+              >
+                <span>{action.label}</span>
+                <Badge variant="outline" className="text-xs shrink-0 ml-2">
+                  {action.risk.replace('_', ' ')}
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Eye className="h-4 w-4 text-purple-500" />
+            What to Monitor
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-2">
+            {data.monitor.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                <BarChart3 className="h-3 w-3 shrink-0" />
+                <span className="truncate">{item}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 interface DashboardData {
   growth: {
@@ -379,6 +567,53 @@ export default function SafePilotIntelligence() {
   const [selectedQuestion, setSelectedQuestion] = useState<typeof PRELOADED_TEST_QUESTIONS[0] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
+  
+  const [selectedModule, setSelectedModule] = useState<ModuleKey | null>(null);
+  const [moduleData, setModuleData] = useState<Vision2030ModuleData | null>(null);
+  const [moduleLoading, setModuleLoading] = useState(false);
+  const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
+
+  const fetchModuleData = async (moduleKey: ModuleKey) => {
+    setModuleLoading(true);
+    setSelectedModule(moduleKey);
+    setModuleDialogOpen(true);
+    
+    try {
+      const response = await fetch(`/api/admin/safepilot/modules/${moduleKey}`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setModuleData(data);
+      } else {
+        setModuleData({
+          mode: 'ASK',
+          summary: ['Module data temporarily unavailable', 'Please try again shortly'],
+          keySignals: ['Connection issue', 'Retry recommended'],
+          actions: [{ label: 'Retry loading', risk: 'SAFE' }],
+          monitor: ['System status'],
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch module data:', error);
+      setModuleData({
+        mode: 'ASK',
+        summary: ['Unable to connect to module', 'Check your connection'],
+        keySignals: ['Network error'],
+        actions: [{ label: 'Retry', risk: 'SAFE' }],
+        monitor: ['Connection status'],
+      });
+    } finally {
+      setModuleLoading(false);
+    }
+  };
+
+  const closeModuleDetail = () => {
+    setModuleDialogOpen(false);
+    setSelectedModule(null);
+    setModuleData(null);
+  };
 
   useEffect(() => {
     if (demoModeActive && demoStep < PRELOADED_TEST_QUESTIONS.length) {
@@ -624,6 +859,30 @@ export default function SafePilotIntelligence() {
         </div>
       </div>
 
+      <Dialog open={moduleDialogOpen} onOpenChange={(open) => !open && closeModuleDetail()}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="pb-0">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <SafePilotIcon size="xs" />
+              Intelligence Module
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Vision 2030 Analysis
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 pr-4">
+            {selectedModule && (
+              <ModuleDetailPanel
+                moduleKey={selectedModule}
+                data={moduleData}
+                isLoading={moduleLoading}
+                onClose={closeModuleDetail}
+              />
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-2 gap-2 sm:gap-4">
         <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
           <CardContent className="p-3 sm:pt-4 sm:px-6">
@@ -709,6 +968,7 @@ export default function SafePilotIntelligence() {
                 { label: "Onboarding", value: dashboard?.growth?.onboardingOpportunities || 0 },
                 { label: "Surge Recs", value: dashboard?.growth?.surgeRecommendations || 0 },
               ]}
+              onClick={() => fetchModuleData('growth')}
             />
 
             <ModuleCard
@@ -723,6 +983,7 @@ export default function SafePilotIntelligence() {
                 { label: "Discount Abuse", value: dashboard?.cost?.discountAbuserCount || 0 },
                 { label: "Payout Leaks", value: dashboard?.cost?.payoutLeakageCount || 0 },
               ]}
+              onClick={() => fetchModuleData('cost-reduction')}
             />
 
             <ModuleCard
@@ -737,6 +998,7 @@ export default function SafePilotIntelligence() {
                 { label: "Est. Loss", value: `$${dashboard?.fraud?.estimatedTotalLoss || 0}` },
                 { label: "High Risk", value: dashboard?.fraud?.highAlerts || 0 },
               ]}
+              onClick={() => fetchModuleData('fraud-shield')}
             />
 
             <ModuleCard
@@ -751,6 +1013,7 @@ export default function SafePilotIntelligence() {
                 { label: "Avg Driver", value: dashboard?.partner?.averageDriverRating?.toFixed(1) || "0" },
                 { label: "Avg Restaurant", value: dashboard?.partner?.averageRestaurantRating?.toFixed(1) || "0" },
               ]}
+              onClick={() => fetchModuleData('partner-coach')}
             />
 
             <ModuleCard
@@ -765,6 +1028,7 @@ export default function SafePilotIntelligence() {
                 { label: "Win-back", value: dashboard?.retention?.winBackCandidates || 0 },
                 { label: "Value at Risk", value: `$${dashboard?.retention?.totalRetentionValue || 0}` },
               ]}
+              onClick={() => fetchModuleData('customer-retention')}
             />
 
             <ModuleCard
@@ -779,6 +1043,7 @@ export default function SafePilotIntelligence() {
                 { label: "Campaigns", value: dashboard?.marketing?.upcomingCampaigns || 0 },
                 { label: "Est. Reach", value: dashboard?.marketing?.totalEstimatedReach?.toLocaleString() || 0 },
               ]}
+              onClick={() => fetchModuleData('marketing-ai')}
             />
 
             <ModuleCard
@@ -793,6 +1058,7 @@ export default function SafePilotIntelligence() {
                 { label: "Balance Risks", value: dashboard?.financial?.negativeBalanceRisks || 0 },
                 { label: "Growth", value: `${dashboard?.financial?.revenueGrowth || 0}%`, trend: (dashboard?.financial?.revenueGrowth || 0) > 0 ? "up" : "down" },
               ]}
+              onClick={() => fetchModuleData('financial-intelligence')}
             />
 
             <ModuleCard
@@ -807,6 +1073,7 @@ export default function SafePilotIntelligence() {
                 { label: "BD Issues", value: dashboard?.compliance?.bdViolations || 0 },
                 { label: "US Issues", value: dashboard?.compliance?.usViolations || 0 },
               ]}
+              onClick={() => fetchModuleData('legal-compliance')}
             />
 
             <ModuleCard
