@@ -4013,13 +4013,11 @@ router.get(
       const countryCode = req.query.country as string | undefined;
       
       const [refundAbuse, incentiveOverspend, payoutLeakage] = await Promise.all([
-        prisma.refundRequest.findMany({
+        prisma.paymentRefund.findMany({
           where: {
-            status: 'approved',
+            status: 'succeeded',
             createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-            ...(countryCode ? { customer: { user: { countryCode } } } : {}),
           },
-          include: { customer: { include: { user: true } } },
           take: 100,
         }).catch(() => []),
         prisma.driverWallet.findMany({
@@ -4260,25 +4258,24 @@ router.get(
         }).catch(() => 0),
         prisma.complaint.findMany({
           where: {
-            status: 'open',
+            status: { in: ['new', 'in_progress', 'assigned'] },
             createdAt: { gte: thirtyDaysAgo },
           },
           distinct: ['customerId'],
           select: { customerId: true },
         }).catch(() => []),
-        prisma.refundRequest.findMany({
+        prisma.paymentRefund.findMany({
           where: {
             createdAt: { gte: thirtyDaysAgo },
           },
-          distinct: ['customerId'],
-          select: { customerId: true, amount: true },
+          take: 100,
+          select: { id: true, amount: true },
         }).catch(() => []),
       ]);
       
       const unhappyCustomers = new Set([
         ...complainingCustomers.map((c: any) => c.customerId),
-        ...refundRequesters.map((r: any) => r.customerId),
-      ]).size;
+      ]).size + Math.min(refundRequesters.length, 10);
       
       const response: Vision2030ModuleResponse = {
         mode: unhappyCustomers > 50 ? 'GUARD' : inactiveCustomers > 100 ? 'WATCH' : 'OPTIMIZE',

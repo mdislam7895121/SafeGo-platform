@@ -1277,8 +1277,8 @@ export const safePilotService = {
       pendingRefunds,
       totalRefunds,
     ] = await Promise.all([
-      prisma.refundRequest.count({ where: { status: 'pending' } }),
-      prisma.refundRequest.count({ where: { createdAt: { gte: last30d } } }),
+      prisma.paymentRefund.count({ where: { status: 'pending' } }).catch(() => 0),
+      prisma.paymentRefund.count({ where: { createdAt: { gte: last30d } } }).catch(() => 0),
     ]);
 
     const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
@@ -1383,8 +1383,8 @@ export const safePilotService = {
       pendingAlerts,
     ] = await Promise.all([
       prisma.fraudAlert.count(),
-      prisma.fraudAlert.count({ where: { severity: 'CRITICAL', status: 'open' } }).catch(() => 0),
-      prisma.fraudAlert.count({ where: { severity: 'HIGH', status: 'open' } }).catch(() => 0),
+      prisma.fraudAlert.count({ where: { severity: 'critical', status: 'open' } }).catch(() => 0),
+      prisma.fraudAlert.count({ where: { severity: 'high', status: 'open' } }).catch(() => 0),
       prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
     ]);
 
@@ -1538,11 +1538,11 @@ export const safePilotService = {
       criticalComplaints,
       resolvedToday,
     ] = await Promise.all([
-      prisma.complaint.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
-      prisma.complaint.count({ where: { status: 'OPEN', priority: 'CRITICAL' } }),
+      prisma.complaint.count({ where: { status: { in: ['new', 'in_progress', 'assigned'] } } }).catch(() => 0),
+      prisma.complaint.count({ where: { status: 'new' } }).catch(() => 0),
       prisma.complaint.count({
         where: {
-          status: 'RESOLVED',
+          status: 'resolved',
           resolvedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
       }),
@@ -2115,11 +2115,11 @@ export const safePilotService = {
       prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
       prisma.fraudAlert.count({
         where: {
-          status: 'RESOLVED',
+          status: 'resolved_confirmed',
           createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         },
-      }),
-      prisma.fraudAlert.count({ where: { status: 'open', severity: { in: ['HIGH', 'CRITICAL'] } } }).catch(() => 0),
+      }).catch(() => 0),
+      prisma.fraudAlert.count({ where: { status: 'open', severity: { in: ['high', 'critical'] } } }).catch(() => 0),
     ]);
 
     const formatted = this.formatVision2030Response(
@@ -2187,9 +2187,9 @@ export const safePilotService = {
     const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
     const [pendingRefunds, approvedRefunds, rejectedRefunds] = await Promise.all([
-      prisma.refundRequest.count({ where: { status: 'pending' } }),
-      prisma.refundRequest.count({ where: { status: 'approved', createdAt: { gte: last30d } } }),
-      prisma.refundRequest.count({ where: { status: 'rejected', createdAt: { gte: last30d } } }),
+      prisma.paymentRefund.count({ where: { status: 'pending' } }).catch(() => 0),
+      prisma.paymentRefund.count({ where: { status: 'succeeded', createdAt: { gte: last30d } } }).catch(() => 0),
+      prisma.paymentRefund.count({ where: { status: 'failed', createdAt: { gte: last30d } } }).catch(() => 0),
     ]);
 
     const totalProcessed = approvedRefunds + rejectedRefunds;
@@ -2674,8 +2674,8 @@ export const safePilotService = {
     const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
     const [refundCount, negativeBalances] = await Promise.all([
-      prisma.refundRequest.count({ where: { status: 'approved', createdAt: { gte: last30d } } }),
-      prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
+      prisma.paymentRefund.count({ where: { status: 'succeeded', createdAt: { gte: last30d } } }).catch(() => 0),
+      prisma.driverWallet.count({ where: { balance: { lt: 0 } } }).catch(() => 0),
     ]);
 
     const formatted = this.formatVision2030Response(
@@ -3174,7 +3174,7 @@ export const safePilotService = {
           prisma.fraudAlert.count({ where: { status: 'open' } }).catch(() => 0),
           prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } }).catch(() => 0),
           prisma.payout.count({ where: { status: 'failed' } }).catch(() => 0),
-          prisma.refundRequest.count({ where: { status: 'pending' } }).catch(() => 0),
+          prisma.paymentRefund.count({ where: { status: 'pending' } }).catch(() => 0),
           prisma.driverWallet.count({ where: { balance: { lt: 0 } } }).catch(() => 0),
           prisma.driverProfile.count({ where: { ...where, verificationStatus: 'pending' } }).catch(() => 0),
           prisma.driverStats.count({ where: { rating: { lt: 3.0 } } }).catch(() => 0),
@@ -3184,7 +3184,7 @@ export const safePilotService = {
         ]);
 
         const revenueAgg = await prisma.ride.aggregate({ where: { createdAt: { gte: since7d }, status: 'completed' }, _sum: { finalFare: true } }).catch(() => ({ _sum: { finalFare: null } }));
-        const refundsAgg = await prisma.refundRequest.aggregate({ where: { createdAt: { gte: since7d }, status: 'approved' }, _sum: { amount: true } }).catch(() => ({ _sum: { amount: null } }));
+        const refundsAgg = await prisma.paymentRefund.aggregate({ where: { createdAt: { gte: since7d }, status: 'succeeded' }, _sum: { amount: true } }).catch(() => ({ _sum: { amount: null } }));
         totalRevenue7d = Number(revenueAgg._sum?.finalFare ?? 0);
         totalRefunds7d = Number(refundsAgg._sum?.amount ?? 0);
       } catch (queryError) {
@@ -3540,11 +3540,11 @@ export const safePilotService = {
         where: {
           createdAt: { gte: since24h },
           OR: [
-            { distanceKm: { gt: 200 } },
-            { finalFare: { gt: 500 } },
+            { distanceMiles: { gt: 125 } },
+            { serviceFare: { gt: 500 } },
           ],
         },
-      });
+      }).catch(() => 0);
       
       if (suspiciousTrips > 10) {
         findings.push({
@@ -3576,9 +3576,9 @@ export const safePilotService = {
       }
 
       // 4. Refund Increase Detection
-      const refunds24h = await prisma.refundRequest.count({ where: { createdAt: { gte: since24h } } });
-      const refunds7dAvg = await prisma.refundRequest.count({ where: { createdAt: { gte: since7d } } });
-      const avgRefundsDaily = refunds7dAvg / 7;
+      const refunds24h = await prisma.paymentRefund.count({ where: { createdAt: { gte: since24h } } }).catch(() => 0);
+      const refunds7dAvg = await prisma.paymentRefund.count({ where: { createdAt: { gte: since7d } } }).catch(() => 0);
+      const avgRefundsDaily = (refunds7dAvg || 1) / 7;
       
       if (refunds24h > avgRefundsDaily * 2 && refunds24h > 5) {
         findings.push({
@@ -3711,7 +3711,7 @@ export const safePilotService = {
         [totalDrivers, pendingKYC, totalRefunds, pendingComplaints, totalRides7d] = await Promise.all([
           prisma.driverProfile.count().catch(() => 0),
           prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }).catch(() => 0),
-          prisma.refundRequest.count({ where: { status: 'pending' } }).catch(() => 0),
+          prisma.paymentRefund.count({ where: { status: 'pending' } }).catch(() => 0),
           prisma.complaint.count({ where: { status: 'open' } }).catch(() => 0),
           prisma.ride.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }).catch(() => 0),
         ]);
@@ -4138,11 +4138,11 @@ export const safePilotService = {
       ordersWithComplaints,
       customersWithRefunds,
     ] = await Promise.all([
-      prisma.driverStats.count({ where: { rating: { lt: 3.5 } } }),
-      prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
-      prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }),
-      prisma.complaint.count({ where: { status: 'open' } }),
-      prisma.refundRequest.count({ where: { status: 'approved' } }),
+      prisma.driverStats.count({ where: { rating: { lt: 3.5 } } }).catch(() => 0),
+      prisma.driverWallet.count({ where: { balance: { lt: 0 } } }).catch(() => 0),
+      prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }).catch(() => 0),
+      prisma.complaint.count({ where: { status: 'new' } }).catch(() => 0),
+      prisma.paymentRefund.count({ where: { status: 'succeeded' } }).catch(() => 0),
     ]);
 
     const correlations: Array<{
@@ -4280,7 +4280,7 @@ export const safePilotService = {
       lowRatedRestaurants,
     ] = await Promise.all([
       prisma.fraudAlert.count({ where: { createdAt: { gte: periodStart } } }),
-      prisma.fraudAlert.count({ where: { status: 'RESOLVED', createdAt: { gte: periodStart } } }),
+      prisma.fraudAlert.count({ where: { status: 'resolved_confirmed', createdAt: { gte: periodStart } } }).catch(() => 0),
       prisma.payout.count({ where: { status: 'failed', createdAt: { gte: periodStart } } }),
       prisma.payout.count({ where: { status: 'pending' } }),
       prisma.driverProfile.count({ where: { verificationStatus: 'pending' } }),
@@ -4651,10 +4651,10 @@ export const safePilotService = {
       failedPayouts,
       approvedRefunds,
     ] = await Promise.all([
-      prisma.ride.count({ where: { status: { contains: 'cancelled' }, createdAt: { gte: periodStart } } }),
-      prisma.foodOrder.count({ where: { status: { contains: 'cancelled' }, createdAt: { gte: periodStart } } }),
-      prisma.payout.count({ where: { status: 'failed', createdAt: { gte: periodStart } } }),
-      prisma.refundRequest.count({ where: { status: 'approved', createdAt: { gte: periodStart } } }),
+      prisma.ride.count({ where: { status: { contains: 'cancelled' }, createdAt: { gte: periodStart } } }).catch(() => 0),
+      prisma.foodOrder.count({ where: { status: { contains: 'cancelled' }, createdAt: { gte: periodStart } } }).catch(() => 0),
+      prisma.payout.count({ where: { status: 'failed', createdAt: { gte: periodStart } } }).catch(() => 0),
+      prisma.paymentRefund.count({ where: { status: 'succeeded', createdAt: { gte: periodStart } } }).catch(() => 0),
     ]);
 
     // Estimate average values
