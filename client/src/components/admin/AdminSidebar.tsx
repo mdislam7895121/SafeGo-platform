@@ -30,6 +30,11 @@ import {
   FileText,
   BrainCircuit,
   Gauge,
+  Star,
+  FileCheck,
+  DollarSign,
+  Route,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -275,6 +280,51 @@ const phase3cNavItems: NavItem[] = [
   },
 ];
 
+const phase4NavItems: NavItem[] = [
+  {
+    title: "Ratings Center",
+    href: "/admin/ratings-center",
+    icon: Star,
+    navKey: "dashboard",
+  },
+  {
+    title: "Driver Violations",
+    href: "/admin/driver-violations",
+    icon: FileWarning,
+    navKey: "dashboard",
+  },
+  {
+    title: "Earnings Disputes",
+    href: "/admin/earnings-disputes",
+    icon: DollarSign,
+    navKey: "payouts",
+  },
+  {
+    title: "Ride Timeline",
+    href: "/admin/ride-timeline",
+    icon: Route,
+    navKey: "dashboard",
+  },
+  {
+    title: "Notification Rules",
+    href: "/admin/notification-rules",
+    icon: Bell,
+    navKey: "settings",
+  },
+  {
+    title: "Payment Integrity",
+    href: "/admin/payment-integrity",
+    icon: CreditCard,
+    navKey: "payouts",
+  },
+  {
+    title: "Global Search",
+    href: "/admin/global-search",
+    icon: Search,
+    navKey: "dashboard",
+  },
+];
+
 export function AdminSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
@@ -471,6 +521,19 @@ export function AdminSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {renderNavGroup(phase3cNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {renderNavGroup(phase4NavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Advanced Admin Tools
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(phase4NavItems)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

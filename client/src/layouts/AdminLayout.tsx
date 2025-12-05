@@ -26,6 +26,7 @@ import {
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
+import { AdminTutorial } from "@/components/admin/AdminTutorial";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
@@ -199,6 +200,7 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
           </main>
         </SidebarInset>
       </div>
+      <AdminTutorial />
     </SidebarProvider>
   );
 }
