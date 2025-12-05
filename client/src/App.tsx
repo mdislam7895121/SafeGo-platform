@@ -304,6 +304,7 @@ import AuditConsole from "@/pages/admin/audit-console";
 // Phase 3C: Enterprise Admin Intelligence Layer
 import IntelligenceDashboard from "@/pages/admin/intelligence-dashboard";
 import OperationsCenter from "@/pages/admin/operations-center";
+import SafePilotIntelligence from "@/pages/admin/safepilot-intelligence";
 
 // Phase 5A: Admin Observability Center
 import ObservabilityCenter from "@/pages/admin/observability-center";
@@ -2232,6 +2233,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Intelligence Dashboard">
             <IntelligenceDashboard />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/safepilot-intelligence">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="SafePilot Intelligence">
+            <SafePilotIntelligence />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
