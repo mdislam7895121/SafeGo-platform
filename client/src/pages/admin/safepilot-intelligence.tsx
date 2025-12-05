@@ -236,44 +236,44 @@ function ModuleCard({
   return (
     <Card 
       className={cn(
-        "cursor-pointer transition-all hover-elevate",
+        "cursor-pointer transition-all hover-elevate touch-manipulation",
         status === "critical" && "border-destructive/50",
         status === "warning" && "border-yellow-500/50"
       )}
       onClick={onClick}
       data-testid={`card-module-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={cn("p-2 rounded-lg", color)}>
-              <Icon className="h-4 w-4 text-white" />
+      <CardHeader className="p-2.5 sm:p-4 pb-1.5 sm:pb-2">
+        <div className="flex items-start sm:items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className={cn("p-1.5 sm:p-2 rounded-lg shrink-0", color)}>
+              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
             </div>
-            <div>
-              <CardTitle className="text-sm font-medium">{title}</CardTitle>
-              <CardDescription className="text-xs">{description}</CardDescription>
+            <div className="min-w-0">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">{title}</CardTitle>
+              <CardDescription className="text-[10px] sm:text-xs truncate">{description}</CardDescription>
             </div>
           </div>
           {status === "critical" && (
-            <Badge variant="destructive" className="text-xs">Critical</Badge>
+            <Badge variant="destructive" className="text-[10px] sm:text-xs shrink-0">!</Badge>
           )}
           {status === "warning" && (
-            <Badge className="bg-yellow-500 text-xs">Attention</Badge>
+            <Badge className="bg-yellow-500 text-[10px] sm:text-xs shrink-0">!</Badge>
           )}
           {status === "healthy" && (
-            <Badge variant="secondary" className="text-xs">Healthy</Badge>
+            <Badge variant="secondary" className="text-[10px] sm:text-xs shrink-0 hidden sm:inline-flex">OK</Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-2">
+      <CardContent className="p-2.5 sm:p-4 pt-0 sm:pt-0">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
           {metrics.map((metric, i) => (
-            <div key={i} className="space-y-0.5">
-              <p className="text-xs text-muted-foreground">{metric.label}</p>
-              <div className="flex items-center gap-1">
-                <p className="text-sm font-semibold">{metric.value}</p>
-                {metric.trend === "up" && <TrendingUp className="h-3 w-3 text-green-500" />}
-                {metric.trend === "down" && <TrendingDown className="h-3 w-3 text-red-500" />}
+            <div key={i} className="space-y-0">
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{metric.label}</p>
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                <p className="text-xs sm:text-sm font-semibold truncate">{metric.value}</p>
+                {metric.trend === "up" && <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-green-500 shrink-0" />}
+                {metric.trend === "down" && <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-red-500 shrink-0" />}
               </div>
             </div>
           ))}
@@ -298,23 +298,23 @@ function ActionItem({
 }) {
   return (
     <div 
-      className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+      className="flex items-center justify-between p-2 sm:p-3 border rounded-lg hover-elevate cursor-pointer touch-manipulation gap-2"
       onClick={onClick}
       data-testid={`action-item-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
         <div className={cn(
-          "w-2 h-2 rounded-full",
+          "w-2 h-2 rounded-full shrink-0",
           priority >= 90 ? "bg-red-500" : priority >= 70 ? "bg-yellow-500" : "bg-blue-500"
         )} />
-        <div>
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
+        <div className="min-w-0">
+          <p className="text-xs sm:text-sm font-medium truncate">{title}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{description}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-xs">{category}</Badge>
-        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <Badge variant="outline" className="text-[10px] sm:text-xs hidden sm:inline-flex">{category}</Badge>
+        <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
       </div>
     </div>
   );
@@ -332,20 +332,20 @@ function AlertItem({
   riskScore: number;
 }) {
   return (
-    <div className="flex items-center justify-between p-3 border rounded-lg" data-testid={`alert-item-${category}`}>
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between p-2 sm:p-3 border rounded-lg gap-2" data-testid={`alert-item-${category}`}>
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
         <AlertTriangle className={cn(
-          "h-4 w-4",
+          "h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0",
           severity === "CRITICAL" ? "text-red-500" : 
           severity === "HIGH" ? "text-orange-500" : "text-yellow-500"
         )} />
-        <div>
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-muted-foreground">{category.replace(/_/g, " ")}</p>
+        <div className="min-w-0">
+          <p className="text-xs sm:text-sm font-medium truncate">{title}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{category.replace(/_/g, " ")}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Badge variant={severity === "CRITICAL" ? "destructive" : "secondary"} className="text-xs">
+      <div className="flex items-center shrink-0">
+        <Badge variant={severity === "CRITICAL" ? "destructive" : "secondary"} className="text-[10px] sm:text-xs">
           {riskScore}%
         </Badge>
       </div>
@@ -436,48 +436,49 @@ export default function SafePilotIntelligence() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
-            <Bot className="h-6 w-6 text-white" />
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shrink-0">
+            <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">SafePilot Intelligence</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-page-title">SafePilot Intelligence</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
               AI-powered business automation engine
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <Dialog open={testModeOpen} onOpenChange={setTestModeOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" data-testid="button-test-mode">
-                <TestTube className="h-4 w-4 mr-2" />
-                Test Mode
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm touch-manipulation" data-testid="button-test-mode">
+                <TestTube className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Test Mode</span>
+                <span className="sm:hidden">Test</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5 text-purple-500" />
+                <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
                   SafePilot Test Mode
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-xs sm:text-sm">
                   Test SafePilot intelligence with preloaded questions and demo actions
                 </DialogDescription>
               </DialogHeader>
               
               <div className="flex-1 overflow-hidden">
                 <Tabs defaultValue="questions" className="h-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="questions">Test Questions</TabsTrigger>
-                    <TabsTrigger value="actions">Demo Actions</TabsTrigger>
-                    <TabsTrigger value="demo">Auto Demo</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3 h-auto">
+                    <TabsTrigger value="questions" className="text-xs sm:text-sm py-1.5 sm:py-2">Questions</TabsTrigger>
+                    <TabsTrigger value="actions" className="text-xs sm:text-sm py-1.5 sm:py-2">Actions</TabsTrigger>
+                    <TabsTrigger value="demo" className="text-xs sm:text-sm py-1.5 sm:py-2">Demo</TabsTrigger>
                   </TabsList>
                   
-                  <TabsContent value="questions" className="h-[400px] overflow-hidden">
-                    <div className="grid grid-cols-2 gap-4 h-full">
+                  <TabsContent value="questions" className="h-[50vh] sm:h-[400px] overflow-hidden">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 h-full">
                       <ScrollArea className="h-full border rounded-lg p-3">
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-muted-foreground mb-3">Preloaded Questions</p>
@@ -615,85 +616,88 @@ export default function SafePilotIntelligence() {
             size="sm"
             onClick={() => refetch()}
             disabled={isRefetching}
+            className="text-xs sm:text-sm touch-manipulation"
             data-testid="button-refresh-dashboard"
           >
-            <RefreshCw className={cn("h-4 w-4 mr-2", isRefetching && "animate-spin")} />
-            Refresh
+            <RefreshCw className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2", isRefetching && "animate-spin")} />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
         <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Monthly Revenue</p>
-                <p className="text-xl font-bold" data-testid="text-monthly-revenue">
+          <CardContent className="p-3 sm:pt-4 sm:px-6">
+            <div className="flex items-center justify-between gap-1">
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Monthly Revenue</p>
+                <p className="text-base sm:text-xl font-bold truncate" data-testid="text-monthly-revenue">
                   ${dashboard?.financial?.monthlyPrediction?.toLocaleString() || 0}
                 </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-500/50" />
+              <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-500/50 shrink-0" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Potential Savings</p>
-                <p className="text-xl font-bold" data-testid="text-potential-savings">
+          <CardContent className="p-3 sm:pt-4 sm:px-6">
+            <div className="flex items-center justify-between gap-1">
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Potential Savings</p>
+                <p className="text-base sm:text-xl font-bold truncate" data-testid="text-potential-savings">
                   ${dashboard?.cost?.totalPotentialSavings?.toLocaleString() || 0}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-blue-500/50" />
+              <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500/50 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Critical Alerts</p>
-                <p className="text-xl font-bold" data-testid="text-critical-alerts">
+          <CardContent className="p-3 sm:pt-4 sm:px-6">
+            <div className="flex items-center justify-between gap-1">
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Critical Alerts</p>
+                <p className="text-base sm:text-xl font-bold" data-testid="text-critical-alerts">
                   {(dashboard?.fraud?.criticalAlerts || 0) + (dashboard?.compliance?.criticalViolations || 0)}
                 </p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-500/50" />
+              <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500/50 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Compliance Score</p>
-                <p className="text-xl font-bold" data-testid="text-compliance-score">
+          <CardContent className="p-3 sm:pt-4 sm:px-6">
+            <div className="flex items-center justify-between gap-1">
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Compliance</p>
+                <p className="text-base sm:text-xl font-bold" data-testid="text-compliance-score">
                   {dashboard?.compliance?.complianceScore || 0}%
                 </p>
               </div>
-              <CheckCircle2 className="h-8 w-8 text-purple-500/50" />
+              <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8 text-purple-500/50 shrink-0" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="flex flex-wrap gap-2">
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="growth" data-testid="tab-growth">Growth</TabsTrigger>
-          <TabsTrigger value="operations" data-testid="tab-operations">Operations</TabsTrigger>
-          <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
-          <TabsTrigger value="automation" data-testid="tab-automation">Automation</TabsTrigger>
-          <TabsTrigger value="advisor" data-testid="tab-advisor">Business Coach</TabsTrigger>
-          <TabsTrigger value="actions" data-testid="tab-actions">Actions</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-4">
+        <ScrollArea className="w-full">
+          <TabsList className="inline-flex w-auto min-w-full sm:w-auto gap-1 p-1 h-auto">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="growth" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-growth">Growth</TabsTrigger>
+            <TabsTrigger value="operations" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-operations">Ops</TabsTrigger>
+            <TabsTrigger value="security" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-security">Security</TabsTrigger>
+            <TabsTrigger value="automation" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-automation">Auto</TabsTrigger>
+            <TabsTrigger value="advisor" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-advisor">Coach</TabsTrigger>
+            <TabsTrigger value="actions" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap" data-testid="tab-actions">Actions</TabsTrigger>
+          </TabsList>
+        </ScrollArea>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <TabsContent value="overview" className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
             <ModuleCard
               title="Growth Engine"
               description="Demand-supply AI"

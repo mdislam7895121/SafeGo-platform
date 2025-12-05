@@ -73,11 +73,24 @@ interface SafePilotContextResponse {
   quickActions: SafePilotSuggestion[];
 }
 
+interface SafePilotAction {
+  label: string;
+  risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK';
+  actionType?: string;
+  payload?: Record<string, unknown>;
+}
+
 interface SafePilotQueryResponse {
-  answerText: string;
-  insights: SafePilotInsight[];
-  suggestions: SafePilotSuggestion[];
-  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  mode?: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE';
+  summary?: string[];
+  keySignals?: string[];
+  actions?: SafePilotAction[];
+  monitor?: string[];
+  answerText?: string;
+  insights?: SafePilotInsight[];
+  suggestions?: SafePilotSuggestion[];
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  error?: string;
 }
 
 interface SafePilotHistoryItem {
@@ -233,7 +246,7 @@ export function SafePilotButton() {
     }
   }, [pageKey, isOpen]);
 
-  const handleSubmitQuestion = async () => {
+  const handleSubmitQuestion = async (retryCount = 0) => {
     if (!question.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -242,7 +255,22 @@ export function SafePilotButton() {
         pageKey,
         question: question.trim(),
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        if (retryCount < 2) {
+          await new Promise(r => setTimeout(r, 1000));
+          return handleSubmitQuestion(retryCount + 1);
+        }
+        throw new Error(errorData.error || 'Request failed');
+      }
+      
       const response = await res.json() as SafePilotQueryResponse;
+
+      if (response.error && retryCount < 2) {
+        await new Promise(r => setTimeout(r, 1000));
+        return handleSubmitQuestion(retryCount + 1);
+      }
 
       setQueryResponse(response);
       setActiveTab('response');
@@ -250,9 +278,23 @@ export function SafePilotButton() {
       
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setQueryResponse({
+        mode: 'ASK',
+        summary: ['Unable to process your question. Please try again.'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        answerText: '',
+        insights: [],
+        suggestions: [],
+        riskLevel: 'LOW',
+        error: errorMessage,
+      } as SafePilotQueryResponse);
+      setActiveTab('response');
       toast({
-        title: 'Error',
-        description: 'Failed to process your question. Please try again.',
+        title: 'Connection Issue',
+        description: 'Please check your connection and try again.',
         variant: 'destructive',
       });
     } finally {
