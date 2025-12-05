@@ -88,6 +88,70 @@ Phase 3C Routes (/api/admin/phase3c/):
 - POST /intelligence/actions/:actionType
 ```
 
+## Phase 4: Enterprise Admin Features (December 2025)
+
+### Phase 4A - Complaint Resolution Center (Completed)
+Enhanced complaint resolution system (`/admin/complaint-resolution`):
+- **SLA Timer System**: Real-time SLA calculations with severity-based deadlines (Critical: 4h, High: 12h, Medium: 24h, Low: 72h)
+- **SLA Status Indicators**: Visual status for breached, critical, on-track, and completed SLAs
+- **AI Summary Generation**: Automated complaint analysis with issue type, severity assessment, recommended actions, and risk assessment
+- **Multi-Filter System**: Filter by category, severity, status, date range with search
+- **Triage Notes**: Add notes during complaint processing
+- **Resolution Workflow**: Assign to admins, update status, resolve with resolution types
+
+### Phase 4B - Driver Violation Management (Completed)
+Comprehensive driver violation tracking (`/admin/driver-violations`):
+- **Violation Types**: Speed violations, harassment complaints, safety violations, fraud, no-shows, route deviations, vehicle condition, documentation issues
+- **Severity Levels**: Critical, high, medium, low with visual indicators
+- **Point System**: Violation points tracking per driver
+- **Penalty Management**: Warning, fine, temporary suspension, permanent ban
+- **Appeal Processing**: Track and process driver appeals with decision workflow
+
+### Phase 4C - Customer Trust & Safety Review Board (Completed)
+Committee-based safety case review (`/admin/trust-safety`):
+- **Case Types**: Safety incidents, fraud investigations, harassment cases, accident reviews, dispute resolution
+- **Priority Levels**: Critical, high, medium, low with visual indicators
+- **Committee Decision Workflow**: In favor of customer/driver, split decision, insufficient evidence, both at fault
+- **Multi-Language Support**: English and Bangla decision letters
+- **Action Tracking**: Warning, suspension, ban, refund, compensation, legal escalation, law enforcement referral
+
+### Phase 4D - Policy Enforcement Engine (Completed)
+Platform policy configuration (`/admin/policy-engine`):
+- **Policy Types**: Rides, Eats, Parcel, General policies
+- **Rule Engine**: Condition-based rules with priority ordering
+- **Policy Lifecycle**: Draft, active, paused, deprecated states
+- **Version Control**: Policy versioning with effective dates
+
+### Phase 4E - Global Export Center (Enhanced)
+Data export with integrity verification (`/admin/export-center`):
+- **Export Types**: Complaints, refunds, violations, rides, orders, audit logs, users, drivers
+- **Format Support**: CSV, JSON, Excel (XLSX)
+- **SHA-256 Checksums**: Tamper-proof verification for all exports
+- **Date Range Filtering**: Filter exports by date range
+- **Processing Queue**: Queued, processing, completed, expired status tracking
+
+### Phase 4F - Admin Activity Monitor (Completed)
+Real-time admin activity tracking (`/admin/activity-monitor`):
+- **Live Activity Feed**: Real-time admin actions with auto-refresh (10s intervals)
+- **Risk Scoring**: 0-100% risk assessment per action
+- **Anomaly Detection**: Unusual volume, new IP address, policy violations
+- **Geo-Location Tracking**: IP address, city, country for each action
+- **Security Alerts**: Create and send alerts for suspicious activities
+
+### Phase 4 API Routes
+```
+Phase 4 Routes (/api/admin/phase4/):
+- GET /complaints, GET /complaints/:id, PATCH /complaints/:id, POST /complaints/export
+- GET /refunds, GET /refunds/:id, PATCH /refunds/:id, POST /refunds/batch
+- GET /legal-requests, PATCH /legal-requests/:id
+- GET /violations, PATCH /violations/:id
+- GET /trust-safety/cases, POST /trust-safety/cases/:id/decision
+- GET /policies, POST /policies, PATCH /policies/:id
+- GET /exports, POST /exports, GET /exports/:id/download
+- GET /activity-monitor, POST /activity-monitor/alert
+- GET /documents/expiring
+```
+
 ## External Dependencies
 
 *   **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.

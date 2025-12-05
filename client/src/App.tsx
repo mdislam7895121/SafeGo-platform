@@ -309,6 +309,10 @@ import MapControl from "@/pages/admin/map-control";
 import EmailTemplates from "@/pages/admin/email-templates";
 import SMSTemplates from "@/pages/admin/sms-templates";
 import AdminChat from "@/pages/admin/admin-chat";
+import DriverViolations from "@/pages/admin/driver-violations";
+import TrustSafety from "@/pages/admin/trust-safety";
+import PolicyEngine from "@/pages/admin/policy-engine";
+import ActivityMonitor from "@/pages/admin/activity-monitor";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -2297,6 +2301,34 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Document Manager">
             <DocumentManager />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/driver-violations">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Driver Violations">
+            <DriverViolations />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/trust-safety">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Trust & Safety Review Board">
+            <TrustSafety />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/policy-engine">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Policy Enforcement Engine">
+            <PolicyEngine />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/activity-monitor">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Admin Activity Monitor">
+            <ActivityMonitor />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

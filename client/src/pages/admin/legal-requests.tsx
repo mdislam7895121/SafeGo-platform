@@ -81,22 +81,18 @@ export default function LegalRequestsDashboard() {
   const [showResponseDialog, setShowResponseDialog] = useState(false);
   const [responseNotes, setResponseNotes] = useState("");
 
-  const buildQueryParams = () => {
+  const buildLegalRequestsQueryUrl = () => {
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.append("status", statusFilter);
     if (countryFilter !== "all") params.append("country", countryFilter);
     params.append("page", String(currentPage));
     params.append("limit", "20");
-    return params.toString();
+    return `/api/admin/phase4/legal-requests?${params.toString()}`;
   };
 
+  const legalRequestsQueryUrl = buildLegalRequestsQueryUrl();
   const { data, isLoading, refetch } = useQuery<LegalRequestsResponse>({
-    queryKey: ["/api/admin/phase4/legal-requests", statusFilter, countryFilter, currentPage],
-    queryFn: async () => {
-      const response = await fetch(`/api/admin/phase4/legal-requests?${buildQueryParams()}`);
-      if (!response.ok) throw new Error("Failed to fetch legal requests");
-      return response.json();
-    },
+    queryKey: [legalRequestsQueryUrl],
   });
 
   const updateStatusMutation = useMutation({
@@ -108,7 +104,8 @@ export default function LegalRequestsDashboard() {
     },
     onSuccess: () => {
       toast({ title: "Status updated successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/legal-requests"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/legal-requests") });
+      setSelectedRequest(null);
     },
     onError: () => {
       toast({ title: "Failed to update status", variant: "destructive" });
@@ -116,17 +113,18 @@ export default function LegalRequestsDashboard() {
   });
 
   const submitResponseMutation = useMutation({
-    mutationFn: async (data: { id: string; notes: string; evidencePackage?: string }) => {
-      return apiRequest(`/api/admin/phase4/legal-requests/${data.id}`, {
+    mutationFn: async (responseData: { id: string; notes: string; evidencePackage?: string }) => {
+      return apiRequest(`/api/admin/phase4/legal-requests/${responseData.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ notes: data.notes, evidencePackage: data.evidencePackage }),
+        body: JSON.stringify({ notes: responseData.notes, evidencePackage: responseData.evidencePackage }),
       });
     },
     onSuccess: () => {
       toast({ title: "Notes updated successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/legal-requests"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/legal-requests") });
       setShowResponseDialog(false);
       setResponseNotes("");
+      setSelectedRequest(null);
     },
     onError: () => {
       toast({ title: "Failed to update notes", variant: "destructive" });

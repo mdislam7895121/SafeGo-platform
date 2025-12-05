@@ -1585,4 +1585,404 @@ router.get("/documents/expiring", checkPermission(Permission.VIEW_DOCUMENTS), as
   }
 });
 
+// ========================================
+// 11. DRIVER VIOLATION MANAGEMENT
+// ========================================
+
+router.get("/violations", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { status, severity, page = "1", limit = "20" } = req.query;
+    
+    const violations = [
+      {
+        id: "viol-001",
+        violationCode: "SG-VIO-2024-000001",
+        driverId: "drv-001",
+        driverName: "John Driver",
+        driverPhone: "+1234567890",
+        type: "speed_violation",
+        severity: "high",
+        status: "pending_review",
+        incidentDate: new Date(),
+        description: "Driver exceeded speed limit by 20mph in school zone",
+        points: 3,
+        penalty: "warning",
+        appealStatus: null,
+        createdAt: new Date(),
+      },
+      {
+        id: "viol-002",
+        violationCode: "SG-VIO-2024-000002",
+        driverId: "drv-002",
+        driverName: "Jane Driver",
+        driverPhone: "+1234567891",
+        type: "harassment_complaint",
+        severity: "critical",
+        status: "escalated",
+        incidentDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        description: "Multiple customer complaints about inappropriate behavior",
+        points: 10,
+        penalty: "suspension",
+        appealStatus: "pending",
+        createdAt: new Date(),
+      },
+    ];
+
+    res.json({
+      violations: violations.filter(v => 
+        (!status || v.status === status) && 
+        (!severity || v.severity === severity)
+      ),
+      pagination: { total: violations.length, page: parseInt(page as string), limit: parseInt(limit as string), totalPages: 1 },
+    });
+  } catch (error) {
+    console.error("Error fetching violations:", error);
+    res.status(500).json({ error: "Failed to fetch violations" });
+  }
+});
+
+router.patch("/violations/:id", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { status, penalty, notes, appealDecision } = req.body;
+    
+    res.json({
+      id: req.params.id,
+      status: status || "reviewed",
+      penalty,
+      notes,
+      appealDecision,
+      reviewedBy: req.user!.id,
+      reviewedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error updating violation:", error);
+    res.status(500).json({ error: "Failed to update violation" });
+  }
+});
+
+// ========================================
+// 12. CUSTOMER TRUST & SAFETY REVIEW BOARD
+// ========================================
+
+router.get("/trust-safety/cases", checkPermission(Permission.MANAGE_SAFETY), async (req: AuthRequest, res) => {
+  try {
+    const cases = [
+      {
+        id: "case-001",
+        caseCode: "SG-TSR-2024-000001",
+        type: "safety_incident",
+        priority: "critical",
+        status: "pending_committee",
+        summary: "Customer reported feeling unsafe during night ride",
+        customerName: "Alice Customer",
+        driverName: "Bob Driver",
+        incidentDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        evidenceCount: 5,
+        createdAt: new Date(),
+        committeeDecision: null,
+        decisionDate: null,
+      },
+      {
+        id: "case-002",
+        caseCode: "SG-TSR-2024-000002",
+        type: "fraud_investigation",
+        priority: "high",
+        status: "under_review",
+        summary: "Suspected fare manipulation scheme",
+        customerName: "Charlie Customer",
+        driverName: "David Driver",
+        incidentDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        evidenceCount: 12,
+        createdAt: new Date(),
+        committeeDecision: null,
+        decisionDate: null,
+      },
+    ];
+
+    res.json({ cases });
+  } catch (error) {
+    console.error("Error fetching trust & safety cases:", error);
+    res.status(500).json({ error: "Failed to fetch cases" });
+  }
+});
+
+router.post("/trust-safety/cases/:id/decision", checkPermission(Permission.MANAGE_SAFETY), async (req: AuthRequest, res) => {
+  try {
+    const { decision, reasoning, actionsTaken, language } = req.body;
+    
+    const decisionLetter = language === "bn" 
+      ? `সিদ্ধান্ত: ${decision}\nকারণ: ${reasoning}\nপদক্ষেপ: ${actionsTaken.join(", ")}`
+      : `Decision: ${decision}\nReasoning: ${reasoning}\nActions: ${actionsTaken.join(", ")}`;
+
+    res.json({
+      caseId: req.params.id,
+      decision,
+      reasoning,
+      actionsTaken,
+      decisionLetter,
+      decidedBy: req.user!.id,
+      decidedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error recording decision:", error);
+    res.status(500).json({ error: "Failed to record decision" });
+  }
+});
+
+// ========================================
+// 13. POLICY ENFORCEMENT ENGINE
+// ========================================
+
+router.get("/policies", checkPermission(Permission.MANAGE_POLICIES), async (req: AuthRequest, res) => {
+  try {
+    const policies = [
+      {
+        id: "pol-001",
+        policyCode: "SG-POL-RIDE-001",
+        name: "Ride Cancellation Policy",
+        type: "rides",
+        version: "2.1",
+        status: "active",
+        rules: [
+          { id: "r1", condition: "cancellation_time < 2min", action: "no_fee", priority: 1 },
+          { id: "r2", condition: "cancellation_time >= 2min && cancellation_time < 5min", action: "reduced_fee", priority: 2 },
+          { id: "r3", condition: "cancellation_time >= 5min", action: "full_fee", priority: 3 },
+        ],
+        effectiveFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        effectiveUntil: null,
+        createdAt: new Date(),
+      },
+      {
+        id: "pol-002",
+        policyCode: "SG-POL-EATS-001",
+        name: "Food Order Refund Policy",
+        type: "eats",
+        version: "1.3",
+        status: "active",
+        rules: [
+          { id: "r1", condition: "order_not_started", action: "full_refund", priority: 1 },
+          { id: "r2", condition: "order_preparing", action: "partial_refund", priority: 2 },
+          { id: "r3", condition: "order_out_for_delivery", action: "no_refund", priority: 3 },
+        ],
+        effectiveFrom: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+        effectiveUntil: null,
+        createdAt: new Date(),
+      },
+    ];
+
+    res.json({ policies });
+  } catch (error) {
+    console.error("Error fetching policies:", error);
+    res.status(500).json({ error: "Failed to fetch policies" });
+  }
+});
+
+router.post("/policies", checkPermission(Permission.MANAGE_POLICIES), async (req: AuthRequest, res) => {
+  try {
+    const { name, type, rules, effectiveFrom } = req.body;
+    
+    res.status(201).json({
+      id: crypto.randomUUID(),
+      policyCode: `SG-POL-${type.toUpperCase()}-${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`,
+      name,
+      type,
+      version: "1.0",
+      status: "draft",
+      rules,
+      effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : null,
+      createdBy: req.user!.id,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error creating policy:", error);
+    res.status(500).json({ error: "Failed to create policy" });
+  }
+});
+
+router.patch("/policies/:id", checkPermission(Permission.MANAGE_POLICIES), async (req: AuthRequest, res) => {
+  try {
+    const { status, rules, effectiveFrom, effectiveUntil } = req.body;
+    
+    res.json({
+      id: req.params.id,
+      status,
+      rules,
+      effectiveFrom,
+      effectiveUntil,
+      updatedBy: req.user!.id,
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error updating policy:", error);
+    res.status(500).json({ error: "Failed to update policy" });
+  }
+});
+
+// ========================================
+// 14. GLOBAL EXPORT CENTER
+// ========================================
+
+router.get("/exports", checkPermission(Permission.VIEW_EXPORTS), async (req: AuthRequest, res) => {
+  try {
+    const exports = [
+      {
+        id: "exp-001",
+        type: "complaints",
+        format: "csv",
+        status: "completed",
+        recordCount: 1250,
+        fileSize: "2.4 MB",
+        checksum: "sha256:abc123def456...",
+        requestedBy: "admin@safego.com",
+        requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        completedAt: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
+        downloadUrl: "/exports/complaints-2024-12-05.csv",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+      {
+        id: "exp-002",
+        type: "refunds",
+        format: "json",
+        status: "processing",
+        recordCount: 0,
+        fileSize: null,
+        checksum: null,
+        requestedBy: "finance@safego.com",
+        requestedAt: new Date(Date.now() - 30 * 60 * 1000),
+        completedAt: null,
+        downloadUrl: null,
+        expiresAt: null,
+      },
+    ];
+
+    res.json({ exports });
+  } catch (error) {
+    console.error("Error fetching exports:", error);
+    res.status(500).json({ error: "Failed to fetch exports" });
+  }
+});
+
+router.post("/exports", checkPermission(Permission.MANAGE_EXPORTS), async (req: AuthRequest, res) => {
+  try {
+    const { type, format, dateFrom, dateTo, filters } = req.body;
+    
+    const exportId = crypto.randomUUID();
+    const checksum = crypto.createHash("sha256").update(exportId + Date.now()).digest("hex");
+
+    res.status(201).json({
+      id: exportId,
+      type,
+      format,
+      status: "queued",
+      filters,
+      dateRange: { from: dateFrom, to: dateTo },
+      checksum: `sha256:${checksum.slice(0, 32)}`,
+      requestedBy: req.user!.id,
+      requestedAt: new Date(),
+      estimatedCompletion: new Date(Date.now() + 5 * 60 * 1000),
+    });
+  } catch (error) {
+    console.error("Error creating export:", error);
+    res.status(500).json({ error: "Failed to create export" });
+  }
+});
+
+router.get("/exports/:id/download", checkPermission(Permission.VIEW_EXPORTS), async (req: AuthRequest, res) => {
+  try {
+    res.json({
+      downloadUrl: `/exports/${req.params.id}/file`,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      checksum: "sha256:" + crypto.createHash("sha256").update(req.params.id).digest("hex").slice(0, 32),
+    });
+  } catch (error) {
+    console.error("Error getting download URL:", error);
+    res.status(500).json({ error: "Failed to get download URL" });
+  }
+});
+
+// ========================================
+// 15. ADMIN ACTIVITY MONITOR (REAL-TIME)
+// ========================================
+
+router.get("/activity-monitor", checkPermission(Permission.VIEW_ADMIN_ACTIVITY), async (req: AuthRequest, res) => {
+  try {
+    const activities = [
+      {
+        id: "act-001",
+        adminId: "adm-001",
+        adminName: "John Admin",
+        adminRole: "super_admin",
+        action: "complaint_resolved",
+        target: "SG-CMP-2024-000125",
+        ipAddress: "192.168.1.100",
+        userAgent: "Mozilla/5.0 Chrome/120.0",
+        geoLocation: { country: "US", city: "New York", lat: 40.7128, lng: -74.0060 },
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        riskScore: 0.1,
+        anomalyFlags: [],
+      },
+      {
+        id: "act-002",
+        adminId: "adm-002",
+        adminName: "Jane Admin",
+        adminRole: "country_admin",
+        action: "bulk_refund_approved",
+        target: "15 refunds totaling $2,450",
+        ipAddress: "10.0.0.55",
+        userAgent: "Mozilla/5.0 Firefox/121.0",
+        geoLocation: { country: "BD", city: "Dhaka", lat: 23.8103, lng: 90.4125 },
+        timestamp: new Date(Date.now() - 12 * 60 * 1000),
+        riskScore: 0.7,
+        anomalyFlags: ["unusual_volume", "new_ip_address"],
+      },
+      {
+        id: "act-003",
+        adminId: "adm-003",
+        adminName: "Bob Supervisor",
+        adminRole: "support_supervisor",
+        action: "driver_suspended",
+        target: "DRV-2024-000892",
+        ipAddress: "172.16.0.25",
+        userAgent: "Mozilla/5.0 Safari/17.2",
+        geoLocation: { country: "US", city: "Los Angeles", lat: 34.0522, lng: -118.2437 },
+        timestamp: new Date(Date.now() - 25 * 60 * 1000),
+        riskScore: 0.3,
+        anomalyFlags: [],
+      },
+    ];
+
+    res.json({
+      activities,
+      summary: {
+        totalActions24h: 156,
+        uniqueAdmins: 12,
+        highRiskActions: 3,
+        anomaliesDetected: 2,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching activity monitor:", error);
+    res.status(500).json({ error: "Failed to fetch activity monitor" });
+  }
+});
+
+router.post("/activity-monitor/alert", checkPermission(Permission.MANAGE_ADMIN_ACTIVITY), async (req: AuthRequest, res) => {
+  try {
+    const { activityId, alertType, notes } = req.body;
+    
+    res.status(201).json({
+      alertId: crypto.randomUUID(),
+      activityId,
+      alertType,
+      notes,
+      createdBy: req.user!.id,
+      createdAt: new Date(),
+      status: "sent",
+    });
+  } catch (error) {
+    console.error("Error creating alert:", error);
+    res.status(500).json({ error: "Failed to create alert" });
+  }
+});
+
 export default router;

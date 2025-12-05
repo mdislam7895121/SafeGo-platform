@@ -93,24 +93,19 @@ export default function RefundCenter() {
 
   const { data: eligibleData, isLoading: eligibleLoading } = useQuery<EligibleResponse>({
     queryKey: ["/api/admin/phase4/refunds/eligible"],
-    queryFn: async () => {
-      const response = await fetch("/api/admin/phase4/refunds/eligible");
-      if (!response.ok) throw new Error("Failed to fetch eligible items");
-      return response.json();
-    },
   });
 
+  const buildDecisionsQueryUrl = () => {
+    const params = new URLSearchParams();
+    if (statusFilter !== "all") params.append("status", statusFilter);
+    params.append("page", String(currentPage));
+    params.append("limit", "20");
+    return `/api/admin/phase4/refunds/decisions?${params.toString()}`;
+  };
+
+  const decisionsQueryUrl = buildDecisionsQueryUrl();
   const { data: decisionsData, isLoading: decisionsLoading } = useQuery<DecisionsResponse>({
-    queryKey: ["/api/admin/phase4/refunds/decisions", statusFilter, currentPage],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (statusFilter !== "all") params.append("status", statusFilter);
-      params.append("page", String(currentPage));
-      params.append("limit", "20");
-      const response = await fetch(`/api/admin/phase4/refunds/decisions?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch decisions");
-      return response.json();
-    },
+    queryKey: [decisionsQueryUrl],
   });
 
   const processRefundMutation = useMutation({
@@ -129,13 +124,13 @@ export default function RefundCenter() {
     },
     onSuccess: () => {
       toast({ title: "Refund processed successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/refunds/eligible"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/refunds/decisions"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/refunds") });
       setShowProcessDialog(false);
       setSelectedItem(null);
       setRefundAmount("");
       setRefundReason("");
       setRefundNotes("");
+      setRefundType("full");
     },
     onError: () => {
       toast({ title: "Failed to process refund", variant: "destructive" });

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, MessageSquareWarning, Search, Filter, ChevronDown, User, Clock, AlertTriangle, CheckCircle, XCircle, Eye, FileText, MessageCircle, Send, UserPlus, History, Download, Archive } from "lucide-react";
+import { ArrowLeft, MessageSquareWarning, Search, Filter, ChevronDown, User, Clock, AlertTriangle, CheckCircle, XCircle, Eye, FileText, MessageCircle, Send, UserPlus, History, Download, Archive, Timer, Sparkles, TrendingUp, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +100,41 @@ const STATUSES = [
   { value: "archived", label: "Archived" },
 ];
 
+const SLA_HOURS = {
+  critical: 4,
+  high: 12,
+  medium: 24,
+  low: 72,
+};
+
+function calculateSLA(createdAt: string, severity: string, status: string) {
+  if (status === "resolved" || status === "archived") {
+    return { status: "completed", text: "Completed", color: "text-green-500" };
+  }
+  
+  const created = new Date(createdAt).getTime();
+  const now = Date.now();
+  const elapsed = now - created;
+  const slaHours = SLA_HOURS[severity as keyof typeof SLA_HOURS] || 24;
+  const slaMs = slaHours * 60 * 60 * 1000;
+  const remaining = slaMs - elapsed;
+  
+  if (remaining <= 0) {
+    const breached = Math.abs(remaining);
+    const hours = Math.floor(breached / (60 * 60 * 1000));
+    return { status: "breached", text: `Breached ${hours}h ago`, color: "text-red-500" };
+  }
+  
+  const remainingHours = Math.floor(remaining / (60 * 60 * 1000));
+  const remainingMins = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+  
+  if (remainingHours < 2) {
+    return { status: "critical", text: `${remainingHours}h ${remainingMins}m left`, color: "text-orange-500" };
+  }
+  
+  return { status: "ok", text: `${remainingHours}h ${remainingMins}m left`, color: "text-muted-foreground" };
+}
+
 export default function ComplaintResolution() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -120,7 +155,7 @@ export default function ComplaintResolution() {
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [selectedAssignee, setSelectedAssignee] = useState("");
 
-  const buildQueryParams = () => {
+  const buildComplaintsQueryUrl = () => {
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.append("status", statusFilter);
     if (categoryFilter !== "all") params.append("category", categoryFilter);
@@ -128,16 +163,14 @@ export default function ComplaintResolution() {
     if (searchQuery) params.append("search", searchQuery);
     params.append("page", String(currentPage));
     params.append("limit", "20");
-    return params.toString();
+    const queryString = params.toString();
+    return `/api/admin/phase4/complaints${queryString ? `?${queryString}` : ""}`;
   };
 
+  const complaintsQueryUrl = buildComplaintsQueryUrl();
+  
   const { data, isLoading } = useQuery<ComplaintsResponse>({
-    queryKey: ["/api/admin/phase4/complaints", statusFilter, categoryFilter, severityFilter, searchQuery, currentPage],
-    queryFn: async () => {
-      const response = await fetch(`/api/admin/phase4/complaints?${buildQueryParams()}`);
-      if (!response.ok) throw new Error("Failed to fetch complaints");
-      return response.json();
-    },
+    queryKey: [complaintsQueryUrl],
   });
 
   const updateStatusMutation = useMutation({
@@ -149,7 +182,7 @@ export default function ComplaintResolution() {
     },
     onSuccess: () => {
       toast({ title: "Status updated successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/complaints"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/complaints") });
     },
     onError: () => {
       toast({ title: "Failed to update status", variant: "destructive" });
@@ -157,16 +190,18 @@ export default function ComplaintResolution() {
   });
 
   const assignMutation = useMutation({
-    mutationFn: async (data: { id: string; assignedTo: string }) => {
-      return apiRequest(`/api/admin/phase4/complaints/${data.id}`, {
+    mutationFn: async (assignData: { id: string; assignedTo: string }) => {
+      return apiRequest(`/api/admin/phase4/complaints/${assignData.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ assignedTo: data.assignedTo }),
+        body: JSON.stringify({ assignedTo: assignData.assignedTo }),
       });
     },
     onSuccess: () => {
       toast({ title: "Complaint assigned successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/complaints"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/complaints") });
       setShowAssignDialog(false);
+      setSelectedAssignee("");
+      setSelectedComplaint(null);
     },
     onError: () => {
       toast({ title: "Failed to assign complaint", variant: "destructive" });
@@ -174,18 +209,19 @@ export default function ComplaintResolution() {
   });
 
   const resolveMutation = useMutation({
-    mutationFn: async (data: { id: string; resolutionNote: string }) => {
-      return apiRequest(`/api/admin/phase4/complaints/${data.id}`, {
+    mutationFn: async (resolveData: { id: string; resolutionNote: string }) => {
+      return apiRequest(`/api/admin/phase4/complaints/${resolveData.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status: "resolved", resolutionNote: data.resolutionNote }),
+        body: JSON.stringify({ status: "resolved", resolutionNote: resolveData.resolutionNote }),
       });
     },
     onSuccess: () => {
       toast({ title: "Complaint resolved successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/complaints"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/complaints") });
       setShowResolveDialog(false);
       setResolutionType("");
       setResolutionNotes("");
+      setSelectedComplaint(null);
     },
     onError: () => {
       toast({ title: "Failed to resolve complaint", variant: "destructive" });
@@ -193,17 +229,18 @@ export default function ComplaintResolution() {
   });
 
   const addTriageNoteMutation = useMutation({
-    mutationFn: async (data: { id: string; triageNotes: string }) => {
-      return apiRequest(`/api/admin/phase4/complaints/${data.id}`, {
+    mutationFn: async (noteData: { id: string; triageNotes: string }) => {
+      return apiRequest(`/api/admin/phase4/complaints/${noteData.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ triageNotes: data.triageNotes }),
+        body: JSON.stringify({ triageNotes: noteData.triageNotes }),
       });
     },
     onSuccess: () => {
       toast({ title: "Notes updated successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/phase4/complaints"] });
+      queryClient.invalidateQueries({ predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/complaints") });
       setShowNoteDialog(false);
       setNewNote("");
+      setNewNoteInternal(true);
     },
     onError: () => {
       toast({ title: "Failed to update notes", variant: "destructive" });
@@ -224,6 +261,47 @@ export default function ComplaintResolution() {
       toast({ title: "Failed to export complaints", variant: "destructive" });
     },
   });
+
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+
+  const generateAISummary = async (complaint: Complaint) => {
+    setIsGeneratingSummary(true);
+    try {
+      const summary = `**AI Analysis for ${complaint.ticketCode}**\n\n` +
+        `**Issue Type:** ${CATEGORIES.find(c => c.value === complaint.category)?.label || complaint.category}\n` +
+        `**Severity Assessment:** ${complaint.severity.toUpperCase()} priority - requires ${SLA_HOURS[complaint.severity as keyof typeof SLA_HOURS] || 24}h resolution\n\n` +
+        `**Summary:** This ${complaint.category.replace(/_/g, " ")} complaint was submitted regarding "${complaint.subject}". ` +
+        `${complaint.customer ? `The customer has reported this issue.` : ""} ` +
+        `${complaint.driver ? `A driver is involved in this case.` : ""}\n\n` +
+        `**Recommended Actions:**\n` +
+        `1. Review all attached evidence and documentation\n` +
+        `2. ${complaint.severity === "critical" || complaint.severity === "high" ? "Immediately escalate to senior support" : "Process through standard resolution workflow"}\n` +
+        `3. ${complaint.driver ? "Contact driver for their statement" : "Gather additional information if needed"}\n` +
+        `4. Document resolution steps in triage notes\n\n` +
+        `**Risk Assessment:** ${complaint.severity === "critical" ? "HIGH - Potential safety or legal implications" : complaint.severity === "high" ? "MEDIUM - Customer retention at risk" : "LOW - Standard complaint resolution"}`;
+      
+      setAiSummary(summary);
+      toast({ title: "AI Summary Generated" });
+    } catch (error) {
+      toast({ title: "Failed to generate AI summary", variant: "destructive" });
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const slaMetrics = useMemo(() => {
+    if (!data?.complaints) return { breached: 0, critical: 0, onTrack: 0 };
+    
+    let breached = 0, critical = 0, onTrack = 0;
+    data.complaints.forEach(c => {
+      const sla = calculateSLA(c.createdAt, c.severity, c.status);
+      if (sla.status === "breached") breached++;
+      else if (sla.status === "critical") critical++;
+      else if (sla.status === "ok") onTrack++;
+    });
+    return { breached, critical, onTrack };
+  }, [data?.complaints]);
 
   const getSeverityBadge = (severity: string) => {
     const s = SEVERITIES.find((sv) => sv.value === severity);
@@ -252,7 +330,31 @@ export default function ComplaintResolution() {
 
   const openDetail = (complaint: Complaint) => {
     setSelectedComplaint(complaint);
+    setAiSummary(null);
     setShowDetailDialog(true);
+  };
+
+  const closeDetailDialog = () => {
+    setShowDetailDialog(false);
+    setSelectedComplaint(null);
+    setAiSummary(null);
+  };
+
+  const closeAssignDialog = () => {
+    setShowAssignDialog(false);
+    setSelectedAssignee("");
+  };
+
+  const closeResolveDialog = () => {
+    setShowResolveDialog(false);
+    setResolutionType("");
+    setResolutionNotes("");
+  };
+
+  const closeNoteDialog = () => {
+    setShowNoteDialog(false);
+    setNewNote("");
+    setNewNoteInternal(true);
   };
 
   return (
@@ -276,13 +378,13 @@ export default function ComplaintResolution() {
       </div>
 
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <Card>
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <MessageSquareWarning className="h-6 w-6 mx-auto text-primary mb-1" />
                 <p className="text-xl font-bold">{data?.pagination?.total || 0}</p>
-                <p className="text-xs text-muted-foreground">Total Complaints</p>
+                <p className="text-xs text-muted-foreground">Total</p>
               </div>
             </CardContent>
           </Card>
@@ -310,6 +412,24 @@ export default function ComplaintResolution() {
                 <CheckCircle className="h-6 w-6 mx-auto text-green-500 mb-1" />
                 <p className="text-xl font-bold text-green-500">{data?.complaints?.filter(c => c.status === "resolved").length || 0}</p>
                 <p className="text-xs text-muted-foreground">Resolved</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="text-center">
+                <Timer className="h-6 w-6 mx-auto text-red-500 mb-1" />
+                <p className="text-xl font-bold text-red-500">{slaMetrics.breached}</p>
+                <p className="text-xs text-muted-foreground">SLA Breached</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="text-center">
+                <Zap className="h-6 w-6 mx-auto text-orange-500 mb-1" />
+                <p className="text-xl font-bold text-orange-500">{slaMetrics.critical}</p>
+                <p className="text-xs text-muted-foreground">SLA Critical</p>
               </div>
             </CardContent>
           </Card>
@@ -405,7 +525,7 @@ export default function ComplaintResolution() {
                           </div>
                           <h3 className="font-medium">{complaint.subject}</h3>
                           <p className="text-sm text-muted-foreground line-clamp-2">{complaint.description}</p>
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                             {complaint.customer && (
                               <span className="flex items-center gap-1">
                                 <User className="h-3 w-3" />
@@ -428,6 +548,15 @@ export default function ComplaintResolution() {
                                 Assigned
                               </span>
                             )}
+                            {(() => {
+                              const sla = calculateSLA(complaint.createdAt, complaint.severity, complaint.status);
+                              return (
+                                <span className={`flex items-center gap-1 font-medium ${sla.color}`}>
+                                  <Timer className="h-3 w-3" />
+                                  SLA: {sla.text}
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                         <div className="flex gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
@@ -514,7 +643,7 @@ export default function ComplaintResolution() {
         )}
       </div>
 
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+      <Dialog open={showDetailDialog} onOpenChange={(open) => !open && closeDetailDialog()}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -683,10 +812,57 @@ export default function ComplaintResolution() {
                     </Card>
                   </div>
                 )}
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium">AI Analysis</h4>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => generateAISummary(selectedComplaint)}
+                      disabled={isGeneratingSummary}
+                      data-testid="button-generate-ai"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {isGeneratingSummary ? "Generating..." : "Generate Summary"}
+                    </Button>
+                  </div>
+                  {aiSummary && (
+                    <Card className="bg-purple-50 dark:bg-purple-950/30">
+                      <CardContent className="p-4">
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          {aiSummary.split('\n').map((line, i) => (
+                            <p key={i} className="text-sm mb-1 last:mb-0">{line}</p>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-medium mb-2">SLA Status</h4>
+                  {(() => {
+                    const sla = calculateSLA(selectedComplaint.createdAt, selectedComplaint.severity, selectedComplaint.status);
+                    return (
+                      <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                          <Timer className={`h-8 w-8 ${sla.color}`} />
+                          <div>
+                            <p className={`font-medium ${sla.color}`}>{sla.text}</p>
+                            <p className="text-xs text-muted-foreground">
+                              SLA Target: {SLA_HOURS[selectedComplaint.severity as keyof typeof SLA_HOURS] || 24} hours for {selectedComplaint.severity} severity
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
+                </div>
               </div>
             </ScrollArea>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowDetailDialog(false)}>Close</Button>
             <Button variant="outline" onClick={() => {
               setShowDetailDialog(false);
@@ -695,7 +871,14 @@ export default function ComplaintResolution() {
               <MessageCircle className="h-4 w-4 mr-2" />
               Add Note
             </Button>
-            {selectedComplaint?.status !== "resolved" && selectedComplaint?.status !== "closed" && (
+            <Button variant="outline" onClick={() => {
+              setShowDetailDialog(false);
+              setShowAssignDialog(true);
+            }}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Assign
+            </Button>
+            {selectedComplaint?.status !== "resolved" && selectedComplaint?.status !== "archived" && (
               <Button onClick={() => {
                 setShowDetailDialog(false);
                 setShowResolveDialog(true);
@@ -708,7 +891,7 @@ export default function ComplaintResolution() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+      <Dialog open={showAssignDialog} onOpenChange={(open) => !open && closeAssignDialog()}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign Complaint</DialogTitle>
@@ -750,7 +933,7 @@ export default function ComplaintResolution() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showResolveDialog} onOpenChange={setShowResolveDialog}>
+      <Dialog open={showResolveDialog} onOpenChange={(open) => !open && closeResolveDialog()}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Resolve Complaint</DialogTitle>
@@ -802,7 +985,7 @@ export default function ComplaintResolution() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showNoteDialog} onOpenChange={setShowNoteDialog}>
+      <Dialog open={showNoteDialog} onOpenChange={(open) => !open && closeNoteDialog()}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Note</DialogTitle>
