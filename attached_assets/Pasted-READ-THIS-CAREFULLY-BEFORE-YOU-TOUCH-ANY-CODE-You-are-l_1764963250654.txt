@@ -1,0 +1,143 @@
+READ THIS CAREFULLY BEFORE YOU TOUCH ANY CODE.
+
+You are losing me money with partial, broken fixes.  
+From now on, you must work like a senior production engineer, not a draft generator.
+
+YOUR MISSION
+- Fully audit and FIX the SafePilot AI Intelligence Engine so that:
+  - The Ask SafePilot box ALWAYS returns a valid AI answer.
+  - No more “Error Processing Query. Unable to process your question. Please try again.”
+  - The system is READY FOR PRODUCTION USE, not “almost working”.
+
+NON-NEGOTIABLE RULES
+1. One-shot, complete fix:
+   - You must design and apply a COMPLETE end-to-end solution in one pass.
+   - Do NOT leave “TODO”, “we can improve later”, or “coming soon” in core flows.
+   - Do NOT suggest that I re-run you 5 more times for small patches.
+
+2. No breaking existing working features:
+   - Do NOT remove or break any feature that is already working outside SafePilot.
+   - Do NOT change global UI styling, layout, or other modules (rides, food, delivery, admin) unless absolutely required by your fix.
+   - Any refactor MUST be minimal and safe.
+
+3. Respect boundaries:
+   - Scope is SafePilot AI Engine only:
+     - Ask SafePilot query box
+     - Intelligence modules (Growth Engine, Cost Reduction, Fraud Shield, Partner Coach)
+     - Quick Actions that depend on AI
+   - Do NOT rename projects, change build configs, or touch unrelated services.
+
+TECHNICAL CHECKLIST – YOU MUST FOLLOW ALL STEPS
+
+A. FRONTEND PIPELINE
+1) Locate the component that renders “Ask SafePilot”.
+2) Identify the exact function that runs when:
+   - User hits Enter in the text box.
+   - User clicks the “Ask SafePilot” button.
+3) Ensure both events call a single, robust handler, e.g. `handleSafePilotQuery()`.
+4) Add strict validation:
+   - Reject empty queries with a clear inline message, no backend call.
+5) Implement a proper loading and error state:
+   - `status: idle | loading | success | error`
+   - Disable the button while loading.
+6) Make sure the request payload matches backend expectations:
+   - Example: `{ query: string, context: {...}, userId: ..., role: ... }`
+   - If the backend expects different keys, update the frontend accordingly.
+
+B. BACKEND ROUTING & CONTROLLERS
+1) Identify the API endpoint that serves SafePilot:
+   - Prefer a dedicated route: `/api/safepilot/query` (or the actual equivalent).
+2) Validate:
+   - Route exists.
+   - It is registered in the main router.
+   - It is reachable from the frontend (no CORS, no path mismatch).
+3) Implement a single controller function, e.g. `handleSafePilotQueryController(req, res)`:
+   - Read `query` from body.
+   - Validate user auth & role.
+   - Route the call to the AI service layer.
+   - Always respond with a well-defined JSON shape:
+     `{ success: boolean, message: string, data?: any, error_code?: string }`
+4) Add strong error handling:
+   - Wrap AI call in try/catch.
+   - Log the full error on the server (stack, input, userId).
+   - Return a SAFE, meaningful error object, not a crash.
+
+C. AI SERVICE LAYER
+1) Implement a dedicated service module (if missing), e.g. `safePilotService.ts`:
+   - `runSafePilotQuery({ query, userContext, modules }): Promise<SafePilotResponse>`
+2) Wire specialized modules:
+   - Growth Engine (revenue optimization)
+   - Cost Reduction
+   - Fraud Shield
+   - Partner Coach
+3) Route intelligently:
+   - If the query matches a specific module, route to that module.
+   - Otherwise, route to a general SafePilot reasoning model.
+4) Handle external LLM/AI provider failures:
+   - If the provider call fails, catch the error and return:
+     `{ success: false, message: "AI engine is temporarily unavailable", error_code: "AI_DOWN" }`
+   - Never throw raw errors up the stack.
+
+D. CONFIG, AUTH, AND KEYS
+1) Verify all required environment variables:
+   - AI provider key (e.g. OPENAI_API_KEY or equivalent).
+   - Any internal SAFE key for SafePilot.
+2) Implement a single config loader that:
+   - Fails fast on missing required env vars in non-dev environments.
+   - Does NOT expose secrets to the frontend.
+3) If auth tokens (JWT, session) are required:
+   - Validate them at the API layer.
+   - Fail with a proper 401/403, not a generic 500.
+
+E. RESPONSE MAPPING BACK TO UI
+1) Ensure frontend expects and reads:
+   - `success`
+   - `message`
+   - `data.summary`, `data.recommendations`, etc.
+2) On success:
+   - Render AI answer clearly in the Ask SafePilot result area.
+   - Add the query + summary to “Recent Queries” immediately.
+3) On error:
+   - Show a clear, non-technical message to the user.
+   - Optionally show a short “technical code” (like `AI_DOWN`, `BAD_INPUT`) for admins.
+
+F. LOGGING & OBSERVABILITY
+1) Add structured logs at key points:
+   - When a SafePilot query starts.
+   - When it succeeds (with latency).
+   - When it fails (with error_code).
+2) Do NOT log sensitive PII or secrets.
+3) If available, integrate with existing logging/monitoring (e.g. console, log service).
+
+G. SAFETY & ROLLBACK
+1) Apply all changes in a controlled way:
+   - Keep diffs minimal.
+   - Do NOT remove existing working logic without a replacement.
+2) Ensure the code can be rolled back safely (no schema migrations unless absolutely required; if you must, design them carefully and make them backward compatible).
+
+H. FINAL ACCEPTANCE TESTS
+You must only declare the system “READY” after it passes ALL of these tests:
+
+1) Functional tests:
+   - Input: “What are the top growth opportunities right now?”  
+     → Returns a clear, structured answer. No errors.
+   - Input: “Show me potential fraud risks for drivers this week.”  
+     → Returns a valid fraud-related analysis.
+   - Input: “How can we reduce operating costs next month?”  
+     → Returns a cost reduction plan.
+   - Input: very short query (“test”)  
+     → Either a valid AI response or a graceful validation error, but NO red error banner.
+
+2) UI tests:
+   - No red “Error Processing Query” banner in normal, valid usage.
+   - When AI is actually down, user sees a clear friendly message and nothing crashes.
+   - Recent Queries list updates correctly after each successful answer.
+
+3) Stability tests:
+   - Rapidly send 5+ queries in a row.
+   - System must not crash, spam unhandled errors, or lock the UI.
+
+FINAL RULE:
+Do not stop after fixing the first visible error.  
+You must assume there are hidden issues and proactively find and fix them as part of this task.
+Only when all layers (frontend → backend → AI service → UI response) work together without errors, the job is considered DONE.

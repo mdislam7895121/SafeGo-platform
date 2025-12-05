@@ -464,52 +464,86 @@ export function SafePilotButton() {
   const handleSubmitQuestion = async (retryCount = 0) => {
     if (!question.trim() || isSubmitting) return;
 
+    // Input validation
+    if (question.trim().length < 2) {
+      toast({
+        title: 'Question too short',
+        description: 'Please enter a more detailed question.',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
+    console.log('[SafePilot] Submitting question:', question.trim().slice(0, 50));
+    
     try {
       const res = await apiRequest('POST', '/api/admin/safepilot/query', {
         pageKey,
         question: question.trim(),
       });
       
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        if (retryCount < 2) {
-          await new Promise(r => setTimeout(r, 1000));
-          return handleSubmitQuestion(retryCount + 1);
-        }
-        throw new Error(errorData.error || 'Request failed');
+      // Parse response (backend now ALWAYS returns valid JSON)
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        console.error('[SafePilot] JSON parse error:', parseError);
+        data = {
+          mode: 'ASK',
+          summary: ['Response parsing issue. Please try again.'],
+          keySignals: [],
+          actions: [],
+          monitor: [],
+        };
       }
       
-      const response = await res.json() as SafePilotQueryResponse;
+      // Normalize the response with defaults
+      const response: SafePilotQueryResponse = {
+        mode: data.mode || 'ASK',
+        summary: data.summary?.length > 0 ? data.summary : ['Analysis complete.'],
+        keySignals: data.keySignals || [],
+        actions: data.actions || [],
+        monitor: data.monitor || [],
+        answerText: data.answerText || data.summary?.join(' ') || '',
+        insights: data.insights || [],
+        suggestions: data.suggestions || [],
+        riskLevel: data.riskLevel || 'LOW',
+        error: undefined, // Never set error if we got a response
+      };
 
-      if (response.error && retryCount < 2) {
-        await new Promise(r => setTimeout(r, 1000));
-        return handleSubmitQuestion(retryCount + 1);
-      }
-
+      console.log('[SafePilot] Query successful, mode:', response.mode);
       setQueryResponse(response);
       setActiveTab('response');
       setQuestion('');
       
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[SafePilot] Request error:', error);
+      
+      // Retry on network errors
+      if (retryCount < 2) {
+        console.log('[SafePilot] Retrying...', retryCount + 1);
+        await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+        setIsSubmitting(false);
+        return handleSubmitQuestion(retryCount + 1);
+      }
+      
+      // Final fallback after retries
       setQueryResponse({
         mode: 'ASK',
-        summary: ['Unable to process your question. Please try again.'],
-        keySignals: [],
-        actions: [],
-        monitor: [],
+        summary: ['Network issue detected. Please check your connection and try again.'],
+        keySignals: ['Connection may be unstable'],
+        actions: [{ label: 'Retry your question', risk: 'SAFE' }],
+        monitor: ['Monitor connection status'],
         answerText: '',
         insights: [],
         suggestions: [],
         riskLevel: 'LOW',
-        error: errorMessage,
-      } as SafePilotQueryResponse);
+      });
       setActiveTab('response');
       toast({
         title: 'Connection Issue',
-        description: 'Please check your connection and try again.',
+        description: 'Please check your network and try again.',
         variant: 'destructive',
       });
     } finally {

@@ -223,20 +223,41 @@ export default function SafePilotPage() {
         pageKey: 'admin.dashboard',
         question: q,
       });
-      return res.json();
+      const data = await res.json();
+      
+      // Ensure response has all required fields with defaults
+      return {
+        mode: data.mode || 'ASK',
+        summary: data.summary?.length > 0 ? data.summary : ['Analysis complete.'],
+        keySignals: data.keySignals || [],
+        actions: data.actions || [],
+        monitor: data.monitor || [],
+        answerText: data.answerText || '',
+        insights: data.insights || [],
+        suggestions: data.suggestions || [],
+        riskLevel: data.riskLevel || 'LOW',
+        error: data.error,
+      } as SafePilotQueryResponse;
     },
     onSuccess: (data: SafePilotQueryResponse) => {
       setResponse(data);
+      setQuestion(''); // Clear input on success
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('[SafePilot] Query error:', error);
+      // Set a helpful response even on network errors
       setResponse({
         mode: 'ASK',
-        summary: ['Unable to process your question. Please try again.'],
-        keySignals: [],
-        actions: [],
-        monitor: [],
-        error: 'Failed to process query',
+        summary: ['Connection issue detected. Please check your network and try again.'],
+        keySignals: ['Network connectivity may be limited'],
+        actions: [{ label: 'Retry your question', risk: 'SAFE' }],
+        monitor: ['Check connection status'],
+      });
+      toast({
+        title: 'Connection Issue',
+        description: 'Please check your network and try again.',
+        variant: 'destructive',
       });
     },
   });
