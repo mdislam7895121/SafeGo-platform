@@ -15,6 +15,14 @@ import {
   ArrowDownRight,
   Scale,
   MessageSquare,
+  Image,
+  Video,
+  Download,
+  ExternalLink,
+  History,
+  Receipt,
+  Calculator,
+  TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -466,30 +476,103 @@ export default function EarningsDisputes() {
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">Evidence</h4>
                   {selectedDispute.evidence?.length ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {selectedDispute.evidence.map((item, index) => (
-                        <Card key={index}>
-                          <CardContent className="p-3">
-                            <div className="flex items-start gap-2">
-                              <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {item.type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{item.description}</p>
-                                {item.url && (
-                                  <Button variant="link" size="sm" className="p-0 h-auto text-xs">
-                                    View File
-                                  </Button>
-                                )}
+                        <Card key={index} className="overflow-hidden">
+                          <CardContent className="p-0">
+                            {item.type === "image" || item.type === "screenshot" || item.type === "receipt" ? (
+                              <div className="relative">
+                                <div className="aspect-video bg-muted flex items-center justify-center">
+                                  {item.url ? (
+                                    <img
+                                      src={item.url}
+                                      alt={item.description}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = "none";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="flex flex-col items-center">
+                                      <Image className="h-10 w-10 text-muted-foreground mb-2" />
+                                      <p className="text-sm text-muted-foreground">Image Preview</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="p-3">
+                                  <p className="font-medium text-sm">{item.description}</p>
+                                  {item.url && (
+                                    <div className="flex gap-2 mt-2">
+                                      <Button size="sm" variant="outline" asChild>
+                                        <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                          <ExternalLink className="h-3 w-3 mr-1" />
+                                          Open
+                                        </a>
+                                      </Button>
+                                      <Button size="sm" variant="outline" asChild>
+                                        <a href={item.url} download>
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Download
+                                        </a>
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
+                            ) : item.type === "video" ? (
+                              <div className="relative">
+                                <div className="aspect-video bg-muted flex items-center justify-center">
+                                  {item.url ? (
+                                    <video
+                                      src={item.url}
+                                      controls
+                                      className="w-full h-full"
+                                    >
+                                      Your browser does not support video playback.
+                                    </video>
+                                  ) : (
+                                    <div className="flex flex-col items-center">
+                                      <Video className="h-10 w-10 text-muted-foreground mb-2" />
+                                      <p className="text-sm text-muted-foreground">Video Preview</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="p-3">
+                                  <p className="font-medium text-sm">{item.description}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-3">
+                                <div className="flex items-start gap-2">
+                                  <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium">
+                                      {item.type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                                    {item.url && (
+                                      <div className="flex gap-2 mt-2">
+                                        <Button size="sm" variant="outline" asChild>
+                                          <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            View
+                                          </a>
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No evidence attached</p>
+                    <div className="text-center py-6 bg-muted/50 rounded-lg">
+                      <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">No evidence attached</p>
+                    </div>
                   )}
                 </div>
 

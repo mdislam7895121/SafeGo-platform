@@ -52,13 +52,18 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Cell,
+  Legend,
 } from "recharts";
+import { Label } from "@/components/ui/label";
+import { Calendar, Gavel, RefreshCw, Info } from "lucide-react";
 
 interface Rating {
   id: string;
@@ -108,22 +113,72 @@ interface Complaint {
   createdAt: string;
 }
 
+interface TrendData {
+  date: string;
+  driverAvg: number;
+  restaurantAvg: number;
+  driverCount: number;
+  restaurantCount: number;
+}
+
+interface TrendsResponse {
+  trends: TrendData[];
+  period: number;
+}
+
+interface RatingDispute {
+  id: string;
+  ticketCode: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  rideId: string | null;
+  driverName: string;
+  originalRating: number;
+  disputeReason: string;
+  status: string;
+  severity: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolutionType: string | null;
+}
+
+interface DisputesResponse {
+  disputes: RatingDispute[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 const RATING_COLORS = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e"];
 
 export default function RatingsCenter() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState("overview");
   const [typeFilter, setTypeFilter] = useState("all");
   const [ratingFilter, setRatingFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [trendPeriod, setTrendPeriod] = useState<"7d" | "30d">("7d");
 
   const [selectedRating, setSelectedRating] = useState<Rating | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [actionType, setActionType] = useState<string>("");
   const [actionReason, setActionReason] = useState("");
+
+  const [disputeFilter, setDisputeFilter] = useState("all");
+  const [disputePage, setDisputePage] = useState(1);
+  const [selectedDispute, setSelectedDispute] = useState<RatingDispute | null>(null);
+  const [showDisputeDialog, setShowDisputeDialog] = useState(false);
+  const [disputeAction, setDisputeAction] = useState<string>("");
+  const [disputeReason, setDisputeReason] = useState("");
+  const [newRating, setNewRating] = useState<number | undefined>();
 
   const buildQueryUrl = () => {
     const params = new URLSearchParams();
@@ -147,6 +202,15 @@ export default function RatingsCenter() {
     enabled: !!selectedRating,
   });
 
+  const { data: trendsData, isLoading: trendsLoading } = useQuery<TrendsResponse>({
+    queryKey: [`/api/admin/phase4/ratings/trends?period=${trendPeriod}`],
+  });
+
+  const disputeQueryUrl = `/api/admin/phase4/ratings/disputes?status=${disputeFilter}&page=${disputePage}&limit=10`;
+  const { data: disputesData, isLoading: disputesLoading } = useQuery<DisputesResponse>({
+    queryKey: [disputeQueryUrl],
+  });
+
   const updateRatingMutation = useMutation({
     mutationFn: async ({ id, action, reason }: { id: string; action: string; reason?: string }) => {
       return apiRequest(`/api/admin/phase4/ratings/${id}`, {
@@ -166,6 +230,52 @@ export default function RatingsCenter() {
       toast({ title: "Error", description: "Failed to update rating", variant: "destructive" });
     },
   });
+
+  const resolveDisputeMutation = useMutation({
+    mutationFn: async ({ id, action, reason, newRating }: { id: string; action: string; reason: string; newRating?: number }) => {
+      return apiRequest(`/api/admin/phase4/ratings/disputes/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action, reason, newRating }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/admin/phase4/ratings"),
+      });
+      toast({ title: "Dispute updated", description: "The dispute has been processed successfully." });
+      closeDisputeDialog();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update dispute", variant: "destructive" });
+    },
+  });
+
+  const openDisputeDialog = (dispute: RatingDispute, action: string) => {
+    setSelectedDispute(dispute);
+    setDisputeAction(action);
+    setDisputeReason("");
+    setNewRating(undefined);
+    setShowDisputeDialog(true);
+  };
+
+  const closeDisputeDialog = () => {
+    setShowDisputeDialog(false);
+    setSelectedDispute(null);
+    setDisputeAction("");
+    setDisputeReason("");
+    setNewRating(undefined);
+  };
+
+  const handleDisputeAction = () => {
+    if (!selectedDispute) return;
+    resolveDisputeMutation.mutate({
+      id: selectedDispute.id,
+      action: disputeAction,
+      reason: disputeReason,
+      newRating: disputeAction === "resolve" ? newRating : undefined,
+    });
+  };
 
   const openDetailSheet = (rating: Rating) => {
     setSelectedRating(rating);
@@ -332,57 +442,65 @@ export default function RatingsCenter() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Driver Rating Distribution
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={chartData.driver}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" name="Count">
-                    {chartData.driver.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={RATING_COLORS[entry.rating - 1]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+            <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="trends" data-testid="tab-trends">Trends</TabsTrigger>
+            <TabsTrigger value="disputes" data-testid="tab-disputes">Disputes</TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Restaurant Rating Distribution
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={chartData.restaurant}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" name="Count">
-                    {chartData.restaurant.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={RATING_COLORS[entry.rating - 1]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Driver Rating Distribution
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={chartData.driver}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" name="Count">
+                        {chartData.driver.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={RATING_COLORS[entry.rating - 1]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-        <Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Restaurant Rating Distribution
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={chartData.restaurant}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" name="Count">
+                        {chartData.restaurant.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={RATING_COLORS[entry.rating - 1]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -562,6 +680,218 @@ export default function RatingsCenter() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="trends" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Rating Trends
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={trendPeriod === "7d" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTrendPeriod("7d")}
+                      data-testid="button-7d-trend"
+                    >
+                      7 Days
+                    </Button>
+                    <Button
+                      variant={trendPeriod === "30d" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTrendPeriod("30d")}
+                      data-testid="button-30d-trend"
+                    >
+                      30 Days
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {trendsLoading ? (
+                  <Skeleton className="h-64" />
+                ) : trendsData?.trends && trendsData.trends.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={trendsData.trends}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickFormatter={(d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" })} />
+                      <YAxis domain={[0, 5]} />
+                      <Tooltip
+                        labelFormatter={(d) => new Date(d).toLocaleDateString()}
+                        formatter={(value: number, name: string) => [value.toFixed(2), name]}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="driverAvg" name="Driver Avg" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="restaurantAvg" name="Restaurant Avg" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                    <BarChart3 className="h-12 w-12 mb-2 opacity-50" />
+                    <p>No trend data available</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Car className="h-4 w-4 text-blue-500" />
+                    Driver Ratings Volume
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {trendsData?.trends.reduce((sum, t) => sum + t.driverCount, 0) || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">ratings in {trendPeriod}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Utensils className="h-4 w-4 text-orange-500" />
+                    Restaurant Reviews Volume
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {trendsData?.trends.reduce((sum, t) => sum + t.restaurantCount, 0) || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">reviews in {trendPeriod}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="disputes" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Gavel className="h-5 w-5" />
+                    Rating Disputes
+                  </CardTitle>
+                  <Select value={disputeFilter} onValueChange={setDisputeFilter}>
+                    <SelectTrigger className="w-[160px]" data-testid="select-dispute-status">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="pending_info">Pending Info</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {disputesLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-20" />
+                    ))}
+                  </div>
+                ) : disputesData?.disputes && disputesData.disputes.length > 0 ? (
+                  <ScrollArea className="h-[500px]">
+                    <div className="space-y-3">
+                      {disputesData.disputes.map((dispute) => (
+                        <Card key={dispute.id} className="hover-elevate">
+                          <CardContent className="p-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-mono text-sm text-primary">{dispute.ticketCode}</span>
+                                  <Badge variant={dispute.status === "resolved" ? "secondary" : dispute.status === "open" ? "destructive" : "outline"}>
+                                    {dispute.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm font-medium">{dispute.customerName}</p>
+                                <p className="text-xs text-muted-foreground">Driver: {dispute.driverName}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs">Original Rating:</span>
+                                  {renderStars(dispute.originalRating)}
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{dispute.disputeReason}</p>
+                              </div>
+                              <div className="flex gap-2">
+                                {dispute.status !== "resolved" && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => openDisputeDialog(dispute, "resolve")}
+                                      data-testid={`button-resolve-${dispute.id}`}
+                                    >
+                                      <CheckCircle className="h-4 w-4 mr-1" />
+                                      Resolve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openDisputeDialog(dispute, "reject")}
+                                      data-testid={`button-reject-${dispute.id}`}
+                                    >
+                                      Reject
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => openDisputeDialog(dispute, "request_info")}
+                                      data-testid={`button-request-info-${dispute.id}`}
+                                    >
+                                      <Info className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                    <Gavel className="h-12 w-12 mb-2 opacity-50" />
+                    <p>No rating disputes found</p>
+                  </div>
+                )}
+
+                {disputesData?.pagination && disputesData.pagination.totalPages > 1 && (
+                  <div className="flex justify-center gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDisputePage((p) => Math.max(1, p - 1))}
+                      disabled={disputePage === 1}
+                      data-testid="button-dispute-prev"
+                    >
+                      Previous
+                    </Button>
+                    <span className="px-4 py-2 text-sm">
+                      Page {disputePage} of {disputesData.pagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDisputePage((p) => p + 1)}
+                      disabled={disputePage >= disputesData.pagination.totalPages}
+                      data-testid="button-dispute-next"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Sheet open={showDetailSheet} onOpenChange={(open) => !open && closeDetailSheet()}>
@@ -755,6 +1085,103 @@ export default function RatingsCenter() {
               data-testid="button-confirm-action"
             >
               {updateRatingMutation.isPending ? "Processing..." : `Confirm ${actionType}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDisputeDialog} onOpenChange={(open) => !open && closeDisputeDialog()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gavel className="h-5 w-5" />
+              {disputeAction === "resolve" && "Resolve Dispute"}
+              {disputeAction === "reject" && "Reject Dispute"}
+              {disputeAction === "request_info" && "Request More Information"}
+            </DialogTitle>
+            <DialogDescription>
+              {disputeAction === "resolve" && "Approve this rating dispute and optionally update the rating."}
+              {disputeAction === "reject" && "Reject this rating dispute with a reason."}
+              {disputeAction === "request_info" && "Request additional information from the customer."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            {selectedDispute && (
+              <div className="bg-muted p-3 rounded-lg text-sm">
+                <p className="font-medium">{selectedDispute.ticketCode}</p>
+                <p className="text-muted-foreground">Customer: {selectedDispute.customerName}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span>Current Rating:</span>
+                  {renderStars(selectedDispute.originalRating)}
+                </div>
+              </div>
+            )}
+
+            {disputeAction === "resolve" && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block">New Rating (optional)</Label>
+                <Select
+                  value={newRating?.toString() || ""}
+                  onValueChange={(v) => setNewRating(v ? parseInt(v) : undefined)}
+                >
+                  <SelectTrigger data-testid="select-new-rating">
+                    <SelectValue placeholder="Keep original rating" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Keep original rating</SelectItem>
+                    <SelectItem value="5">5 Stars</SelectItem>
+                    <SelectItem value="4">4 Stars</SelectItem>
+                    <SelectItem value="3">3 Stars</SelectItem>
+                    <SelectItem value="2">2 Stars</SelectItem>
+                    <SelectItem value="1">1 Star</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                {disputeAction === "resolve" ? "Resolution Notes" : disputeAction === "reject" ? "Rejection Reason" : "Information Requested"}
+              </Label>
+              <Textarea
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder={
+                  disputeAction === "resolve"
+                    ? "Enter resolution notes..."
+                    : disputeAction === "reject"
+                      ? "Enter reason for rejection..."
+                      : "What information do you need?"
+                }
+                className="min-h-[100px]"
+                data-testid="input-dispute-reason"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDisputeDialog} data-testid="button-cancel-dispute">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDisputeAction}
+              disabled={resolveDisputeMutation.isPending || !disputeReason.trim()}
+              variant={disputeAction === "reject" ? "destructive" : "default"}
+              data-testid="button-confirm-dispute"
+            >
+              {resolveDisputeMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {disputeAction === "resolve" && "Approve & Resolve"}
+                  {disputeAction === "reject" && "Reject Dispute"}
+                  {disputeAction === "request_info" && "Send Request"}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

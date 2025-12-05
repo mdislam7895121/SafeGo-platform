@@ -2273,6 +2273,224 @@ router.get("/ratings/:id/complaints", checkPermission(Permission.VIEW_COMPLAINTS
   }
 });
 
+// Rating trends endpoint (7d/30d)
+router.get("/ratings/trends", checkPermission(Permission.VIEW_REPORTS), async (req: AuthRequest, res) => {
+  try {
+    const period = req.query.period === "30d" ? 30 : 7;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - period);
+
+    // Get rides with ratings in the period
+    const rides = await prisma.ride.findMany({
+      where: {
+        createdAt: { gte: startDate },
+        OR: [
+          { customerRating: { not: null } },
+          { driverRating: { not: null } },
+        ],
+      },
+      select: {
+        createdAt: true,
+        customerRating: true,
+        driverRating: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Get reviews in the period
+    const reviews = await prisma.review.findMany({
+      where: {
+        createdAt: { gte: startDate },
+      },
+      select: {
+        createdAt: true,
+        rating: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Group by date
+    const trendData: Record<string, { date: string; driverAvg: number; restaurantAvg: number; driverCount: number; restaurantCount: number }> = {};
+    
+    for (let i = 0; i < period; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - (period - 1 - i));
+      const dateStr = date.toISOString().split("T")[0];
+      trendData[dateStr] = { date: dateStr, driverAvg: 0, restaurantAvg: 0, driverCount: 0, restaurantCount: 0 };
+    }
+
+    // Aggregate driver ratings
+    rides.forEach(ride => {
+      const dateStr = ride.createdAt.toISOString().split("T")[0];
+      if (trendData[dateStr] && ride.customerRating) {
+        trendData[dateStr].driverCount++;
+        trendData[dateStr].driverAvg = 
+          ((trendData[dateStr].driverAvg * (trendData[dateStr].driverCount - 1)) + ride.customerRating) / trendData[dateStr].driverCount;
+      }
+    });
+
+    // Aggregate restaurant ratings
+    reviews.forEach(review => {
+      const dateStr = review.createdAt.toISOString().split("T")[0];
+      if (trendData[dateStr]) {
+        trendData[dateStr].restaurantCount++;
+        trendData[dateStr].restaurantAvg = 
+          ((trendData[dateStr].restaurantAvg * (trendData[dateStr].restaurantCount - 1)) + review.rating) / trendData[dateStr].restaurantCount;
+      }
+    });
+
+    // Convert to array and round averages
+    const trends = Object.values(trendData).map(d => ({
+      ...d,
+      driverAvg: Math.round(d.driverAvg * 100) / 100,
+      restaurantAvg: Math.round(d.restaurantAvg * 100) / 100,
+    }));
+
+    res.json({ trends, period });
+  } catch (error) {
+    console.error("Error fetching rating trends:", error);
+    res.status(500).json({ error: "Failed to fetch rating trends" });
+  }
+});
+
+// Rating disputes endpoint
+router.get("/ratings/disputes", checkPermission(Permission.VIEW_COMPLAINTS), async (req: AuthRequest, res) => {
+  try {
+    const status = (req.query.status as string) || "all";
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    // Find complaints related to ratings
+    const whereClause: any = {
+      category: { in: ["rating_dispute", "unfair_rating", "rating_issue"] },
+    };
+    if (status !== "all") {
+      whereClause.status = status;
+    }
+
+    const disputes = await prisma.complaint.findMany({
+      where: whereClause,
+      include: {
+        customer: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+        ride: {
+          select: {
+            id: true,
+            customerRating: true,
+            driverRating: true,
+            driver: { include: { user: { select: { firstName: true, lastName: true } } } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const total = await prisma.complaint.count({ where: whereClause });
+
+    const formattedDisputes = disputes.map(d => ({
+      id: d.id,
+      ticketCode: d.ticketCode,
+      customerId: d.customerId,
+      customerName: d.customer?.user ? `${d.customer.user.firstName} ${d.customer.user.lastName}` : "Unknown",
+      customerEmail: d.customer?.user?.email || "",
+      rideId: d.rideId,
+      driverName: d.ride?.driver?.user ? `${d.ride.driver.user.firstName} ${d.ride.driver.user.lastName}` : "N/A",
+      originalRating: d.ride?.customerRating || 0,
+      disputeReason: d.description,
+      status: d.status,
+      severity: d.severity,
+      createdAt: d.createdAt,
+      resolvedAt: d.resolvedAt,
+      resolutionType: d.resolutionType,
+    }));
+
+    res.json({
+      disputes: formattedDisputes,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    console.error("Error fetching rating disputes:", error);
+    res.status(500).json({ error: "Failed to fetch rating disputes" });
+  }
+});
+
+// Resolve rating dispute
+router.patch("/ratings/disputes/:id", checkPermission(Permission.MANAGE_COMPLAINTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { action, reason, newRating } = req.body;
+    const adminId = req.user!.id;
+
+    const complaint = await prisma.complaint.findUnique({
+      where: { id },
+      include: { ride: true },
+    });
+
+    if (!complaint) {
+      return res.status(404).json({ error: "Dispute not found" });
+    }
+
+    let updateData: any = {};
+    switch (action) {
+      case "resolve":
+        updateData = {
+          status: "resolved",
+          resolvedAt: new Date(),
+          resolutionType: "approved",
+          resolutionNotes: reason,
+          resolvedByAdminId: adminId,
+        };
+        // If new rating provided and ride exists, update it
+        if (newRating && complaint.rideId) {
+          await prisma.ride.update({
+            where: { id: complaint.rideId },
+            data: { customerRating: newRating },
+          });
+        }
+        break;
+      case "reject":
+        updateData = {
+          status: "resolved",
+          resolvedAt: new Date(),
+          resolutionType: "rejected",
+          resolutionNotes: reason,
+          resolvedByAdminId: adminId,
+        };
+        break;
+      case "request_info":
+        updateData = {
+          status: "pending_info",
+          internalNotes: reason,
+        };
+        break;
+    }
+
+    const updated = await prisma.complaint.update({
+      where: { id },
+      data: updateData,
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: `rating_dispute_${action}`,
+        entityType: "complaint",
+        entityId: id,
+        userId: adminId,
+        details: { action, reason, newRating },
+        ipAddress: req.ip || "unknown",
+        userAgent: req.headers["user-agent"] || "unknown",
+      },
+    });
+
+    res.json({ success: true, dispute: updated });
+  } catch (error) {
+    console.error("Error resolving rating dispute:", error);
+    res.status(500).json({ error: "Failed to resolve dispute" });
+  }
+});
+
 // ========================================
 // 17. DRIVER VIOLATIONS CENTER (Enhanced)
 // ========================================

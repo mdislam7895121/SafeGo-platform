@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft,
@@ -20,6 +20,13 @@ import {
   CreditCard,
   Smartphone,
   ShieldAlert,
+  Image,
+  Video,
+  Download,
+  ExternalLink,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -165,9 +172,67 @@ export default function DriverViolations() {
   };
 
   const queryUrl = buildQueryUrl();
-  const { data, isLoading } = useQuery<ViolationsResponse>({
+  const { data, isLoading, refetch } = useQuery<ViolationsResponse>({
     queryKey: [queryUrl],
+    refetchInterval: 30000,
   });
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/admin/notifications/ws`;
+
+    const connectWebSocket = () => {
+      try {
+        wsRef.current = new WebSocket(wsUrl);
+
+        wsRef.current.onopen = () => {
+          setIsConnected(true);
+          console.log("[Violations] WebSocket connected");
+        };
+
+        wsRef.current.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === "violation_update" || message.type === "violation_created") {
+              setLastUpdate(new Date());
+              refetch();
+              toast({
+                title: message.type === "violation_created" ? "New Violation" : "Violation Updated",
+                description: message.data?.description || "A violation has been updated",
+              });
+            }
+          } catch (err) {
+            console.error("[Violations] Error parsing WebSocket message:", err);
+          }
+        };
+
+        wsRef.current.onclose = () => {
+          setIsConnected(false);
+          console.log("[Violations] WebSocket disconnected");
+          setTimeout(connectWebSocket, 5000);
+        };
+
+        wsRef.current.onerror = (error) => {
+          console.error("[Violations] WebSocket error:", error);
+          setIsConnected(false);
+        };
+      } catch (error) {
+        console.error("[Violations] Failed to connect WebSocket:", error);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [refetch, toast]);
 
   const createViolationMutation = useMutation({
     mutationFn: async (violationData: typeof newViolation) => {
@@ -357,14 +422,34 @@ export default function DriverViolations() {
               <p className="text-sm opacity-90">Manage violations, investigations, and penalties</p>
             </div>
           </div>
-          <Button
-            onClick={() => setShowCreateDialog(true)}
-            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-            data-testid="button-create-violation"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Violation
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              {isConnected ? (
+                <div className="flex items-center gap-1 text-green-300">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  Live
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-yellow-300">
+                  <RefreshCw className="h-3 w-3" />
+                  Auto-refresh
+                </div>
+              )}
+              {lastUpdate && (
+                <span className="text-xs opacity-70">
+                  Updated {formatDistanceToNow(lastUpdate, { addSuffix: true })}
+                </span>
+              )}
+            </div>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+              data-testid="button-create-violation"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Violation
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -712,27 +797,133 @@ export default function DriverViolations() {
               <TabsContent value="evidence" className="mt-4">
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-3">
-                    {selectedViolation.evidence?.map((item, index) => (
-                      <Card key={index}>
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium text-sm">
-                                {item.type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                              </p>
-                              <p className="text-sm text-muted-foreground">{item.description}</p>
-                              {item.url && (
-                                <Button variant="link" size="sm" className="p-0 h-auto mt-1">
-                                  View File
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )) || (
-                      <p className="text-center text-muted-foreground py-8">No evidence attached</p>
+                    {selectedViolation.evidence?.length > 0 ? (
+                      selectedViolation.evidence.map((item, index) => (
+                        <Card key={index} className="overflow-hidden">
+                          <CardContent className="p-0">
+                            {item.type === "image" || item.type === "photo" || item.type === "screenshot" ? (
+                              <div className="relative">
+                                <div className="aspect-video bg-muted flex items-center justify-center">
+                                  {item.url ? (
+                                    <img
+                                      src={item.url}
+                                      alt={item.description}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = "none";
+                                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
+                                      }}
+                                    />
+                                  ) : null}
+                                  <div className={`flex flex-col items-center ${item.url ? "hidden" : ""}`}>
+                                    <Image className="h-12 w-12 text-muted-foreground mb-2" />
+                                    <p className="text-sm text-muted-foreground">Image Preview</p>
+                                  </div>
+                                </div>
+                                <div className="p-3">
+                                  <p className="font-medium text-sm">{item.description}</p>
+                                  <div className="flex gap-2 mt-2">
+                                    {item.url && (
+                                      <>
+                                        <Button size="sm" variant="outline" asChild>
+                                          <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            Open
+                                          </a>
+                                        </Button>
+                                        <Button size="sm" variant="outline" asChild>
+                                          <a href={item.url} download>
+                                            <Download className="h-3 w-3 mr-1" />
+                                            Download
+                                          </a>
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : item.type === "video" || item.type === "dashcam" ? (
+                              <div className="relative">
+                                <div className="aspect-video bg-muted flex items-center justify-center">
+                                  {item.url ? (
+                                    <video
+                                      src={item.url}
+                                      controls
+                                      className="w-full h-full"
+                                      onError={(e) => {
+                                        (e.target as HTMLVideoElement).style.display = "none";
+                                      }}
+                                    >
+                                      Your browser does not support video playback.
+                                    </video>
+                                  ) : (
+                                    <div className="flex flex-col items-center">
+                                      <Video className="h-12 w-12 text-muted-foreground mb-2" />
+                                      <p className="text-sm text-muted-foreground">Video Preview</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="p-3">
+                                  <p className="font-medium text-sm">{item.description}</p>
+                                  {item.url && (
+                                    <div className="flex gap-2 mt-2">
+                                      <Button size="sm" variant="outline" asChild>
+                                        <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                          <ExternalLink className="h-3 w-3 mr-1" />
+                                          Open
+                                        </a>
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-4">
+                                <div className="flex items-start gap-3">
+                                  <FileText className="h-5 w-5 text-muted-foreground" />
+                                  <div className="flex-1">
+                                    <p className="font-medium text-sm">
+                                      {item.type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                                    {item.url && (
+                                      <div className="flex gap-2 mt-2">
+                                        <Button size="sm" variant="outline" asChild>
+                                          <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            View
+                                          </a>
+                                        </Button>
+                                        <Button size="sm" variant="outline" asChild>
+                                          <a href={item.url} download>
+                                            <Download className="h-3 w-3 mr-1" />
+                                            Download
+                                          </a>
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">No evidence attached</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-4"
+                          onClick={() => openActionDialog("add_evidence")}
+                          data-testid="button-add-evidence"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Evidence
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </ScrollArea>
