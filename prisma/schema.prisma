@@ -1896,6 +1896,64 @@ model PlatformSettings {
   @@map("platform_settings")
 }
 
+// Global Admin Settings with Safety Locks
+enum AdminSettingScope {
+  GLOBAL
+  BD_ONLY
+  US_ONLY
+}
+
+enum AdminSettingCategory {
+  PLATFORM_ECONOMICS
+  SECURITY_ABUSE
+  CONTACTS_SUPPORT
+  OPERATIONAL
+}
+
+model AdminSetting {
+  id               String               @id @default(uuid())
+  key              String               @unique
+  value            Json
+  description      String
+  isSensitive      Boolean              @default(false)
+  countryScope     AdminSettingScope    @default(GLOBAL)
+  category         AdminSettingCategory @default(OPERATIONAL)
+  validationRules  Json?
+  updatedByAdminId String?
+  updatedAt        DateTime             @updatedAt
+  createdAt        DateTime             @default(now())
+
+  changes AdminSettingChange[]
+
+  @@index([key])
+  @@index([category])
+  @@index([countryScope])
+  @@index([isSensitive])
+  @@map("admin_settings")
+}
+
+model AdminSettingChange {
+  id          String   @id @default(uuid())
+  settingId   String
+  settingKey  String
+  oldValue    Json?
+  newValue    Json
+  changedById String
+  changedByEmail String
+  ipAddress   String?
+  userAgent   String?
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  setting AdminSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  @@index([settingId])
+  @@index([settingKey])
+  @@index([changedById])
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_setting_changes")
+}
+
 enum PayoutType {
   mobile_wallet
   bank_account

@@ -166,6 +166,12 @@ export enum Permission {
   MANAGE_GEOFENCES = 'MANAGE_GEOFENCES',
   VIEW_DOCUMENTS = 'VIEW_DOCUMENTS',
   MANAGE_DOCUMENTS = 'MANAGE_DOCUMENTS',
+  
+  // Global Admin Settings & Safety Locks
+  VIEW_GLOBAL_SETTINGS = 'VIEW_GLOBAL_SETTINGS',
+  MANAGE_GLOBAL_SETTINGS = 'MANAGE_GLOBAL_SETTINGS',
+  MANAGE_SENSITIVE_SETTINGS = 'MANAGE_SENSITIVE_SETTINGS',
+  VIEW_SETTING_HISTORY = 'VIEW_SETTING_HISTORY',
 }
 
 type RolePermissions = {
@@ -306,6 +312,11 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_GEOFENCES,
     Permission.VIEW_DOCUMENTS,
     Permission.MANAGE_DOCUMENTS,
+    // Global Admin Settings & Safety Locks
+    Permission.VIEW_GLOBAL_SETTINGS,
+    Permission.MANAGE_GLOBAL_SETTINGS,
+    Permission.MANAGE_SENSITIVE_SETTINGS,
+    Permission.VIEW_SETTING_HISTORY,
   ]),
 
   // ADMIN: General management (non-sensitive)
@@ -615,6 +626,9 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_PAYMENT_ISSUES,
     Permission.MANAGE_PAYMENT_ISSUES,
     Permission.VIEW_FULL_AUDIT,
+    // Global Admin Settings (read-only)
+    Permission.VIEW_GLOBAL_SETTINGS,
+    Permission.VIEW_SETTING_HISTORY,
   ]),
 
   // RISK_ADMIN: Safety & Risk Center focused
@@ -674,6 +688,9 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_INCIDENTS,
     Permission.VIEW_SYSTEM_HEALTH,
     Permission.VIEW_FULL_AUDIT,
+    // Global Admin Settings (read-only)
+    Permission.VIEW_GLOBAL_SETTINGS,
+    Permission.VIEW_SETTING_HISTORY,
   ]),
 
   [AdminRole.READONLY_ADMIN]: new Set([

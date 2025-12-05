@@ -276,6 +276,7 @@ import AdminBDExpansionDashboard from "@/pages/admin/bd-expansion-dashboard";
 import AdminPeopleKycCenter from "@/pages/admin/people-kyc";
 import AdminSafetyCenterNew from "@/pages/admin/safety-center";
 import AdminFeatureFlags from "@/pages/admin/feature-flags";
+import AdminGlobalSettings from "@/pages/admin/global-settings";
 import AdminAccessGovernance from "@/pages/admin/access-governance";
 
 // Phase 3A: Enterprise Admin Features
@@ -2077,6 +2078,11 @@ function Router() {
       <Route path="/admin/feature-flags">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminFeatureFlags />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/global-settings">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminGlobalSettings />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/access-governance">

@@ -1,0 +1,78 @@
+You are an expert full-stack engineer and product architect working on the SafeGo platform.
+
+Follow all existing SafeGo rules:
+- 4 main roles (customer, driver, restaurant partner, shop partner) + ticket/rental partners and admins.
+- Single simple customer signup; all partners and admins are onboarded later through controlled flows.
+- Global app logic supports rides, food delivery, parcel/shop delivery, and ticket/rental flows.
+- Country-specific rules for Bangladesh and USA (KYC, payments, tax, legal holds).
+- Strong security: JWT auth, role-based access control (RBAC), audit logs, environment separation (dev/staging/prod).
+- Never break existing roles, data models, or flows; only extend safely and compatibly.
+
+TASK GOAL  
+Implement a **Global Admin Settings & Safety Locks** module in the SafeGo admin console, so that only super-admins can change critical configuration. Everything must be safe for production and auditable.
+
+REQUIREMENTS  
+
+1. Global Settings Architecture
+   - Add a backend model/table (or Prisma schema) for `AdminSetting` that stores:
+     - key (string, unique)
+     - value (JSON or string)
+     - description
+     - isSensitive (boolean)
+     - countryScope (enum: GLOBAL, BD_ONLY, US_ONLY)
+     - updatedByAdminId
+     - updatedAt
+   - Define a typesafe enum or constants for allowed keys, for example:
+     - RIDE_COMMISSION_PERCENT
+     - SHOP_COMMISSION_PERCENT
+     - MAX_DAILY_PAYOUT_LIMIT
+     - SUPPORT_EMAIL_BD, SUPPORT_EMAIL_US
+     - EMERGENCY_CONTACT_BD, EMERGENCY_CONTACT_US
+     - LOGIN_RATE_LIMIT_CONFIG
+     - ACCOUNT_LOCK_THRESHOLD
+   - Never allow arbitrary keys from the client.
+
+2. Safety Locks & Permissions
+   - Only admins with a dedicated role, e.g. `SUPER_ADMIN` or `CONFIG_ADMIN`, can:
+     - Create or update admin settings.
+     - Unlock or change safety-critical items (commissions, payout limits, account lock thresholds).
+   - Read-only access to the settings page is allowed for `RISK_ADMIN` and `FINANCE_ADMIN` but they cannot edit.
+   - Enforce this in the backend middleware (JWT + RBAC) and double-check on the frontend UI (disable buttons).
+
+3. Admin Settings API
+   - Implement secure REST/GraphQL endpoints such as:
+     - GET `/api/admin/settings` with optional filters (countryScope, category).
+     - PATCH `/api/admin/settings/:key` for updating a single setting.
+   - Validate inputs strictly:
+     - Percentages must be between sensible bounds (e.g. 0–50%).
+     - Monetary limits must be non-negative and below a configurable maximum.
+   - Every write must:
+     - Log an audit event (old value, new value, admin id, IP/userAgent).
+     - Require an explicit confirmation (e.g. a confirmation dialog or secondary “type key name to confirm” step).
+
+4. Admin UI – Global Settings Page
+   - Add a new navigation entry in the admin sidebar, e.g. under “Configuration” → “Global Settings”.
+   - UI sections:
+     - Platform economics (commissions, payout limits).
+     - Security & abuse protection (login rate limit, account lock rules).
+     - Contacts & support (support emails/numbers per country).
+   - For each setting:
+     - Show label, description, current value, last updated time, and who changed it.
+     - Provide inline validation messages on change.
+   - For sensitive settings (e.g. commissions, account lock rules), show a clear “Safety lock” badge and require an extra confirmation step before saving.
+
+5. Audit & History
+   - Implement a simple history view for each key:
+     - On clicking an “History” icon, show a panel with recent changes (admin, timestamp, old value, new value).
+   - Store these in the existing audit log system or a dedicated `AdminSettingChange` table.
+
+6. Tests & Verification
+   - Add backend tests (or integration tests) that verify:
+     - Only correct roles can update settings.
+     - Invalid values are rejected with clear errors.
+   - Add frontend tests or data-testid hooks for:
+     - Editing and saving a setting.
+     - History view.
+   - Confirm that existing commission and payout logic now reads values from `AdminSetting` instead of hardcoded constants, without breaking current behavior.
+
+Deliver a complete implementation: updated schema/models, backend routes, frontend components, RBAC checks, audit logging, and any necessary documentation so this feature is ready for production.

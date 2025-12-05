@@ -162,6 +162,12 @@ const configNavItems: NavItem[] = [
     navKey: "featureFlags",
   },
   {
+    title: "Global Settings",
+    href: "/admin/global-settings",
+    icon: Shield,
+    navKey: "settings",
+  },
+  {
     title: "Settings",
     href: "/admin/settings",
     icon: Settings,
