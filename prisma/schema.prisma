@@ -10987,3 +10987,194 @@ model ReleaseAuditLog {
   @@index([createdAt])
   @@map("release_audit_logs")
 }
+
+// ===========================================
+// OBSERVABILITY CENTER: System Metrics & Logs
+// ===========================================
+
+// Log Category Types
+enum ObservabilityLogCategory {
+  API
+  AUTH
+  FRAUD
+  DRIVER
+  ERROR
+  PAYMENT
+  SYSTEM
+}
+
+// Log Severity Levels
+enum ObservabilityLogSeverity {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+}
+
+// System Metrics - CPU, memory, connections, etc.
+model SystemMetric {
+  id String @id @default(uuid())
+
+  metricType    String   // cpu_usage, memory_usage, db_connections, job_queue_depth, websocket_connections
+  value         Decimal  @db.Decimal(10, 4)
+  unit          String   // percent, count, ms, bytes
+  
+  // Time window aggregation
+  windowStart   DateTime
+  windowEnd     DateTime
+  windowMinutes Int      @default(1) // 1, 5, or 15 minute windows
+  
+  // Context
+  environment   String   @default("development")
+  hostId        String?  // For multi-instance tracking
+  
+  // Min/Max/Avg for the window
+  minValue      Decimal? @db.Decimal(10, 4)
+  maxValue      Decimal? @db.Decimal(10, 4)
+  avgValue      Decimal? @db.Decimal(10, 4)
+  sampleCount   Int      @default(1)
+  
+  metadata      Json?
+  
+  createdAt DateTime @default(now())
+
+  @@index([metricType])
+  @@index([windowStart])
+  @@index([windowMinutes])
+  @@index([environment])
+  @@map("system_metrics")
+}
+
+// Observability Log - Unified log aggregation
+model ObservabilityLog {
+  id String @id @default(uuid())
+
+  category     ObservabilityLogCategory
+  severity     ObservabilityLogSeverity
+  
+  // Log content
+  message      String   @db.Text
+  source       String   // e.g., "auth-service", "payment-gateway", "fraud-detection"
+  
+  // Context
+  userId       String?
+  adminId      String?
+  requestId    String?  // For request tracing
+  sessionId    String?
+  
+  // Request details
+  method       String?  // GET, POST, etc.
+  path         String?
+  statusCode   Int?
+  latencyMs    Int?
+  
+  // Error details
+  errorCode    String?
+  stackTrace   String?  @db.Text
+  
+  // Additional context
+  ipAddress    String?
+  userAgent    String?  @db.Text
+  countryCode  String?
+  
+  metadata     Json?    // Flexible additional data
+  
+  createdAt DateTime @default(now())
+
+  @@index([category])
+  @@index([severity])
+  @@index([source])
+  @@index([userId])
+  @@index([adminId])
+  @@index([requestId])
+  @@index([createdAt])
+  @@index([errorCode])
+  @@map("observability_logs")
+}
+
+// Event Correlation - Links related events for root cause analysis
+model EventCorrelation {
+  id String @id @default(uuid())
+
+  // Correlation identification
+  correlationId   String   @unique // UUID for grouping related events
+  
+  // Root event
+  rootEventType   String   // incident, fraud_alert, payment_failure, driver_violation
+  rootEventId     String   // ID of the triggering event
+  rootEventTime   DateTime
+  
+  // Correlated events (stored as JSON array)
+  correlatedEvents Json    // Array of { eventType, eventId, eventTime, confidence }
+  
+  // Analysis
+  suggestedRootCause  String? @db.Text
+  confidenceScore     Decimal? @db.Decimal(3, 2) // 0.00 to 1.00
+  analysisStatus      String   @default("PENDING") // PENDING, ANALYZED, CONFIRMED, DISMISSED
+  
+  // Scope
+  affectedUserId      String?
+  affectedDriverId    String?
+  affectedOrderId     String?
+  affectedRideId      String?
+  
+  // Severity and impact
+  impactLevel         String?  // LOW, MEDIUM, HIGH, CRITICAL
+  estimatedImpact     String?  @db.Text // Description of potential impact
+  
+  // Resolution tracking
+  resolvedAt          DateTime?
+  resolvedBy          String?
+  resolutionNotes     String?  @db.Text
+  
+  metadata            Json?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([correlationId])
+  @@index([rootEventType])
+  @@index([rootEventId])
+  @@index([rootEventTime])
+  @@index([analysisStatus])
+  @@index([impactLevel])
+  @@index([affectedUserId])
+  @@index([affectedDriverId])
+  @@index([createdAt])
+  @@map("event_correlations")
+}
+
+// Metric Threshold Alert - For triggering alerts when metrics exceed thresholds
+model MetricThresholdAlert {
+  id String @id @default(uuid())
+
+  metricType       String   // cpu_usage, memory_usage, etc.
+  thresholdType    String   // ABOVE, BELOW, EQUALS
+  thresholdValue   Decimal  @db.Decimal(10, 4)
+  
+  alertSeverity    String   @default("WARNING") // INFO, WARNING, CRITICAL
+  alertMessage     String   @db.Text
+  
+  isEnabled        Boolean  @default(true)
+  cooldownMinutes  Int      @default(15) // Prevent alert spam
+  
+  lastTriggeredAt  DateTime?
+  triggerCount     Int      @default(0)
+  
+  // Notification settings
+  notifyWebSocket  Boolean  @default(true)
+  notifyEmail      Boolean  @default(false)
+  notifyRecipients String[] @default([])
+  
+  createdBy        String?
+  createdByName    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([metricType])
+  @@index([isEnabled])
+  @@index([alertSeverity])
+  @@map("metric_threshold_alerts")
+}
