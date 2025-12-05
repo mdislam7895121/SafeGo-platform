@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -33,6 +35,10 @@ import {
   Settings,
   MessageSquare,
   Sparkles,
+  TestTube,
+  Play,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -295,8 +301,60 @@ function AlertItem({
   );
 }
 
+const PRELOADED_TEST_QUESTIONS = [
+  { id: "1", category: "Cost", question: "How can I reduce operating costs this month?", response: "Based on SafePilot analysis: 1) You have 12 refund abuse cases worth $3,240 - consider tightening refund policies. 2) Driver incentive overspend detected in 3 zones - recommend reducing by 15%. 3) Unused promotional codes cost $890 monthly - consider expiration. Total potential savings: $5,847/month." },
+  { id: "2", category: "Growth", question: "Where should we expand next?", response: "Growth Engine recommends: 1) Downtown financial district shows 340% unmet demand during lunch hours. 2) University area has high request rate but low driver coverage - add 8 drivers to capture $12,000/month. 3) Industrial zone shows emerging demand pattern for parcel delivery." },
+  { id: "3", category: "Fraud", question: "Are there any active fraud risks?", response: "Fraud Shield detected: 1) 3 accounts with duplicate KYC documents - flagged for review. 2) 1 driver showing unusual trip patterns (possible GPS spoofing). 3) 2 customer accounts with abnormal refund requests. Recommended action: Review flagged accounts in Fraud Dashboard." },
+  { id: "4", category: "Support", question: "How can we reduce support ticket volume?", response: "Support AI analysis: 1) 45% of tickets are about order status - implement proactive notifications. 2) 23% are refund requests - add self-service refund for orders under $15. 3) 18% are driver complaints - improve driver app UX. Estimated ticket reduction: 40%." },
+  { id: "5", category: "Partner", question: "Which drivers need attention?", response: "Partner AI insights: 1) 5 drivers with ratings below 4.0 need coaching. 2) 3 high-performers are at churn risk (earnings dropped 30%). 3) 8 new drivers haven't completed training. Recommended: Schedule coaching sessions and retention bonuses for top performers." },
+  { id: "6", category: "Revenue", question: "How can we increase revenue this quarter?", response: "Revenue optimization opportunities: 1) Enable surge pricing during peak hours (estimated +$8,400/week). 2) Launch loyalty program to increase order frequency (+12% projected). 3) Add premium delivery tier for time-sensitive parcels. 4) Partner with 15 pending restaurants in high-demand zones." },
+  { id: "7", category: "Compliance", question: "Are we meeting all compliance requirements?", response: "Compliance Guard status: Overall score 94%. 1) 2 drivers have expired documents - send renewal reminders. 2) Data retention policy needs update for EU customers. 3) Insurance certificates current for all active drivers. 4) Background check refresh due for 12 drivers next month." },
+  { id: "8", category: "System", question: "How is our system health?", response: "System Health Monitor: Overall health 98%. All core services operational. 1) Database latency slightly elevated (42ms avg). 2) Job queue processing normally. 3) API response times within SLA. 4) Memory usage optimal. Next maintenance window: Sunday 2 AM." },
+];
+
+const DEMO_ACTIONS = [
+  { id: "1", title: "Auto-approve low-risk KYC", description: "Automatically approve KYC for returning customers with verified history", impact: "Saves 4 hours/week" },
+  { id: "2", title: "Enable dynamic surge pricing", description: "Turn on AI-driven surge pricing during detected peak hours", impact: "+$2,100/week estimated" },
+  { id: "3", title: "Block detected fraud accounts", description: "Suspend 3 accounts flagged for suspicious activity", impact: "Prevents $890 potential loss" },
+  { id: "4", title: "Send driver coaching alerts", description: "Notify 5 underperforming drivers with improvement tips", impact: "Improve ratings by 0.3 avg" },
+  { id: "5", title: "Launch win-back campaign", description: "Send personalized offers to 47 churning customers", impact: "Recover $2,340 in revenue" },
+];
+
 export default function SafePilotIntelligence() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [testModeOpen, setTestModeOpen] = useState(false);
+  const [demoModeActive, setDemoModeActive] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [selectedQuestion, setSelectedQuestion] = useState<typeof PRELOADED_TEST_QUESTIONS[0] | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [demoStep, setDemoStep] = useState(0);
+
+  useEffect(() => {
+    if (demoModeActive && demoStep < PRELOADED_TEST_QUESTIONS.length) {
+      const timer = setTimeout(() => {
+        setSelectedQuestion(PRELOADED_TEST_QUESTIONS[demoStep]);
+        setDemoStep(prev => prev + 1);
+      }, 4000);
+      return () => clearTimeout(timer);
+    } else if (demoStep >= PRELOADED_TEST_QUESTIONS.length) {
+      setDemoModeActive(false);
+      setDemoStep(0);
+    }
+  }, [demoModeActive, demoStep]);
+
+  const handleTestQuestion = (q: typeof PRELOADED_TEST_QUESTIONS[0]) => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setSelectedQuestion(q);
+      setIsProcessing(false);
+    }, 800);
+  };
+
+  const startDemoMode = () => {
+    setDemoModeActive(true);
+    setDemoStep(0);
+    setSelectedQuestion(null);
+  };
 
   const { data: dashboard, isLoading, refetch, isRefetching } = useQuery<DashboardData>({
     queryKey: ["/api/admin/safepilot/dashboard"],
@@ -339,16 +397,178 @@ export default function SafePilotIntelligence() {
             </p>
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isRefetching}
-          data-testid="button-refresh-dashboard"
-        >
-          <RefreshCw className={cn("h-4 w-4 mr-2", isRefetching && "animate-spin")} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Dialog open={testModeOpen} onOpenChange={setTestModeOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-test-mode">
+                <TestTube className="h-4 w-4 mr-2" />
+                Test Mode
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-purple-500" />
+                  SafePilot Test Mode
+                </DialogTitle>
+                <DialogDescription>
+                  Test SafePilot intelligence with preloaded questions and demo actions
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="flex-1 overflow-hidden">
+                <Tabs defaultValue="questions" className="h-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="questions">Test Questions</TabsTrigger>
+                    <TabsTrigger value="actions">Demo Actions</TabsTrigger>
+                    <TabsTrigger value="demo">Auto Demo</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="questions" className="h-[400px] overflow-hidden">
+                    <div className="grid grid-cols-2 gap-4 h-full">
+                      <ScrollArea className="h-full border rounded-lg p-3">
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground mb-3">Preloaded Questions</p>
+                          {PRELOADED_TEST_QUESTIONS.map((q) => (
+                            <Button
+                              key={q.id}
+                              variant="ghost"
+                              className="w-full justify-start text-left h-auto py-2 px-3"
+                              onClick={() => handleTestQuestion(q)}
+                              data-testid={`button-test-question-${q.id}`}
+                            >
+                              <div>
+                                <Badge variant="outline" className="mb-1 text-xs">{q.category}</Badge>
+                                <p className="text-sm">{q.question}</p>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                      
+                      <div className="border rounded-lg p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-3">SafePilot Response</p>
+                        {isProcessing ? (
+                          <div className="flex items-center justify-center h-[300px]">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <span>Processing...</span>
+                            </div>
+                          </div>
+                        ) : selectedQuestion ? (
+                          <div className="space-y-3">
+                            <div className="p-3 bg-muted rounded-lg">
+                              <p className="text-sm font-medium">{selectedQuestion.question}</p>
+                            </div>
+                            <div className="p-3 bg-gradient-to-br from-purple-500/10 to-blue-500/10 rounded-lg border border-purple-500/20">
+                              <div className="flex items-start gap-2">
+                                <Bot className="h-4 w-4 text-purple-500 mt-1" />
+                                <p className="text-sm">{selectedQuestion.response}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                            <p className="text-sm">Select a question to see SafePilot's response</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="actions" className="h-[400px]">
+                    <ScrollArea className="h-full">
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          These are demo actions that SafePilot can execute automatically.
+                        </p>
+                        {DEMO_ACTIONS.map((action) => (
+                          <Card key={action.id} className="hover-elevate">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <h4 className="font-medium">{action.title}</h4>
+                                  <p className="text-sm text-muted-foreground mt-1">{action.description}</p>
+                                  <Badge className="mt-2 bg-green-500">{action.impact}</Badge>
+                                </div>
+                                <Button size="sm" variant="outline" data-testid={`button-demo-action-${action.id}`}>
+                                  <Play className="h-3 w-3 mr-1" />
+                                  Execute
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                  
+                  <TabsContent value="demo" className="h-[400px]">
+                    <div className="flex flex-col items-center justify-center h-full space-y-6">
+                      <div className="text-center space-y-2">
+                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center mx-auto">
+                          <Bot className="h-10 w-10 text-purple-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold">Auto Demo Mode</h3>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          SafePilot will automatically cycle through all test questions, showcasing its intelligence capabilities.
+                        </p>
+                      </div>
+                      
+                      {demoModeActive ? (
+                        <div className="space-y-4 w-full max-w-md">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                            <span className="text-sm">Demo running... ({demoStep}/{PRELOADED_TEST_QUESTIONS.length})</span>
+                          </div>
+                          {selectedQuestion && (
+                            <Card className="bg-gradient-to-br from-purple-500/5 to-blue-500/5">
+                              <CardContent className="p-4">
+                                <Badge variant="outline" className="mb-2">{selectedQuestion.category}</Badge>
+                                <p className="font-medium text-sm mb-2">{selectedQuestion.question}</p>
+                                <p className="text-xs text-muted-foreground">{selectedQuestion.response}</p>
+                              </CardContent>
+                            </Card>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setDemoModeActive(false)}
+                            data-testid="button-stop-demo"
+                          >
+                            Stop Demo
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="lg"
+                          onClick={startDemoMode}
+                          className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                          data-testid="button-start-demo"
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Start Auto Demo
+                        </Button>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            data-testid="button-refresh-dashboard"
+          >
+            <RefreshCw className={cn("h-4 w-4 mr-2", isRefetching && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
