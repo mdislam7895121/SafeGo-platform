@@ -332,8 +332,8 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <p className="text-sm font-medium">Your Progress</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm font-medium" data-testid="text-progress-label">Your Progress</p>
+                <p className="text-xs text-muted-foreground" data-testid="text-progress-count">
                   {completedSections.length} of {TUTORIALS.length} sections completed
                 </p>
               </div>
@@ -341,7 +341,7 @@ export function AdminTutorial({ onComplete }: AdminTutorialProps) {
                 Reset Progress
               </Button>
             </div>
-            <Progress value={totalProgress} className="h-2" />
+            <Progress value={totalProgress} className="h-2" data-testid="progress-tutorials" />
 
             <div className="grid gap-3 mt-4">
               {TUTORIALS.map((section) => {

@@ -75,7 +75,7 @@ export function PageTransition({ children, className }: PageTransitionProps) {
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (prefersReducedMotion) {
-    return <div className={className}>{children}</div>;
+    return <div className={className} data-testid="page-transition-static">{children}</div>;
   }
 
   return (
@@ -87,6 +87,7 @@ export function PageTransition({ children, className }: PageTransitionProps) {
         exit="exit"
         variants={pageVariants}
         className={className}
+        data-testid="page-transition-animated"
       >
         {children}
       </motion.div>
@@ -99,7 +100,7 @@ export function FadeTransition({ children, className }: PageTransitionProps) {
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (prefersReducedMotion) {
-    return <div className={className}>{children}</div>;
+    return <div className={className} data-testid="fade-transition-static">{children}</div>;
   }
 
   return (
@@ -109,6 +110,7 @@ export function FadeTransition({ children, className }: PageTransitionProps) {
       exit="exit"
       variants={fadeVariants}
       className={className}
+      data-testid="fade-transition-animated"
     >
       {children}
     </motion.div>
@@ -120,7 +122,7 @@ export function SlideUpTransition({ children, className }: PageTransitionProps) 
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (prefersReducedMotion) {
-    return <div className={className}>{children}</div>;
+    return <div className={className} data-testid="slideup-transition-static">{children}</div>;
   }
 
   return (
@@ -130,6 +132,7 @@ export function SlideUpTransition({ children, className }: PageTransitionProps) 
       exit="exit"
       variants={slideUpVariants}
       className={className}
+      data-testid="slideup-transition-animated"
     >
       {children}
     </motion.div>
@@ -141,7 +144,7 @@ export function ScaleTransition({ children, className }: PageTransitionProps) {
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (prefersReducedMotion) {
-    return <div className={className}>{children}</div>;
+    return <div className={className} data-testid="scale-transition-static">{children}</div>;
   }
 
   return (
@@ -151,6 +154,7 @@ export function ScaleTransition({ children, className }: PageTransitionProps) {
       exit="exit"
       variants={scaleVariants}
       className={className}
+      data-testid="scale-transition-animated"
     >
       {children}
     </motion.div>
@@ -168,7 +172,7 @@ export function StaggerContainer({ children, className, delay = 0.1 }: StaggerCo
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (prefersReducedMotion) {
-    return <div className={className}>{children}</div>;
+    return <div className={className} data-testid="stagger-container-static">{children}</div>;
   }
 
   return (
@@ -185,6 +189,7 @@ export function StaggerContainer({ children, className, delay = 0.1 }: StaggerCo
           },
         },
       }}
+      data-testid="stagger-container-animated"
     >
       {children}
     </motion.div>
@@ -201,7 +206,7 @@ export function StaggerItem({ children, className }: StaggerItemProps) {
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (prefersReducedMotion) {
-    return <div className={className}>{children}</div>;
+    return <div className={className} data-testid="stagger-item-static">{children}</div>;
   }
 
   return (
@@ -215,6 +220,7 @@ export function StaggerItem({ children, className }: StaggerItemProps) {
           transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
         },
       }}
+      data-testid="stagger-item-animated"
     >
       {children}
     </motion.div>
@@ -235,7 +241,7 @@ export function AnimatedSkeleton({ className, width, height }: AnimatedSkeletonP
   const style = { width, height };
 
   if (prefersReducedMotion) {
-    return <div className={`${baseClass} ${className || ""}`} style={style} />;
+    return <div className={`${baseClass} ${className || ""}`} style={style} data-testid="skeleton-static" />;
   }
 
   return (
@@ -250,6 +256,7 @@ export function AnimatedSkeleton({ className, width, height }: AnimatedSkeletonP
         repeat: Infinity,
         ease: "easeInOut",
       }}
+      data-testid="skeleton-animated"
     />
   );
 }

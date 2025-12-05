@@ -134,13 +134,13 @@ export default function PaymentIntegrity() {
   const getSyncHealthBadge = (status: string) => {
     switch (status) {
       case "healthy":
-        return <Badge className="bg-green-500">Healthy</Badge>;
+        return <Badge className="bg-green-500" data-testid="badge-sync-health">Healthy</Badge>;
       case "degraded":
-        return <Badge className="bg-yellow-500">Degraded</Badge>;
+        return <Badge className="bg-yellow-500" data-testid="badge-sync-health">Degraded</Badge>;
       case "critical":
-        return <Badge variant="destructive">Critical</Badge>;
+        return <Badge variant="destructive" data-testid="badge-sync-health">Critical</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" data-testid="badge-sync-health">{status}</Badge>;
     }
   };
 
@@ -195,65 +195,65 @@ export default function PaymentIntegrity() {
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <Card>
+          <Card data-testid="metric-transactions">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <CreditCard className="h-6 w-6 mx-auto text-primary mb-1" />
-                <p className="text-xl font-bold">{data?.summary?.totalTransactions24h?.toLocaleString() || 0}</p>
+                <p className="text-xl font-bold" data-testid="value-transactions">{data?.summary?.totalTransactions24h?.toLocaleString() || 0}</p>
                 <p className="text-xs text-muted-foreground">24h Transactions</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-integrity-score">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <Shield className="h-6 w-6 mx-auto text-green-500 mb-1" />
-                <p className="text-xl font-bold text-green-500">{data?.summary?.integrityScore?.toFixed(1) || 0}%</p>
+                <p className="text-xl font-bold text-green-500" data-testid="value-integrity-score">{data?.summary?.integrityScore?.toFixed(1) || 0}%</p>
                 <p className="text-xs text-muted-foreground">Integrity Score</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-flagged">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <AlertTriangle className="h-6 w-6 mx-auto text-orange-500 mb-1" />
-                <p className="text-xl font-bold text-orange-500">{data?.summary?.flaggedTransactions || 0}</p>
+                <p className="text-xl font-bold text-orange-500" data-testid="value-flagged">{data?.summary?.flaggedTransactions || 0}</p>
                 <p className="text-xs text-muted-foreground">Flagged</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-undercharges">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <TrendingDown className="h-6 w-6 mx-auto text-red-500 mb-1" />
-                <p className="text-xl font-bold text-red-500">{data?.summary?.underchargeAnomalies || 0}</p>
+                <p className="text-xl font-bold text-red-500" data-testid="value-undercharges">{data?.summary?.underchargeAnomalies || 0}</p>
                 <p className="text-xs text-muted-foreground">Undercharges</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-overcharges">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <TrendingUp className="h-6 w-6 mx-auto text-purple-500 mb-1" />
-                <p className="text-xl font-bold text-purple-500">{data?.summary?.overchargeAnomalies || 0}</p>
+                <p className="text-xl font-bold text-purple-500" data-testid="value-overcharges">{data?.summary?.overchargeAnomalies || 0}</p>
                 <p className="text-xs text-muted-foreground">Overcharges</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-sync-errors">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <RefreshCw className="h-6 w-6 mx-auto text-blue-500 mb-1" />
-                <p className="text-xl font-bold text-blue-500">{data?.summary?.stripeSyncErrors || 0}</p>
+                <p className="text-xl font-bold text-blue-500" data-testid="value-sync-errors">{data?.summary?.stripeSyncErrors || 0}</p>
                 <p className="text-xs text-muted-foreground">Sync Errors</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-fraud-patterns">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <Users className="h-6 w-6 mx-auto text-red-500 mb-1" />
-                <p className="text-xl font-bold text-red-500">{data?.summary?.fraudPatterns || 0}</p>
+                <p className="text-xl font-bold text-red-500" data-testid="value-fraud-patterns">{data?.summary?.fraudPatterns || 0}</p>
                 <p className="text-xs text-muted-foreground">Fraud Patterns</p>
               </div>
             </CardContent>
@@ -261,7 +261,7 @@ export default function PaymentIntegrity() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2" data-testid="card-trends">
             <CardHeader>
               <CardTitle>7-Day Trends</CardTitle>
               <CardDescription>Anomaly and fraud rate trends</CardDescription>
@@ -281,31 +281,31 @@ export default function PaymentIntegrity() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-testid="card-stripe-sync">
             <CardHeader>
               <CardTitle>Stripe Sync Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between" data-testid="row-sync-status">
                   <span className="text-sm text-muted-foreground">Status</span>
                   {getSyncHealthBadge(data?.syncStatus?.healthStatus || "unknown")}
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between" data-testid="row-last-sync">
                   <span className="text-sm text-muted-foreground">Last Sync</span>
-                  <span className="text-sm">
+                  <span className="text-sm" data-testid="value-last-sync">
                     {data?.syncStatus?.lastSync
                       ? formatDistanceToNow(new Date(data.syncStatus.lastSync), { addSuffix: true })
                       : "Unknown"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between" data-testid="row-pending-sync">
                   <span className="text-sm text-muted-foreground">Pending</span>
-                  <Badge variant="outline">{data?.syncStatus?.pendingSync || 0}</Badge>
+                  <Badge variant="outline" data-testid="badge-pending-sync">{data?.syncStatus?.pendingSync || 0}</Badge>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between" data-testid="row-failed-sync">
                   <span className="text-sm text-muted-foreground">Failed</span>
-                  <Badge variant="destructive">{data?.syncStatus?.failedSync || 0}</Badge>
+                  <Badge variant="destructive" data-testid="badge-failed-sync">{data?.syncStatus?.failedSync || 0}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -314,8 +314,8 @@ export default function PaymentIntegrity() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="anomalies">Anomalies</TabsTrigger>
-            <TabsTrigger value="fraud">Fraud Patterns</TabsTrigger>
+            <TabsTrigger value="anomalies" data-testid="tab-anomalies">Anomalies</TabsTrigger>
+            <TabsTrigger value="fraud" data-testid="tab-fraud">Fraud Patterns</TabsTrigger>
           </TabsList>
 
           <TabsContent value="anomalies">

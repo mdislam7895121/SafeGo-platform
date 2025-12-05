@@ -106,19 +106,20 @@ export default function GlobalSearch() {
     }
   };
 
-  const getStatusBadge = (status: string | undefined) => {
+  const getStatusBadge = (status: string | undefined, testId?: string) => {
     if (!status) return null;
+    const tid = testId || "badge-result-status";
     switch (status) {
       case "active":
       case "approved":
-        return <Badge className="bg-green-500">{status}</Badge>;
+        return <Badge className="bg-green-500" data-testid={tid}>{status}</Badge>;
       case "pending":
-        return <Badge className="bg-yellow-500">{status}</Badge>;
+        return <Badge className="bg-yellow-500" data-testid={tid}>{status}</Badge>;
       case "suspended":
       case "rejected":
-        return <Badge variant="destructive">{status}</Badge>;
+        return <Badge variant="destructive" data-testid={tid}>{status}</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" data-testid={tid}>{status}</Badge>;
     }
   };
 
@@ -270,18 +271,18 @@ export default function GlobalSearch() {
                               <div className="p-2 rounded-lg bg-muted">{getTypeIcon(result.type)}</div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <p className="font-medium">{result.title}</p>
-                                  <Badge variant="outline" className="text-xs capitalize">
+                                  <p className="font-medium" data-testid={`text-result-title-${result.id}`}>{result.title}</p>
+                                  <Badge variant="outline" className="text-xs capitalize" data-testid={`badge-result-type-${result.id}`}>
                                     {result.type}
                                   </Badge>
-                                  {getStatusBadge(result.meta?.status)}
+                                  {getStatusBadge(result.meta?.status, `badge-result-status-${result.id}`)}
                                 </div>
-                                <p className="text-sm text-muted-foreground">{result.subtitle}</p>
+                                <p className="text-sm text-muted-foreground" data-testid={`text-result-subtitle-${result.id}`}>{result.subtitle}</p>
                                 {result.meta?.role && (
-                                  <p className="text-xs text-muted-foreground mt-1">Role: {result.meta.role}</p>
+                                  <p className="text-xs text-muted-foreground mt-1" data-testid={`text-result-role-${result.id}`}>Role: {result.meta.role}</p>
                                 )}
                                 {result.meta?.severity && (
-                                  <p className="text-xs text-muted-foreground mt-1">Severity: {result.meta.severity}</p>
+                                  <p className="text-xs text-muted-foreground mt-1" data-testid={`text-result-severity-${result.id}`}>Severity: {result.meta.severity}</p>
                                 )}
                               </div>
                             </div>

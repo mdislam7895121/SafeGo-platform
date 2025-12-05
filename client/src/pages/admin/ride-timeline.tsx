@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   CreditCard,
   Shield,
   Search,
+  Map,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 interface TimelineEvent {
   type: string;
@@ -65,6 +68,85 @@ interface RideTimelineResponse {
   safetyEvents: any[];
   paymentEvents: PaymentEvent[];
   anomalies: any[];
+}
+
+function RouteMap({ pickup, dropoff }: { 
+  pickup?: { lat: number; lng: number } | null; 
+  dropoff?: { lat: number; lng: number } | null;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+    if (!pickup && !dropoff) return;
+
+    const center = pickup || dropoff || { lat: 40.7128, lng: -74.006 };
+    const map = L.map(mapRef.current).setView([center.lat, center.lng], 13);
+    mapInstanceRef.current = map;
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    const pickupIcon = L.divIcon({
+      className: "custom-marker",
+      html: '<div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-lg">A</div>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+
+    const dropoffIcon = L.divIcon({
+      className: "custom-marker",
+      html: '<div class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-lg">B</div>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+
+    if (pickup) {
+      L.marker([pickup.lat, pickup.lng], { icon: pickupIcon })
+        .addTo(map)
+        .bindPopup("Pickup Location");
+    }
+
+    if (dropoff) {
+      L.marker([dropoff.lat, dropoff.lng], { icon: dropoffIcon })
+        .addTo(map)
+        .bindPopup("Dropoff Location");
+    }
+
+    if (pickup && dropoff) {
+      const routeLine = L.polyline(
+        [
+          [pickup.lat, pickup.lng],
+          [dropoff.lat, dropoff.lng],
+        ],
+        { color: "#3b82f6", weight: 4, opacity: 0.7, dashArray: "10, 10" }
+      ).addTo(map);
+
+      map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [pickup, dropoff]);
+
+  if (!pickup && !dropoff) {
+    return (
+      <div className="h-[300px] bg-muted rounded-lg flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <Map className="h-8 w-8 mx-auto mb-2" />
+          <p>No location data available</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <div ref={mapRef} className="h-[300px] rounded-lg" data-testid="map-route" />;
 }
 
 export default function RideTimeline() {
@@ -250,6 +332,21 @@ export default function RideTimeline() {
                     <p className="text-xs text-muted-foreground">Customer Rating</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Map className="h-5 w-5" />
+                  Route Visualization
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RouteMap
+                  pickup={data.ride.pickupLocation}
+                  dropoff={data.ride.dropoffLocation}
+                />
               </CardContent>
             </Card>
 

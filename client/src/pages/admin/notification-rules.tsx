@@ -245,29 +245,29 @@ export default function NotificationRules() {
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-3 gap-4">
-          <Card>
+          <Card data-testid="metric-total-rules">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <Bell className="h-6 w-6 mx-auto text-primary mb-1" />
-                <p className="text-xl font-bold">{data?.summary?.total || 0}</p>
+                <p className="text-xl font-bold" data-testid="value-total-rules">{data?.summary?.total || 0}</p>
                 <p className="text-xs text-muted-foreground">Total Rules</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-active-rules">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <CheckCircle className="h-6 w-6 mx-auto text-green-500 mb-1" />
-                <p className="text-xl font-bold text-green-500">{data?.summary?.active || 0}</p>
+                <p className="text-xl font-bold text-green-500" data-testid="value-active-rules">{data?.summary?.active || 0}</p>
                 <p className="text-xs text-muted-foreground">Active</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-testid="metric-escalation-rules">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <ArrowUpRight className="h-6 w-6 mx-auto text-orange-500 mb-1" />
-                <p className="text-xl font-bold text-orange-500">{data?.summary?.withEscalation || 0}</p>
+                <p className="text-xl font-bold text-orange-500" data-testid="value-escalation-rules">{data?.summary?.withEscalation || 0}</p>
                 <p className="text-xs text-muted-foreground">With Escalation</p>
               </div>
             </CardContent>
@@ -288,12 +288,12 @@ export default function NotificationRules() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-medium">{rule.name}</h3>
-                            <Badge variant={rule.isActive ? "default" : "secondary"}>
+                            <h3 className="font-medium" data-testid={`text-rule-name-${rule.id}`}>{rule.name}</h3>
+                            <Badge variant={rule.isActive ? "default" : "secondary"} data-testid={`badge-rule-status-${rule.id}`}>
                               {rule.isActive ? "Active" : "Inactive"}
                             </Badge>
                             {rule.escalation?.enabled && (
-                              <Badge variant="outline" className="border-orange-500 text-orange-500">
+                              <Badge variant="outline" className="border-orange-500 text-orange-500" data-testid={`badge-escalation-${rule.id}`}>
                                 <ArrowUpRight className="h-3 w-3 mr-1" />
                                 Escalation
                               </Badge>
@@ -302,12 +302,12 @@ export default function NotificationRules() {
                           <p className="text-sm text-muted-foreground mb-3">{rule.description}</p>
 
                           <div className="flex flex-wrap gap-2 mb-2">
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs" data-testid={`badge-trigger-${rule.id}`}>
                               <Zap className="h-3 w-3 mr-1" />
                               Trigger: {rule.trigger.type}
                             </Badge>
                             {rule.actions.map((action, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
+                              <Badge key={idx} variant="outline" className="text-xs" data-testid={`badge-action-${rule.id}-${idx}`}>
                                 {getActionIcon(action.type)}
                                 <span className="ml-1">{action.type}</span>
                               </Badge>
