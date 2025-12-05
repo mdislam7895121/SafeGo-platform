@@ -32,7 +32,19 @@ interface SafePilotContextResponse {
   quickActions: SafePilotSuggestion[];
 }
 
+interface SafePilotAction {
+  label: string;
+  risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK';
+  actionType?: string;
+  payload?: Record<string, unknown>;
+}
+
 interface SafePilotQueryResponse {
+  mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE';
+  summary: string[];
+  keySignals: string[];
+  actions: SafePilotAction[];
+  monitor: string[];
   answerText: string;
   insights: SafePilotInsight[];
   suggestions: SafePilotSuggestion[];
@@ -324,6 +336,7 @@ export const safePilotService = {
   /**
    * Format response in Vision 2030 structured format
    * GUARANTEED: Never returns empty - always provides structured output
+   * Returns both formatted text AND structured data for frontend rendering
    */
   formatVision2030Response(
     summary: string[],
@@ -331,33 +344,31 @@ export const safePilotService = {
     actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK'; permission?: string }>,
     monitoring: string[],
     mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE'
-  ): string {
-    let response = '';
-    
-    // Mode indicator - ALWAYS present
-    response += `**[${mode} MODE]**\n\n`;
-    
-    // Summary section - ALWAYS has at least one item
-    response += '**Summary:**\n';
+  ): { text: string; structured: { mode: typeof mode; summary: string[]; keySignals: string[]; actions: SafePilotAction[]; monitor: string[] } } {
+    // Ensure no empty arrays - always provide fallback content
     const safeSummary = summary.length > 0 
-      ? summary.slice(0, 3)  // Max 3 bullets
+      ? summary.slice(0, 3)
       : ['Analysis in progress. Gathering data from last 24h telemetry.'];
-    safeSummary.forEach(s => response += `• ${s}\n`);
-    response += '\n';
-    
-    // Key signals section - ALWAYS has at least one item
-    response += '**Key signals I used:**\n';
     const safeSignals = keySignals.length > 0 
       ? keySignals 
       : ['Platform activity monitoring', 'Historical trend analysis'];
+    const safeActions: SafePilotAction[] = actions.length > 0 
+      ? actions.map(a => ({ label: a.label, risk: a.risk }))
+      : [{ label: 'Continue monitoring current metrics', risk: 'SAFE' as const }];
+    const safeMonitoring = monitoring.length > 0 
+      ? monitoring 
+      : ['Watch for changes in key performance indicators'];
+
+    // Build formatted text response
+    let response = '';
+    response += `**[${mode} MODE]**\n\n`;
+    response += '**Summary:**\n';
+    safeSummary.forEach(s => response += `• ${s}\n`);
+    response += '\n';
+    response += '**Key signals I used:**\n';
     safeSignals.forEach(s => response += `• ${s}\n`);
     response += '\n';
-    
-    // Recommended actions section - ALWAYS has at least one item
     response += '**Recommended actions:**\n';
-    const safeActions = actions.length > 0 
-      ? actions 
-      : [{ label: 'Continue monitoring current metrics', risk: 'SAFE' as const }];
     safeActions.forEach(a => {
       const riskTag = a.risk === 'SAFE' ? '[SAFE]' : 
                      a.risk === 'CAUTION' ? '[CAUTION]' : 
@@ -365,22 +376,26 @@ export const safePilotService = {
       response += `• ${riskTag} ${a.label}\n`;
     });
     response += '\n';
-    
-    // Monitoring section - ALWAYS has at least one item
     response += '**What to monitor next:**\n';
-    const safeMonitoring = monitoring.length > 0 
-      ? monitoring 
-      : ['Watch for changes in key performance indicators'];
     safeMonitoring.forEach(m => response += `• ${m}\n`);
     
-    return response;
+    return {
+      text: response,
+      structured: {
+        mode,
+        summary: safeSummary,
+        keySignals: safeSignals,
+        actions: safeActions,
+        monitor: safeMonitoring,
+      },
+    };
   },
 
   /**
    * Create fallback response when data is unavailable
    */
   createFallbackResponse(mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE', error?: string): SafePilotQueryResponse {
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       ['Data unavailable — switching to fallback analysis using last 24h telemetry.'],
       ['Platform telemetry active', 'Fallback mode engaged'],
       [{ label: 'Retry data fetch in 60 seconds', risk: 'SAFE' }],
@@ -389,7 +404,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [{
         type: 'performance' as const,
         title: 'Fallback Mode Active',
@@ -638,7 +658,7 @@ export const safePilotService = {
       ? top3.map(r => `**${r.severity}**: ${r.name} (${r.area})`)
       : ['No critical risks detected. Platform operating normally.'];
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       summary,
       ['Real-time fraud alerts', 'SOS monitoring', 'Payment gateway status', 'Driver ratings'],
       top3.map(r => ({
@@ -650,7 +670,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: top3.map(r => ({
         type: 'risk' as const,
         title: r.name,
@@ -2000,7 +2025,7 @@ export const safePilotService = {
     const highRiskDrivers = lowRatingDrivers + blockedDrivers;
     const lowRatingCustomers = blockedCustomers;
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${highRiskDrivers} high-risk drivers identified (low rating or blocked)`,
         `${lowRatingCustomers} flagged customers currently blocked`,
@@ -2026,7 +2051,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'risk',
@@ -2073,7 +2103,7 @@ export const safePilotService = {
       prisma.fraudAlert.count({ where: { status: 'PENDING', severity: { in: ['HIGH', 'CRITICAL'] } } }),
     ]);
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${pendingFraudAlerts} pending fraud alerts requiring investigation`,
         `${highSeverityAlerts} high/critical severity alerts need immediate attention`,
@@ -2101,7 +2131,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'fraud',
@@ -2141,7 +2176,7 @@ export const safePilotService = {
     const totalProcessed = approvedRefunds + rejectedRefunds;
     const approvalRate = totalProcessed > 0 ? ((approvedRefunds / totalProcessed) * 100).toFixed(1) : 0;
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${pendingRefunds} refunds pending review`,
         `Approval rate: ${approvalRate}% over last 30 days`,
@@ -2167,7 +2202,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'cost',
@@ -2219,7 +2259,7 @@ export const safePilotService = {
     const settleRisk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 
       negativeBalanceRate > 10 ? 'HIGH_RISK' : negativeBalanceRate > 3 ? 'CAUTION' : 'SAFE';
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${pendingPayouts} payouts pending processing`,
         `${failedPayouts} failed payouts (${failureRate.toFixed(1)}% failure rate)`,
@@ -2245,7 +2285,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'cost',
@@ -2301,7 +2346,7 @@ export const safePilotService = {
     const kycRisk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 
       pendingKycRate > 15 ? 'CAUTION' : 'SAFE';
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${totalDrivers} total drivers registered`,
         `${onlineDrivers} currently online (${onlineRate}%)`,
@@ -2327,7 +2372,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'performance',
@@ -2365,7 +2415,7 @@ export const safePilotService = {
 
     const blockRate = totalCustomers > 0 ? ((blockedCustomers / totalCustomers) * 100).toFixed(2) : 0;
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${totalCustomers} total customers registered`,
         `${blockedCustomers} currently blocked (${blockRate}%)`,
@@ -2391,7 +2441,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'performance',
@@ -2428,7 +2483,7 @@ export const safePilotService = {
       prisma.restaurantProfile.count({ where: { ...where, averageRating: { lt: RISK_THRESHOLDS.restaurant.lowRating } } }),
     ]);
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${totalRestaurants} restaurant partners active`,
         `${pendingKyc} pending verification`,
@@ -2454,7 +2509,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'performance',
@@ -2482,7 +2542,7 @@ export const safePilotService = {
     const pendingDrivers = context.metrics.pendingDriverKyc as number;
     const pendingRestaurants = context.metrics.pendingRestaurantKyc as number;
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${totalPending} total pending KYC verifications`,
         `${pendingDrivers} drivers awaiting review`,
@@ -2508,7 +2568,12 @@ export const safePilotService = {
     );
     
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'compliance',
@@ -2533,7 +2598,7 @@ export const safePilotService = {
 
     const totalTrips = completedRides + completedOrders;
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${totalTrips} total trips/orders in last 24 hours`,
         `${completedRides} rides completed`,
@@ -2559,7 +2624,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'performance',
@@ -2589,7 +2659,7 @@ export const safePilotService = {
       prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
     ]);
 
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         `${refundCount} refunds approved in last 30 days`,
         `${negativeBalances} drivers owe commission (negative balance)`,
@@ -2615,7 +2685,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: [
         {
           type: 'cost',
@@ -2646,7 +2721,7 @@ export const safePilotService = {
   async handleGeneralQuery(question: string, pageKey: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const context = await this.getContext(pageKey, countryCode);
     
-    const answerText = this.formatVision2030Response(
+    const formatted = this.formatVision2030Response(
       [
         context.summary.description,
         ...context.alerts.slice(0, 2).map(a => a.message),
@@ -2661,7 +2736,12 @@ export const safePilotService = {
     );
 
     return {
-      answerText,
+      mode: formatted.structured.mode,
+      summary: formatted.structured.summary,
+      keySignals: formatted.structured.keySignals,
+      actions: formatted.structured.actions,
+      monitor: formatted.structured.monitor,
+      answerText: formatted.text,
       insights: context.alerts.map(alert => ({
         type: 'performance' as const,
         title: alert.message,

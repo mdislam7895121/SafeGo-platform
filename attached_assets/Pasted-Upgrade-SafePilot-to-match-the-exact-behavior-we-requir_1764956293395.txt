@@ -1,0 +1,75 @@
+Upgrade SafePilot to match the exact behavior we require:
+
+1. Response Intelligence
+   - SafePilot must ALWAYS respond using the Vision-2030 structured format:
+     • MODE  
+     • SUMMARY  
+     • KEY SIGNALS  
+     • ACTIONS (with SAFE / CAUTION / HIGH RISK tags)  
+     • WHAT TO MONITOR  
+   - No empty responses allowed. If data is missing, SafePilot must say:
+     “Data unavailable — switching to fallback analysis using last 24h telemetry.”
+
+2. Automatic Mode Detection
+   - ASK mode → normal questions  
+   - WATCH mode → risk, monitoring, alerts  
+   - GUARD mode → fraud, abuse, suspicious patterns  
+   - OPTIMIZE mode → revenue, cost, improvement  
+
+   SafePilot must detect mode 100% accurately.
+
+3. Data Layer Fix
+   - SafePilot must use REAL database fields for:
+     • drivers  
+     • trips  
+     • payouts  
+     • chargebacks  
+     • disputes  
+     • customer flags  
+     • fraud markers  
+     • device signals  
+
+   No placeholder or undefined fields permitted.
+
+4. Context Tab Fix
+   - The Context tab must ALWAYS load.
+   - If context is unavailable, SafePilot must fetch:
+     • request logs  
+     • recent admin activity  
+     • last 50 events  
+     • platform telemetry  
+   And rebuild the context view automatically.
+
+5. UI Integration
+   - Replace ALL old SafePilot icons and logos with the new SafePilot brand pack:
+     safepilot_shield_icon_blue_gradient.png  
+     safepilot_full_logo_light_mode.png  
+     safepilot_full_logo_dark_mode.png  
+     safepilot_mobile_app_icon.png  
+
+   - Apply consistently to:
+     • header  
+     • floating button  
+     • drawer  
+     • tabs  
+     • intelligence dashboard  
+
+6. Safety & Enforcement
+   - If SafePilot detects HIGH RISK:
+     • Automatically prepare an admin alert
+     • Include evidence
+     • Include recommended action
+     • Never send empty or partial messages
+
+7. Error Handling
+   - If any backend error occurs:
+     “System issue detected — attempting automated recovery.”
+   - Then retry 2 times before sending final output.
+
+8. Final Requirement
+   - SafePilot must behave EXACTLY like a real enterprise AI supervisor:
+     • No silent failures  
+     • No empty responses  
+     • No broken context  
+     • Always structured  
+     • Always actionable  

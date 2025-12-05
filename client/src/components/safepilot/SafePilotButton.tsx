@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  Eye,
 } from 'lucide-react';
 import { SafePilotIcon } from './SafePilotLogo';
 import { Button } from '@/components/ui/button';
@@ -1029,7 +1030,7 @@ export function SafePilotButton() {
                         <div className="space-y-1">
                           {(queryResponse as any).monitor.map((item: string, idx: number) => (
                             <div key={idx} className="flex items-start gap-2 text-xs text-muted-foreground">
-                              <span className="shrink-0">👁</span>
+                              <Eye className="h-3 w-3 shrink-0 mt-0.5" />
                               <span>{item}</span>
                             </div>
                           ))}
