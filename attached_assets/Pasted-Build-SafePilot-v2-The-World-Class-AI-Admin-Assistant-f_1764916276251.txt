@@ -1,0 +1,112 @@
+Build SafePilot v2 — The World-Class AI Admin Assistant for SafeGo
+
+Goal:
+Upgrade the existing SafePilot into a fully autonomous, business-driving AI system that reduces company cost, reduces admin workload, automates decision-making, and actively grows SafeGo revenues. SafePilot must combine analytics, automation, forecasting, fraud-control, support automation, and operational intelligence.
+
+Core Requirements:
+1. Replace the old “copilot” concept with a fully branded “SafePilot”. 
+   SafePilot must represent the most advanced operational AI assistant.
+
+2. SafePilot must run globally across every admin page, with:
+   • Page-aware insights  
+   • Real-time alerts  
+   • Auto-summarization  
+   • Smart recommendations  
+   • Fully natural-language questions and commands
+
+3. Add the following 12 SafePilot Intelligence Modules (all must be implemented):
+
+MODULE 1: Cost Reduction Engine
+- Detect repetitive admin tasks
+- Suggest automation
+- Identify unnecessary expenses (servers, coupons, driver bonuses)
+- Recommend optimizations for expenses
+- Predict cost-saving opportunities per week/month
+
+MODULE 2: Revenue Growth Engine
+- Predict daily/weekly/monthly revenue
+- Recommend surge-pricing times (rides, delivery, parcel)
+- Detect underperforming zones and suggest fixes
+- Recommend promotions for customers/drivers
+- Automatically forecast demand (heatmap)
+
+MODULE 3: Workforce Reduction & Automation
+- Identify work that no human admin needs to do
+- Suggest auto-approval, auto-triage, auto-KYC rules
+- Detect when admin workload falls or spikes
+- Generate automation rules (no human review needed)
+- Provide “One-click automation” for repeated tasks
+
+MODULE 4: Fraud & Risk Intelligence
+- Detect fake accounts, risky drivers, duplicate KYC
+- Flag abnormal ride patterns
+- Predict high-risk events before they occur
+- Recommend actions (block, review, suspend)
+
+MODULE 5: Customer Experience AI
+- Summarize complaints automatically
+- Suggest resolutions that save money
+- Predict unhappy customers and alert admins
+- Detect service gaps (late driver, cancelled ride)
+
+MODULE 6: Driver Performance AI
+- Detect best & worst drivers
+- Identify drivers likely to churn
+- Recommend incentives only when profitable
+- Detect misuse of incentives
+
+MODULE 7: System Health Monitoring
+- Track all backend services (jobs, health, logs)
+- Predict outage risk
+- Auto-restart failing services
+- Notify admins before downtime happens
+
+MODULE 8: Legal & Compliance AI
+- Auto-anonymize exports
+- Detect policy violations
+- Check data retention
+- Auto-generate compliance reports
+
+MODULE 9: Dynamic Policy Generator
+- Generate new company rules on demand
+- Example: fare rules, penalty rules, fraud rules, KYC levels
+- Allow admin to apply rules in one click
+- Auto-simulate rule impact before activation
+
+MODULE 10: Support Automation AI
+- Auto-reply suggestions for admin chat
+- Write policy-based professional responses
+- Handle refunds, disputes, and appeals automatically
+- Provide quick templates for support teams
+
+MODULE 11: Growth Advisor (Business Coach)
+SafePilot must act like a senior business advisor:
+- Tell what feature to build next
+- Tell what improvement increases revenue fastest
+- Tell how to reach profitability quicker
+- Show business KPIs and next actions
+
+MODULE 12: Multi-Page SafePilot Panel
+- SafePilot must open from a floating icon on all admin pages
+- Left side: context summary of the page
+- Right side: actions, alerts, insights, shortcuts
+- Support voice commands
+
+4. SafePilot UI Requirements:
+- Floating SafePilot button (bottom-right)
+- Sliding panel with:
+  • Page summary  
+  • Alerts  
+  • Recommended actions  
+  • Deep analytics  
+  • Quick shortcuts  
+  • Automation proposals  
+
+5. SafePilot must not break any current system (RBAC, logs, routes, pages).
+6. Provide final SafePilot Test Mode:
+   • Preloaded test questions  
+   • Preloaded actions  
+   • Auto demo mode  
+
+Deliverables:
+Build all 12 modules, full UI, backend logic, pages, analytics, and make SafePilot available on every admin page. After development, show screenshot + summary.
