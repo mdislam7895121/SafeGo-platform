@@ -399,7 +399,7 @@ export const partnerSuccessCoach = {
 
     const restaurants = await prisma.restaurantProfile.findMany({
       where: {
-        rating: { lt: 3.8 },
+        averageRating: { lt: 3.8 },
         ...(countryCode ? { user: { countryCode } } : {}),
       },
       include: {
@@ -417,7 +417,7 @@ export const partnerSuccessCoach = {
         }),
       ]);
 
-      const rating = restaurant.rating?.toNumber() || 0;
+      const rating = (restaurant.averageRating as number) || 0;
       const cancellationRate = orderCount > 0 ? cancelCount / (orderCount + cancelCount) : 0;
 
       const issues: string[] = [];
@@ -557,7 +557,7 @@ export const partnerSuccessCoach = {
       }),
       prisma.restaurantProfile.aggregate({
         where: countryCode ? { user: { countryCode } } : {},
-        _avg: { rating: true },
+        _avg: { averageRating: true },
       }),
       prisma.driverProfile.count({
         where: {
@@ -574,7 +574,7 @@ export const partnerSuccessCoach = {
       topPerformerCount: topDrivers,
       pendingActions: actions.length,
       averageDriverRating: driverAvg._avg.rating?.toNumber() || 0,
-      averageRestaurantRating: restaurantAvg._avg.rating?.toNumber() || 0,
+      averageRestaurantRating: (restaurantAvg._avg.averageRating as number) || 0,
     };
   },
 };

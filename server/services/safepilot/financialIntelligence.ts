@@ -377,23 +377,23 @@ export const financialIntelligence = {
     const [rideRevenue, prevRideRevenue, topDrivers] = await Promise.all([
       prisma.ride.aggregate({
         where: { createdAt: { gte: last30d }, status: 'completed' },
-        _sum: { fare: true },
+        _sum: { serviceFare: true },
       }),
       prisma.ride.aggregate({
         where: { createdAt: { gte: last60d, lt: last30d }, status: 'completed' },
-        _sum: { fare: true },
+        _sum: { serviceFare: true },
       }),
       prisma.ride.groupBy({
         by: ['driverId'],
         where: { createdAt: { gte: last30d }, status: 'completed' },
-        _sum: { fare: true },
-        orderBy: { _sum: { fare: 'desc' } },
+        _sum: { serviceFare: true },
+        orderBy: { _sum: { serviceFare: 'desc' } },
         take: 5,
       }),
     ]);
 
-    const currentRide = rideRevenue._sum.fare?.toNumber() || 0;
-    const prevRide = prevRideRevenue._sum.fare?.toNumber() || 1;
+    const currentRide = rideRevenue._sum.serviceFare?.toNumber() || 0;
+    const prevRide = prevRideRevenue._sum.serviceFare?.toNumber() || 1;
     const rideGrowth = ((currentRide - prevRide) / prevRide) * 100;
 
     const topDriverNames = await Promise.all(
@@ -404,7 +404,7 @@ export const financialIntelligence = {
         });
         return {
           name: driver?.user?.fullName || 'Unknown',
-          revenue: d._sum.fare?.toNumber() || 0,
+          revenue: d._sum.serviceFare?.toNumber() || 0,
         };
       })
     );

@@ -245,7 +245,7 @@ export const complianceGuard = {
 
       if (!hasRecentActivity) {
         const hasStoredPayment = await prisma.paymentMethod.findFirst({
-          where: { userId: customer.userId },
+          where: { customerId: customer.userId },
         });
 
         if (hasStoredPayment) {

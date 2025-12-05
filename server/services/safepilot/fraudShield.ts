@@ -98,7 +98,7 @@ export const fraudShield = {
           include: { user: true },
         },
       },
-      orderBy: { fare: 'desc' },
+      orderBy: { serviceFare: 'desc' },
       take: 200,
     });
 
