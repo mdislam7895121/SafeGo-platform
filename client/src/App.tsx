@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { SafePilotButton } from "@/components/safepilot/SafePilotButton";
 import { NotificationSoundProvider } from "@/contexts/NotificationSoundContext";
 import { EatsCartProvider } from "@/contexts/EatsCartContext";
 // SignupProvider removed - new customer signup flow is single-step and doesn't need context
@@ -2784,6 +2785,7 @@ export default function App() {
                 <Toaster />
                 <AccountLockedHandler />
                 <Router />
+                <SafePilotButton />
               </TooltipProvider>
             </EatsCartProvider>
           </AuthProvider>
