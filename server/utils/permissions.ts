@@ -203,6 +203,15 @@ export enum Permission {
   CANCEL_RESTORE = 'CANCEL_RESTORE',
   VIEW_DR_CONFIG = 'VIEW_DR_CONFIG',
   MANAGE_DR_CONFIG = 'MANAGE_DR_CONFIG',
+  
+  // Periodic Access Review (Governance)
+  VIEW_ACCESS_REVIEWS = 'VIEW_ACCESS_REVIEWS',
+  CREATE_ACCESS_REVIEW = 'CREATE_ACCESS_REVIEW',
+  MANAGE_ACCESS_REVIEWS = 'MANAGE_ACCESS_REVIEWS',
+  REVIEW_ACCESS_ITEMS = 'REVIEW_ACCESS_ITEMS',
+  APPROVE_ACCESS_DECISIONS = 'APPROVE_ACCESS_DECISIONS',
+  ENFORCE_ACCESS_DECISIONS = 'ENFORCE_ACCESS_DECISIONS',
+  EXPORT_ACCESS_REVIEWS = 'EXPORT_ACCESS_REVIEWS',
 }
 
 type RolePermissions = {
@@ -375,6 +384,14 @@ const rolePermissions: RolePermissions = {
     Permission.CANCEL_RESTORE,
     Permission.VIEW_DR_CONFIG,
     Permission.MANAGE_DR_CONFIG,
+    // Periodic Access Review (Governance)
+    Permission.VIEW_ACCESS_REVIEWS,
+    Permission.CREATE_ACCESS_REVIEW,
+    Permission.MANAGE_ACCESS_REVIEWS,
+    Permission.REVIEW_ACCESS_ITEMS,
+    Permission.APPROVE_ACCESS_DECISIONS,
+    Permission.ENFORCE_ACCESS_DECISIONS,
+    Permission.EXPORT_ACCESS_REVIEWS,
   ]),
 
   // ADMIN: General management (non-sensitive)
@@ -622,6 +639,14 @@ const rolePermissions: RolePermissions = {
     Permission.DOWNLOAD_COMPLIANCE_EXPORT,
     Permission.MANAGE_RETENTION_POLICIES,
     Permission.VIEW_EXPORT_AUDIT_LOGS,
+    // Periodic Access Review (Governance)
+    Permission.VIEW_ACCESS_REVIEWS,
+    Permission.CREATE_ACCESS_REVIEW,
+    Permission.MANAGE_ACCESS_REVIEWS,
+    Permission.REVIEW_ACCESS_ITEMS,
+    Permission.APPROVE_ACCESS_DECISIONS,
+    Permission.ENFORCE_ACCESS_DECISIONS,
+    Permission.EXPORT_ACCESS_REVIEWS,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
