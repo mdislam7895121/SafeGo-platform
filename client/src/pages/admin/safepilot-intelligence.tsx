@@ -24,6 +24,15 @@ import {
   Zap,
   Target,
   Brain,
+  Cog,
+  Activity,
+  FileText,
+  Headphones,
+  Lightbulb,
+  Server,
+  Settings,
+  MessageSquare,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -105,6 +114,46 @@ interface DashboardData {
     usViolations: number;
     pendingActions: number;
     complianceScore: number;
+  };
+  workforce: {
+    totalAutomationRules: number;
+    activeRules: number;
+    proposedRules: number;
+    estimatedHoursSavedPerWeek: number;
+    automationCoveragePercent: number;
+    adminWorkloadTrend: string;
+  };
+  health: {
+    overallHealth: string;
+    healthScore: number;
+    criticalServices: number;
+    degradedServices: number;
+    activeJobs: number;
+    failedJobs: number;
+  };
+  policy: {
+    totalPolicies: number;
+    activePolicies: number;
+    draftPolicies: number;
+    pendingSuggestions: number;
+    averageImpactScore: number;
+    policyEffectivenessPercent: number;
+  };
+  support: {
+    totalPendingTickets: number;
+    autoResolvable: number;
+    avgResponseTime: number;
+    customerSatisfaction: number;
+    escalationRate: number;
+    templateUsagePercent: number;
+  };
+  advisor: {
+    overallScore: number;
+    priorityActions: number;
+    growthOpportunities: number;
+    efficiencyGains: number;
+    competitivePosition: string;
+    monthsToBreakeven: number;
   };
   lastUpdated: string;
 }
@@ -361,12 +410,13 @@ export default function SafePilotIntelligence() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-3 lg:grid-cols-6 gap-2">
+        <TabsList className="flex flex-wrap gap-2">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="growth" data-testid="tab-growth">Growth</TabsTrigger>
           <TabsTrigger value="operations" data-testid="tab-operations">Operations</TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
-          <TabsTrigger value="marketing" data-testid="tab-marketing">Marketing</TabsTrigger>
+          <TabsTrigger value="automation" data-testid="tab-automation">Automation</TabsTrigger>
+          <TabsTrigger value="advisor" data-testid="tab-advisor">Business Coach</TabsTrigger>
           <TabsTrigger value="actions" data-testid="tab-actions">Actions</TabsTrigger>
         </TabsList>
 
@@ -483,6 +533,101 @@ export default function SafePilotIntelligence() {
                 { label: "US Issues", value: dashboard?.compliance?.usViolations || 0 },
               ]}
             />
+
+            <ModuleCard
+              title="Workforce Automation"
+              description="Admin task automation"
+              icon={Cog}
+              color="bg-indigo-500"
+              status={getModuleStatus(0, dashboard?.workforce?.proposedRules || 0)}
+              metrics={[
+                { label: "Active Rules", value: dashboard?.workforce?.activeRules || 0 },
+                { label: "Proposed", value: dashboard?.workforce?.proposedRules || 0 },
+                { label: "Hours Saved", value: `${dashboard?.workforce?.estimatedHoursSavedPerWeek || 0}h` },
+                { label: "Coverage", value: `${dashboard?.workforce?.automationCoveragePercent || 0}%` },
+              ]}
+            />
+
+            <ModuleCard
+              title="System Health"
+              description="Infrastructure monitoring"
+              icon={Activity}
+              color="bg-emerald-500"
+              status={getModuleStatus(
+                dashboard?.health?.criticalServices || 0,
+                dashboard?.health?.degradedServices || 0
+              )}
+              metrics={[
+                { label: "Health Score", value: `${dashboard?.health?.healthScore || 0}%` },
+                { label: "Critical", value: dashboard?.health?.criticalServices || 0 },
+                { label: "Degraded", value: dashboard?.health?.degradedServices || 0 },
+                { label: "Failed Jobs", value: dashboard?.health?.failedJobs || 0 },
+              ]}
+            />
+
+            <ModuleCard
+              title="Policy Engine"
+              description="Dynamic policy management"
+              icon={FileText}
+              color="bg-amber-500"
+              status={getModuleStatus(0, dashboard?.policy?.pendingSuggestions || 0)}
+              metrics={[
+                { label: "Active", value: dashboard?.policy?.activePolicies || 0 },
+                { label: "Draft", value: dashboard?.policy?.draftPolicies || 0 },
+                { label: "Suggestions", value: dashboard?.policy?.pendingSuggestions || 0 },
+                { label: "Effectiveness", value: `${dashboard?.policy?.policyEffectivenessPercent || 0}%` },
+              ]}
+            />
+
+            <ModuleCard
+              title="Support AI"
+              description="Automated customer support"
+              icon={Headphones}
+              color="bg-teal-500"
+              status={getModuleStatus(0, (dashboard?.support?.totalPendingTickets || 0) > 50 ? 1 : 0)}
+              metrics={[
+                { label: "Pending", value: dashboard?.support?.totalPendingTickets || 0 },
+                { label: "Auto-Resolve", value: dashboard?.support?.autoResolvable || 0 },
+                { label: "CSAT", value: `${dashboard?.support?.customerSatisfaction || 0}%` },
+                { label: "Response", value: `${dashboard?.support?.avgResponseTime || 0}m` },
+              ]}
+            />
+
+            <ModuleCard
+              title="Growth Advisor"
+              description="Business coaching AI"
+              icon={Lightbulb}
+              color="bg-gradient-to-r from-purple-500 to-pink-500"
+              status={getModuleStatus(0, dashboard?.advisor?.priorityActions || 0)}
+              metrics={[
+                { label: "Score", value: `${dashboard?.advisor?.overallScore || 0}/100` },
+                { label: "Priority", value: dashboard?.advisor?.priorityActions || 0 },
+                { label: "Opportunities", value: dashboard?.advisor?.growthOpportunities || 0 },
+                { label: "Position", value: dashboard?.advisor?.competitivePosition || "N/A" },
+              ]}
+            />
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">Module Categories</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">Growth & Revenue</p>
+                <p className="text-lg font-bold">3 modules</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">Cost & Operations</p>
+                <p className="text-lg font-bold">3 modules</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">Security & Compliance</p>
+                <p className="text-lg font-bold">2 modules</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">Automation & AI</p>
+                <p className="text-lg font-bold">4 modules</p>
+              </div>
+            </div>
           </div>
         </TabsContent>
 
@@ -820,6 +965,295 @@ export default function SafePilotIntelligence() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="automation" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Cog className="h-5 w-5 text-indigo-500" />
+                  Workforce Automation
+                </CardTitle>
+                <CardDescription>Automate repetitive admin tasks</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-indigo-500/10 rounded-lg text-center border border-indigo-500/20">
+                      <p className="text-2xl font-bold">{dashboard?.workforce?.activeRules || 0}</p>
+                      <p className="text-xs text-muted-foreground">Active Rules</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <p className="text-2xl font-bold">{dashboard?.workforce?.proposedRules || 0}</p>
+                      <p className="text-xs text-muted-foreground">Proposed</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Hours Saved/Week</span>
+                      <Badge className="bg-green-500">{dashboard?.workforce?.estimatedHoursSavedPerWeek || 0}h</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Automation Coverage</span>
+                      <Badge variant="secondary">{dashboard?.workforce?.automationCoveragePercent || 0}%</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Workload Trend</span>
+                      <Badge variant="outline">{dashboard?.workforce?.adminWorkloadTrend || "STABLE"}</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-emerald-500" />
+                  System Health
+                </CardTitle>
+                <CardDescription>Infrastructure monitoring</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center">
+                    <div className={cn(
+                      "w-24 h-24 rounded-full border-4 flex items-center justify-center",
+                      dashboard?.health?.overallHealth === "HEALTHY" ? "border-green-500 bg-green-500/10" :
+                      dashboard?.health?.overallHealth === "DEGRADED" ? "border-yellow-500 bg-yellow-500/10" :
+                      "border-red-500 bg-red-500/10"
+                    )}>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold">{dashboard?.health?.healthScore || 0}%</p>
+                        <p className="text-xs text-muted-foreground">Health</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Critical Services</span>
+                      <Badge variant={dashboard?.health?.criticalServices ? "destructive" : "secondary"}>
+                        {dashboard?.health?.criticalServices || 0}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Degraded Services</span>
+                      <Badge variant="outline">{dashboard?.health?.degradedServices || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Failed Jobs</span>
+                      <Badge variant={dashboard?.health?.failedJobs ? "destructive" : "secondary"}>
+                        {dashboard?.health?.failedJobs || 0}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-amber-500" />
+                  Dynamic Policy Engine
+                </CardTitle>
+                <CardDescription>AI-generated policies</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-2 bg-muted rounded-lg text-center">
+                      <p className="text-xl font-bold">{dashboard?.policy?.activePolicies || 0}</p>
+                      <p className="text-xs text-muted-foreground">Active</p>
+                    </div>
+                    <div className="p-2 bg-muted rounded-lg text-center">
+                      <p className="text-xl font-bold">{dashboard?.policy?.draftPolicies || 0}</p>
+                      <p className="text-xs text-muted-foreground">Draft</p>
+                    </div>
+                    <div className="p-2 bg-amber-500/10 rounded-lg text-center border border-amber-500/20">
+                      <p className="text-xl font-bold">{dashboard?.policy?.pendingSuggestions || 0}</p>
+                      <p className="text-xs text-muted-foreground">Suggested</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Policy Effectiveness</span>
+                    <Badge className="bg-green-500">{dashboard?.policy?.policyEffectivenessPercent || 0}%</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Headphones className="h-5 w-5 text-teal-500" />
+                  Support Automation AI
+                </CardTitle>
+                <CardDescription>Automated ticket handling</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <p className="text-2xl font-bold">{dashboard?.support?.totalPendingTickets || 0}</p>
+                      <p className="text-xs text-muted-foreground">Pending Tickets</p>
+                    </div>
+                    <div className="p-3 bg-teal-500/10 rounded-lg text-center border border-teal-500/20">
+                      <p className="text-2xl font-bold">{dashboard?.support?.autoResolvable || 0}</p>
+                      <p className="text-xs text-muted-foreground">Auto-Resolvable</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Customer Satisfaction</span>
+                      <Badge className="bg-green-500">{dashboard?.support?.customerSatisfaction || 0}%</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Avg Response Time</span>
+                      <Badge variant="secondary">{dashboard?.support?.avgResponseTime || 0} min</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Escalation Rate</span>
+                      <Badge variant="outline">{dashboard?.support?.escalationRate || 0}%</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="advisor" className="space-y-4">
+          <Card className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 border-purple-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="h-5 w-5 text-purple-500" />
+                Growth Advisor - Business Coaching AI
+              </CardTitle>
+              <CardDescription>Strategic recommendations for your business</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted rounded-lg text-center">
+                    <p className="text-4xl font-bold">{dashboard?.advisor?.overallScore || 0}</p>
+                    <p className="text-sm text-muted-foreground">Business Health Score</p>
+                    <p className="text-xs text-muted-foreground mt-1">out of 100</p>
+                  </div>
+                  <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                    <p className="text-lg font-semibold">{dashboard?.advisor?.competitivePosition || "N/A"}</p>
+                    <p className="text-xs text-muted-foreground">Market Position</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium">Key Metrics</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-2 bg-muted rounded">
+                      <span className="text-sm">Priority Actions</span>
+                      <Badge variant="destructive">{dashboard?.advisor?.priorityActions || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted rounded">
+                      <span className="text-sm">Growth Opportunities</span>
+                      <Badge className="bg-green-500">{dashboard?.advisor?.growthOpportunities || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted rounded">
+                      <span className="text-sm">Efficiency Gains</span>
+                      <Badge variant="secondary">{dashboard?.advisor?.efficiencyGains || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted rounded">
+                      <span className="text-sm">Months to Breakeven</span>
+                      <Badge variant="outline">{dashboard?.advisor?.monthsToBreakeven || 0}</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium">Quick Actions</h4>
+                  <div className="space-y-2">
+                    <Button variant="outline" className="w-full justify-start" size="sm" data-testid="button-get-next-action">
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Get Next Best Action
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" size="sm" data-testid="button-revenue-accelerators">
+                      <TrendingUp className="h-4 w-4 mr-2" />
+                      View Revenue Accelerators
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" size="sm" data-testid="button-market-analysis">
+                      <Target className="h-4 w-4 mr-2" />
+                      Market Opportunity Analysis
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" size="sm" data-testid="button-profitability-path">
+                      <PieChart className="h-4 w-4 mr-2" />
+                      Profitability Roadmap
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Business Insights</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="p-3 border rounded-lg">
+                    <p className="text-sm font-medium">Revenue Optimization</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      AI has identified {dashboard?.advisor?.growthOpportunities || 0} opportunities to increase revenue
+                    </p>
+                  </div>
+                  <div className="p-3 border rounded-lg">
+                    <p className="text-sm font-medium">Cost Efficiency</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {dashboard?.advisor?.efficiencyGains || 0} process improvements recommended
+                    </p>
+                  </div>
+                  <div className="p-3 border rounded-lg">
+                    <p className="text-sm font-medium">Strategic Priority</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {dashboard?.advisor?.priorityActions || 0} high-impact actions require attention
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Coaching Recommendations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Focus on customer retention</p>
+                      <p className="text-xs text-muted-foreground">VIP customers show high lifetime value potential</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <Target className="h-5 w-5 text-blue-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Expand to high-demand zones</p>
+                      <p className="text-xs text-muted-foreground">3 underserved areas identified with strong demand</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                    <Zap className="h-5 w-5 text-purple-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Automate support tickets</p>
+                      <p className="text-xs text-muted-foreground">45% of tickets can be auto-resolved</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="actions" className="space-y-4">

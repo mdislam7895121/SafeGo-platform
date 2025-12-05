@@ -1,4 +1,4 @@
-import { prisma } from "../../storage";
+import { prisma } from '../../db';
 
 interface BusinessKPI {
   name: string;
