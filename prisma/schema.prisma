@@ -10409,3 +10409,138 @@ model Geofence {
   @@index([ruleType])
   @@map("geofences")
 }
+
+// Operations Console: Job Run Tracking
+enum SystemJobStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL
+  CANCELLED
+}
+
+model SystemJobRun {
+  id String @id @default(uuid())
+
+  jobName     String // e.g., "payout_processing", "wallet_reconciliation", "stripe_sync"
+  jobCategory String // e.g., "payments", "sync", "cleanup", "analytics"
+
+  // Execution details
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  status      SystemJobStatus @default(RUNNING)
+  durationMs  Int?
+
+  // Results
+  recordsProcessed Int?
+  recordsSucceeded Int?
+  recordsFailed    Int?
+  errorSummary     String? @db.Text
+  errorDetails     Json?
+
+  // Context
+  triggeredBy  String? // "scheduler", "manual", "webhook", admin email
+  environment  String  @default("development") // dev, staging, production
+  metadata     Json?   // Additional context
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobName])
+  @@index([jobCategory])
+  @@index([status])
+  @@index([startedAt])
+  @@index([environment])
+  @@map("system_job_runs")
+}
+
+// Operations Console: System Error Tracking
+enum SystemErrorSeverity {
+  DEBUG
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+model SystemError {
+  id String @id @default(uuid())
+
+  // Error classification
+  service       String // e.g., "payment", "kyc", "notification", "maps"
+  severity      SystemErrorSeverity
+  errorCode     String? // Custom error code
+  errorType     String? // Exception type name
+
+  // Error details
+  message       String @db.Text
+  stackTrace    String? @db.Text
+  requestPath   String?
+  requestMethod String?
+
+  // Correlation
+  correlationId String? // Request/transaction ID
+  userId        String?
+  driverId      String?
+  rideId        String?
+  orderId       String?
+
+  // Context
+  countryCode   String?
+  environment   String @default("development")
+  metadata      Json?  // Additional context
+  userAgent     String?
+  ipAddress     String?
+
+  // Resolution
+  isResolved    Boolean @default(false)
+  resolvedBy    String?
+  resolvedAt    DateTime?
+  resolution    String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([service])
+  @@index([severity])
+  @@index([errorCode])
+  @@index([correlationId])
+  @@index([userId])
+  @@index([countryCode])
+  @@index([environment])
+  @@index([isResolved])
+  @@index([createdAt])
+  @@map("system_errors")
+}
+
+// Operations Console: Service Health Check Results
+model ServiceHealthCheck {
+  id String @id @default(uuid())
+
+  serviceName   String // e.g., "database", "stripe", "twilio", "google_maps"
+  serviceType   String // e.g., "database", "payment", "notification", "maps", "queue"
+
+  // Status
+  status        String // OK, DEGRADED, DOWN
+  latencyMs     Int?
+  lastSuccess   DateTime?
+  lastFailure   DateTime?
+
+  // Details
+  statusMessage String?
+  errorMessage  String?
+  metadata      Json?
+
+  // Configuration
+  checkInterval Int @default(60) // seconds
+  timeout       Int @default(5000) // milliseconds
+
+  checkedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceName])
+  @@index([serviceType])
+  @@index([status])
+  @@index([checkedAt])
+  @@map("service_health_checks")
+}

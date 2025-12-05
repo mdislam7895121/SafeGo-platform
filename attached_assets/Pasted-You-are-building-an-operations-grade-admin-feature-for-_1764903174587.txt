@@ -1,0 +1,64 @@
+You are building an operations-grade admin feature for SafeGo.
+
+Follow SafeGo’s existing architecture:
+- Node/TypeScript backend with Prisma (or equivalent).
+- Admin console with RBAC, JWT, and audit logs.
+- Rides, Eats, Shop, and Ticket/Rental flows running on the same platform.
+
+TASK GOAL  
+Implement an **Operations Console** inside the admin panel where ops admins can see:
+- scheduled jobs / cron tasks
+- service health checks
+- critical backend errors and third-party integration issues
+
+REQUIREMENTS  
+
+1. Job & Task Monitoring
+   - Identify recurring backend jobs (examples):
+     - payout processing
+     - wallet reconciliation
+     - Stripe sync or payment provider sync
+     - notification cleanups
+     - analytics aggregation
+   - Create a `SystemJobRun` model/table logging:
+     - id, jobName, startedAt, finishedAt, status (SUCCESS, FAILED, PARTIAL), durationMs, errorSummary, environment (dev/staging/prod).
+   - Wrap existing job runners to automatically insert/update logs.
+
+2. Health Check Endpoints
+   - Implement a structured health check endpoint:
+     - `/api/admin/health` returning:
+       - database connectivity
+       - external services (payment gateway, SMS/email providers, map/location provider)
+       - queue / background worker status
+     - Use clear status fields (OK, DEGRADED, DOWN) with latency metrics.
+
+3. Error & Alert View
+   - Integrate with existing logging (or add a lightweight error log table) for:
+     - recent critical errors (5xx, payment failures, KYC provider issues).
+   - Store: timestamp, service, severity, message, correlationId, userId (if any), country, environment.
+   - Create endpoint(s) for paginated fetching with filters (date, severity, service, country).
+
+4. Operations Console UI
+   - New sidebar section “Operations” with sub-pages:
+     - “Jobs & Schedules”
+     - “Health & Dependencies”
+     - “Error Monitor”
+   - Jobs page:
+     - Table of last N runs per job with sparkline or simple success/failure history.
+     - Indicators if a job hasn’t run on schedule.
+   - Health page:
+     - Simple cards (DB, Payments, Notifications, Maps, Queue) with status (green/amber/red) and last check time.
+   - Error page:
+     - Filterable list of critical errors with quick search and link to related entities (user, trip, order) when available.
+
+5. Permissions & Security
+   - Only `OPS_ADMIN`, `TECH_ADMIN`, or `SUPER_ADMIN` roles can access the Operations section.
+   - All access should be logged in audit logs (who viewed what page and when).
+
+6. Tests & Validation
+   - Include sanity checks to make sure:
+     - Jobs records are created and updated correctly.
+     - Health endpoint handles failures gracefully and never leaks secrets.
+     - Error views paginate correctly.
+
+Deliver fully working backend and UI so the operations team can monitor SafeGo reliability from one place without needing external tools.
