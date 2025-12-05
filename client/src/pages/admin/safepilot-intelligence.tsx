@@ -1206,7 +1206,6 @@ export default function SafePilotIntelligence() {
             <TabsTrigger value="automation" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-automation">Auto</TabsTrigger>
             <TabsTrigger value="advisor" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-advisor">Coach</TabsTrigger>
             <TabsTrigger value="actions" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-actions">Actions</TabsTrigger>
-            <TabsTrigger value="diagnostic" className="text-xs sm:text-sm py-1.5 px-2 sm:px-3 touch-manipulation whitespace-nowrap min-h-[36px]" data-testid="tab-diagnostic">Diagnostic</TabsTrigger>
           </TabsList>
         </div>
 
@@ -2209,10 +2208,6 @@ export default function SafePilotIntelligence() {
               </ScrollArea>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="diagnostic" className="space-y-4">
-          <DiagnosticPanel />
         </TabsContent>
       </Tabs>
 
