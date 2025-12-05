@@ -39,6 +39,11 @@ import {
   Play,
   Send,
   Loader2,
+  AlertOctagon,
+  MapPin,
+  Eye,
+  LineChart,
+  PlayCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -160,6 +165,53 @@ interface DashboardData {
     efficiencyGains: number;
     competitivePosition: string;
     monthsToBreakeven: number;
+  };
+  safety: {
+    activeAlerts: number;
+    routeDeviations: number;
+    unsafeBehaviorCount: number;
+    activeSOSAlerts: number;
+    avgSeverityScore: number;
+    recentIncidents: number;
+  };
+  location: {
+    gpsSpoofingSuspects: number;
+    teleportationAlerts: number;
+    abnormalPatterns: number;
+    flaggedDrivers: number;
+    integrityScore: number;
+    recentViolations: number;
+  };
+  insider: {
+    suspiciousActivities: number;
+    flaggedAdmins: number;
+    afterHoursAccess: number;
+    bulkOperations: number;
+    threatLevel: string;
+    lastSecurityReview: string;
+  };
+  predictive: {
+    demandForecast24h: {
+      totalPredictedRides: number;
+      confidence: number;
+    };
+    churnRisk: {
+      atRiskCustomers: number;
+      potentialRevenueLoss: number;
+    };
+    revenueOutlook: {
+      weeklyProjection: number;
+      growthTrend: string;
+    };
+    capacityAlerts: number;
+    fraudRiskEntities: number;
+  };
+  autoDecision: {
+    pendingSuggestions: number;
+    autoBlockedToday: number;
+    reviewQueueSize: number;
+    approvalRate: number;
+    reversalRate: number;
   };
   lastUpdated: string;
 }
@@ -826,6 +878,91 @@ export default function SafePilotIntelligence() {
                 { label: "Position", value: dashboard?.advisor?.competitivePosition || "N/A" },
               ]}
             />
+
+            <ModuleCard
+              title="Safety Incident"
+              description="Real-time safety monitoring"
+              icon={AlertOctagon}
+              color="bg-rose-600"
+              status={getModuleStatus(
+                dashboard?.safety?.activeSOSAlerts || 0,
+                dashboard?.safety?.activeAlerts || 0
+              )}
+              metrics={[
+                { label: "Active Alerts", value: dashboard?.safety?.activeAlerts || 0 },
+                { label: "SOS Alerts", value: dashboard?.safety?.activeSOSAlerts || 0 },
+                { label: "Deviations", value: dashboard?.safety?.routeDeviations || 0 },
+                { label: "Unsafe Behavior", value: dashboard?.safety?.unsafeBehaviorCount || 0 },
+              ]}
+            />
+
+            <ModuleCard
+              title="Location Integrity"
+              description="GPS fraud detection"
+              icon={MapPin}
+              color="bg-violet-600"
+              status={getModuleStatus(
+                dashboard?.location?.teleportationAlerts || 0,
+                dashboard?.location?.gpsSpoofingSuspects || 0
+              )}
+              metrics={[
+                { label: "GPS Spoofing", value: dashboard?.location?.gpsSpoofingSuspects || 0 },
+                { label: "Teleportation", value: dashboard?.location?.teleportationAlerts || 0 },
+                { label: "Abnormal", value: dashboard?.location?.abnormalPatterns || 0 },
+                { label: "Integrity", value: `${dashboard?.location?.integrityScore || 0}%` },
+              ]}
+            />
+
+            <ModuleCard
+              title="Insider Threat"
+              description="Admin security monitoring"
+              icon={Eye}
+              color="bg-slate-700"
+              status={getModuleStatus(
+                dashboard?.insider?.flaggedAdmins || 0,
+                dashboard?.insider?.suspiciousActivities || 0
+              )}
+              metrics={[
+                { label: "Suspicious", value: dashboard?.insider?.suspiciousActivities || 0 },
+                { label: "Flagged", value: dashboard?.insider?.flaggedAdmins || 0 },
+                { label: "After Hours", value: dashboard?.insider?.afterHoursAccess || 0 },
+                { label: "Bulk Ops", value: dashboard?.insider?.bulkOperations || 0 },
+              ]}
+            />
+
+            <ModuleCard
+              title="Predictive Analytics"
+              description="AI forecasting engine"
+              icon={LineChart}
+              color="bg-sky-600"
+              status={getModuleStatus(
+                0,
+                dashboard?.predictive?.capacityAlerts || 0
+              )}
+              metrics={[
+                { label: "24h Rides", value: dashboard?.predictive?.demandForecast24h?.totalPredictedRides || 0 },
+                { label: "Churn Risk", value: dashboard?.predictive?.churnRisk?.atRiskCustomers || 0 },
+                { label: "Revenue", value: `$${(dashboard?.predictive?.revenueOutlook?.weeklyProjection || 0).toLocaleString()}` },
+                { label: "Confidence", value: `${dashboard?.predictive?.demandForecast24h?.confidence || 0}%` },
+              ]}
+            />
+
+            <ModuleCard
+              title="Auto-Decision"
+              description="Automated enforcement"
+              icon={PlayCircle}
+              color="bg-fuchsia-600"
+              status={getModuleStatus(
+                0,
+                dashboard?.autoDecision?.pendingSuggestions || 0
+              )}
+              metrics={[
+                { label: "Pending", value: dashboard?.autoDecision?.pendingSuggestions || 0 },
+                { label: "Blocked Today", value: dashboard?.autoDecision?.autoBlockedToday || 0 },
+                { label: "Queue", value: dashboard?.autoDecision?.reviewQueueSize || 0 },
+                { label: "Approval", value: `${dashboard?.autoDecision?.approvalRate || 0}%` },
+              ]}
+            />
           </div>
 
           <div className="mt-6">
@@ -833,19 +970,19 @@ export default function SafePilotIntelligence() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs text-muted-foreground">Growth & Revenue</p>
-                <p className="text-lg font-bold">3 modules</p>
+                <p className="text-lg font-bold">4 modules</p>
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs text-muted-foreground">Cost & Operations</p>
-                <p className="text-lg font-bold">3 modules</p>
+                <p className="text-lg font-bold">4 modules</p>
               </div>
               <div className="p-3 bg-muted rounded-lg">
-                <p className="text-xs text-muted-foreground">Security & Compliance</p>
-                <p className="text-lg font-bold">2 modules</p>
+                <p className="text-xs text-muted-foreground">Security & Safety</p>
+                <p className="text-lg font-bold">5 modules</p>
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs text-muted-foreground">Automation & AI</p>
-                <p className="text-lg font-bold">4 modules</p>
+                <p className="text-lg font-bold">5 modules</p>
               </div>
             </div>
           </div>
