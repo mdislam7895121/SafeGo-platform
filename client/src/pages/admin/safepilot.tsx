@@ -49,7 +49,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, fetchWithAuth } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
 
@@ -219,9 +219,13 @@ export default function SafePilotPage() {
 
   const queryMutation = useMutation({
     mutationFn: async (q: string) => {
-      const res = await apiRequest('POST', '/api/admin/safepilot/query', {
-        pageKey: 'admin.dashboard',
-        question: q,
+      const res = await fetchWithAuth('/api/admin/safepilot/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageKey: 'admin.dashboard',
+          question: q,
+        }),
       });
       const data = await res.json();
       

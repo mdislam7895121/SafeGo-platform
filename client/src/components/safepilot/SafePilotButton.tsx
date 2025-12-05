@@ -477,9 +477,13 @@ export function SafePilotButton() {
     console.log('[SafePilot] Submitting question:', question.trim().slice(0, 50));
     
     try {
-      const res = await apiRequest('POST', '/api/admin/safepilot/query', {
-        pageKey,
-        question: question.trim(),
+      const res = await fetchWithAuth('/api/admin/safepilot/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageKey,
+          question: question.trim(),
+        }),
       });
       
       // Parse response (backend now ALWAYS returns valid JSON)
@@ -553,10 +557,14 @@ export function SafePilotButton() {
 
   const handleActionClick = async (suggestion: SafePilotSuggestion) => {
     try {
-      const res = await apiRequest('POST', '/api/admin/safepilot/run-action', {
-        actionKey: suggestion.key,
-        actionType: suggestion.actionType,
-        payload: suggestion.payload,
+      const res = await fetchWithAuth('/api/admin/safepilot/run-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionKey: suggestion.key,
+          actionType: suggestion.actionType,
+          payload: suggestion.payload,
+        }),
       });
       const response = await res.json() as { success: boolean; route?: string; filter?: string };
 
@@ -767,9 +775,13 @@ export function SafePilotButton() {
     if (!command.trim()) return;
     
     try {
-      const res = await apiRequest('POST', '/api/admin/safepilot/ultra/voicepilot', {
-        command: command.trim(),
-        pageKey,
+      const res = await fetchWithAuth('/api/admin/safepilot/ultra/voicepilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          command: command.trim(),
+          pageKey,
+        }),
       });
       
       if (res.ok) {
