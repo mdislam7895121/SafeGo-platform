@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="64" viewBox="0 0 200 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="safepilot-full-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2F80ED"/>
+      <stop offset="100%" stop-color="#56CCF2"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield Icon -->
+  <g transform="translate(4, 8)">
+    <path 
+      d="M24 2L4 8V18C4 27.71 10.72 36.57 24 40C37.28 36.57 44 27.71 44 18V8L24 2Z" 
+      fill="url(#safepilot-full-gradient)"
+    />
+    <path 
+      d="M10 20H14L16 16L19 24L22 14L25 26L28 18L30 20H38" 
+      fill="none" 
+      stroke="#FFFFFF" 
+      stroke-width="1.5" 
+      stroke-linecap="round" 
+      stroke-linejoin="round"
+    />
+  </g>
+  
+  <!-- SafePilot Text -->
+  <text x="56" y="38" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="currentColor">
+    <tspan fill="url(#safepilot-full-gradient)">Safe</tspan><tspan fill="currentColor">Pilot</tspan>
+  </text>
+</svg>
