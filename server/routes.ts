@@ -77,6 +77,7 @@ import complianceExportsRoutes from "./routes/compliance-exports"; // Legal & Co
 import operationsConsoleRoutes from "./routes/operations-console"; // Operations Console: Jobs, Health, Errors
 import backupDRRoutes from "./routes/backup-dr"; // Backup & Disaster Recovery
 import accessReviewsRoutes from "./routes/access-reviews"; // Periodic Access Review (Governance)
+import releasesRoutes from "./routes/releases"; // Release & Environment Promotion Console
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -384,6 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/operations", operationsConsoleRoutes); // Operations Console: Jobs, Health, Errors
   app.use("/api/backup-dr", backupDRRoutes); // Backup & Disaster Recovery
   app.use("/api/admin/access-reviews", accessReviewsRoutes); // Periodic Access Review (Governance)
+  app.use("/api/admin/releases", releasesRoutes); // Release & Environment Promotion Console
 
   // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)
   app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)

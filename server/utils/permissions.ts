@@ -212,6 +212,17 @@ export enum Permission {
   APPROVE_ACCESS_DECISIONS = 'APPROVE_ACCESS_DECISIONS',
   ENFORCE_ACCESS_DECISIONS = 'ENFORCE_ACCESS_DECISIONS',
   EXPORT_ACCESS_REVIEWS = 'EXPORT_ACCESS_REVIEWS',
+  
+  // Release & Environment Promotion
+  VIEW_RELEASES = 'VIEW_RELEASES',
+  CREATE_RELEASE = 'CREATE_RELEASE',
+  MANAGE_RELEASES = 'MANAGE_RELEASES',
+  UPDATE_RELEASE_STATUS = 'UPDATE_RELEASE_STATUS',
+  PROPOSE_PROMOTION = 'PROPOSE_PROMOTION',
+  APPROVE_PROMOTION = 'APPROVE_PROMOTION',
+  UPDATE_CHECKLIST = 'UPDATE_CHECKLIST',
+  VIEW_RELEASE_AUDIT = 'VIEW_RELEASE_AUDIT',
+  DELETE_RELEASE = 'DELETE_RELEASE',
 }
 
 type RolePermissions = {
@@ -392,6 +403,17 @@ const rolePermissions: RolePermissions = {
     Permission.APPROVE_ACCESS_DECISIONS,
     Permission.ENFORCE_ACCESS_DECISIONS,
     Permission.EXPORT_ACCESS_REVIEWS,
+    
+    // Release & Environment Promotion
+    Permission.VIEW_RELEASES,
+    Permission.CREATE_RELEASE,
+    Permission.MANAGE_RELEASES,
+    Permission.UPDATE_RELEASE_STATUS,
+    Permission.PROPOSE_PROMOTION,
+    Permission.APPROVE_PROMOTION,
+    Permission.UPDATE_CHECKLIST,
+    Permission.VIEW_RELEASE_AUDIT,
+    Permission.DELETE_RELEASE,
   ]),
 
   // ADMIN: General management (non-sensitive)
@@ -647,6 +669,9 @@ const rolePermissions: RolePermissions = {
     Permission.APPROVE_ACCESS_DECISIONS,
     Permission.ENFORCE_ACCESS_DECISIONS,
     Permission.EXPORT_ACCESS_REVIEWS,
+    // Release & Environment Promotion (compliance oversight)
+    Permission.VIEW_RELEASES,
+    Permission.VIEW_RELEASE_AUDIT,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
@@ -855,6 +880,16 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_DR_CONFIG,
     Permission.MANAGE_DR_CONFIG,
     Permission.MANAGE_BACKUPS,
+    // Release & Environment Promotion (full access for infra)
+    Permission.VIEW_RELEASES,
+    Permission.CREATE_RELEASE,
+    Permission.MANAGE_RELEASES,
+    Permission.UPDATE_RELEASE_STATUS,
+    Permission.PROPOSE_PROMOTION,
+    Permission.APPROVE_PROMOTION,
+    Permission.UPDATE_CHECKLIST,
+    Permission.VIEW_RELEASE_AUDIT,
+    Permission.DELETE_RELEASE,
   ]),
 };
 
