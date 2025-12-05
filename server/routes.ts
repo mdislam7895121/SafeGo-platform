@@ -80,6 +80,7 @@ import accessReviewsRoutes from "./routes/access-reviews"; // Periodic Access Re
 import releasesRoutes from "./routes/releases"; // Release & Environment Promotion Console
 import observabilityRoutes from "./routes/observability"; // Phase 5A: Admin Observability Center
 import safePilotRoutes from "./routes/safepilot"; // SafePilot: AI Admin Assistant
+import profilePhotoRoutes from "./routes/profile-photo"; // Profile Picture System
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -391,6 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/releases", releasesRoutes); // Release & Environment Promotion Console
   app.use("/api/admin/observability", observabilityRoutes); // Phase 5A: Admin Observability Center
   app.use("/api/admin/safepilot", safePilotRoutes); // SafePilot: AI Admin Assistant
+  app.use("/api/profile", profilePhotoRoutes); // Profile Picture System
 
   // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)
   app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)

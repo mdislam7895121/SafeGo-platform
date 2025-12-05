@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -172,14 +173,15 @@ export default function DriverProfile() {
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row items-start gap-6">
-            {/* Large Circular Avatar */}
+            {/* Profile Photo with Upload */}
             <div className="relative">
-              <Avatar className="h-28 w-28 border-4 border-border">
-                <AvatarImage src={profile?.profilePhotoUrl} alt={driverName} />
-                <AvatarFallback className="bg-muted text-muted-foreground text-2xl">
-                  <User className="h-12 w-12" />
-                </AvatarFallback>
-              </Avatar>
+              <ProfilePhotoUploader
+                currentPhotoUrl={profile?.profilePhotoUrl}
+                currentThumbnailUrl={profile?.profilePhotoThumbnail}
+                userName={driverName}
+                role="driver"
+                size="xl"
+              />
               
               {/* Tier Pill attached to avatar */}
               {currentTier && (

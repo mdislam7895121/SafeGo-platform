@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -334,13 +335,14 @@ export default function CustomerProfile() {
         <Card className="bg-background/95 backdrop-blur">
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
-              {/* Avatar */}
-              <Avatar className="h-20 w-20 border-4 border-primary/20">
-                <AvatarImage src={profile?.profilePhotoUrl} alt={displayName} />
-                <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              {/* Profile Photo with Upload */}
+              <ProfilePhotoUploader
+                currentPhotoUrl={profile?.profilePhotoUrl}
+                currentThumbnailUrl={profile?.profilePhotoThumbnail}
+                userName={displayName}
+                role="customer"
+                size="lg"
+              />
 
               {/* Profile Info */}
               <div className="flex-1 min-w-0">

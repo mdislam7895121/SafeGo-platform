@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings as SettingsIcon, Palette, Sun, Moon, Monitor, Eye, Type } from "lucide-react";
+import { Loader2, Save, Settings as SettingsIcon, Palette, Sun, Moon, Monitor, Eye, Type, User } from "lucide-react";
+import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/contexts/ThemeContext";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -300,10 +302,59 @@ function ThemeSettingsTab() {
   );
 }
 
+function ProfileTabContent() {
+  const { user } = useAuth();
+  const adminName = user?.email?.split("@")[0] || "Admin";
+  
+  const { data: adminProfile } = useQuery({
+    queryKey: ["/api/admin/home"],
+  });
+
+  const profile = (adminProfile as any)?.admin;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <User className="h-5 w-5" />
+          My Profile
+        </CardTitle>
+        <CardDescription>
+          Manage your admin profile photo and personal settings
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex items-start gap-6">
+          <ProfilePhotoUploader
+            currentPhotoUrl={profile?.profilePhotoUrl}
+            currentThumbnailUrl={profile?.profilePhotoThumbnail}
+            userName={adminName}
+            role="admin"
+            size="xl"
+          />
+          <div className="space-y-2">
+            <h3 className="font-medium">{adminName}</h3>
+            <p className="text-sm text-muted-foreground">{user?.email || "Administrator"}</p>
+            <p className="text-xs text-muted-foreground mt-4">
+              Upload a profile photo. Maximum size: 5MB. Formats: JPEG, PNG, WebP
+            </p>
+          </div>
+        </div>
+        <Separator />
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Your profile photo will be visible to other administrators in the system.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("profile");
 
   // Fetch all settings
   const { data: settings, isLoading } = useQuery<AllSettings>({
@@ -449,6 +500,7 @@ export default function AdminSettings() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="inline-flex w-full overflow-x-auto overflow-y-hidden gap-1 justify-start">
+          <TabsTrigger value="profile" data-testid="tab-profile" className="whitespace-nowrap flex-shrink-0">My Profile</TabsTrigger>
           <TabsTrigger value="general" data-testid="tab-general" className="whitespace-nowrap flex-shrink-0">General</TabsTrigger>
           <TabsTrigger value="theme" data-testid="tab-theme" className="whitespace-nowrap flex-shrink-0">Theme</TabsTrigger>
           <TabsTrigger value="kyc" data-testid="tab-kyc" className="whitespace-nowrap flex-shrink-0">KYC Rules</TabsTrigger>
@@ -460,6 +512,11 @@ export default function AdminSettings() {
           <TabsTrigger value="support" data-testid="tab-support" className="whitespace-nowrap flex-shrink-0">Support</TabsTrigger>
           <TabsTrigger value="welcomeMessage" data-testid="tab-welcome-message" className="whitespace-nowrap flex-shrink-0">Welcome Message</TabsTrigger>
         </TabsList>
+
+        {/* Profile Tab */}
+        <TabsContent value="profile" className="space-y-4">
+          <ProfileTabContent />
+        </TabsContent>
 
         {/* General Tab */}
         <TabsContent value="general" className="space-y-4">

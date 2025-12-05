@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, UtensilsCrossed, Shield } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, Shield, Store } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 
 export default function RestaurantProfile() {
   const { data: restaurantData, isLoading } = useQuery({
@@ -21,9 +22,37 @@ export default function RestaurantProfile() {
   }
 
   const profile = (restaurantData as any)?.profile;
+  const restaurantName = profile?.restaurantName || profile?.email?.split('@')[0] || 'Restaurant';
 
   return (
     <div className="space-y-6">
+        {/* Profile Photo Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Profile Photo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-6">
+            <ProfilePhotoUploader
+              currentPhotoUrl={profile?.profilePhotoUrl}
+              currentThumbnailUrl={profile?.profilePhotoThumbnail}
+              userName={restaurantName}
+              role="restaurant"
+              size="lg"
+            />
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Upload a photo that represents your restaurant. This will be displayed to customers.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Maximum size: 5MB. Formats: JPEG, PNG, WebP
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Account Info */}
         <Card>
           <CardHeader>

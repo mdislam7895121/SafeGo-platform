@@ -1,0 +1,135 @@
+Your next and ONLY authorized task is to fully implement the SafeGo Profile Picture System for all four roles:
+
+1. Customer
+2. Driver
+3. Restaurant Partner
+4. Admin
+
+Follow ALL SafeGo Master Rules with zero exceptions:
+- Never delete or rename existing fields, routes, or schemas.
+- Only ADD fields and endpoints.
+- No breaking changes.
+- No mixing of roles.
+- All BD/US KYC rules must remain untouched.
+- No feature outside this scope may be created.
+
+===========================================================
+PHASE 1 — DATABASE EXTENSION (NON-BREAKING)
+===========================================================
+Extend each user collection (customers, drivers, restaurants, admins) with:
+
+profile_photo_url: string | null  
+profile_photo_thumbnail: string | null  
+profile_photo_last_updated: timestamp  
+
+These must NOT interfere with any KYC fields.
+
+===========================================================
+PHASE 2 — SECURE UPLOAD ENDPOINT
+===========================================================
+Create endpoint:
+POST /api/profile/upload-photo
+
+Requirements:
+- Roles allowed: customer, driver, restaurant partner, admin
+- Auth required
+- Users can update ONLY their own photo
+- Accept file types: jpg, jpeg, png, webp
+- Max size: 5MB
+- Process uploaded image:
+  - Optimize main image to 512x512
+  - Generate thumbnail 128x128
+  - Store securely (S3/Uploadcare/Firebase)
+- Sanitize filename
+- Reject dangerous/malicious uploads
+- Update database fields
+- Return { profile_photo_url, profile_photo_thumbnail }
+
+===========================================================
+PHASE 3 — DELETE ENDPOINT
+===========================================================
+DELETE /api/profile/remove-photo  
+- Auth required  
+- Allowed for all four roles  
+- Only delete the authenticated user’s photo  
+- Set profile_photo_url = null  
+- Set profile_photo_thumbnail = null  
+- Write audit log entry:
+  action: "profile_photo_deleted"
+
+===========================================================
+PHASE 4 — FRONTEND IMPLEMENTATION
+===========================================================
+For each dashboard (customer app, driver app, restaurant dashboard, admin panel):
+
+Implement UI:
+
+1. Profile Image Component
+   - If no image: show default avatar by role
+   - If exists: show thumbnail
+
+2. Actions:
+   - Upload new photo
+   - Change existing photo
+   - Delete photo
+   - Modal confirmation for delete
+
+3. Proper error handling:
+   - File too large
+   - Wrong format
+   - Upload failure
+   - Permission error
+   - Network error
+
+4. Live UI update without page reload
+
+===========================================================
+PHASE 5 — SECURITY RULES
+===========================================================
+Must enforce:
+- No user can see anyone else’s photo upload interface
+- No one can overwrite another user's photo
+- Admin cannot view driver/customer KYC images
+- Customer cannot view driver docs
+- Strong input validation
+
+===========================================================
+PHASE 6 — NOTIFICATIONS
+===========================================================
+Trigger notifications:
+- On successful upload: "Your profile picture has been updated."
+- On deletion: "Your profile picture has been removed."
+
+===========================================================
+PHASE 7 — AUDIT & LOGGING
+===========================================================
+Log entries for:
+- profile_image_uploaded
+- profile_image_updated
+- profile_image_deleted
+
+Include:
+- user_id
+- role
+- timestamp
+- old_url
+- new_url
+
+===========================================================
+PHASE 8 — SYSTEM-WIDE QA CHECK
+===========================================================
+Before marking complete, perform a full audit:
+
+1. Customer app (mobile + desktop) working
+2. Driver dashboard working
+3. Restaurant partner dashboard working
+4. Admin panel working
+5. All role-permission rules intact
+6. No broken UI
+7. No routing errors
+8. No conflict with KYC flows
+9. No console errors
+10. No accidental new pages or features
+
+Only when everything is fully stable, confirm:
+“Profile Picture System — PRODUCTION READY”

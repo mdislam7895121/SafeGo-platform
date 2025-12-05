@@ -264,6 +264,11 @@ model AdminProfile {
   activityAnomalies AdminActivityAnomaly[] @relation("AdminAnomalies")
   payoutAuditLogs   PayoutAuditLog[]       @relation("PayoutAuditLogs")
 
+  // Profile Picture System (additive only)
+  profilePhotoUrl         String?   // Main profile photo URL (512x512)
+  profilePhotoThumbnail   String?   // Thumbnail URL (128x128)
+  profilePhotoLastUpdated DateTime? // When photo was last updated
+
   @@index([countryCode])
   @@index([cityCode])
   @@map("admin_profiles")
@@ -333,6 +338,11 @@ model CustomerProfile {
   avatarUrl               String? // Profile picture URL
   languagePreference      String? @default("en") // en, bn, es, fr, ar
   notificationPreferences Json? // { ride_updates, food_updates, parcel_updates, marketing }
+
+  // Profile Picture System (additive only)
+  profilePhotoUrl         String?   // Main profile photo URL (512x512)
+  profilePhotoThumbnail   String?   // Thumbnail URL (128x128)
+  profilePhotoLastUpdated DateTime? // When photo was last updated
 
   // Phase 3: Saved places and ride preferences (relations)
   savedPlaces     CustomerSavedPlace[]
@@ -537,6 +547,9 @@ model DriverProfile {
   // D7: Document Status Tracking
   profilePhotoStatus           DocumentStatus @default(PENDING)
   profilePhotoRejectionReason  String?
+  // Profile Picture System (additive only)
+  profilePhotoThumbnail        String?   // Thumbnail URL (128x128)
+  profilePhotoLastUpdated      DateTime? // When photo was last updated
   driverLicenseStatus          DocumentStatus @default(PENDING)
   driverLicenseRejectionReason String?
   tlcLicenseDocStatus          DocumentStatus @default(PENDING)
@@ -1073,6 +1086,11 @@ model RestaurantProfile {
   isAcceptingOrders      Boolean         @default(true) // Can receive new orders
   kitchenStatus          KitchenStatus   @default(open) // open, busy, closed
   kitchenTickets         KitchenTicket[] // Kitchen tickets for orders
+
+  // Profile Picture System (additive only)
+  profilePhotoUrl         String?   // Main profile photo URL (512x512)
+  profilePhotoThumbnail   String?   // Thumbnail URL (128x128)
+  profilePhotoLastUpdated DateTime? // When photo was last updated
 
   @@index([cityCode])
   @@index([countryCode])

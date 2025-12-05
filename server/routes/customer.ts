@@ -246,6 +246,12 @@ router.get("/home", async (req: AuthRequest, res) => {
         verificationStatus: customerProfile.verificationStatus,
         isVerified: customerProfile.isVerified,
         rejectionReason: customerProfile.rejectionReason,
+        fullName: customerProfile.fullName,
+        firstName: customerProfile.firstName,
+        lastName: customerProfile.lastName,
+        profilePhotoUrl: customerProfile.profilePhotoUrl,
+        profilePhotoThumbnail: customerProfile.profilePhotoThumbnail,
+        avatarUrl: customerProfile.avatarUrl,
       },
     });
   } catch (error) {
@@ -2329,14 +2335,18 @@ router.patch("/profile/preferences", async (req: AuthRequest, res) => {
 
 // ====================================================
 // PATCH /api/customer/profile/avatar
-// Update customer avatar
+// Update customer avatar (legacy endpoint - use /api/profile/upload-photo for new uploads)
+// Accepts both avatarUrl (legacy) and profilePhotoUrl (new) for backward compatibility
 // ====================================================
 router.patch("/profile/avatar", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
 
     const avatarSchema = z.object({
-      avatarUrl: z.string().url().nullable(),
+      avatarUrl: z.string().url().nullable().optional(),
+      profilePhotoUrl: z.string().url().nullable().optional(),
+    }).refine((data) => data.avatarUrl !== undefined || data.profilePhotoUrl !== undefined, {
+      message: "Either avatarUrl or profilePhotoUrl must be provided",
     });
 
     const validationResult = avatarSchema.safeParse(req.body);
@@ -2347,7 +2357,7 @@ router.patch("/profile/avatar", async (req: AuthRequest, res) => {
       });
     }
 
-    const { avatarUrl } = validationResult.data;
+    const photoUrl = validationResult.data.profilePhotoUrl ?? validationResult.data.avatarUrl ?? null;
 
     const customer = await prisma.customerProfile.findUnique({
       where: { userId },
@@ -2359,12 +2369,16 @@ router.patch("/profile/avatar", async (req: AuthRequest, res) => {
 
     const updated = await prisma.customerProfile.update({
       where: { id: customer.id },
-      data: { avatarUrl },
+      data: { 
+        profilePhotoUrl: photoUrl,
+        avatarUrl: photoUrl,
+      },
     });
 
     res.json({
       success: true,
       avatarUrl: updated.avatarUrl,
+      profilePhotoUrl: updated.profilePhotoUrl,
     });
   } catch (error: any) {
     console.error("[Customer] Error updating avatar:", error);

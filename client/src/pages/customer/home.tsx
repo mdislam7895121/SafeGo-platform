@@ -400,7 +400,7 @@ function CustomerHomeMobile() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="flex items-center gap-1.5 px-2 h-8" data-testid="profile-pill">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={profile?.avatarUrl} />
+                  <AvatarImage src={profile?.profilePhotoUrl || profile?.profilePhotoThumbnail} />
                   <AvatarFallback className="text-[9px] font-semibold bg-primary text-primary-foreground">
                     {getInitials(getUserDisplayName(), profile?.email || user?.email)}
                   </AvatarFallback>
@@ -412,7 +412,7 @@ function CustomerHomeMobile() {
               <div className="px-3 py-3 border-b">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={profile?.avatarUrl} />
+                    <AvatarImage src={profile?.profilePhotoUrl || profile?.profilePhotoThumbnail} />
                     <AvatarFallback className="text-sm font-medium bg-primary text-primary-foreground">
                       {getInitials(getUserDisplayName(), profile?.email || user?.email)}
                     </AvatarFallback>
