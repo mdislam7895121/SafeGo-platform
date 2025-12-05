@@ -1,0 +1,57 @@
+You are designing SafeGo’s admin-visible **Backup & Disaster Recovery** controls.
+
+Respect all SafeGo security rules:
+- Never expose raw database credentials or cloud secrets in the UI.
+- Only SUPER_ADMIN and a dedicated `INFRA_ADMIN` role may trigger backup/restore actions.
+- All actions must be auditable and, where possible, require human confirmation.
+
+TASK GOAL  
+Expose a safe, minimal **Backup & DR** section in the admin console that integrates with existing backup mechanisms (real or mocked), so business stakeholders can see that backups exist and infra admins can trigger controlled operations.
+
+REQUIREMENTS  
+
+1. Backup Metadata Model
+   - Define a `BackupSnapshot` entity with fields:
+     - id
+     - createdAt
+     - environment (dev/staging/prod)
+     - type (FULL_DB, PARTIAL_ANALYTICS, FILES_ONLY, CONFIG_ONLY)
+     - storageLocationLabel (friendly name only, no raw bucket URLs/keys)
+     - sizeMb (approx)
+     - status (CREATED, VERIFIED, FAILED)
+   - Provide an API for listing and viewing details.
+
+2. Integration with Real Backup Jobs
+   - If actual backup jobs exist, hook into their completion to create `BackupSnapshot` entries.
+   - If not, simulate via a command/function you can call from code, clearly marked as a stub so it can be wired later.
+
+3. Admin Actions
+   - On the “Backups” page, allow:
+     - Trigger new backup (for permitted environments only).
+     - Mark a snapshot as “Verified” after a test restore.
+   - On a separate “Restore” tab:
+     - Show a big warning banner that restore is dangerous and usually done outside production UI.
+     - Allow only **staged restore** to a non-prod environment (e.g. restore prod backup into a staging DB alias) – do not implement destructive production restores.
+   - Every action must:
+     - Require confirmation (type the snapshot ID or environment name).
+     - Write a detailed audit log entry.
+
+4. Disaster Recovery Checklist & Status
+   - Add a non-interactive DR status section summarizing:
+     - RPO/RTO targets (text).
+     - When last backup was taken & verified.
+     - Whether cross-region backup copies exist (boolean flags).
+   - This is mostly content + data read from `BackupSnapshot`.
+
+5. UI/UX
+   - New sidebar entry: “Infrastructure” → “Backups & DR”.
+   - Clear separation:
+     - Snapshots list + filters (by environment, type, status).
+     - Actions (Trigger backup, Verify backup).
+     - DR Overview section.
+
+6. Safety & Guardrails
+   - Ensure all sensitive configuration remains server-side only.
+   - Any failure talking to the backup system should be reported gracefully in the UI without exposing stack traces or secret values.
+
+Deliver a concrete implementation: schema/models, routes, and admin UI that is production-safe even if underlying backup wiring is initially partial/mock.

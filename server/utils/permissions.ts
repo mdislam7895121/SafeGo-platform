@@ -8,6 +8,7 @@ export enum AdminRole {
   FINANCE_ADMIN = 'FINANCE_ADMIN',
   RISK_ADMIN = 'RISK_ADMIN',
   READONLY_ADMIN = 'READONLY_ADMIN',
+  INFRA_ADMIN = 'INFRA_ADMIN',
 }
 
 export enum Permission {
@@ -190,6 +191,18 @@ export enum Permission {
   VIEW_SYSTEM_ERRORS = 'VIEW_SYSTEM_ERRORS',
   MANAGE_SYSTEM_ERRORS = 'MANAGE_SYSTEM_ERRORS',
   RESOLVE_SYSTEM_ERRORS = 'RESOLVE_SYSTEM_ERRORS',
+  
+  // Backup & Disaster Recovery
+  VIEW_BACKUPS = 'VIEW_BACKUPS',
+  TRIGGER_BACKUP = 'TRIGGER_BACKUP',
+  VERIFY_BACKUP = 'VERIFY_BACKUP',
+  DELETE_BACKUP = 'DELETE_BACKUP',
+  VIEW_RESTORE_OPERATIONS = 'VIEW_RESTORE_OPERATIONS',
+  INITIATE_RESTORE = 'INITIATE_RESTORE',
+  CONFIRM_RESTORE = 'CONFIRM_RESTORE',
+  CANCEL_RESTORE = 'CANCEL_RESTORE',
+  VIEW_DR_CONFIG = 'VIEW_DR_CONFIG',
+  MANAGE_DR_CONFIG = 'MANAGE_DR_CONFIG',
 }
 
 type RolePermissions = {
@@ -351,6 +364,17 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SYSTEM_ERRORS,
     Permission.MANAGE_SYSTEM_ERRORS,
     Permission.RESOLVE_SYSTEM_ERRORS,
+    // Backup & Disaster Recovery
+    Permission.VIEW_BACKUPS,
+    Permission.TRIGGER_BACKUP,
+    Permission.VERIFY_BACKUP,
+    Permission.DELETE_BACKUP,
+    Permission.VIEW_RESTORE_OPERATIONS,
+    Permission.INITIATE_RESTORE,
+    Permission.CONFIRM_RESTORE,
+    Permission.CANCEL_RESTORE,
+    Permission.VIEW_DR_CONFIG,
+    Permission.MANAGE_DR_CONFIG,
   ]),
 
   // ADMIN: General management (non-sensitive)
@@ -778,6 +802,35 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_PAYMENT_ISSUES,
     Permission.VIEW_POLICIES,
   ]),
+  
+  // INFRA_ADMIN: Infrastructure and Backup/DR management
+  [AdminRole.INFRA_ADMIN]: new Set([
+    Permission.VIEW_DASHBOARD,
+    Permission.VIEW_ACTIVITY_LOG,
+    Permission.VIEW_AUDIT_LOG,
+    // Operations Console (full access)
+    Permission.VIEW_OPERATIONS_CONSOLE,
+    Permission.VIEW_SYSTEM_JOBS,
+    Permission.MANAGE_SYSTEM_JOBS,
+    Permission.VIEW_HEALTH_CHECKS,
+    Permission.RUN_HEALTH_CHECKS,
+    Permission.VIEW_SYSTEM_ERRORS,
+    Permission.MANAGE_SYSTEM_ERRORS,
+    Permission.RESOLVE_SYSTEM_ERRORS,
+    Permission.VIEW_SYSTEM_HEALTH,
+    // Backup & Disaster Recovery (full access)
+    Permission.VIEW_BACKUPS,
+    Permission.TRIGGER_BACKUP,
+    Permission.VERIFY_BACKUP,
+    Permission.DELETE_BACKUP,
+    Permission.VIEW_RESTORE_OPERATIONS,
+    Permission.INITIATE_RESTORE,
+    Permission.CONFIRM_RESTORE,
+    Permission.CANCEL_RESTORE,
+    Permission.VIEW_DR_CONFIG,
+    Permission.MANAGE_DR_CONFIG,
+    Permission.MANAGE_BACKUPS,
+  ]),
 };
 
 export interface AdminUser {
@@ -843,7 +896,7 @@ export function getAdminCapabilities(adminUser: AdminUser | null | undefined): s
 }
 
 export const roleHierarchy: Record<AdminRole, { level: number; canManage: AdminRole[]; scope: 'global' | 'country' | 'regional' }> = {
-  [AdminRole.SUPER_ADMIN]: { level: 1, canManage: [AdminRole.ADMIN, AdminRole.COUNTRY_ADMIN, AdminRole.CITY_ADMIN, AdminRole.COMPLIANCE_ADMIN, AdminRole.SUPPORT_ADMIN, AdminRole.FINANCE_ADMIN, AdminRole.RISK_ADMIN, AdminRole.READONLY_ADMIN], scope: 'global' },
+  [AdminRole.SUPER_ADMIN]: { level: 1, canManage: [AdminRole.ADMIN, AdminRole.COUNTRY_ADMIN, AdminRole.CITY_ADMIN, AdminRole.COMPLIANCE_ADMIN, AdminRole.SUPPORT_ADMIN, AdminRole.FINANCE_ADMIN, AdminRole.RISK_ADMIN, AdminRole.READONLY_ADMIN, AdminRole.INFRA_ADMIN], scope: 'global' },
   [AdminRole.ADMIN]: { level: 2, canManage: [AdminRole.COUNTRY_ADMIN, AdminRole.CITY_ADMIN, AdminRole.SUPPORT_ADMIN, AdminRole.READONLY_ADMIN], scope: 'global' },
   [AdminRole.COUNTRY_ADMIN]: { level: 3, canManage: [AdminRole.CITY_ADMIN, AdminRole.SUPPORT_ADMIN, AdminRole.READONLY_ADMIN], scope: 'country' },
   [AdminRole.CITY_ADMIN]: { level: 4, canManage: [AdminRole.SUPPORT_ADMIN, AdminRole.READONLY_ADMIN], scope: 'regional' },
@@ -852,6 +905,7 @@ export const roleHierarchy: Record<AdminRole, { level: number; canManage: AdminR
   [AdminRole.FINANCE_ADMIN]: { level: 4, canManage: [], scope: 'global' },
   [AdminRole.RISK_ADMIN]: { level: 4, canManage: [], scope: 'global' },
   [AdminRole.READONLY_ADMIN]: { level: 6, canManage: [], scope: 'regional' },
+  [AdminRole.INFRA_ADMIN]: { level: 2, canManage: [], scope: 'global' },
 };
 
 export function getRoleDescription(role: AdminRole): string {
@@ -865,6 +919,7 @@ export function getRoleDescription(role: AdminRole): string {
     [AdminRole.FINANCE_ADMIN]: 'Financial operations, payouts, commissions, and settlements',
     [AdminRole.RISK_ADMIN]: 'Fraud detection, risk assessment, and safety monitoring',
     [AdminRole.READONLY_ADMIN]: 'View-only access for monitoring and reporting purposes',
+    [AdminRole.INFRA_ADMIN]: 'Infrastructure management, backup/disaster recovery, and system operations',
   };
   return descriptions[role] || `${role} role`;
 }

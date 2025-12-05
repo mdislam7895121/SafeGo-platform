@@ -10544,3 +10544,107 @@ model ServiceHealthCheck {
   @@index([checkedAt])
   @@map("service_health_checks")
 }
+
+// Backup & Disaster Recovery: Backup Snapshots
+model BackupSnapshot {
+  id String @id @default(uuid())
+
+  createdAt    DateTime @default(now())
+  environment  String   // dev, staging, prod
+  type         String   // FULL_DB, PARTIAL_ANALYTICS, FILES_ONLY, CONFIG_ONLY
+  
+  storageLocationLabel String   // Friendly name only, no raw bucket URLs/keys
+  sizeMb               Decimal? @db.Decimal(10, 2)
+  status               String   // CREATED, VERIFIED, FAILED, IN_PROGRESS
+  
+  retentionDays   Int      @default(30)
+  expiresAt       DateTime?
+  
+  initiatedBy     String?  // Admin who triggered the backup
+  initiatedByName String?  // Admin name for display
+  
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  verifiedByName  String?
+  
+  errorMessage    String?  @db.Text
+  metadata        Json?    // Additional context (e.g., tables included, checksums)
+  
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
+  deletedBy       String?
+
+  @@index([environment])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@index([isDeleted])
+  @@map("backup_snapshots")
+}
+
+// Backup & Disaster Recovery: Restore Operations
+model RestoreOperation {
+  id String @id @default(uuid())
+
+  snapshotId         String
+  sourceEnvironment  String  // Environment the backup was taken from
+  targetEnvironment  String  // Environment being restored to (never prod directly)
+  
+  status             String  // PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED
+  startedAt          DateTime?
+  completedAt        DateTime?
+  
+  initiatedBy        String
+  initiatedByName    String?
+  
+  confirmationToken  String?  // For double-confirmation of dangerous operations
+  confirmedAt        DateTime?
+  
+  errorMessage       String? @db.Text
+  rollbackAvailable  Boolean @default(false)
+  
+  auditLogId         String? // Link to detailed audit log entry
+  metadata           Json?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([snapshotId])
+  @@index([status])
+  @@index([sourceEnvironment])
+  @@index([targetEnvironment])
+  @@index([initiatedBy])
+  @@index([createdAt])
+  @@map("restore_operations")
+}
+
+// Backup & Disaster Recovery: DR Configuration
+model DRConfiguration {
+  id String @id @default(uuid())
+
+  environment       String @unique // dev, staging, prod
+  
+  rpoTargetMinutes  Int    @default(60)  // Recovery Point Objective
+  rtoTargetMinutes  Int    @default(240) // Recovery Time Objective
+  
+  autoBackupEnabled Boolean @default(true)
+  backupFrequency   String  @default("DAILY") // HOURLY, DAILY, WEEKLY
+  backupRetentionDays Int   @default(30)
+  
+  crossRegionEnabled   Boolean @default(false)
+  crossRegionLocation  String?
+  
+  lastBackupAt         DateTime?
+  lastVerifiedBackupAt DateTime?
+  
+  alertsEnabled        Boolean @default(true)
+  alertRecipients      String[] @default([])
+  
+  metadata Json?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("dr_configurations")
+}
