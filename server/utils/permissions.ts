@@ -172,6 +172,14 @@ export enum Permission {
   MANAGE_GLOBAL_SETTINGS = 'MANAGE_GLOBAL_SETTINGS',
   MANAGE_SENSITIVE_SETTINGS = 'MANAGE_SENSITIVE_SETTINGS',
   VIEW_SETTING_HISTORY = 'VIEW_SETTING_HISTORY',
+  
+  // Legal & Compliance Data Export Center
+  VIEW_COMPLIANCE_EXPORTS = 'VIEW_COMPLIANCE_EXPORTS',
+  CREATE_COMPLIANCE_EXPORT = 'CREATE_COMPLIANCE_EXPORT',
+  APPROVE_COMPLIANCE_EXPORT = 'APPROVE_COMPLIANCE_EXPORT',
+  DOWNLOAD_COMPLIANCE_EXPORT = 'DOWNLOAD_COMPLIANCE_EXPORT',
+  MANAGE_RETENTION_POLICIES = 'MANAGE_RETENTION_POLICIES',
+  VIEW_EXPORT_AUDIT_LOGS = 'VIEW_EXPORT_AUDIT_LOGS',
 }
 
 type RolePermissions = {
@@ -317,6 +325,13 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_GLOBAL_SETTINGS,
     Permission.MANAGE_SENSITIVE_SETTINGS,
     Permission.VIEW_SETTING_HISTORY,
+    // Legal & Compliance Data Export Center
+    Permission.VIEW_COMPLIANCE_EXPORTS,
+    Permission.CREATE_COMPLIANCE_EXPORT,
+    Permission.APPROVE_COMPLIANCE_EXPORT,
+    Permission.DOWNLOAD_COMPLIANCE_EXPORT,
+    Permission.MANAGE_RETENTION_POLICIES,
+    Permission.VIEW_EXPORT_AUDIT_LOGS,
   ]),
 
   // ADMIN: General management (non-sensitive)
@@ -557,6 +572,13 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_POLICIES,
     Permission.MANAGE_POLICIES,
     Permission.VIEW_FULL_AUDIT,
+    // Legal & Compliance Data Export Center
+    Permission.VIEW_COMPLIANCE_EXPORTS,
+    Permission.CREATE_COMPLIANCE_EXPORT,
+    Permission.APPROVE_COMPLIANCE_EXPORT,
+    Permission.DOWNLOAD_COMPLIANCE_EXPORT,
+    Permission.MANAGE_RETENTION_POLICIES,
+    Permission.VIEW_EXPORT_AUDIT_LOGS,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([

@@ -9407,6 +9407,155 @@ model RegulatorExportQueue {
 }
 
 // ====================================================
+// LEGAL & COMPLIANCE DATA EXPORT CENTER
+// ====================================================
+
+enum ComplianceExportStatus {
+  QUEUED
+  PROCESSING
+  READY
+  DOWNLOADED
+  EXPIRED
+  FAILED
+  CANCELLED
+}
+
+enum ComplianceExportCategory {
+  USER_REQUEST
+  REGULATOR_COURT
+  BULK_ANALYTICS
+}
+
+enum ComplianceExportScope {
+  SINGLE_USER
+  CASE_CENTRIC
+  TIME_WINDOW
+  CUSTOM
+}
+
+enum AnonymizationLevel {
+  NONE
+  PARTIAL
+  FULL
+}
+
+model ComplianceDataExport {
+  id String @id @default(uuid())
+
+  category ComplianceExportCategory
+  scope    ComplianceExportScope
+  status   ComplianceExportStatus   @default(QUEUED)
+
+  title       String
+  description String?
+  reason      String
+
+  countryCode String?
+
+  anonymizationLevel AnonymizationLevel @default(NONE)
+
+  targetUserId    String?
+  targetUserEmail String?
+  targetUserPhone String?
+
+  caseId   String?
+  caseType String?
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  includedEntities String[]
+  excludedFields   String[]
+
+  fileUrl  String?
+  fileSize Int?
+  fileHash String?
+  manifest Json?
+
+  recordCount Int?
+
+  requestedBy      String
+  requestedByEmail String
+  requestedByRole  String
+  requestedAt      DateTime @default(now())
+
+  approvedBy      String?
+  approvedByEmail String?
+  approvedAt      DateTime?
+
+  processedAt DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime?
+
+  downloadCount    Int       @default(0)
+  lastDownloadedAt DateTime?
+  lastDownloadedBy String?
+
+  errorMessage String?
+  retryCount   Int     @default(0)
+
+  auditLogId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accessLogs ComplianceExportAccessLog[]
+
+  @@index([category])
+  @@index([scope])
+  @@index([status])
+  @@index([requestedBy])
+  @@index([requestedAt])
+  @@index([countryCode])
+  @@index([targetUserId])
+  @@map("compliance_data_exports")
+}
+
+model ComplianceExportAccessLog {
+  id String @id @default(uuid())
+
+  exportId String
+  export   ComplianceDataExport @relation(fields: [exportId], references: [id])
+
+  action String
+
+  accessedBy      String
+  accessedByEmail String
+  accessedAt      DateTime @default(now())
+
+  ipAddress String?
+  userAgent String?
+
+  @@index([exportId])
+  @@index([accessedBy])
+  @@index([accessedAt])
+  @@map("compliance_export_access_logs")
+}
+
+model DataRetentionPolicy {
+  id String @id @default(uuid())
+
+  countryCode String @unique
+
+  rideDataRetentionDays    Int @default(2555)
+  paymentDataRetentionDays Int @default(2555)
+  kycDataRetentionDays     Int @default(3650)
+  auditLogRetentionDays    Int @default(2555)
+  complaintRetentionDays   Int @default(1825)
+
+  allowUserDeletionRequest Boolean @default(true)
+  softDeleteOnly           Boolean @default(true)
+
+  archivedDataAccessible Boolean @default(false)
+
+  legalBasis  String?
+  lastUpdated DateTime @default(now())
+  updatedBy   String?
+
+  @@map("data_retention_policies")
+}
+
+// ====================================================
 // PHASE 2: PEOPLE & KYC CENTER - ADVANCED FEATURES
 // ====================================================
 

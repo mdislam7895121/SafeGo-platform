@@ -1,0 +1,67 @@
+You are an expert full-stack engineer and compliance-aware architect working on SafeGo.
+
+Respect all existing SafeGo rules and security model:
+- 4 core roles + partners and admins.
+- Strong RBAC, JWT auth, audit logging.
+- Separate logic per country (Bangladesh vs USA) for KYC, payments, and legal retention.
+- Do not break existing flows; only extend with backward-compatible additions.
+
+TASK GOAL  
+Create a **Legal & Compliance Data Export Center** in the admin console, so that authorized compliance admins can export user and transaction data for regulators, courts, or user-requested data access, without exposing anything unsafe.
+
+REQUIREMENTS  
+
+1. Role & Permissions
+   - Introduce or reuse a `COMPLIANCE_ADMIN` / `LEGAL_ADMIN` role.
+   - Only these roles (plus SUPER_ADMIN) can access the export center.
+   - All export requests must be fully logged.
+
+2. Export Scope Types
+   Implement backend endpoints to prepare **export bundles** for:
+   - User-centric exports:
+     - Single user by email / phone / userId.
+     - Include profile, KYC status, rides, deliveries, wallet activity, complaints, safety incidents.
+   - Case-centric exports:
+     - A specific complaint, dispute, safety incident, or fraud case.
+     - Include involved users, drivers, partners, trip/order details, payment traces.
+   - Time-window exports:
+     - For a date range and country (BD or US).
+     - Summary level only (aggregated metrics), never raw PII for bulk exports unless explicitly flagged.
+
+3. Data Minimization & Anonymization
+   - For bulk / regulator exports:
+     - Strip unnecessary fields (e.g. internal notes that are not legally required).
+     - Support anonymized exports where PII is masked (hash or partial masking).
+   - Per-user exports (for access requests) can include more data but must be scoped to that user only.
+
+4. Export Format & Delivery
+   - Generate export packages as:
+     - JSON and CSV where appropriate (e.g. rides, orders, wallet entries).
+     - Bundle into a zip file with a manifest describing what’s inside.
+   - Provide an admin UI to:
+     - Configure an export (type, scope, country, anonymized vs full).
+     - Trigger generation (can be async).
+     - Download when ready.
+   - For large exports, use a job/queue or background task mechanism and display status (QUEUED, RUNNING, DONE, FAILED).
+
+5. Logging & Security Controls
+   - Every export must create an audit record containing:
+     - exportId, adminId, reason (free-text field), createdAt, scope description, and file size.
+   - Enforce a **mandatory reason** text for all exports.
+   - Optionally restrict export availability (e.g. link expires after X hours).
+
+6. Retention & Deletion Rules
+   - Respect different retention rules:
+     - Bangladesh: keep trip/payment logs for the legally required minimum; mark older data as archived.
+     - USA: support data subject requests (access/delete) where legally permitted; mark deletions logically without breaking referential integrity.
+   - Clearly document which tables/fields are included and which are excluded for each country mode.
+
+7. Admin UI – Export Center Page
+   - New sidebar entry: “Legal & Compliance” → “Data Export Center”.
+   - Tabs or sections:
+     - User Requests (per-user exports).
+     - Regulator / Court Requests.
+     - Bulk Analytics Exports.
+   - Show a table of past exports with filters (date, admin, type, country, status) and a secure “Download” action for completed ones.
+
+Provide a full implementation: backend models, endpoints, job handling (if needed), frontend UI, RBAC, audit logs, and a short admin help text so non-technical compliance staff can safely use this.
