@@ -344,6 +344,9 @@ model CustomerProfile {
   rentalBookings RentalBooking[] // Rental bookings
   mobileWallets  CustomerMobileWallet[] // BD mobile wallet payment methods (bKash, Nagad)
 
+  // Phase 4: Enterprise Admin relations
+  complaints     Complaint[]
+
   @@index([cityCode])
   @@map("customer_profiles")
 }
@@ -637,6 +640,10 @@ model DriverProfile {
 
   // Bangladesh Expansion: Shop delivery orders
   productOrders ProductOrder[] // Shop orders delivered by driver
+
+  // Phase 4: Enterprise Admin relations
+  complaints                Complaint[]
+  enterpriseSafetyIncidents SafetyIncident[] @relation("SafetyIncidentDriver")
 
   @@map("driver_profiles")
 }
@@ -1413,6 +1420,10 @@ model Ride {
   // Phase 6B: Safety & Security relations
   sosAlerts       SOSAlert[]              @relation("RideSOSAlerts")
   routeMonitoring RouteMonitoringSession? @relation("RideRouteMonitoring")
+
+  // Phase 4: Enterprise Admin relations
+  complaints      Complaint[]
+  safetyIncidents SafetyIncident[]
 
   @@index([countryCode])
   @@index([cityCode])
@@ -9608,4 +9619,586 @@ model SuspiciousActivityFlag {
   @@index([severity])
   @@index([flaggedAt])
   @@map("suspicious_activity_flags")
+}
+
+// ====================================================
+// PHASE 4: ENTERPRISE ADMIN FEATURES
+// ====================================================
+
+// Complaint Resolution System
+enum ComplaintStatus {
+  new
+  reviewed
+  needs_more_info
+  escalated
+  assigned
+  in_progress
+  resolved
+  archived
+}
+
+enum ComplaintCategory {
+  ride_quality
+  driver_behavior
+  safety_concern
+  billing_issue
+  food_quality
+  delivery_issue
+  app_problem
+  fraud_report
+  harassment
+  discrimination
+  vehicle_condition
+  other
+}
+
+enum ComplaintSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+model Complaint {
+  id String @id @default(uuid())
+
+  ticketCode String @unique // e.g., "SG-CMP-2025-000123"
+
+  category    ComplaintCategory
+  severity    ComplaintSeverity @default(medium)
+  status      ComplaintStatus   @default(new)
+  countryCode String
+
+  customerId String?
+  driverId   String?
+  rideId     String?
+  orderId    String?
+  parcelId   String?
+
+  subject     String
+  description String   @db.Text
+  attachments String[] // Array of file URLs
+
+  triageNotes    String?
+  assignedTo     String? // Admin ID
+  assignedAt     DateTime?
+  assignedBy     String? // Admin ID who assigned
+
+  resolutionNote String?   @db.Text
+  resolvedBy     String?
+  resolvedAt     DateTime?
+
+  userNotified       Boolean   @default(false)
+  userNotifiedAt     DateTime?
+  customerSatisfied  Boolean?
+
+  archivedAt DateTime?
+  archivedBy String?
+
+  customer CustomerProfile? @relation(fields: [customerId], references: [id])
+  driver   DriverProfile?   @relation(fields: [driverId], references: [id])
+  ride     Ride?            @relation(fields: [rideId], references: [id])
+
+  auditLogs ComplaintAuditLog[]
+  evidence  ComplaintEvidence[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ticketCode])
+  @@index([category])
+  @@index([severity])
+  @@index([status])
+  @@index([countryCode])
+  @@index([customerId])
+  @@index([driverId])
+  @@index([assignedTo])
+  @@index([createdAt])
+  @@map("complaints")
+}
+
+model ComplaintAuditLog {
+  id          String @id @default(uuid())
+  complaintId String
+
+  action    String // created, status_changed, assigned, escalated, resolved, archived
+  actor     String // Admin ID
+  actorRole String
+  details   Json?
+
+  previousValue String?
+  newValue      String?
+
+  createdAt DateTime @default(now())
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId])
+  @@index([actor])
+  @@index([createdAt])
+  @@map("complaint_audit_logs")
+}
+
+model ComplaintEvidence {
+  id          String @id @default(uuid())
+  complaintId String
+
+  fileType    String // image, video, audio, document
+  fileName    String
+  fileUrl     String
+  fileSize    Int?
+  mimeType    String?
+  description String?
+
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId])
+  @@map("complaint_evidence")
+}
+
+// Legal Requests Dashboard
+enum LegalRequestStatus {
+  received
+  verification
+  processing
+  delivered
+  archived
+  expired
+  rejected
+}
+
+enum LegalRequestCountry {
+  USA
+  BD
+}
+
+model LegalRequest {
+  id String @id @default(uuid())
+
+  requestCode String             @unique // e.g., "SG-LEG-2025-000001"
+  country     LegalRequestCountry
+  status      LegalRequestStatus  @default(received)
+
+  // USA-specific fields
+  subpoenaId String?
+  caseId     String?
+  agencyName String?
+
+  // Bangladesh-specific fields
+  gdNumber      String? // General Diary Number
+  policeStation String?
+  ioName        String? // Investigating Officer Name
+
+  // Common fields
+  requestType        String // user_data, trip_records, financial_records, communications
+  targetUserId       String?
+  targetDriverId     String?
+  dateRangeStart     DateTime?
+  dateRangeEnd       DateTime?
+  
+  requestingOfficer  String
+  requestingAgency   String
+  contactEmail       String
+  contactPhone       String?
+
+  description String  @db.Text
+  attachments String[] // Legal documents
+
+  // Evidence delivery
+  evidencePackage   String? // URL to compiled evidence
+  evidenceExpiresAt DateTime?
+  evidenceDownloads Int     @default(0)
+
+  // Processing
+  assignedTo     String?
+  assignedAt     DateTime?
+  processedBy    String?
+  processedAt    DateTime?
+  deliveredAt    DateTime?
+  deliveryMethod String? // secure_download, email, physical
+
+  // Expiry
+  requestExpiresAt DateTime?
+
+  notes String? @db.Text
+
+  auditLogs LegalRequestAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requestCode])
+  @@index([country])
+  @@index([status])
+  @@index([targetUserId])
+  @@index([targetDriverId])
+  @@index([createdAt])
+  @@map("legal_requests")
+}
+
+model LegalRequestAuditLog {
+  id             String @id @default(uuid())
+  legalRequestId String
+
+  action    String
+  actor     String
+  actorRole String
+  details   Json?
+
+  ipAddress   String?
+  hashChainId String? // For tamper-proof verification
+
+  createdAt DateTime @default(now())
+
+  legalRequest LegalRequest @relation(fields: [legalRequestId], references: [id], onDelete: Cascade)
+
+  @@index([legalRequestId])
+  @@index([actor])
+  @@index([createdAt])
+  @@map("legal_request_audit_logs")
+}
+
+// Admin Communication Hub
+enum AnnouncementStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+  cancelled
+}
+
+enum AnnouncementTargetGroup {
+  all
+  customers
+  drivers
+  restaurants
+  admins
+}
+
+model Announcement {
+  id String @id @default(uuid())
+
+  title       String
+  messageEn   String @db.Text // English message
+  messageBn   String? @db.Text // Bengali message
+  imageUrl    String?
+
+  targetGroup  AnnouncementTargetGroup
+  countryCode  String?
+  cityCode     String?
+
+  channels String[] // push, sms, email, in_app_banner
+
+  status       AnnouncementStatus @default(draft)
+  scheduledFor DateTime?
+  sentAt       DateTime?
+
+  // Analytics
+  totalRecipients  Int @default(0)
+  delivered        Int @default(0)
+  opened           Int @default(0)
+  clicked          Int @default(0)
+  failed           Int @default(0)
+
+  createdBy String
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([targetGroup])
+  @@index([scheduledFor])
+  @@index([createdAt])
+  @@map("announcements")
+}
+
+// Email Template Editor
+model EmailTemplate {
+  id String @id @default(uuid())
+
+  templateKey String @unique // e.g., "ride_receipt", "refund_notice"
+  name        String
+  description String?
+
+  subjectEn String
+  subjectBn String?
+  bodyEn    String @db.Text // HTML content
+  bodyBn    String? @db.Text
+
+  variables String[] // Available placeholders like {name}, {amount}
+
+  version   Int      @default(1)
+  isActive  Boolean  @default(true)
+  isDefault Boolean  @default(false)
+
+  createdBy String
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions EmailTemplateVersion[]
+
+  @@index([templateKey])
+  @@index([isActive])
+  @@map("email_templates")
+}
+
+model EmailTemplateVersion {
+  id         String @id @default(uuid())
+  templateId String
+
+  version   Int
+  subjectEn String
+  subjectBn String?
+  bodyEn    String @db.Text
+  bodyBn    String? @db.Text
+
+  createdBy String
+  createdAt DateTime @default(now())
+
+  template EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([version])
+  @@map("email_template_versions")
+}
+
+// SMS Template & Automation Engine
+model SmsTemplate {
+  id String @id @default(uuid())
+
+  templateKey String @unique // e.g., "otp", "ride_status"
+  name        String
+  description String?
+
+  messageEn String // SMS content
+  messageBn String?
+
+  variables String[] // Available placeholders
+
+  // Country-specific routing
+  usaTwilioEnabled Boolean @default(true)
+  bdRouting        String? // telecom provider preference
+
+  version   Int     @default(1)
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false)
+
+  createdBy String
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveryLogs SmsDeliveryLog[]
+
+  @@index([templateKey])
+  @@index([isActive])
+  @@map("sms_templates")
+}
+
+model SmsDeliveryLog {
+  id         String @id @default(uuid())
+  templateId String?
+
+  phoneNumber  String
+  countryCode  String
+  message      String
+  provider     String // twilio, grameenphone, robi, etc.
+
+  status       String // sent, delivered, failed
+  errorCode    String?
+  errorMessage String?
+
+  externalId String? // Provider's message ID
+  cost       Decimal? @db.Decimal(10, 4)
+
+  sentAt      DateTime @default(now())
+  deliveredAt DateTime?
+
+  template SmsTemplate? @relation(fields: [templateId], references: [id])
+
+  @@index([templateId])
+  @@index([phoneNumber])
+  @@index([status])
+  @@index([sentAt])
+  @@map("sms_delivery_logs")
+}
+
+// Internal Admin Chat System
+enum AdminChatChannelType {
+  department
+  private
+  announcement
+}
+
+model AdminChatChannel {
+  id String @id @default(uuid())
+
+  name        String
+  description String?
+  type        AdminChatChannelType @default(department)
+  department  String? // safety, support, finance, ops, legal
+
+  isPrivate Boolean @default(false)
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  AdminChatMember[]
+  messages AdminChatMessage[]
+
+  @@index([type])
+  @@index([department])
+  @@map("admin_chat_channels")
+}
+
+model AdminChatMember {
+  id        String @id @default(uuid())
+  channelId String
+  adminId   String
+
+  role          String   @default("member") // owner, admin, member
+  joinedAt      DateTime @default(now())
+  lastReadAt    DateTime?
+  notifications Boolean  @default(true)
+
+  channel AdminChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, adminId])
+  @@index([adminId])
+  @@map("admin_chat_members")
+}
+
+model AdminChatMessage {
+  id        String @id @default(uuid())
+  channelId String
+  senderId  String
+
+  content     String  @db.Text
+  attachments String[] // File URLs
+  mentions    String[] // @mentioned admin IDs
+
+  isEdited  Boolean   @default(false)
+  isDeleted Boolean   @default(false)
+  editedAt  DateTime?
+
+  replyToId String?
+
+  createdAt DateTime @default(now())
+
+  channel AdminChatChannel     @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  reads   AdminChatReadReceipt[]
+
+  @@index([channelId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("admin_chat_messages")
+}
+
+model AdminChatReadReceipt {
+  id        String @id @default(uuid())
+  messageId String
+  adminId   String
+  readAt    DateTime @default(now())
+
+  message AdminChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, adminId])
+  @@index([adminId])
+  @@map("admin_chat_read_receipts")
+}
+
+// Safety Incident Replay Tool
+model SafetyIncident {
+  id String @id @default(uuid())
+
+  incidentCode String @unique // e.g., "SG-INC-2025-000001"
+
+  rideId   String
+  driverId String
+  customerId String?
+
+  severity String // low, medium, high, critical
+
+  // Event details
+  eventType     String // speed_spike, hard_brake, route_deviation, sos_triggered
+  eventData     Json?  // Speed, location, timestamps
+  gpsSnapshots  Json?  // Array of GPS coordinates with timestamps
+
+  // Timeline
+  incidentStart DateTime
+  incidentEnd   DateTime?
+
+  // Summary
+  summary        String? @db.Text
+  adminNotes     String? @db.Text
+  aiAnalysis     Json?   // AI-generated analysis
+
+  // Status
+  status       String @default("pending") // pending, under_review, resolved, escalated
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  resolution   String?
+
+  // Export
+  pdfReportUrl String?
+  pdfExportedAt DateTime?
+  pdfExportedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ride   Ride          @relation(fields: [rideId], references: [id])
+  driver DriverProfile @relation("SafetyIncidentDriver", fields: [driverId], references: [id])
+
+  @@index([incidentCode])
+  @@index([rideId])
+  @@index([driverId])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+  @@map("safety_incidents")
+}
+
+// Admin Geofence Management
+model Geofence {
+  id String @id @default(uuid())
+
+  name        String
+  description String?
+  countryCode String
+  cityCode    String?
+
+  // GeoJSON polygon or circle
+  geoType   String // polygon, circle
+  geoData   Json   // Coordinates for polygon or center+radius for circle
+
+  // Rules
+  isActive      Boolean @default(true)
+  ruleType      String  // no_service, surge_zone, restricted, airport, hospital
+  restrictions  Json?   // Specific restrictions
+
+  // Validity
+  validFrom  DateTime?
+  validUntil DateTime?
+
+  createdBy String
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([countryCode])
+  @@index([cityCode])
+  @@index([isActive])
+  @@index([ruleType])
+  @@map("geofences")
 }

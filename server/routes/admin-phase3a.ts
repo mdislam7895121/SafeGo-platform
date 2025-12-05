@@ -47,7 +47,7 @@ router.get("/analytics/realtime", checkPermission(Permission.VIEW_ANALYTICS_DASH
       prisma.driverProfile.count({ where: { createdAt: { lt: oneDayAgo } } }),
       prisma.user.count(),
       prisma.user.count({ where: { createdAt: { lt: oneDayAgo } } }),
-      prisma.walletTransaction.count({ where: { createdAt: { gte: oneDayAgo }, direction: "OUTGOING" } }),
+      prisma.walletTransaction.count({ where: { createdAt: { gte: oneDayAgo }, direction: "debit" } }),
       prisma.walletTransaction.count({ where: { createdAt: { gte: oneDayAgo } } }),
     ]);
 

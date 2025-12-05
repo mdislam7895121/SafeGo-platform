@@ -298,6 +298,18 @@ import AuditConsole from "@/pages/admin/audit-console";
 import IntelligenceDashboard from "@/pages/admin/intelligence-dashboard";
 import OperationsCenter from "@/pages/admin/operations-center";
 
+// Phase 4: Enterprise Admin Features
+import ComplaintResolution from "@/pages/admin/complaint-resolution";
+import RefundCenter from "@/pages/admin/refund-center";
+import LegalRequestsDashboard from "@/pages/admin/legal-requests";
+import CommunicationHub from "@/pages/admin/communication-hub";
+import DocumentManager from "@/pages/admin/document-manager";
+import SafetyReplay from "@/pages/admin/safety-replay";
+import MapControl from "@/pages/admin/map-control";
+import EmailTemplates from "@/pages/admin/email-templates";
+import SMSTemplates from "@/pages/admin/sms-templates";
+import AdminChat from "@/pages/admin/admin-chat";
+
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
 
@@ -2248,6 +2260,78 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Support Portal">
             <AdminSupportHub />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Phase 4: Enterprise Admin Features */}
+      <Route path="/admin/complaint-resolution">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Complaint Resolution System">
+            <ComplaintResolution />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/refund-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Refund & Adjustment Center">
+            <RefundCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/legal-requests">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Legal Requests Dashboard">
+            <LegalRequestsDashboard />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/communication-hub">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Admin Communication Hub">
+            <CommunicationHub />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/document-manager">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Document Manager">
+            <DocumentManager />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/safety-replay">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Safety Incident Replay">
+            <SafetyReplay />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/map-control">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Real-time Admin Map Control">
+            <MapControl />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/email-templates">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Email Template Editor">
+            <EmailTemplates />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/sms-templates">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="SMS Template & Automation">
+            <SMSTemplates />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/admin-chat">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Internal Admin Chat">
+            <AdminChat />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
