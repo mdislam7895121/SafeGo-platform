@@ -101,6 +101,7 @@ export const safePilotService = {
       
       case 'admin.payouts':
       case 'admin.payouts.list':
+      case 'admin.wallets':
         return this.getPayoutsContext(countryCode);
       
       case 'admin.safety':
@@ -118,6 +119,21 @@ export const safePilotService = {
       case 'admin.kyc':
       case 'admin.people':
         return this.getKycContext(countryCode);
+      
+      case 'admin.fraud':
+      case 'admin.fraud-detection':
+        return this.getFraudContext(countryCode);
+      
+      case 'admin.safepilot':
+      case 'admin.safepilot-intelligence':
+        return this.getSafePilotContext(countryCode);
+      
+      case 'admin.analytics':
+      case 'admin.observability':
+        return this.getAnalyticsContext(countryCode);
+      
+      case 'admin.complaints':
+        return this.getComplaintsContext(countryCode);
       
       case 'admin.dashboard':
       default:
@@ -1023,6 +1039,226 @@ export const safePilotService = {
           label: 'KYC Processing Report',
           actionType: 'RUN_REPORT',
           payload: { reportType: 'kyc_processing' },
+        },
+      ],
+    };
+  },
+
+  async getFraudContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [
+      totalAlerts,
+      criticalAlerts,
+      highAlerts,
+      pendingAlerts,
+    ] = await Promise.all([
+      prisma.fraudAlert.count(),
+      prisma.fraudAlert.count({ where: { severity: 'CRITICAL', status: 'PENDING' } }),
+      prisma.fraudAlert.count({ where: { severity: 'HIGH', status: 'PENDING' } }),
+      prisma.fraudAlert.count({ where: { status: 'PENDING' } }),
+    ]);
+
+    const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
+
+    if (criticalAlerts > 0) {
+      alerts.push({
+        type: 'critical_fraud',
+        message: `${criticalAlerts} CRITICAL fraud alerts require immediate attention`,
+        severity: 'CRITICAL',
+      });
+    }
+
+    if (highAlerts > 0) {
+      alerts.push({
+        type: 'high_fraud',
+        message: `${highAlerts} HIGH severity fraud patterns detected`,
+        severity: 'HIGH',
+      });
+    }
+
+    return {
+      pageKey: 'admin.fraud',
+      summary: {
+        title: 'Fraud Detection Center',
+        description: `${pendingAlerts} pending fraud alerts for review`,
+      },
+      metrics: {
+        totalAlerts,
+        criticalAlerts,
+        highAlerts,
+        pendingAlerts,
+        estimatedLoss: '$0',
+      },
+      alerts,
+      quickActions: [
+        {
+          key: 'review_critical',
+          label: 'Review Critical Alerts',
+          actionType: 'FILTER',
+          payload: { filter: 'critical' },
+        },
+        {
+          key: 'detect_patterns',
+          label: 'Detect Fraud Patterns',
+          actionType: 'RUN_REPORT',
+          payload: { reportType: 'fraud_patterns' },
+        },
+        {
+          key: 'block_suspicious',
+          label: 'Block Suspicious Accounts',
+          actionType: 'BULK_ACTION',
+          payload: { action: 'block_suspicious' },
+          permission: 'BLOCK_ACCOUNTS',
+        },
+      ],
+    };
+  },
+
+  async getSafePilotContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [
+      totalQueries,
+      todayQueries,
+    ] = await Promise.all([
+      prisma.safePilotInteraction.count(),
+      prisma.safePilotInteraction.count({
+        where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      }),
+    ]);
+
+    return {
+      pageKey: 'admin.safepilot',
+      summary: {
+        title: 'SafePilot Intelligence',
+        description: 'AI-powered business automation and analytics',
+      },
+      metrics: {
+        totalQueries,
+        todayQueries,
+        activeModules: 8,
+        aiHealth: 'Operational',
+      },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'view_growth',
+          label: 'Growth Engine',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/safepilot-intelligence?tab=growth' },
+        },
+        {
+          key: 'view_cost',
+          label: 'Cost Reduction',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/safepilot-intelligence?tab=operations' },
+        },
+        {
+          key: 'view_fraud',
+          label: 'Fraud Shield',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/safepilot-intelligence?tab=security' },
+        },
+      ],
+    };
+  },
+
+  async getAnalyticsContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [
+      todayRides,
+      todayOrders,
+      activeDrivers,
+    ] = await Promise.all([
+      prisma.ride.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
+      prisma.foodOrder.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
+      prisma.driverProfile.count({ where: { isOnline: true } }),
+    ]);
+
+    return {
+      pageKey: 'admin.analytics',
+      summary: {
+        title: 'Platform Analytics',
+        description: 'Real-time performance metrics and insights',
+      },
+      metrics: {
+        todayRides,
+        todayOrders,
+        activeDrivers,
+        systemHealth: 'Good',
+      },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'generate_report',
+          label: 'Generate Daily Report',
+          actionType: 'RUN_REPORT',
+          payload: { reportType: 'daily_analytics' },
+        },
+        {
+          key: 'export_data',
+          label: 'Export Analytics Data',
+          actionType: 'RUN_REPORT',
+          payload: { reportType: 'export_analytics' },
+        },
+      ],
+    };
+  },
+
+  async getComplaintsContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [
+      openComplaints,
+      criticalComplaints,
+      resolvedToday,
+    ] = await Promise.all([
+      prisma.complaint.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
+      prisma.complaint.count({ where: { status: 'OPEN', priority: 'CRITICAL' } }),
+      prisma.complaint.count({
+        where: {
+          status: 'RESOLVED',
+          resolvedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+      }),
+    ]);
+
+    const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
+
+    if (criticalComplaints > 0) {
+      alerts.push({
+        type: 'critical_complaints',
+        message: `${criticalComplaints} critical complaints require immediate attention`,
+        severity: 'CRITICAL',
+      });
+    }
+
+    if (openComplaints > 50) {
+      alerts.push({
+        type: 'complaint_backlog',
+        message: `${openComplaints} open complaints - backlog growing`,
+        severity: 'HIGH',
+      });
+    }
+
+    return {
+      pageKey: 'admin.complaints',
+      summary: {
+        title: 'Complaint Resolution Center',
+        description: `${openComplaints} open complaints pending resolution`,
+      },
+      metrics: {
+        openComplaints,
+        criticalComplaints,
+        resolvedToday,
+      },
+      alerts,
+      quickActions: [
+        {
+          key: 'prioritize_critical',
+          label: 'View Critical Complaints',
+          actionType: 'FILTER',
+          payload: { filter: 'critical' },
+        },
+        {
+          key: 'assign_agents',
+          label: 'Auto-Assign to Agents',
+          actionType: 'BULK_ACTION',
+          payload: { action: 'auto_assign' },
         },
       ],
     };
