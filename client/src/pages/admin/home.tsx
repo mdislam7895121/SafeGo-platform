@@ -395,7 +395,7 @@ export default function AdminHome() {
   return (
     <div className="min-h-screen bg-background pb-6">
       {/* Dashboard Header - Premium Minimal Design */}
-      <div className="relative border-b border-border/50 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+      <div className="relative bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent border-b border-black/[0.06] dark:border-white/[0.06]">
         <div className="px-4 sm:px-6 md:px-8 py-3">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
@@ -412,8 +412,6 @@ export default function AdminHome() {
             </div>
           </div>
         </div>
-        {/* Subtle bottom glow line */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
       </div>
 
       {/* Welcome Message for New Admins */}
