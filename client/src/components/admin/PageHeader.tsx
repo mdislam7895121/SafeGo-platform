@@ -41,11 +41,7 @@ export function PageHeader({
 
   const handleBack = () => {
     if (backButton?.href) {
-      if (window.history.length > 2) {
-        window.history.back();
-      } else {
-        setLocation(backButton.href);
-      }
+      setLocation(backButton.href);
     }
   };
 

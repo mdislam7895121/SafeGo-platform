@@ -704,7 +704,7 @@ export default function AccessReviewsPage() {
         title="Periodic Access Review"
         description="Audit and certify admin role assignments"
         icon={ClipboardCheck}
-        backButton={{ label: "Back to Security", href: "/admin" }}
+        backButton={{ label: "Back to Security", href: "/admin/security-center" }}
       />
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
