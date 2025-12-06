@@ -2,7 +2,6 @@ import { ReactNode } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminHeader } from "./AdminHeader";
-import { SafePilotButton } from "@/components/safepilot/SafePilotButton";
 import { cn } from "@/lib/utils";
 
 interface AdminLayoutProps {
@@ -26,7 +25,6 @@ export function AdminLayout({ children, className }: AdminLayoutProps) {
             {children}
           </main>
         </SidebarInset>
-        <SafePilotButton />
       </div>
     </SidebarProvider>
   );

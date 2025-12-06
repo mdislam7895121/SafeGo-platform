@@ -839,9 +839,13 @@ export function SafePilotButton() {
       <Button
         data-testid="button-safepilot-launcher"
         size="icon"
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-14 w-14 rounded-full shadow-xl z-[9999] bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-transform active:scale-95 border-2 border-white/20"
+        className="fixed h-12 w-12 rounded-full shadow-lg shadow-primary/25 z-[9999] bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-all duration-200 active:scale-95 border border-white/20 ring-2 ring-white/10 hover:ring-primary/30 hover:shadow-xl hover:shadow-primary/30"
         onClick={() => setIsOpen(true)}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
+        style={{ 
+          WebkitTapHighlightColor: 'transparent',
+          bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+          right: '24px',
+        }}
       >
         <SafePilotIcon size="sm" className="text-white" />
         {alertCount > 0 && (
