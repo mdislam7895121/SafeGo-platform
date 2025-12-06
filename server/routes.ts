@@ -83,6 +83,7 @@ import safePilotRoutes from "./routes/safepilot"; // SafePilot: AI Admin Assista
 import profilePhotoRoutes from "./routes/profile-photo"; // Profile Picture System
 import bdRidesRoutes from "./routes/bd-rides"; // BD Ride Pricing Engine
 import adminRidePricingRoutes from "./routes/admin-ride-pricing"; // Admin Ride Pricing Management
+import bdTaxRoutes from "./routes/bd-tax"; // Bangladesh Tax System
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -361,6 +362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rides", rideRoutes);
   app.use("/api/rides/bd", bdRidesRoutes); // BD Ride Pricing Engine (fare-estimate, request, vehicle-types)
   app.use("/api/admin/ride-pricing", adminRidePricingRoutes); // Admin Ride Pricing Management
+  app.use("/api/admin/bd-tax", bdTaxRoutes); // Bangladesh Tax System
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
   app.use("/api/support", rateLimitSupport, supportChatRoutes); // Rate limited

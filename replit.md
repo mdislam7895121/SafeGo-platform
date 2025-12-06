@@ -24,6 +24,16 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
     - **COD Settlement**: 0.8% fee (min ৳10), negative balance for CASH payments, auto-settle for ONLINE
     - **Driver Flow**: Accept/decline parcels, status transitions (accepted → picked_up → on_the_way → delivered), proof-of-delivery photos
     - **API Endpoints**: Public pricing calculator (`/api/parcel/bd/calculate-price`), zone rates (`/api/parcel/bd/zones`), surcharges (`/api/parcel/bd/surcharges`), authenticated parcel requests and driver operations
+*   **Bangladesh Tax System**: Comprehensive VAT tax calculation and management for all 6 SafeGo services in Bangladesh:
+    - **Supported Services**: ride, food, parcel, shop, ticket, rental
+    - **Default Rate**: 15% VAT applied to all services (configurable per service)
+    - **Tax Calculation Engine**: Reusable `calculateBangladeshTax()` function in `server/services/bangladeshTaxService.ts`
+    - **Schema Fields**: bd_tax_rate, bd_tax_amount, bd_tax_type, bd_fare_before_tax, bd_fare_after_tax added to all 6 service models
+    - **BdTaxRule Model**: Configurable tax rules per service type with isActive toggle
+    - **Admin Panel**: `/admin/bd-tax-settings` for viewing/editing tax rates, enabling/disabling per service, and tax preview calculator
+    - **API Endpoints**: `/api/admin/bd-tax/rules` (GET, PATCH), `/api/admin/bd-tax/preview` (POST), `/api/admin/bd-tax/seed` (POST)
+    - **Integration**: Tax automatically calculated in ride fare engine, displayed in customer UI fare breakdown
+    - **Country Awareness**: Tax only applied when countryCode === "BD", zero tax for US and other countries
 *   **Loyalty & Incentives**: SafeGo Points System, Opportunity Bonus Management System, and Driver Incentive Engine.
 *   **Real-Time & Optimization**: AI Marketplace Balancer, Real-Time Dispatch System (WebSocket-based, proximity matching), Experience Intelligence with real-time ETA refinement, dynamic routing optimization, personalized push notifications, and Admin Notifications WebSocket.
 *   **Profit-Focused Automation Systems**: A suite of 32 services covering core automation, security & fraud prevention, risk intelligence, experience optimization, and platform operations.

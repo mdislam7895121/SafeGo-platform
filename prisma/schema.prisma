@@ -536,6 +536,13 @@ model Delivery {
   ticketOperatorId String? // For ticket-related deliveries  
   rentalOperatorId String? // For rental-related deliveries
 
+  // Bangladesh Tax System (additive only, BD-only fields)
+  bdTaxType          String?  // e.g., "vat"
+  bdTaxRate          Decimal? @db.Decimal(5, 2) // Tax rate percentage
+  bdTaxAmount        Decimal? @db.Decimal(10, 2) // Calculated tax amount
+  bdFareBeforeTax    Decimal? @db.Decimal(10, 2) // Fare before tax
+  bdFareAfterTax     Decimal? @db.Decimal(10, 2) // Total with tax
+
   @@index([isDemo])
   @@index([serviceType]) // Step 46: Index for service type queries
   @@index([status]) // Step 46: Index for status queries
@@ -1004,6 +1011,13 @@ model FoodOrder {
 
   // Phase 6B: Safety & Security relations
   sosAlerts SOSAlert[] @relation("FoodOrderSOSAlerts")
+
+  // Bangladesh Tax System (additive only, BD-only fields)
+  bdTaxType          String?  // e.g., "vat"
+  bdTaxRate          Decimal? @db.Decimal(5, 2) // Tax rate percentage
+  bdTaxAmount        Decimal? @db.Decimal(10, 2) // Calculated tax amount
+  bdFareBeforeTax    Decimal? @db.Decimal(10, 2) // Fare before tax
+  bdFareAfterTax     Decimal? @db.Decimal(10, 2) // Total with tax
 
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt])
@@ -1551,6 +1565,13 @@ model Ride {
   driverEarnings   Decimal? @db.Decimal(10, 2) // Net driver earnings
   pricingRuleId    String?  // FK to ride_pricing_rules
   pricingRule      RidePricingRule? @relation(fields: [pricingRuleId], references: [id], onDelete: SetNull)
+
+  // Bangladesh Tax System (additive only, BD-only fields)
+  bdTaxType          String?  // e.g., "vat"
+  bdTaxRate          Decimal? @db.Decimal(5, 2) // Tax rate percentage
+  bdTaxAmount        Decimal? @db.Decimal(10, 2) // Calculated tax amount
+  bdFareBeforeTax    Decimal? @db.Decimal(10, 2) // Fare before tax
+  bdFareAfterTax     Decimal? @db.Decimal(10, 2) // Total with tax
 
   @@index([countryCode])
   @@index([cityCode])
@@ -2601,6 +2622,36 @@ enum ServiceType {
   RIDE
   FOOD
   PARCEL
+}
+
+enum BdServiceType {
+  ride
+  food
+  parcel
+  shop
+  ticket
+  rental
+}
+
+enum BdTaxType {
+  vat
+}
+
+model BdTaxRule {
+  id                   String        @id @default(uuid())
+  serviceType          BdServiceType // ride, food, parcel, shop, ticket, rental
+  bdTaxType            BdTaxType     @default(vat)
+  bdTaxRatePercentage  Decimal       @db.Decimal(5, 2) @default(15.00) // 15% VAT default
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  createdByAdminId     String?
+  updatedByAdminId     String?
+
+  @@unique([serviceType]) // One rule per service type
+  @@index([serviceType])
+  @@index([isActive])
+  @@map("bd_tax_rules")
 }
 
 enum TaxType {
@@ -7974,6 +8025,14 @@ model ProductOrder {
   estimatedDeliveryMinutes Int?
   actualDeliveryMinutes    Int?
 
+  // Bangladesh Tax System (additive only, BD-only fields)
+  countryCode        String?  // BD | US
+  bdTaxType          String?  // e.g., "vat"
+  bdTaxRate          Decimal? @db.Decimal(5, 2) // Tax rate percentage
+  bdTaxAmount        Decimal? @db.Decimal(10, 2) // Calculated tax amount
+  bdFareBeforeTax    Decimal? @db.Decimal(10, 2) // Fare before tax
+  bdFareAfterTax     Decimal? @db.Decimal(10, 2) // Total with tax
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -7986,6 +8045,7 @@ model ProductOrder {
   @@index([status])
   @@index([orderNumber])
   @@index([placedAt])
+  @@index([countryCode])
   @@map("product_orders")
 }
 
@@ -8226,6 +8286,14 @@ model TicketBooking {
   customerRating   Int?
   customerFeedback String?
 
+  // Bangladesh Tax System (additive only, BD-only fields)
+  countryCode        String?  // BD | US
+  bdTaxType          String?  // e.g., "vat"
+  bdTaxRate          Decimal? @db.Decimal(5, 2) // Tax rate percentage
+  bdTaxAmount        Decimal? @db.Decimal(10, 2) // Calculated tax amount
+  bdFareBeforeTax    Decimal? @db.Decimal(10, 2) // Fare before tax
+  bdFareAfterTax     Decimal? @db.Decimal(10, 2) // Total with tax
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -8235,6 +8303,7 @@ model TicketBooking {
   @@index([status])
   @@index([journeyDate])
   @@index([bookingNumber])
+  @@index([countryCode])
   @@map("ticket_bookings")
 }
 
@@ -8380,6 +8449,14 @@ model RentalBooking {
   customerRating   Int?
   customerFeedback String?
 
+  // Bangladesh Tax System (additive only, BD-only fields)
+  countryCode        String?  // BD | US
+  bdTaxType          String?  // e.g., "vat"
+  bdTaxRate          Decimal? @db.Decimal(5, 2) // Tax rate percentage
+  bdTaxAmount        Decimal? @db.Decimal(10, 2) // Calculated tax amount
+  bdFareBeforeTax    Decimal? @db.Decimal(10, 2) // Fare before tax
+  bdFareAfterTax     Decimal? @db.Decimal(10, 2) // Total with tax
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -8389,6 +8466,7 @@ model RentalBooking {
   @@index([status])
   @@index([startDate])
   @@index([bookingNumber])
+  @@index([countryCode])
   @@map("rental_bookings")
 }
 

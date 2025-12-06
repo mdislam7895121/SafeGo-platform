@@ -276,6 +276,7 @@ import AdminDriverSupportCenter from "@/pages/admin/driver-support";
 import AdminMobileWalletConfig from "@/pages/admin/mobile-wallet-config";
 import AdminRidePricingConfig from "@/pages/admin/ride-pricing-config";
 import AdminRideRequests from "@/pages/admin/ride-requests";
+import AdminBdTaxSettings from "@/pages/admin/bd-tax-settings";
 import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
@@ -1867,6 +1868,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Ride Requests">
             <AdminRideRequests />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/bd-tax-settings">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Bangladesh Tax Settings">
+            <AdminBdTaxSettings />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

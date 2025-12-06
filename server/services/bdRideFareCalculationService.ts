@@ -3,17 +3,18 @@
  * 
  * Pure, side-effect free fare calculation for Bangladesh rides.
  * Implements city/vehicle-specific pricing with night/peak multipliers,
- * cash/online payment logic, and commission handling.
+ * cash/online payment logic, commission handling, and BD VAT tax.
  * 
  * SafeGo Master Rules Compliance:
- * - BD: Both cash and online payments allowed
- * - US: ONLY online payment allowed (cash rejected)
+ * - BD: Both cash and online payments allowed + 15% VAT
+ * - US: ONLY online payment allowed (cash rejected), no VAT
  * - Commission: 15-25% depending on vehicle type
  * - Cash rides: Commission goes to negative driver wallet
  * - Online rides: Commission kept by platform
  */
 
 import { prisma } from "../lib/prisma";
+import { calculateBangladeshTax } from "./bangladeshTaxService";
 
 export type VehicleType = "bike" | "cng" | "car_economy" | "car_premium";
 export type PaymentMethod = "cash" | "online";
@@ -45,6 +46,9 @@ export interface FareBreakdown {
   finalMultiplier: number;
   multiplierAdjustment: number;
   priorityFee: number;
+  fareBeforeTax: number;
+  bdTaxRate: number;
+  bdTaxAmount: number;
   totalFare: number;
   minimumFareApplied: boolean;
   safegoCommission: number;
@@ -161,6 +165,9 @@ export async function calculateRideFare(input: FareCalculationInput): Promise<Fa
         finalMultiplier: 1,
         multiplierAdjustment: 0,
         priorityFee: 0,
+        fareBeforeTax: 0,
+        bdTaxRate: 0,
+        bdTaxAmount: 0,
         totalFare: 0,
         minimumFareApplied: false,
         safegoCommission: 0,
@@ -196,6 +203,9 @@ export async function calculateRideFare(input: FareCalculationInput): Promise<Fa
         finalMultiplier: 1,
         multiplierAdjustment: 0,
         priorityFee: 0,
+        fareBeforeTax: 0,
+        bdTaxRate: 0,
+        bdTaxAmount: 0,
         totalFare: 0,
         minimumFareApplied: false,
         safegoCommission: 0,
@@ -231,6 +241,9 @@ export async function calculateRideFare(input: FareCalculationInput): Promise<Fa
         finalMultiplier: 1,
         multiplierAdjustment: 0,
         priorityFee: 0,
+        fareBeforeTax: 0,
+        bdTaxRate: 0,
+        bdTaxAmount: 0,
         totalFare: 0,
         minimumFareApplied: false,
         safegoCommission: 0,
@@ -292,9 +305,20 @@ export async function calculateRideFare(input: FareCalculationInput): Promise<Fa
     minimumFareApplied = true;
   }
 
-  const totalFare = roundCurrency(subtotal, decimalPlaces);
-  const safegoCommission = roundCurrency(totalFare * (commissionRate / 100), decimalPlaces);
-  const driverEarnings = roundCurrency(totalFare - safegoCommission, decimalPlaces);
+  const fareBeforeTax = roundCurrency(subtotal, decimalPlaces);
+
+  const taxResult = await calculateBangladeshTax({
+    serviceType: "ride",
+    countryCode,
+    baseAmount: fareBeforeTax,
+  });
+
+  const bdTaxRate = taxResult.bdTaxRate;
+  const bdTaxAmount = roundCurrency(taxResult.bdTaxAmount, decimalPlaces);
+  const totalFare = roundCurrency(taxResult.bdFareAfterTax, decimalPlaces);
+
+  const safegoCommission = roundCurrency(fareBeforeTax * (commissionRate / 100), decimalPlaces);
+  const driverEarnings = roundCurrency(fareBeforeTax - safegoCommission, decimalPlaces);
 
   return {
     success: true,
@@ -315,6 +339,9 @@ export async function calculateRideFare(input: FareCalculationInput): Promise<Fa
       finalMultiplier,
       multiplierAdjustment: roundCurrency(multiplierAdjustment, decimalPlaces),
       priorityFee: roundCurrency(priorityFee, decimalPlaces),
+      fareBeforeTax,
+      bdTaxRate,
+      bdTaxAmount,
       totalFare,
       minimumFareApplied,
       safegoCommission,

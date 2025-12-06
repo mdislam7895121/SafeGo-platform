@@ -78,6 +78,9 @@ interface VehicleOption {
     bookingFee: number;
     nightMultiplier: number;
     peakMultiplier: number;
+    fareBeforeTax?: number;
+    bdTaxRate?: number;
+    bdTaxAmount?: number;
     totalFare: number;
     currency: string;
   };
@@ -731,6 +734,20 @@ export default function BDRideBooking() {
                             <Zap className="h-3 w-3" /> Peak Rate
                           </span>
                           <span>×{selectedVehicleOption.fareBreakdown.peakMultiplier.toFixed(1)}</span>
+                        </div>
+                      )}
+                      {selectedVehicleOption.fareBreakdown.fareBeforeTax && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Subtotal</span>
+                          <span>৳{selectedVehicleOption.fareBreakdown.fareBeforeTax.toFixed(0)}</span>
+                        </div>
+                      )}
+                      {(selectedVehicleOption.fareBreakdown.bdTaxAmount ?? 0) > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            VAT ({selectedVehicleOption.fareBreakdown.bdTaxRate}%)
+                          </span>
+                          <span>+৳{(selectedVehicleOption.fareBreakdown.bdTaxAmount ?? 0).toFixed(0)}</span>
                         </div>
                       )}
                       <div className="border-t pt-2 flex justify-between font-semibold">

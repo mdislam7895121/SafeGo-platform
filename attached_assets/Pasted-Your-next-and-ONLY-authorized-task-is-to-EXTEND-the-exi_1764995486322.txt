@@ -1,0 +1,213 @@
+Your next and ONLY authorized task is to EXTEND the existing Bangladesh Tax System so that it also applies to Shop orders, Ticket bookings, and Rental bookings, WITHOUT recreating any of those systems and WITHOUT changing US behavior.
+
+The following are already implemented and MUST remain intact:
+- Core SafeGo Master Rules (4 roles, 3 core services)
+- Bangladesh Tax System for rides, food, and deliveries
+- Shop, Ticket, and Rental partner systems (data models, flows, commissions)
+- All US logic (no Bangladesh tax must affect US).
+
+You must perform only additive, non-breaking changes.
+
+====================================================
+PHASE 1 — DISCOVER EXISTING MODELS (READ-ONLY SCAN)
+====================================================
+First, inspect the Prisma/schema (or equivalent) to find the ACTUAL names of the collections/models used for:
+
+- Shop orders (likely: shop_orders, commerce_orders, or similar)
+- Ticket bookings (likely: ticket_bookings, ticket_orders, etc.)
+- Rental bookings (likely: rental_bookings, rental_orders, etc.)
+
+Do NOT assume names. Detect them by:
+- Relationship to shop_partner / ticket_partner / rental_partner
+- Relationship to customers
+- Existing status fields like placed/confirmed/completed, etc.
+
+Produce a short mapping table for your own reasoning:
+
+- Shop order model name: ______
+- Ticket booking model name: ______
+- Rental booking model name: ______
+
+Then continue.
+
+====================================================
+PHASE 2 — ADD BANGLADESH TAX FIELDS (NON-BREAKING)
+====================================================
+For EACH of the three discovered models (shop orders, ticket bookings, rental bookings):
+
+ADD (only add, no rename) these Bangladesh-only tax fields:
+
+- bd_tax_rate           (numeric, percentage)
+- bd_tax_amount         (numeric)
+- bd_tax_type           (string, e.g. "vat")
+- bd_fare_before_tax    (numeric)
+- bd_fare_after_tax     (numeric)
+
+These fields MUST mirror the structure already used for:
+- rides
+- food_orders
+- deliveries
+
+Do NOT touch user/role models (customers, drivers, restaurants, admins).
+Do NOT touch US-specific fields.
+
+====================================================
+PHASE 3 — REUSE EXISTING BANGLADESH TAX ENGINE
+====================================================
+You already implemented a Bangladesh Tax System (calculateBangladeshTax or equivalent) for rides, food, and deliveries.
+
+Extend that SAME engine so it supports 3 new service_types:
+
+- "shop"
+- "ticket"
+- "rental"
+
+Rules:
+
+1) If country_code != "BD":
+   - Return zero tax:
+     bd_tax_rate = 0
+     bd_tax_amount = 0
+     bd_fare_before_tax = base_amount
+     bd_fare_after_tax  = base_amount
+   - No change in behavior for US.
+
+2) If country_code == "BD":
+   - Use bd_tax_rules table/config.
+   - Ensure there are rules for:
+       service_type="shop"
+       service_type="ticket"
+       service_type="rental"
+   - Compute:
+       bd_fare_before_tax = base_amount
+       bd_tax_amount      = bd_fare_before_tax * (bd_tax_rate / 100)
+       bd_fare_after_tax  = bd_fare_before_tax + bd_tax_amount
+
+Return the result and DO NOT change function signature.
+
+====================================================
+PHASE 4 — INTEGRATE TAX INTO SHOP/TICKET/RENTAL PRICING
+====================================================
+For each service:
+
+1) Shop Orders (Bangladesh only):
+   - Identify where final order total is calculated (before payment).
+   - After computing subtotal (product total + delivery fee, etc.), call:
+        BdTaxResult = calculateBangladeshTax({
+            service_type: "shop",
+            country_code,
+            base_amount: subtotal
+        })
+   - Store on the shop order model:
+        bd_tax_type
+        bd_tax_rate
+        bd_tax_amount
+        bd_fare_before_tax (subtotal)
+        bd_fare_after_tax  (BdTaxResult.bd_fare_after_tax)
+   - Use bd_fare_after_tax as the amount the customer pays.
+
+2) Ticket Bookings (Bangladesh only):
+   - After computing base ticket total, call:
+        service_type: "ticket"
+   - Store tax fields on the ticket booking record.
+   - Use bd_fare_after_tax as total payable.
+
+3) Rental Bookings (Bangladesh only):
+   - After computing rental price (duration * rate, plus any fees), call:
+        service_type: "rental"
+   - Store tax fields on the rental booking record.
+   - Use bd_fare_after_tax as total payable.
+
+For ALL three:
+- When country_code != "BD", leave bd_tax_* at zero or null and keep behavior exactly as before.
+
+====================================================
+PHASE 5 — COMMISSION & WALLET IMPACT (BD ONLY)
+====================================================
+For Bangladesh, extend commission calculations so that:
+
+- safego_commission_base remains as it is (before tax).
+- bd_tax_on_commission = safego_commission_base * bd_tax_rate / 100
+- safego_commission_total = safego_commission_base + bd_tax_on_commission
+
+Apply existing SafeGo commission rules:
+
+- If customer pays CASH in BD:
+   - Partner (shop/ticket/rental partner) receives full bd_fare_after_tax in cash.
+   - safego_commission_total becomes negative balance in that partner_wallet_balance.
+   - Admin can see and settle this negative balance.
+
+- If payment is ONLINE in BD:
+   - SafeGo keeps safego_commission_total automatically.
+   - Partner receives net payout as per existing payout logic.
+
+US and other countries:
+- DO NOT apply any new tax logic.
+- Do not alter existing commission or payout flows.
+
+====================================================
+PHASE 6 — ADMIN PANEL: BD TAX VISIBILITY FOR SHOP/TICKET/RENTAL
+====================================================
+Extend the existing Bangladesh Tax Settings / management page so that Admin can:
+
+- View and edit bd_tax_rules for:
+   * service_type="shop"
+   * service_type="ticket"
+   * service_type="rental"
+
+- See example calculations:
+   * Example shop order with VAT
+   * Example ticket booking with VAT
+   * Example rental booking with VAT
+
+Permissions:
+- Only Super Admin can edit BD tax rates.
+- No access for customers, drivers, restaurants, or standard partners.
+
+====================================================
+PHASE 7 — CUSTOMER & PARTNER UI UPDATES (BD ONLY)
+====================================================
+Update order/booking summaries for Bangladesh:
+
+1) Customer views:
+   - Show breakdown:
+       Subtotal (before tax)
+       VAT (e.g. 15%)
+       Total (with VAT)
+
+2) Partner (shop, ticket, rental) dashboards:
+   - Show:
+       Customer paid (with tax)
+       SafeGo commission (with tax included)
+       Net partner earnings
+
+Make sure:
+- US customers/partners do NOT see BD-specific labels.
+
+====================================================
+PHASE 8 — QA VALIDATION
+====================================================
+Test all of the following:
+
+Bangladesh:
+- Shop order (cash + online)
+- Ticket booking (online; cash if your current rules allow)
+- Rental booking (advance + full payment flows)
+- Verify:
+   * bd_tax fields populated correctly
+   * bd_fare_after_tax used as total
+   * Negative balances for cash flows include commission + VAT
+   * Admin tax changes propagate correctly
+
+Non-BD (especially US):
+- Shop/Ticket/Rental flows remain unchanged.
+- No tax added.
+- No UI regression.
+
+General:
+- rides, food_orders, deliveries TAX system still works as before.
+- No change to KYC, onboarding, or security rules.
+- No schema rename or deletion occurred.
+
+When ALL tests pass cleanly, report:
+“Bangladesh Tax System EXTENDED to Shop, Ticket, Rental — PRODUCTION READY (US unchanged).”
