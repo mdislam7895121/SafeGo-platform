@@ -7,6 +7,10 @@ import { getPhase3Features } from "../config/phase3Features";
 
 const router = Router();
 
+const publicRouter = Router();
+
+export { publicRouter as parcelPublicRoutes };
+
 router.use(authenticateToken);
 
 // ============================================================
@@ -675,6 +679,780 @@ router.patch("/admin/pricing/:id", requireRole(["admin"]), async (req: AuthReque
   } catch (error: any) {
     console.error("[Parcel] Error updating pricing config:", error);
     res.status(500).json({ error: error.message || "Failed to update pricing config" });
+  }
+});
+
+// ============================================================
+// SafeGo Parcel System: BD Domestic + International APIs
+// ============================================================
+
+import { ParcelPricingEngine, seedParcelZones } from "../services/parcelPricingEngine";
+import type { Request, Response } from "express";
+
+// POST /api/parcel/bd/calculate-price - Calculate BD parcel price (PUBLIC)
+const bdCalculatePriceSchema = z.object({
+  isInternational: z.boolean().default(false),
+  actualWeightKg: z.number().min(0.01).max(100),
+  lengthCm: z.number().min(0).max(300).optional(),
+  widthCm: z.number().min(0).max(300).optional(),
+  heightCm: z.number().min(0).max(300).optional(),
+  domesticZoneType: z.enum(["same_city", "inside_division", "outside_division", "remote"]).optional(),
+  destinationCountry: z.string().length(2).optional(),
+  deliverySpeed: z.enum(["regular", "quick", "express", "super_express"]).optional(),
+  isFragile: z.boolean().optional(),
+  codEnabled: z.boolean().optional(),
+  codAmount: z.number().min(0).optional(),
+});
+
+publicRouter.post("/bd/calculate-price", async (req: Request, res: Response) => {
+  try {
+    const validationResult = bdCalculatePriceSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const input = validationResult.data;
+    const pricing = await ParcelPricingEngine.calculatePrice({
+      countryCode: "BD",
+      ...input,
+    });
+
+    res.json({ pricing });
+  } catch (error: any) {
+    console.error("[Parcel BD] Error calculating price:", error);
+    res.status(500).json({ error: error.message || "Failed to calculate price" });
+  }
+});
+
+// GET /api/parcel/bd/zones - Get BD domestic zones (PUBLIC)
+publicRouter.get("/bd/zones", async (req: Request, res: Response) => {
+  try {
+    const domesticZones = await prisma.parcelDomesticZone.findMany({
+      where: { countryCode: "BD", isActive: true },
+      orderBy: { zoneType: "asc" },
+    });
+
+    const internationalZones = await prisma.parcelInternationalZone.findMany({
+      where: { originCountry: "BD", isActive: true },
+      orderBy: { zoneType: "asc" },
+    });
+
+    res.json({
+      domestic: domesticZones.map((z) => ({
+        id: z.id,
+        zoneType: z.zoneType,
+        zoneName: z.zoneName,
+        zoneCode: z.zoneCode,
+        rates: {
+          "0-1kg": Number(z.rate0to1kg),
+          "1-2kg": Number(z.rate1to2kg),
+          "2-5kg": Number(z.rate2to5kg),
+          "5-10kg": Number(z.rate5to10kg),
+          "above10kg": Number(z.rateAbove10kg),
+        },
+        remoteSurcharge: z.remoteSurcharge ? Number(z.remoteSurcharge) : null,
+      })),
+      international: internationalZones.map((z) => ({
+        id: z.id,
+        zoneType: z.zoneType,
+        zoneName: z.zoneName,
+        destinationCountries: z.destinationCountries,
+        rates: {
+          "0-0.5kg": Number(z.rate0to0_5kg),
+          "0.5-1kg": Number(z.rate0_5to1kg),
+          "1-2kg": Number(z.rate1to2kg),
+          "2-5kg": Number(z.rate2to5kg),
+          "5-10kg": Number(z.rate5to10kg),
+          "above10kg": Number(z.rateAbove10kg),
+        },
+        fuelSurchargePercent: Number(z.fuelSurchargePercent),
+        securitySurcharge: Number(z.securitySurcharge),
+        estimatedDays: { min: z.estimatedDaysMin, max: z.estimatedDaysMax },
+      })),
+    });
+  } catch (error: any) {
+    console.error("[Parcel BD] Error fetching zones:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch zones" });
+  }
+});
+
+// GET /api/parcel/bd/surcharges - Get surcharge rules (PUBLIC)
+publicRouter.get("/bd/surcharges", async (req: Request, res: Response) => {
+  try {
+    const surcharges = await prisma.parcelSurchargeRule.findMany({
+      where: { countryCode: "BD", isActive: true },
+    });
+
+    res.json({
+      surcharges: surcharges.map((s) => ({
+        ruleType: s.ruleType,
+        displayName: s.displayName,
+        description: s.description,
+        flatAmount: s.flatAmount ? Number(s.flatAmount) : null,
+        percentAmount: s.percentAmount ? Number(s.percentAmount) : null,
+        minAmount: s.minAmount ? Number(s.minAmount) : null,
+      })),
+    });
+  } catch (error: any) {
+    console.error("[Parcel BD] Error fetching surcharges:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch surcharges" });
+  }
+});
+
+// POST /api/parcel/bd/request - Create a BD parcel delivery request
+const bdParcelRequestSchema = z.object({
+  pickupAddress: z.string().min(1).max(500),
+  pickupLat: z.number().min(-90).max(90),
+  pickupLng: z.number().min(-180).max(180),
+  dropoffAddress: z.string().min(1).max(500),
+  dropoffLat: z.number().min(-90).max(90),
+  dropoffLng: z.number().min(-180).max(180),
+  senderName: z.string().min(1).max(100),
+  senderPhone: z.string().min(1).max(20),
+  receiverName: z.string().min(1).max(100),
+  receiverPhone: z.string().min(1).max(20),
+  parcelType: z.string().min(1).max(50),
+  parcelDescription: z.string().max(500).optional(),
+  specialInstructions: z.string().max(500).optional(),
+  actualWeightKg: z.number().min(0.01).max(100),
+  lengthCm: z.number().min(0).max(300).optional(),
+  widthCm: z.number().min(0).max(300).optional(),
+  heightCm: z.number().min(0).max(300).optional(),
+  isInternational: z.boolean().default(false),
+  destinationCountry: z.string().length(2).optional(),
+  domesticZoneType: z.enum(["same_city", "inside_division", "outside_division", "remote"]).optional(),
+  deliverySpeed: z.enum(["regular", "quick", "express", "super_express"]).optional(),
+  isFragile: z.boolean().optional(),
+  codEnabled: z.boolean().optional(),
+  codAmount: z.number().min(0).optional(),
+  paymentMethod: z.enum(["cash", "online"]),
+  scheduledPickupTime: z.string().datetime().optional(),
+});
+
+router.post("/bd/request", requireRole(["customer"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = bdParcelRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const pricing = await ParcelPricingEngine.calculatePrice({
+      countryCode: "BD",
+      isInternational: data.isInternational,
+      actualWeightKg: data.actualWeightKg,
+      lengthCm: data.lengthCm,
+      widthCm: data.widthCm,
+      heightCm: data.heightCm,
+      domesticZoneType: data.domesticZoneType,
+      destinationCountry: data.destinationCountry,
+      deliverySpeed: data.deliverySpeed,
+      isFragile: data.isFragile,
+      codEnabled: data.codEnabled,
+      codAmount: data.codAmount,
+    });
+
+    const deliveryId = `DEL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    const delivery = await prisma.delivery.create({
+      data: {
+        id: deliveryId,
+        customerId: customer.id,
+        pickupAddress: data.pickupAddress,
+        pickupLat: data.pickupLat,
+        pickupLng: data.pickupLng,
+        dropoffAddress: data.dropoffAddress,
+        dropoffLat: data.dropoffLat,
+        dropoffLng: data.dropoffLng,
+        serviceFare: new Prisma.Decimal(pricing.totalDeliveryCharge),
+        safegoCommission: new Prisma.Decimal(pricing.commissionAmount),
+        driverPayout: new Prisma.Decimal(pricing.driverPayoutAmount),
+        paymentMethod: data.paymentMethod,
+        status: "requested",
+        serviceType: "parcel",
+        countryCode: "BD",
+        parcelType: data.parcelType,
+        parcelDescription: data.parcelDescription,
+        specialInstructions: data.specialInstructions,
+        senderName: data.senderName,
+        senderPhone: data.senderPhone,
+        receiverName: data.receiverName,
+        receiverPhone: data.receiverPhone,
+        actualWeightKg: new Prisma.Decimal(data.actualWeightKg),
+        volumetricWeightKg: pricing.volumetricWeightKg ? new Prisma.Decimal(pricing.volumetricWeightKg) : null,
+        chargeableWeightKg: new Prisma.Decimal(pricing.chargeableWeightKg),
+        lengthCm: data.lengthCm ? new Prisma.Decimal(data.lengthCm) : null,
+        widthCm: data.widthCm ? new Prisma.Decimal(data.widthCm) : null,
+        heightCm: data.heightCm ? new Prisma.Decimal(data.heightCm) : null,
+        isFragile: data.isFragile || false,
+        domesticZoneType: data.domesticZoneType || null,
+        isInternational: data.isInternational,
+        destinationCountry: data.destinationCountry,
+        deliverySpeed: data.deliverySpeed || "regular",
+        codEnabled: data.codEnabled || false,
+        codAmount: data.codAmount ? new Prisma.Decimal(data.codAmount) : null,
+        baseDeliveryCharge: new Prisma.Decimal(pricing.baseDeliveryCharge),
+        speedSurcharge: new Prisma.Decimal(pricing.speedSurcharge),
+        fragileSurcharge: new Prisma.Decimal(pricing.fragileSurcharge),
+        remoteSurcharge: new Prisma.Decimal(pricing.remoteSurcharge),
+        fuelSurchargePercent: new Prisma.Decimal(pricing.fuelSurchargePercent),
+        fuelSurchargeAmount: new Prisma.Decimal(pricing.fuelSurchargeAmount),
+        codFee: new Prisma.Decimal(pricing.codFee),
+        securitySurcharge: new Prisma.Decimal(pricing.securitySurcharge),
+        totalDeliveryCharge: new Prisma.Decimal(pricing.totalDeliveryCharge),
+        commissionAmount: new Prisma.Decimal(pricing.commissionAmount),
+        driverPayoutAmount: new Prisma.Decimal(pricing.driverPayoutAmount),
+        pricingBreakdown: pricing.breakdown,
+        scheduledPickupTime: data.scheduledPickupTime ? new Date(data.scheduledPickupTime) : null,
+        pickupType: data.scheduledPickupTime ? "scheduled" : "immediate",
+        statusHistory: [{ status: "requested", timestamp: new Date().toISOString(), actor: "customer" }],
+      },
+    });
+
+    res.status(201).json({
+      message: "Parcel delivery request created successfully",
+      delivery: {
+        id: delivery.id,
+        status: delivery.status,
+        pickupAddress: delivery.pickupAddress,
+        dropoffAddress: delivery.dropoffAddress,
+        totalCharge: pricing.totalDeliveryCharge,
+        currency: pricing.currency,
+        breakdown: pricing.breakdown,
+        estimatedDays: pricing.estimatedDays,
+      },
+    });
+  } catch (error: any) {
+    console.error("[Parcel BD] Error creating delivery:", error);
+    res.status(500).json({ error: error.message || "Failed to create parcel delivery" });
+  }
+});
+
+// GET /api/parcel/bd/my-parcels - Get customer's parcels
+router.get("/bd/my-parcels", requireRole(["customer"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const parcels = await prisma.delivery.findMany({
+      where: {
+        customerId: customer.id,
+        serviceType: "parcel",
+        countryCode: "BD",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    res.json({
+      parcels: parcels.map((p) => ({
+        id: p.id,
+        status: p.status,
+        pickupAddress: p.pickupAddress,
+        dropoffAddress: p.dropoffAddress,
+        senderName: p.senderName,
+        receiverName: p.receiverName,
+        parcelType: p.parcelType,
+        isInternational: p.isInternational,
+        totalCharge: p.totalDeliveryCharge ? Number(p.totalDeliveryCharge) : Number(p.serviceFare),
+        codEnabled: p.codEnabled,
+        codAmount: p.codAmount ? Number(p.codAmount) : null,
+        deliverySpeed: p.deliverySpeed,
+        createdAt: p.createdAt,
+        deliveredAt: p.deliveredAt,
+      })),
+    });
+  } catch (error: any) {
+    console.error("[Parcel BD] Error fetching parcels:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch parcels" });
+  }
+});
+
+// GET /api/parcel/bd/:id - Get parcel details
+router.get("/bd/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const parcelId = req.params.id;
+
+    const parcel = await prisma.delivery.findUnique({
+      where: { id: parcelId },
+      include: {
+        customer: {
+          select: { fullName: true, user: { select: { phone: true } } },
+        },
+        driver: {
+          select: { fullName: true, phoneNumber: true, profilePhotoUrl: true },
+        },
+        proofPhotos: true,
+      },
+    });
+
+    if (!parcel) {
+      return res.status(404).json({ error: "Parcel not found" });
+    }
+
+    if (role === "customer") {
+      const customer = await prisma.customerProfile.findUnique({ where: { userId } });
+      if (parcel.customerId !== customer?.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    } else if (role === "driver") {
+      const driver = await prisma.driverProfile.findUnique({ where: { userId } });
+      if (parcel.driverId !== driver?.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    } else if (role !== "admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    res.json({
+      parcel: {
+        id: parcel.id,
+        status: parcel.status,
+        pickupAddress: parcel.pickupAddress,
+        pickupLat: parcel.pickupLat,
+        pickupLng: parcel.pickupLng,
+        dropoffAddress: parcel.dropoffAddress,
+        dropoffLat: parcel.dropoffLat,
+        dropoffLng: parcel.dropoffLng,
+        senderName: parcel.senderName,
+        senderPhone: role !== "customer" ? parcel.senderPhone : null,
+        receiverName: parcel.receiverName,
+        receiverPhone: role !== "customer" ? parcel.receiverPhone : null,
+        parcelType: parcel.parcelType,
+        parcelDescription: parcel.parcelDescription,
+        specialInstructions: parcel.specialInstructions,
+        actualWeightKg: parcel.actualWeightKg ? Number(parcel.actualWeightKg) : null,
+        chargeableWeightKg: parcel.chargeableWeightKg ? Number(parcel.chargeableWeightKg) : null,
+        isFragile: parcel.isFragile,
+        isInternational: parcel.isInternational,
+        destinationCountry: parcel.destinationCountry,
+        domesticZoneType: parcel.domesticZoneType,
+        deliverySpeed: parcel.deliverySpeed,
+        codEnabled: parcel.codEnabled,
+        codAmount: parcel.codAmount ? Number(parcel.codAmount) : null,
+        codCollected: parcel.codCollected,
+        totalCharge: parcel.totalDeliveryCharge ? Number(parcel.totalDeliveryCharge) : Number(parcel.serviceFare),
+        pricingBreakdown: parcel.pricingBreakdown,
+        paymentMethod: parcel.paymentMethod,
+        driverInfo: parcel.driver ? {
+          name: parcel.driver.fullName,
+          phone: parcel.driver.phoneNumber,
+          photo: parcel.driver.profilePhotoUrl,
+        } : null,
+        proofPhotos: parcel.proofPhotos.map((p) => ({
+          id: p.id,
+          photoUrl: p.photoUrl,
+          capturedAt: p.capturedAt,
+        })),
+        statusHistory: parcel.statusHistory,
+        createdAt: parcel.createdAt,
+        acceptedAt: parcel.acceptedAt,
+        pickedUpAt: parcel.pickedUpAt,
+        deliveredAt: parcel.deliveredAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("[Parcel BD] Error fetching parcel:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch parcel" });
+  }
+});
+
+// POST /api/parcel/bd/seed-zones - Seed BD zones (admin only)
+router.post("/bd/seed-zones", requireRole(["admin"]), async (req: AuthRequest, res) => {
+  try {
+    await seedParcelZones();
+    res.json({ success: true, message: "BD zones seeded successfully" });
+  } catch (error: any) {
+    console.error("[Parcel BD] Error seeding zones:", error);
+    res.status(500).json({ error: error.message || "Failed to seed zones" });
+  }
+});
+
+// ============================================================
+// Driver Parcel APIs
+// ============================================================
+
+// GET /api/parcel/driver/available - Get available parcel jobs for driver
+router.get("/driver/available", requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const parcels = await prisma.delivery.findMany({
+      where: {
+        serviceType: "parcel",
+        status: { in: ["requested", "searching_driver"] },
+        driverId: null,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+
+    res.json({
+      parcels: parcels.map((p) => ({
+        id: p.id,
+        pickupAddress: p.pickupAddress,
+        pickupLat: p.pickupLat,
+        pickupLng: p.pickupLng,
+        dropoffAddress: p.dropoffAddress,
+        dropoffLat: p.dropoffLat,
+        dropoffLng: p.dropoffLng,
+        parcelType: p.parcelType,
+        chargeableWeightKg: p.chargeableWeightKg ? Number(p.chargeableWeightKg) : null,
+        isFragile: p.isFragile,
+        codEnabled: p.codEnabled,
+        codAmount: p.codAmount ? Number(p.codAmount) : null,
+        driverPayout: Number(p.driverPayout),
+        deliverySpeed: p.deliverySpeed,
+        createdAt: p.createdAt,
+      })),
+    });
+  } catch (error: any) {
+    console.error("[Parcel Driver] Error fetching available:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch available parcels" });
+  }
+});
+
+// POST /api/parcel/driver/:id/accept - Accept a parcel job
+router.post("/driver/:id/accept", requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const parcelId = req.params.id;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const parcel = await prisma.delivery.findUnique({
+      where: { id: parcelId },
+    });
+
+    if (!parcel) {
+      return res.status(404).json({ error: "Parcel not found" });
+    }
+
+    if (parcel.driverId) {
+      return res.status(400).json({ error: "Parcel already assigned to a driver" });
+    }
+
+    if (!["requested", "searching_driver"].includes(parcel.status)) {
+      return res.status(400).json({ error: "Parcel cannot be accepted in current status" });
+    }
+
+    const updatedHistory = [...(parcel.statusHistory as any[] || []), {
+      status: "accepted",
+      timestamp: new Date().toISOString(),
+      actor: "driver",
+    }];
+
+    const updated = await prisma.delivery.update({
+      where: { id: parcelId },
+      data: {
+        driverId: driver.id,
+        status: "accepted",
+        acceptedAt: new Date(),
+        statusHistory: updatedHistory,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Parcel accepted successfully",
+      parcel: {
+        id: updated.id,
+        status: updated.status,
+        pickupAddress: updated.pickupAddress,
+        dropoffAddress: updated.dropoffAddress,
+        driverPayout: Number(updated.driverPayout),
+      },
+    });
+  } catch (error: any) {
+    console.error("[Parcel Driver] Error accepting parcel:", error);
+    res.status(500).json({ error: error.message || "Failed to accept parcel" });
+  }
+});
+
+// POST /api/parcel/driver/:id/picked-up - Mark parcel as picked up
+router.post("/driver/:id/picked-up", requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const parcelId = req.params.id;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const parcel = await prisma.delivery.findFirst({
+      where: { id: parcelId, driverId: driver.id },
+    });
+
+    if (!parcel) {
+      return res.status(404).json({ error: "Parcel not found or not assigned to you" });
+    }
+
+    if (parcel.status !== "accepted") {
+      return res.status(400).json({ error: "Parcel must be in accepted status" });
+    }
+
+    const updatedHistory = [...(parcel.statusHistory as any[] || []), {
+      status: "picked_up",
+      timestamp: new Date().toISOString(),
+      actor: "driver",
+    }];
+
+    const updated = await prisma.delivery.update({
+      where: { id: parcelId },
+      data: {
+        status: "picked_up",
+        pickedUpAt: new Date(),
+        statusHistory: updatedHistory,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Parcel marked as picked up",
+      parcel: { id: updated.id, status: updated.status },
+    });
+  } catch (error: any) {
+    console.error("[Parcel Driver] Error updating status:", error);
+    res.status(500).json({ error: error.message || "Failed to update status" });
+  }
+});
+
+// POST /api/parcel/driver/:id/on-the-way - Mark parcel as on the way
+router.post("/driver/:id/on-the-way", requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const parcelId = req.params.id;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const parcel = await prisma.delivery.findFirst({
+      where: { id: parcelId, driverId: driver.id },
+    });
+
+    if (!parcel) {
+      return res.status(404).json({ error: "Parcel not found or not assigned to you" });
+    }
+
+    if (parcel.status !== "picked_up") {
+      return res.status(400).json({ error: "Parcel must be in picked_up status" });
+    }
+
+    const updatedHistory = [...(parcel.statusHistory as any[] || []), {
+      status: "on_the_way",
+      timestamp: new Date().toISOString(),
+      actor: "driver",
+    }];
+
+    const updated = await prisma.delivery.update({
+      where: { id: parcelId },
+      data: {
+        status: "on_the_way",
+        statusHistory: updatedHistory,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Parcel marked as on the way",
+      parcel: { id: updated.id, status: updated.status },
+    });
+  } catch (error: any) {
+    console.error("[Parcel Driver] Error updating status:", error);
+    res.status(500).json({ error: error.message || "Failed to update status" });
+  }
+});
+
+// POST /api/parcel/driver/:id/delivered - Mark parcel as delivered
+const deliveredSchema = z.object({
+  codCollected: z.boolean().optional(),
+  proofPhotoUrl: z.string().url().optional(),
+});
+
+router.post("/driver/:id/delivered", requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const parcelId = req.params.id;
+
+    const validationResult = deliveredSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { codCollected, proofPhotoUrl } = validationResult.data;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const parcel = await prisma.delivery.findFirst({
+      where: { id: parcelId, driverId: driver.id },
+    });
+
+    if (!parcel) {
+      return res.status(404).json({ error: "Parcel not found or not assigned to you" });
+    }
+
+    if (!["picked_up", "on_the_way"].includes(parcel.status)) {
+      return res.status(400).json({ error: "Parcel must be picked up or on the way" });
+    }
+
+    if (parcel.codEnabled && !codCollected) {
+      return res.status(400).json({ error: "COD amount must be collected before marking as delivered" });
+    }
+
+    const updatedHistory = [...(parcel.statusHistory as any[] || []), {
+      status: "delivered",
+      timestamp: new Date().toISOString(),
+      actor: "driver",
+    }];
+
+    const updated = await prisma.delivery.update({
+      where: { id: parcelId },
+      data: {
+        status: "delivered",
+        deliveredAt: new Date(),
+        codCollected: codCollected || false,
+        codCollectedAt: codCollected ? new Date() : null,
+        statusHistory: updatedHistory,
+        negativeBalanceApplied: parcel.paymentMethod === "cash",
+      },
+    });
+
+    if (proofPhotoUrl) {
+      await prisma.deliveryProofPhoto.create({
+        data: {
+          deliveryId: parcelId,
+          driverId: driver.id,
+          photoUrl: proofPhotoUrl,
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Parcel delivered successfully",
+      parcel: {
+        id: updated.id,
+        status: updated.status,
+        driverPayout: Number(updated.driverPayout),
+        codCollected: updated.codCollected,
+      },
+    });
+  } catch (error: any) {
+    console.error("[Parcel Driver] Error delivering parcel:", error);
+    res.status(500).json({ error: error.message || "Failed to deliver parcel" });
+  }
+});
+
+// GET /api/parcel/driver/my-jobs - Get driver's active/completed parcels
+router.get("/driver/my-jobs", requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { status } = req.query;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const whereClause: any = {
+      driverId: driver.id,
+      serviceType: "parcel",
+    };
+
+    if (status === "active") {
+      whereClause.status = { in: ["accepted", "picked_up", "on_the_way"] };
+    } else if (status === "completed") {
+      whereClause.status = "delivered";
+    }
+
+    const parcels = await prisma.delivery.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    res.json({
+      parcels: parcels.map((p) => ({
+        id: p.id,
+        status: p.status,
+        pickupAddress: p.pickupAddress,
+        dropoffAddress: p.dropoffAddress,
+        parcelType: p.parcelType,
+        chargeableWeightKg: p.chargeableWeightKg ? Number(p.chargeableWeightKg) : null,
+        codEnabled: p.codEnabled,
+        codAmount: p.codAmount ? Number(p.codAmount) : null,
+        codCollected: p.codCollected,
+        driverPayout: Number(p.driverPayout),
+        paymentMethod: p.paymentMethod,
+        createdAt: p.createdAt,
+        acceptedAt: p.acceptedAt,
+        deliveredAt: p.deliveredAt,
+      })),
+    });
+  } catch (error: any) {
+    console.error("[Parcel Driver] Error fetching jobs:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch jobs" });
   }
 });
 

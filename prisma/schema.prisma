@@ -196,6 +196,30 @@ enum ParcelPickupType {
   scheduled
 }
 
+// SafeGo Parcel System: Domestic delivery zones (BD)
+enum ParcelDomesticZoneType {
+  same_city
+  inside_division
+  outside_division
+  remote
+}
+
+// SafeGo Parcel System: International destination zones
+enum ParcelInternationalZoneType {
+  zone1_south_asia       // India, Nepal, Bhutan
+  zone3_middle_east      // UAE, KSA, Qatar, Oman
+  zone5_europe           // UK, EU
+  zone6_north_america    // USA, Canada
+}
+
+// SafeGo Parcel System: Delivery speed tiers
+enum ParcelDeliverySpeed {
+  regular              // +0
+  quick                // +30 tk
+  express              // +60 tk
+  super_express        // +120 tk
+}
+
 // Phase 3: Address label types (for saved places)
 enum SavedPlaceLabel {
   home
@@ -434,6 +458,70 @@ model Delivery {
   scheduledDispatchAt     DateTime? // When to start driver search (scheduledPickupAt - lead_time)
   scheduledDispatchStatus String? // pending, dispatched, cancelled
 
+  // ============================================================
+  // SafeGo Parcel System: BD Domestic + International (additive only)
+  // ============================================================
+  
+  // Parcel details
+  parcelType              String? // documents, electronics, clothing, food, fragile, other
+  actualWeightKg          Decimal?            @db.Decimal(6, 2) // Actual weight in kg
+  volumetricWeightKg      Decimal?            @db.Decimal(6, 2) // Volumetric weight (L*W*H/5000)
+  chargeableWeightKg      Decimal?            @db.Decimal(6, 2) // max(actual, volumetric)
+  lengthCm                Decimal?            @db.Decimal(6, 2) // Length in cm
+  widthCm                 Decimal?            @db.Decimal(6, 2) // Width in cm
+  heightCm                Decimal?            @db.Decimal(6, 2) // Height in cm
+  isFragile               Boolean?            // Fragile item surcharge applies (nullable for backward compat)
+  
+  // Delivery zone (domestic)
+  domesticZoneType        ParcelDomesticZoneType? // same_city, inside_division, outside_division, remote
+  
+  // International delivery
+  isInternational         Boolean?            // Is international delivery (nullable for backward compat)
+  destinationCountry      String? // Destination country code (ISO 3166-1 alpha-2)
+  destinationCity         String? // Destination city
+  internationalZoneType   ParcelInternationalZoneType? // zone1_south_asia, zone3_middle_east, etc.
+  customsDeclaration      Json? // { declared_value, contents_description, hs_code }
+  
+  // Speed and COD
+  deliverySpeed           ParcelDeliverySpeed? // regular, quick, express, super_express
+  codEnabled              Boolean?            // Cash on delivery (nullable for backward compat)
+  codAmount               Decimal?            @db.Decimal(10, 2) // Amount to collect
+  codCollected            Boolean?            // Whether COD was collected (nullable for backward compat)
+  codCollectedAt          DateTime? // When COD was collected
+  
+  // Pricing breakdown (BD parcel system)
+  baseDeliveryCharge      Decimal?            @db.Decimal(10, 2) // Base zone charge
+  speedSurcharge          Decimal?            @db.Decimal(10, 2) // Speed add-on
+  fragileSurcharge        Decimal?            @db.Decimal(10, 2) // Fragile handling
+  remoteSurcharge         Decimal?            @db.Decimal(10, 2) // Remote area fee
+  fuelSurchargePercent    Decimal?            @db.Decimal(5, 2)  // Fuel surcharge %
+  fuelSurchargeAmount     Decimal?            @db.Decimal(10, 2) // Calculated fuel surcharge
+  codFee                  Decimal?            @db.Decimal(10, 2) // COD collection fee
+  securitySurcharge       Decimal?            @db.Decimal(10, 2) // International security fee
+  totalDeliveryCharge     Decimal?            @db.Decimal(10, 2) // Final calculated charge
+  
+  // Commission & settlement (parcel-specific)
+  commissionAmount        Decimal?            @db.Decimal(10, 2) // SafeGo commission
+  driverPayoutAmount      Decimal?            @db.Decimal(10, 2) // Driver earnings
+  negativeBalanceApplied  Boolean?            // If CASH, commission applied as negative (nullable for backward compat)
+  
+  // Sender/Receiver info
+  senderName              String?
+  senderPhone             String?
+  receiverName            String?
+  receiverPhone           String?
+  parcelDescription       String? // User description of contents
+  specialInstructions     String? // Delivery instructions
+  
+  // Driver pickup scheduling (for scheduled parcels)
+  scheduledPickupTime     DateTime? // Legacy field for compatibility
+  
+  // FK to zone configs
+  domesticZoneId          String? // FK to parcel_domestic_zones
+  internationalZoneId     String? // FK to parcel_international_zones
+  domesticZone            ParcelDomesticZone?      @relation(fields: [domesticZoneId], references: [id], onDelete: SetNull)
+  internationalZone       ParcelInternationalZone? @relation(fields: [internationalZoneId], references: [id], onDelete: SetNull)
+
   // Phase 3: Proof of delivery (Task 27) - relation
   proofPhotos   DeliveryProofPhoto[]
   pricingConfig ParcelPricingConfig? @relation(fields: [pricingConfigId], references: [id], onDelete: SetNull)
@@ -455,6 +543,11 @@ model Delivery {
   @@index([restaurantId]) // Step 46: Index for restaurant queries
   @@index([dispatchSessionId])
   @@index([settlementStatus]) // Phase 2A: Fast settlement query
+  @@index([isInternational]) // SafeGo Parcel: International query
+  @@index([domesticZoneType]) // SafeGo Parcel: Domestic zone query
+  @@index([codEnabled]) // SafeGo Parcel: COD query
+  @@index([domesticZoneId]) // SafeGo Parcel: Domestic zone FK
+  @@index([internationalZoneId]) // SafeGo Parcel: International zone FK
   @@map("deliveries")
 }
 
@@ -5421,6 +5514,121 @@ model ParcelPricingConfig {
   @@index([countryCode, isActive])
   @@index([sizeCategory])
   @@map("parcel_pricing_configs")
+}
+
+// ============================================================
+// SafeGo Parcel System: Domestic Zone Configuration (BD)
+// ============================================================
+model ParcelDomesticZone {
+  id          String                   @id @default(uuid())
+  countryCode String                   @default("BD") // BD only for now
+  zoneType    ParcelDomesticZoneType // same_city, inside_division, outside_division, remote
+  zoneName    String // Display name (e.g., "Dhaka City", "Chittagong Division")
+  zoneCode    String // Unique code for this zone (e.g., "DHK", "CTG")
+  
+  // Coverage (can be JSON array of cities/areas or radius-based)
+  coverageCities  String[] // List of city codes covered
+  coverageRadius  Float? // Optional radius in km from a central point
+  centerLat       Float?
+  centerLng       Float?
+  
+  // Pricing by weight slab (in BDT)
+  // Weight slabs: 0-1kg, 1-2kg, 2-5kg, 5-10kg
+  rate0to1kg      Decimal  @db.Decimal(10, 2) // Rate for 0-1kg
+  rate1to2kg      Decimal  @db.Decimal(10, 2) // Rate for 1-2kg
+  rate2to5kg      Decimal  @db.Decimal(10, 2) // Rate for 2-5kg
+  rate5to10kg     Decimal  @db.Decimal(10, 2) // Rate for 5-10kg
+  rateAbove10kg   Decimal  @db.Decimal(10, 2) // Per-kg rate above 10kg
+  
+  // Surcharges
+  remoteSurcharge Decimal? @db.Decimal(10, 2) // Extra charge for remote areas
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  deliveries Delivery[]
+  
+  @@unique([countryCode, zoneCode])
+  @@index([countryCode, isActive])
+  @@index([zoneType])
+  @@map("parcel_domestic_zones")
+}
+
+// ============================================================
+// SafeGo Parcel System: International Zone Configuration
+// ============================================================
+model ParcelInternationalZone {
+  id          String                       @id @default(uuid())
+  originCountry String                     @default("BD") // Origin country
+  zoneType    ParcelInternationalZoneType // zone1_south_asia, zone3_middle_east, etc.
+  zoneName    String // Display name (e.g., "South Asia", "Middle East")
+  
+  // Countries covered by this zone
+  destinationCountries String[] // ISO country codes (e.g., ["IN", "NP", "BT"])
+  
+  // Pricing by weight slab (in BDT)
+  rate0to0_5kg    Decimal  @db.Decimal(10, 2) // 0-0.5kg
+  rate0_5to1kg    Decimal  @db.Decimal(10, 2) // 0.5-1kg
+  rate1to2kg      Decimal  @db.Decimal(10, 2) // 1-2kg
+  rate2to5kg      Decimal  @db.Decimal(10, 2) // 2-5kg
+  rate5to10kg     Decimal  @db.Decimal(10, 2) // 5-10kg
+  rateAbove10kg   Decimal  @db.Decimal(10, 2) // Per-kg rate above 10kg
+  
+  // Mandatory surcharges
+  fuelSurchargePercent  Decimal @db.Decimal(5, 2) @default(0) // Fuel surcharge %
+  securitySurcharge     Decimal @db.Decimal(10, 2) @default(0) // Security fee (300-600 tk)
+  remoteAreaSurcharge   Decimal @db.Decimal(10, 2) @default(0) // Remote area (800-1500 tk)
+  
+  // Commission rate for international
+  commissionPercent     Decimal @db.Decimal(5, 2) @default(20) // SafeGo commission %
+  
+  // Customs requirements
+  customsRequired       Boolean @default(true) // Require customs declaration
+  maxDeclaredValueBDT   Decimal? @db.Decimal(12, 2) // Max declared value
+  
+  // Estimated delivery days
+  estimatedDaysMin      Int @default(3)
+  estimatedDaysMax      Int @default(7)
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  deliveries Delivery[]
+  
+  @@unique([originCountry, zoneType])
+  @@index([originCountry, isActive])
+  @@index([zoneType])
+  @@map("parcel_international_zones")
+}
+
+// ============================================================
+// SafeGo Parcel System: Speed & Surcharge Rules
+// ============================================================
+model ParcelSurchargeRule {
+  id          String  @id @default(uuid())
+  countryCode String  @default("BD")
+  ruleType    String // speed_quick, speed_express, speed_super_express, fragile_domestic, fragile_international, cod_fee
+  
+  // Surcharge configuration
+  flatAmount      Decimal? @db.Decimal(10, 2) // Flat surcharge (e.g., +30 tk for quick)
+  percentAmount   Decimal? @db.Decimal(5, 2)  // Percentage surcharge (e.g., 10% for fragile international)
+  minAmount       Decimal? @db.Decimal(10, 2) // Minimum amount (e.g., min 10 tk for COD)
+  
+  // Description
+  displayName     String // "Quick Delivery (+30৳)"
+  description     String? // Full description
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([countryCode, ruleType])
+  @@index([countryCode, isActive])
+  @@map("parcel_surcharge_rules")
 }
 
 // Task 27: Proof-of-delivery photos

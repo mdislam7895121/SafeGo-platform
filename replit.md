@@ -17,6 +17,13 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Financial Systems**: Comprehensive Wallet & Earnings, Tax & Fees, and Unified Payout systems, managing commissions, negative balances, multi-country taxes, and enterprise-grade payment/payout rails, including a payment verification console.
 *   **Customer & Partner Onboarding**: Multi-step onboarding and country-specific KYC with real-time ID verification, background checks, facial recognition, and a multi-stage review queue.
 *   **Service Offerings**: Supports Food Delivery, Ride-Hailing, and Parcel Delivery with features like restaurant management, multi-route fare engine, and dynamic pricing.
+*   **SafeGo Parcel System (BD)**: Comprehensive parcel delivery system for Bangladesh with:
+    - **Domestic Zones**: 4-zone pricing structure (Same City, Inside Division, Outside Division, Remote Area) with weight-based slabs (0-1kg, 1-2kg, 2-5kg, 5-10kg, 10kg+)
+    - **International Zones**: 4 destination corridors (South Asia, Middle East, Europe, North America) with country-specific rates and fuel/security surcharges
+    - **Dynamic Pricing**: Volumetric weight calculation (L×W×H/5000), speed tiers (Regular, Quick, Express, Super Express), fragile handling, and COD fees
+    - **COD Settlement**: 0.8% fee (min ৳10), negative balance for CASH payments, auto-settle for ONLINE
+    - **Driver Flow**: Accept/decline parcels, status transitions (accepted → picked_up → on_the_way → delivered), proof-of-delivery photos
+    - **API Endpoints**: Public pricing calculator (`/api/parcel/bd/calculate-price`), zone rates (`/api/parcel/bd/zones`), surcharges (`/api/parcel/bd/surcharges`), authenticated parcel requests and driver operations
 *   **Loyalty & Incentives**: SafeGo Points System, Opportunity Bonus Management System, and Driver Incentive Engine.
 *   **Real-Time & Optimization**: AI Marketplace Balancer, Real-Time Dispatch System (WebSocket-based, proximity matching), Experience Intelligence with real-time ETA refinement, dynamic routing optimization, personalized push notifications, and Admin Notifications WebSocket.
 *   **Profit-Focused Automation Systems**: A suite of 32 services covering core automation, security & fraud prevention, risk intelligence, experience optimization, and platform operations.

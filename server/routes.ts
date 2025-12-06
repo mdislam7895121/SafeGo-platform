@@ -56,7 +56,7 @@ import eatsRoutes from "./routes/eats"; // Public Eats endpoint for restaurant b
 import paymentWebhooksRoutes from "./routes/payment-webhooks"; // Phase 2B: Payment webhooks
 import devicesRoutes from "./routes/devices"; // Phase 2B: Device registration for FCM
 import kitchenRoutes from "./routes/kitchen"; // Phase 3: Kitchen Ticket System
-import parcelRoutes from "./routes/parcel"; // Phase 3: Parcel Pricing, Scheduling & POD
+import parcelRoutes, { parcelPublicRoutes } from "./routes/parcel"; // Phase 3: Parcel Pricing, Scheduling & POD
 import phase5Routes from "./routes/phase5"; // Phase 5: Experience Intelligence & Real-Time Optimization
 import phase6Routes from "./routes/phase6"; // Phase 6: Security Hardening & Deployment Readiness
 import securityRoutes from "./routes/securityRoutes"; // Phase 6B: Customer Security Features
@@ -375,7 +375,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/webhooks/payments", paymentWebhooksRoutes); // Phase 2B: Payment webhooks (no auth)
   app.use("/api/devices", devicesRoutes); // Phase 2B: Device registration for FCM
   app.use("/api/kitchen", kitchenRoutes); // Phase 3: Kitchen Ticket System
-  app.use("/api/parcel", parcelRoutes); // Phase 3: Parcel Pricing, Scheduling & POD
+  app.use("/api/parcel", parcelPublicRoutes); // SafeGo Parcel: Public pricing/zones endpoints (no auth)
+  app.use("/api/parcel", parcelRoutes); // Phase 3: Parcel Pricing, Scheduling & POD (auth required)
   app.use("/api/phase5", phase5Routes); // Phase 5: Experience Intelligence & Real-Time Optimization
   app.use("/api", phase6Routes); // Phase 6: Security Hardening & Deployment Readiness (includes /health)
   app.use("/api/security", securityRoutes); // Phase 6B: Customer Security Features (SOS, device trust, privacy)
