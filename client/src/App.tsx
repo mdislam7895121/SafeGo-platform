@@ -282,6 +282,7 @@ import AdminRideRequests from "@/pages/admin/ride-requests";
 import AdminBdTaxSettings from "@/pages/admin/bd-tax-settings";
 import AdminPrivacyConsentSettings from "@/pages/admin/privacy-consent-settings";
 import AdminPrivacyPolicyPreview from "@/pages/admin/privacy-policy-preview";
+import AdminPrivacyPolicy from "@/pages/admin/privacy-policy";
 import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
@@ -1910,6 +1911,11 @@ function Router() {
       <Route path="/admin/privacy-policy-preview">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminPrivacyPolicyPreview />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/privacy-policy">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPrivacyPolicy />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/kyc-verification">
