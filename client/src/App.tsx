@@ -272,6 +272,7 @@ import AdminSupportTickets from "@/pages/admin-portal/support-tickets";
 import AdminSupportTicketDetail2 from "@/pages/admin-portal/support-ticket-detail";
 import AdminDriverSupportCenter from "@/pages/admin/driver-support";
 import AdminMobileWalletConfig from "@/pages/admin/mobile-wallet-config";
+import AdminRidePricingConfig from "@/pages/admin/ride-pricing-config";
 import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
@@ -1839,6 +1840,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Mobile Wallet Config">
             <AdminMobileWalletConfig />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ride-pricing">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ride Pricing Config">
+            <AdminRidePricingConfig />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
