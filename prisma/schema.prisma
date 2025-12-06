@@ -13487,3 +13487,328 @@ model SecurityAlert {
   @@index([createdAt])
   @@map("security_alerts")
 }
+
+// =====================================================================
+// SAFEGO MASTER TASKS 37-42: RATINGS & REPUTATION ENGINE
+// =====================================================================
+
+// Rating Source Types
+enum RatingSourceType {
+  ride
+  food_delivery
+  parcel_delivery
+}
+
+// Rating Actor Types
+enum RatingActorType {
+  customer
+  driver
+  restaurant
+  partner
+}
+
+// Reputation Flag Types
+enum ReputationFlagType {
+  low_rating_warning
+  low_rating_block
+  multiple_low_ratings
+  fraud_integration
+  manual_flag
+}
+
+// Reputation Flag Status
+enum ReputationFlagStatus {
+  active
+  resolved
+  dismissed
+  overridden
+}
+
+// TASK 37: Customer Rating Score System
+model CustomerRating {
+  id String @id @default(uuid())
+
+  customerId     String
+  
+  // Aggregate scores
+  averageRating  Float   @default(5.0)
+  totalRatings   Int     @default(0)
+  
+  // Rating breakdown (1-5 star counts)
+  oneStarCount   Int     @default(0)
+  twoStarCount   Int     @default(0)
+  threeStarCount Int     @default(0)
+  fourStarCount  Int     @default(0)
+  fiveStarCount  Int     @default(0)
+  
+  // Trend tracking
+  last30DaysAverage Float?
+  last30DaysCount   Int   @default(0)
+  ratingTrend       String? // improving, stable, declining
+  
+  // Status
+  isRestricted      Boolean @default(false)
+  restrictedAt      DateTime?
+  restrictionReason String?
+  restrictionLevel  String? // warning, cooldown, blocked
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([customerId])
+  @@index([averageRating])
+  @@index([totalRatings])
+  @@index([isRestricted])
+  @@map("customer_ratings")
+}
+
+// TASK 38: Driver Rating Score System
+model DriverRating {
+  id String @id @default(uuid())
+
+  driverId       String
+  
+  // Aggregate scores
+  averageRating  Float   @default(5.0)
+  totalRatings   Int     @default(0)
+  
+  // Rating breakdown (1-5 star counts)
+  oneStarCount   Int     @default(0)
+  twoStarCount   Int     @default(0)
+  threeStarCount Int     @default(0)
+  fourStarCount  Int     @default(0)
+  fiveStarCount  Int     @default(0)
+  
+  // Sub-category scores (optional detailed ratings)
+  safetyScore       Float?
+  navigationScore   Float?
+  behaviorScore     Float?
+  vehicleCondition  Float?
+  
+  // Trend tracking
+  last30DaysAverage Float?
+  last30DaysCount   Int   @default(0)
+  ratingTrend       String? // improving, stable, declining
+  
+  // Status
+  isRestricted      Boolean @default(false)
+  restrictedAt      DateTime?
+  restrictionReason String?
+  restrictionLevel  String? // warning, temporary_block, permanent_block
+  
+  // Priority impact
+  priorityScore     Int     @default(100) // 0-100, affects ride assignment
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([driverId])
+  @@index([averageRating])
+  @@index([totalRatings])
+  @@index([isRestricted])
+  @@index([priorityScore])
+  @@map("driver_ratings")
+}
+
+// TASK 39: Restaurant/Partner Rating System
+model PartnerRating {
+  id String @id @default(uuid())
+
+  partnerId      String
+  partnerType    String // restaurant, merchant, parcel_hub
+  
+  // Customer ratings
+  averageRating     Float   @default(5.0)
+  totalRatings      Int     @default(0)
+  
+  // Rating breakdown (1-5 star counts)
+  oneStarCount      Int     @default(0)
+  twoStarCount      Int     @default(0)
+  threeStarCount    Int     @default(0)
+  fourStarCount     Int     @default(0)
+  fiveStarCount     Int     @default(0)
+  
+  // Sub-category scores (for restaurants)
+  foodQualityScore    Float?
+  packingQualityScore Float?
+  onTimeScore         Float?
+  
+  // Driver ratings (for pickup experience)
+  driverRatingAvg     Float?
+  driverRatingCount   Int     @default(0)
+  pickupDelayScore    Float?
+  behaviorScore       Float?
+  
+  // Trend tracking
+  last30DaysAverage Float?
+  last30DaysCount   Int   @default(0)
+  ratingTrend       String? // improving, stable, declining
+  
+  // Status
+  isRestricted         Boolean @default(false)
+  restrictedAt         DateTime?
+  restrictionReason    String?
+  searchVisibilityRank Int     @default(100) // 0-100, affects search ranking
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([partnerId])
+  @@index([partnerType])
+  @@index([averageRating])
+  @@index([totalRatings])
+  @@index([isRestricted])
+  @@index([searchVisibilityRank])
+  @@map("partner_ratings")
+}
+
+// Individual Rating Submission (for all rating types)
+model RatingSubmission {
+  id String @id @default(uuid())
+
+  // Who is rating
+  raterId      String
+  raterRole    RatingActorType
+  
+  // Who is being rated
+  targetId     String
+  targetRole   RatingActorType
+  
+  // Context
+  serviceType  RatingSourceType
+  orderId      String? // ride_id, food_order_id, parcel_id
+  
+  // Rating details
+  rating       Int // 1-5
+  comment      String? @db.Text
+  
+  // Sub-ratings (optional)
+  subRatings   Json? // {safety: 4, navigation: 5, behavior: 4}
+  
+  // Immutability (cannot edit once submitted)
+  isLocked     Boolean @default(true)
+  
+  // Processing status
+  processedAt  DateTime?
+  affectedScoreChange Float?
+  
+  createdAt DateTime @default(now())
+
+  @@index([raterId])
+  @@index([targetId])
+  @@index([serviceType])
+  @@index([orderId])
+  @@index([rating])
+  @@index([createdAt])
+  @@map("rating_submissions")
+}
+
+// TASK 40: Reputation Logs (Rating + Fraud Score Integration)
+model ReputationLog {
+  id String @id @default(uuid())
+
+  userId       String
+  userRole     String // customer, driver, partner
+  
+  // Event details
+  eventType    String // rating_submitted, rating_received, fraud_score_impact, auto_restriction, admin_override
+  eventDetails Json?
+  
+  // Rating context
+  ratingSubmissionId String?
+  ratingValue        Int?
+  previousAverage    Float?
+  newAverage         Float?
+  
+  // Fraud score integration
+  fraudScoreImpact   Int?
+  previousFraudScore Int?
+  newFraudScore      Int?
+  
+  // Action taken
+  actionType         String? // warning, cooldown, block, visibility_reduction, none
+  actionDetails      String?
+  
+  // Source
+  triggeredBy        String? // system, admin_id
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("reputation_logs")
+}
+
+// TASK 41: Reputation Flags (Auto-Restriction System)
+model ReputationFlag {
+  id String @id @default(uuid())
+
+  userId       String
+  userRole     String // customer, driver, partner
+  
+  // Flag details
+  flagType     ReputationFlagType
+  flagReason   String
+  severity     String @default("medium") // low, medium, high, critical
+  
+  // Trigger context
+  triggerRating      Float?
+  triggerThreshold   Float?
+  lowRatingCount24h  Int?
+  
+  // Status
+  status       ReputationFlagStatus @default(active)
+  
+  // Restriction applied
+  restrictionApplied String? // warning, cooldown, temporary_block, visibility_reduction
+  restrictionEndsAt  DateTime?
+  
+  // Resolution
+  resolvedAt   DateTime?
+  resolvedBy   String?
+  resolutionNote String?
+  
+  // Admin override
+  overriddenBy String?
+  overriddenAt DateTime?
+  overrideReason String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([flagType])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("reputation_flags")
+}
+
+// Rating Thresholds Configuration (Admin configurable)
+model RatingThreshold {
+  id String @id @default(uuid())
+
+  userRole         String // customer, driver, partner
+  thresholdType    String // warning, block, cooldown, visibility_reduction
+  
+  minRating        Float // Rating below this triggers action
+  actionRequired   String // Action to take
+  actionDuration   Int? // Duration in hours (for temporary actions)
+  
+  // Fraud score impact
+  fraudScorePenalty Int @default(0)
+  
+  isActive         Boolean @default(true)
+  
+  updatedBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userRole, thresholdType])
+  @@index([userRole])
+  @@index([isActive])
+  @@map("rating_thresholds")
+}
