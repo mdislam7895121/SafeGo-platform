@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { 
@@ -834,7 +835,7 @@ export function SafePilotButton() {
 
   const alertCount = contextData?.alerts?.length || 0;
 
-  return (
+  return createPortal(
     <>
       <Button
         data-testid="button-safepilot-launcher"
@@ -2011,7 +2012,8 @@ export function SafePilotButton() {
           </div>
         </SheetContent>
       </Sheet>
-    </>
+    </>,
+    document.body
   );
 }
 
