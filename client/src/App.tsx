@@ -2218,6 +2218,11 @@ function Router() {
           <AdminSafetyCenterNew />
         </ProtectedRoute>
       </Route>
+      <Route path="/admin/safety-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSafetyCenterNew />
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin/feature-flags">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminFeatureFlags />
