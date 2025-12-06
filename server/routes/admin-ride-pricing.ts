@@ -2,12 +2,14 @@
  * Admin Ride Pricing Routes
  * 
  * API endpoints for managing ride pricing rules (admin only)
+ * Includes read-only ride listing for admin monitoring
  */
 
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { Prisma } from "@prisma/client";
 
 const router = Router();
 
@@ -250,6 +252,142 @@ router.post("/:id/toggle", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("[AdminRidePricing] Toggle error:", error);
     res.status(500).json({ error: "Failed to toggle pricing rule" });
+  }
+});
+
+const listRidesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.string().optional(),
+  countryCode: z.enum(["BD", "US"]).optional(),
+  search: z.string().max(100).optional(),
+});
+
+const VALID_RIDE_STATUSES = [
+  "requested",
+  "searching_driver",
+  "accepted",
+  "driver_arriving",
+  "arrived",
+  "in_progress",
+  "completed",
+  "cancelled_by_customer",
+  "cancelled_by_driver",
+  "cancelled_no_driver",
+];
+
+router.get("/rides/list", async (req: AuthRequest, res) => {
+  try {
+    const parsed = listRidesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Invalid query parameters", 
+        details: parsed.error.flatten().fieldErrors 
+      });
+    }
+
+    const { page, limit, status, countryCode, search } = parsed.data;
+
+    if (status && status !== "all" && !VALID_RIDE_STATUSES.includes(status)) {
+      return res.status(400).json({ error: "Invalid status filter" });
+    }
+
+    const where: Prisma.RideRequestWhereInput = {};
+
+    if (status && status !== "all") {
+      where.status = status;
+    }
+    if (countryCode) {
+      where.countryCode = countryCode;
+    }
+    if (search) {
+      const sanitizedSearch = search.trim();
+      if (sanitizedSearch) {
+        where.OR = [
+          { id: { contains: sanitizedSearch, mode: "insensitive" } },
+          { pickupAddress: { contains: sanitizedSearch, mode: "insensitive" } },
+          { dropoffAddress: { contains: sanitizedSearch, mode: "insensitive" } },
+        ];
+      }
+    }
+
+    const [rides, total] = await Promise.all([
+      prisma.rideRequest.findMany({
+        where,
+        orderBy: { requestedAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+          driver: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+        },
+      }),
+      prisma.rideRequest.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPreviousPage = page > 1;
+
+    const ridesWithBreakdown = rides.map((ride) => ({
+      id: ride.id,
+      status: ride.status,
+      countryCode: ride.countryCode,
+      cityCode: ride.cityCode,
+      pickupAddress: ride.pickupAddress,
+      dropoffAddress: ride.dropoffAddress,
+      vehicleType: ride.vehicleType,
+      paymentMethod: ride.paymentMethod,
+      fareCurrency: ride.fareCurrency,
+      serviceFare: Number(ride.serviceFare),
+      safegoCommission: Number(ride.safegoCommission),
+      driverPayout: Number(ride.driverPayout),
+      distanceKm: Number(ride.distanceKm),
+      durationMinutes: ride.durationMinutes,
+      nightMultiplier: ride.nightMultiplier ? Number(ride.nightMultiplier) : undefined,
+      peakMultiplier: ride.peakMultiplier ? Number(ride.peakMultiplier) : undefined,
+      requestedAt: ride.requestedAt,
+      acceptedAt: ride.acceptedAt,
+      completedAt: ride.completedAt,
+      customer: ride.customer,
+      driver: ride.driver,
+      fareBreakdown: ride.fareBreakdown as any,
+    }));
+
+    console.log(`[AdminRides] List query by admin ${req.user?.userId}: page=${page}, limit=${limit}, total=${total}`);
+
+    res.json({
+      success: true,
+      rides: ridesWithBreakdown,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage,
+      },
+      total,
+      page,
+      limit,
+    });
+  } catch (error) {
+    console.error("[AdminRides] List error:", error);
+    res.status(500).json({ error: "Failed to fetch rides" });
   }
 });
 

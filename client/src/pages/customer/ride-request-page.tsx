@@ -1,12 +1,12 @@
 /**
- * Bangladesh Ride Booking Page
+ * Unified Ride Request Page
  * 
- * Customer-facing page for booking rides in Bangladesh with:
- * - Vehicle type selection (bike, cng, car_economy, car_premium)
- * - Real-time fare estimates with breakdown
- * - Cash and online payment options
- * - Night/peak surge indicators
- * - City-specific pricing
+ * Customer-facing page for booking rides supporting both Bangladesh and US markets.
+ * SafeGo Master Rules Compliance:
+ * - BD: Both cash and online payments allowed
+ * - US: ONLY online payment (cash hidden)
+ * - KYC validation enforced per country
+ * - Role isolation enforced
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -47,6 +47,8 @@ import {
   Crown,
   Info,
   BanknoteIcon,
+  Shield,
+  Users,
 } from "lucide-react";
 
 interface LocationData {
@@ -54,6 +56,7 @@ interface LocationData {
   lat: number;
   lng: number;
   name?: string;
+  placeId?: string;
 }
 
 interface VehicleOption {
@@ -103,29 +106,29 @@ interface CityOption {
 const pickupIcon = L.divIcon({
   className: "custom-marker",
   html: `<div style="
-    width: 28px; height: 28px; background: #22C55E; 
+    width: 32px; height: 32px; background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); 
     border: 3px solid white; border-radius: 50%; 
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
     display: flex; align-items: center; justify-content: center;
   ">
-    <span style="color: white; font-weight: bold; font-size: 12px;">A</span>
+    <span style="color: white; font-weight: bold; font-size: 14px;">A</span>
   </div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 const dropoffIcon = L.divIcon({
   className: "custom-marker",
   html: `<div style="
-    width: 28px; height: 28px; background: #EF4444; 
+    width: 32px; height: 32px; background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); 
     border: 3px solid white; border-radius: 50%; 
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
     display: flex; align-items: center; justify-content: center;
   ">
-    <span style="color: white; font-weight: bold; font-size: 12px;">B</span>
+    <span style="color: white; font-weight: bold; font-size: 14px;">B</span>
   </div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 function MapBoundsHandler({
@@ -182,17 +185,81 @@ function getVehicleColor(vehicleType: string): string {
   }
 }
 
-export default function BDRideBooking() {
+function formatCurrency(amount: number, currency: string): string {
+  if (currency === "BDT") {
+    return `৳${amount.toFixed(0)}`;
+  }
+  return `$${amount.toFixed(2)}`;
+}
+
+function decodePolyline(encoded: string): [number, number][] {
+  const points: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let b;
+    let shift = 0;
+    let result = 0;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+
+    points.push([lat / 1e5, lng / 1e5]);
+  }
+
+  return points;
+}
+
+function calculateDirectDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export default function RideRequestPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const countryCode = user?.countryCode || "US";
+  const isUS = countryCode === "US";
+  const isBD = countryCode === "BD";
+
   const [pickupLocation, setPickupLocation] = useState<LocationData | null>(null);
   const [dropoffLocation, setDropoffLocation] = useState<LocationData | null>(null);
-  const [selectedCity, setSelectedCity] = useState<string>("DHK");
+  const [selectedCity, setSelectedCity] = useState<string>(isBD ? "DHK" : "NYC");
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"cash" | "online">("online");
+  const [speedOption, setSpeedOption] = useState<"normal" | "priority">("normal");
   const [isLocating, setIsLocating] = useState(false);
   const [showFareBreakdown, setShowFareBreakdown] = useState(false);
   const [estimatedDistance, setEstimatedDistance] = useState<number | null>(null);
@@ -200,7 +267,8 @@ export default function BDRideBooking() {
   const [routePolyline, setRoutePolyline] = useState<[number, number][] | null>(null);
 
   const { data: cities, isLoading: citiesLoading } = useQuery<{ cities: CityOption[] }>({
-    queryKey: ["/api/rides/bd/cities"],
+    queryKey: ["/api/rides/bd/cities", countryCode],
+    enabled: isBD,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -211,6 +279,7 @@ export default function BDRideBooking() {
   } = useQuery<FareEstimateResponse>({
     queryKey: [
       "/api/rides/bd/fare-estimate",
+      countryCode,
       selectedCity,
       pickupLocation?.lat,
       pickupLocation?.lng,
@@ -218,6 +287,7 @@ export default function BDRideBooking() {
       dropoffLocation?.lng,
       estimatedDistance,
       estimatedDuration,
+      speedOption,
     ],
     enabled:
       !!pickupLocation &&
@@ -227,7 +297,7 @@ export default function BDRideBooking() {
       estimatedDistance > 0,
     queryFn: async () => {
       const params = new URLSearchParams({
-        countryCode: "BD",
+        countryCode,
         cityCode: selectedCity,
         pickupLat: pickupLocation!.lat.toString(),
         pickupLng: pickupLocation!.lng.toString(),
@@ -235,6 +305,7 @@ export default function BDRideBooking() {
         dropoffLng: dropoffLocation!.lng.toString(),
         estimatedDistanceKm: estimatedDistance!.toString(),
         estimatedDurationMin: estimatedDuration!.toString(),
+        speedOption,
       });
       const response = await fetch(`/api/rides/bd/fare-estimate?${params}`, {
         credentials: "include",
@@ -253,18 +324,21 @@ export default function BDRideBooking() {
       pickupAddress: string;
       pickupLat: number;
       pickupLng: number;
+      pickupPlaceId?: string;
       dropoffAddress: string;
       dropoffLat: number;
       dropoffLng: number;
+      dropoffPlaceId?: string;
       estimatedDistanceKm: number;
       estimatedDurationMin: number;
       paymentMethod: "cash" | "online";
+      speedOption: "normal" | "priority";
     }) => {
       return apiRequest("/api/rides/bd/request", {
         method: "POST",
         body: JSON.stringify({
           ...data,
-          countryCode: "BD",
+          countryCode,
           cityCode: selectedCity,
         }),
       });
@@ -275,12 +349,12 @@ export default function BDRideBooking() {
         description: "Looking for a driver nearby...",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
-      setLocation(`/customer/ride-details/${data.ride.id}`);
+      setLocation(`/customer/ride-tracking/${data.ride.id}`);
     },
     onError: (error: any) => {
       toast({
         title: "Request Failed",
-        description: error.message || "Could not request ride",
+        description: error.message || "Could not request ride. Please try again.",
         variant: "destructive",
       });
     },
@@ -325,6 +399,12 @@ export default function BDRideBooking() {
     }
   }, [pickupLocation, dropoffLocation, fetchRoute]);
 
+  useEffect(() => {
+    if (isUS) {
+      setSelectedPaymentMethod("online");
+    }
+  }, [isUS]);
+
   const handleCurrentLocation = async () => {
     setIsLocating(true);
     try {
@@ -336,9 +416,7 @@ export default function BDRideBooking() {
       });
 
       const { latitude, longitude } = position.coords;
-      const response = await fetch(
-        `/api/maps/geocode?latlng=${latitude},${longitude}`
-      );
+      const response = await fetch(`/api/maps/geocode?latlng=${latitude},${longitude}`);
       if (!response.ok) throw new Error("Failed to geocode location");
 
       const data = await response.json();
@@ -376,6 +454,15 @@ export default function BDRideBooking() {
       return;
     }
 
+    if (isUS && selectedPaymentMethod === "cash") {
+      toast({
+        title: "Cash Not Available",
+        description: "Cash payment is not available in the United States. Please use online payment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const selectedOption = fareEstimate?.vehicleOptions.find(
       (v) => v.vehicleType === selectedVehicle
     );
@@ -393,12 +480,15 @@ export default function BDRideBooking() {
       pickupAddress: pickupLocation.address,
       pickupLat: pickupLocation.lat,
       pickupLng: pickupLocation.lng,
+      pickupPlaceId: pickupLocation.placeId,
       dropoffAddress: dropoffLocation.address,
       dropoffLat: dropoffLocation.lat,
       dropoffLng: dropoffLocation.lng,
+      dropoffPlaceId: dropoffLocation.placeId,
       estimatedDistanceKm: estimatedDistance,
       estimatedDurationMin: estimatedDuration,
       paymentMethod: selectedPaymentMethod,
+      speedOption,
     });
   };
 
@@ -406,11 +496,12 @@ export default function BDRideBooking() {
     (v) => v.vehicleType === selectedVehicle
   );
 
-  const defaultCenter: [number, number] = [23.8103, 90.4125];
+  const defaultCenter: [number, number] = isBD ? [23.8103, 90.4125] : [40.7128, -74.006];
+  const currency = isBD ? "BDT" : "USD";
 
   return (
-    <div className="flex flex-col h-screen bg-background" data-testid="bd-ride-booking-page">
-      <header className="flex items-center gap-3 p-4 border-b bg-card">
+    <div className="flex flex-col h-screen bg-background" data-testid="ride-request-page">
+      <header className="flex items-center gap-3 p-3 sm:p-4 border-b bg-card shrink-0">
         <Button
           variant="ghost"
           size="icon"
@@ -419,15 +510,17 @@ export default function BDRideBooking() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div className="flex-1">
-          <h1 className="text-lg font-semibold">Book a Ride</h1>
-          <p className="text-sm text-muted-foreground">Bangladesh</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg font-semibold truncate">Book a Ride</h1>
+          <p className="text-sm text-muted-foreground">
+            {isBD ? "Bangladesh" : "United States"}
+          </p>
         </div>
-        {cities?.cities && cities.cities.length > 0 && (
+        {isBD && cities?.cities && cities.cities.length > 0 && (
           <select
             value={selectedCity}
             onChange={(e) => setSelectedCity(e.target.value)}
-            className="px-3 py-1.5 text-sm border rounded-md bg-background"
+            className="px-3 py-1.5 text-sm border rounded-md bg-background shrink-0"
             data-testid="select-city"
           >
             {cities.cities.map((city) => (
@@ -439,7 +532,7 @@ export default function BDRideBooking() {
         )}
       </header>
 
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0">
         <MapContainer
           center={pickupLocation ? [pickupLocation.lat, pickupLocation.lng] : defaultCenter}
           zoom={13}
@@ -450,10 +543,7 @@ export default function BDRideBooking() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <MapBoundsHandler
-            pickupLocation={pickupLocation}
-            dropoffLocation={dropoffLocation}
-          />
+          <MapBoundsHandler pickupLocation={pickupLocation} dropoffLocation={dropoffLocation} />
           {pickupLocation && (
             <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={pickupIcon} />
           )}
@@ -468,31 +558,38 @@ export default function BDRideBooking() {
           )}
         </MapContainer>
 
-        <div className="absolute top-4 left-4 right-4 z-[1000]">
+        <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-[1000]">
           <Card className="shadow-lg">
             <CardContent className="p-3 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
-                <GooglePlacesInput
-                  value={pickupLocation?.address || ""}
-                  onChange={() => {}}
-                  placeholder="Enter pickup location"
-                  variant="pickup"
-                  onLocationSelect={(loc) => {
-                    setPickupLocation({
-                      address: loc.address,
-                      lat: loc.lat,
-                      lng: loc.lng,
-                    });
-                  }}
-                  showCurrentLocation={false}
-                  className="flex-1"
-                />
+                <div className="w-3 h-3 rounded-full bg-green-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <GooglePlacesInput
+                    value={pickupLocation?.address || ""}
+                    onChange={() => {}}
+                    placeholder="Enter pickup location"
+                    variant="pickup"
+                    onLocationSelect={(loc) => {
+                      setPickupLocation({
+                        address: loc.address,
+                        lat: loc.lat,
+                        lng: loc.lng,
+                        placeId: loc.placeId,
+                      });
+                    }}
+                    onCurrentLocation={handleCurrentLocation}
+                    isLoadingCurrentLocation={isLocating}
+                    showCurrentLocation={true}
+                    className="w-full"
+                    data-testid="input-pickup"
+                  />
+                </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={handleCurrentLocation}
                   disabled={isLocating}
+                  className="shrink-0"
                   data-testid="button-current-location"
                 >
                   {isLocating ? (
@@ -504,26 +601,30 @@ export default function BDRideBooking() {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
-                <GooglePlacesInput
-                  value={dropoffLocation?.address || ""}
-                  onChange={() => {}}
-                  placeholder="Enter destination"
-                  variant="dropoff"
-                  onLocationSelect={(loc) => {
-                    setDropoffLocation({
-                      address: loc.address,
-                      lat: loc.lat,
-                      lng: loc.lng,
-                    });
-                  }}
-                  showCurrentLocation={false}
-                  className="flex-1"
-                />
+                <div className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <GooglePlacesInput
+                    value={dropoffLocation?.address || ""}
+                    onChange={() => {}}
+                    placeholder="Enter destination"
+                    variant="dropoff"
+                    onLocationSelect={(loc) => {
+                      setDropoffLocation({
+                        address: loc.address,
+                        lat: loc.lat,
+                        lng: loc.lng,
+                        placeId: loc.placeId,
+                      });
+                    }}
+                    showCurrentLocation={false}
+                    className="w-full"
+                    data-testid="input-dropoff"
+                  />
+                </div>
               </div>
 
               {estimatedDistance && estimatedDuration && (
-                <div className="flex items-center gap-4 text-sm text-muted-foreground pt-1">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground pt-1 flex-wrap">
                   <div className="flex items-center gap-1">
                     <Navigation className="h-3.5 w-3.5" />
                     <span>{estimatedDistance.toFixed(1)} km</span>
@@ -539,7 +640,7 @@ export default function BDRideBooking() {
         </div>
       </div>
 
-      <div className="bg-card border-t max-h-[55vh] overflow-y-auto">
+      <div className="bg-card border-t max-h-[55vh] overflow-y-auto shrink-0">
         {fareLoading && (
           <div className="p-4 space-y-3">
             <Skeleton className="h-20 w-full" />
@@ -549,20 +650,20 @@ export default function BDRideBooking() {
         )}
 
         {!fareLoading && fareEstimate?.vehicleOptions && fareEstimate.vehicleOptions.length > 0 && (
-          <div className="p-4 space-y-4">
+          <div className="p-3 sm:p-4 space-y-4">
             {(fareEstimate.vehicleOptions[0]?.isNightTime ||
               fareEstimate.vehicleOptions[0]?.isPeakTime) && (
               <Alert className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
                 <AlertDescription className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
                   {fareEstimate.vehicleOptions[0]?.isNightTime && (
                     <>
-                      <Moon className="h-4 w-4" />
+                      <Moon className="h-4 w-4 shrink-0" />
                       <span>Night rates apply (10 PM - 6 AM)</span>
                     </>
                   )}
                   {fareEstimate.vehicleOptions[0]?.isPeakTime && (
                     <>
-                      <Zap className="h-4 w-4" />
+                      <Zap className="h-4 w-4 shrink-0" />
                       <span>Peak hour pricing active</span>
                     </>
                   )}
@@ -592,39 +693,40 @@ export default function BDRideBooking() {
                       id={option.vehicleType}
                       className="sr-only"
                     />
-                    <div
-                      className={`p-2.5 rounded-lg ${getVehicleColor(option.vehicleType)}`}
-                    >
+                    <div className={`p-2.5 rounded-lg shrink-0 ${getVehicleColor(option.vehicleType)}`}>
                       {getVehicleIcon(option.icon)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{option.displayName}</span>
                         {option.capacity > 1 && (
                           <Badge variant="secondary" className="text-xs">
-                            {option.capacity} seats
+                            <Users className="h-3 w-3 mr-1" />
+                            {option.capacity}
                           </Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate">
                         {option.description}
                       </p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        {option.cashAllowed && (
-                          <span className="flex items-center gap-1">
-                            <BanknoteIcon className="h-3 w-3" /> Cash
-                          </span>
-                        )}
-                        {option.onlineAllowed && (
-                          <span className="flex items-center gap-1">
-                            <CreditCard className="h-3 w-3" /> Online
-                          </span>
-                        )}
-                      </div>
+                      {isBD && (
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                          {option.cashAllowed && (
+                            <span className="flex items-center gap-1">
+                              <BanknoteIcon className="h-3 w-3" /> Cash
+                            </span>
+                          )}
+                          {option.onlineAllowed && (
+                            <span className="flex items-center gap-1">
+                              <CreditCard className="h-3 w-3" /> Online
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <div className="font-semibold text-lg">
-                        ৳{option.estimatedFare.toFixed(0)}
+                        {formatCurrency(option.estimatedFare, option.currency)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {option.etaMinutes} min away
@@ -653,29 +755,30 @@ export default function BDRideBooking() {
                       data-testid="payment-online"
                     >
                       <RadioGroupItem value="online" id="online" className="sr-only" />
-                      <CreditCard className="h-5 w-5 text-primary" />
+                      <CreditCard className="h-5 w-5 text-primary shrink-0" />
                       <span className="font-medium">Online</span>
                     </label>
-                    <label
-                      className={`flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
-                        !selectedVehicleOption.cashAllowed
-                          ? "opacity-50 cursor-not-allowed"
-                          : selectedPaymentMethod === "cash"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover-elevate"
-                      }`}
-                      data-testid="payment-cash"
-                    >
-                      <RadioGroupItem
-                        value="cash"
-                        id="cash"
-                        className="sr-only"
-                        disabled={!selectedVehicleOption.cashAllowed}
-                      />
-                      <Wallet className="h-5 w-5 text-green-600" />
-                      <span className="font-medium">Cash</span>
-                    </label>
+                    {isBD && selectedVehicleOption.cashAllowed && (
+                      <label
+                        className={`flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                          selectedPaymentMethod === "cash"
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover-elevate"
+                        }`}
+                        data-testid="payment-cash"
+                      >
+                        <RadioGroupItem value="cash" id="cash" className="sr-only" />
+                        <Wallet className="h-5 w-5 text-green-600 shrink-0" />
+                        <span className="font-medium">Cash</span>
+                      </label>
+                    )}
                   </RadioGroup>
+                  {isUS && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Online payment only in the United States
+                    </p>
+                  )}
                 </div>
 
                 <button
@@ -697,24 +800,24 @@ export default function BDRideBooking() {
                     <CardContent className="p-3 space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Base Fare</span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.baseFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.baseFare, currency)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">
                           Distance ({estimatedDistance?.toFixed(1)} km)
                         </span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.distanceFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.distanceFare, currency)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">
                           Time ({estimatedDuration} min)
                         </span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.timeFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.timeFare, currency)}</span>
                       </div>
                       {selectedVehicleOption.fareBreakdown.bookingFee > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Booking Fee</span>
-                          <span>৳{selectedVehicleOption.fareBreakdown.bookingFee.toFixed(0)}</span>
+                          <span>{formatCurrency(selectedVehicleOption.fareBreakdown.bookingFee, currency)}</span>
                         </div>
                       )}
                       {selectedVehicleOption.fareBreakdown.nightMultiplier > 1 && (
@@ -722,7 +825,7 @@ export default function BDRideBooking() {
                           <span className="flex items-center gap-1">
                             <Moon className="h-3 w-3" /> Night Rate
                           </span>
-                          <span>×{selectedVehicleOption.fareBreakdown.nightMultiplier.toFixed(1)}</span>
+                          <span>x{selectedVehicleOption.fareBreakdown.nightMultiplier.toFixed(1)}</span>
                         </div>
                       )}
                       {selectedVehicleOption.fareBreakdown.peakMultiplier > 1 && (
@@ -730,12 +833,12 @@ export default function BDRideBooking() {
                           <span className="flex items-center gap-1">
                             <Zap className="h-3 w-3" /> Peak Rate
                           </span>
-                          <span>×{selectedVehicleOption.fareBreakdown.peakMultiplier.toFixed(1)}</span>
+                          <span>x{selectedVehicleOption.fareBreakdown.peakMultiplier.toFixed(1)}</span>
                         </div>
                       )}
                       <div className="border-t pt-2 flex justify-between font-semibold">
                         <span>Total</span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.totalFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.totalFare, currency)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -760,7 +863,9 @@ export default function BDRideBooking() {
                   Requesting...
                 </>
               ) : selectedVehicleOption ? (
-                <>Request {selectedVehicleOption.displayName} · ৳{selectedVehicleOption.estimatedFare.toFixed(0)}</>
+                <>
+                  Request {selectedVehicleOption.displayName} · {formatCurrency(selectedVehicleOption.estimatedFare, currency)}
+                </>
               ) : (
                 "Select a Vehicle"
               )}
@@ -783,70 +888,13 @@ export default function BDRideBooking() {
             </div>
           )}
 
-        {!pickupLocation || !dropoffLocation ? (
+        {(!pickupLocation || !dropoffLocation) && (
           <div className="p-4 text-center text-muted-foreground">
             <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p>Enter pickup and destination to see available vehicles</p>
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
-}
-
-function decodePolyline(encoded: string): [number, number][] {
-  const points: [number, number][] = [];
-  let index = 0;
-  let lat = 0;
-  let lng = 0;
-
-  while (index < encoded.length) {
-    let b;
-    let shift = 0;
-    let result = 0;
-
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-
-    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
-    lat += dlat;
-
-    shift = 0;
-    result = 0;
-
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-
-    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
-    lng += dlng;
-
-    points.push([lat / 1e5, lng / 1e5]);
-  }
-
-  return points;
-}
-
-function calculateDirectDistance(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
 }

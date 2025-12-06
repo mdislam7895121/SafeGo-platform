@@ -45,6 +45,8 @@ import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import CustomerMyReviews from "@/pages/customer/my-reviews";
 import ParcelRequest from "@/pages/customer/parcel-request";
 import BDRideBooking from "@/pages/customer/bd-ride-booking";
+import RideRequestPage from "@/pages/customer/ride-request-page";
+import RideTrackingPage from "@/pages/customer/ride-tracking-page";
 import ParcelTracking from "@/pages/customer/parcel-tracking";
 import UnifiedBooking from "@/pages/customer/unified-booking";
 import CustomerSupport from "@/pages/customer/support";
@@ -273,6 +275,7 @@ import AdminSupportTicketDetail2 from "@/pages/admin-portal/support-ticket-detai
 import AdminDriverSupportCenter from "@/pages/admin/driver-support";
 import AdminMobileWalletConfig from "@/pages/admin/mobile-wallet-config";
 import AdminRidePricingConfig from "@/pages/admin/ride-pricing-config";
+import AdminRideRequests from "@/pages/admin/ride-requests";
 import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
@@ -512,6 +515,16 @@ function Router() {
       <Route path="/customer/ride/bd">
         <ProtectedRoute allowedRoles={["customer"]}>
           <BDRideBooking />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/ride-booking">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RideRequestPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/ride-tracking/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RideTrackingPage />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/unified-booking">
@@ -1847,6 +1860,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Ride Pricing Config">
             <AdminRidePricingConfig />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ride-requests">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ride Requests">
+            <AdminRideRequests />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

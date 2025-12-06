@@ -1,0 +1,111 @@
+Your next and ONLY authorized task is to build the complete Customer Ride Request Page for SafeGo Bangladesh and US, following ALL SafeGo Master Rules, KYC rules, role isolation rules, status flow rules, commission logic, and non-breaking architecture rules.
+
+You must NOT add any features that were not requested. You must NOT propose or suggest new features. Only build exactly what is asked here.
+
+====================================================
+PHASE 1 — PAGE STRUCTURE (Customer Only)
+====================================================
+Create a new screen: RideRequestPage
+
+Required UI elements:
+1. Pickup address input (autocomplete + map picker)
+2. Dropoff address input (autocomplete + map picker)
+3. Vehicle Type Selector:
+   - bike
+   - car_economy
+   - car_premium
+   - cng
+4. Estimated fare box (uses backend fare-estimate API)
+5. Payment Method Selector:
+   - Bangladesh: cash + online
+   - USA: online ONLY (cash must be hidden)
+6. "Request Ride" button
+
+Responsive requirements:
+- Mobile (portrait + landscape)
+- Tablet
+- Desktop
+- No broken layout
+
+====================================================
+PHASE 2 — LIVE FARE ESTIMATE
+====================================================
+Integrate API:
+GET /api/rides/fare-estimate
+
+Dynamic updates must occur when:
+- pickup changes
+- dropoff changes
+- vehicle type changes
+- speed option changes
+
+Show:
+- base fare
+- distance fare
+- time fare
+- booking fee
+- surge/peak/night multiplier
+- total estimated fare
+
+====================================================
+PHASE 3 — CREATE RIDE REQUEST
+====================================================
+Use:
+POST /api/rides/request
+
+Flow must include:
+- Validate BD KYC for BD customers
+- Validate US KYC for US customers
+- Recalculate fare for accuracy
+- Enforce US no-cash rule
+- Initialize required SafeGo ride status flow:
+    requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+
+On success:
+- Navigate to “Ride Tracking Page”
+
+====================================================
+PHASE 4 — RIDE TRACKING PAGE
+====================================================
+Create “RideTrackingPage” with:
+- real-time status
+- driver name + phone only (no documents)
+- map showing driver location
+- ETA
+- trip details
+- payment method indicator
+- trip fare breakdown
+
+====================================================
+PHASE 5 — ROLE & SECURITY RULES
+====================================================
+- Customer cannot see driver license, NID, or private documents.
+- Driver cannot see customer KYC fields.
+- Restaurant partners cannot access ride pages.
+- Admin cannot override customer ride UI.
+- No access leaks or unauthorized data exposure.
+
+====================================================
+PHASE 6 — ADMIN PANEL (READ ONLY)
+====================================================
+Add a new admin view:
+- "Ride Requests" list
+- Read-only ride pricing breakdown
+- No edit permissions
+- No status override unless admin_unblock logic applies
+
+====================================================
+PHASE 7 — FULL QA VALIDATION
+====================================================
+Test:
+- BD ride booking (cash + online)
+- BD minimum fare trip
+- BD night ride & peak ride
+- US booking (online only)
+- Ride tracking on map
+- All screens on mobile + desktop
+- No regression in rides, food_orders, deliveries
+
+When all tests pass:
+Return:
+“Customer Ride Request Page — PRODUCTION READY”
