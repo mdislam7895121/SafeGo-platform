@@ -319,6 +319,7 @@ import FraudPreventionCenter from "@/pages/admin/fraud-prevention-center";
 import FinanceCenter from "@/pages/admin/finance-center";
 import PayoutCenter from "@/pages/admin/payout-center";
 import FinanceLogs from "@/pages/admin/finance-logs";
+import SecurityCenter from "@/pages/admin/SecurityCenter";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
@@ -2366,6 +2367,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Finance Audit Logs">
             <FinanceLogs />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/security-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Security Center">
+            <SecurityCenter />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
