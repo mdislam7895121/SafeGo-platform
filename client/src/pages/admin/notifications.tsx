@@ -612,162 +612,152 @@ export default function AdminNotifications() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      <div className="bg-primary text-primary-foreground px-4 sm:px-6 md:px-8 py-5 sm:py-6 rounded-b-2xl sm:rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <Link href="/admin">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-primary-foreground hover:bg-primary-foreground/10 h-10 w-10"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-              <Bell className="h-6 w-6" />
-              Notification Center
-            </h1>
-            <p className="text-xs sm:text-sm opacity-90">Real-time alerts and system notifications</p>
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Link href="/admin">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Back to Dashboard</span>
+                <span className="sm:hidden">Back</span>
+              </Button>
+            </Link>
           </div>
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary-foreground/10">
-                  {isConnected ? (
-                    <Wifi className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <WifiOff className="h-4 w-4 text-red-400" />
-                  )}
-                  <span className="text-xs font-medium">
-                    {isConnected ? "Live" : "Offline"}
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                {isConnected 
-                  ? "WebSocket connected - Real-time updates active" 
-                  : "WebSocket disconnected - Click refresh to reconnect"}
-              </TooltipContent>
-            </Tooltip>
-            {!isConnected && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+                <Bell className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-semibold text-foreground">Notification Center</h1>
+                <p className="text-[11px] text-muted-foreground">Real-time alerts and system notifications</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={reconnect}
-                    className="text-primary-foreground hover:bg-primary-foreground/10"
-                    data-testid="button-reconnect"
-                  >
-                    <RefreshCw className="h-4 w-4" />
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted">
+                    {isConnected ? (
+                      <Wifi className="h-3 w-3 text-green-600" />
+                    ) : (
+                      <WifiOff className="h-3 w-3 text-red-500" />
+                    )}
+                    <span className="text-xs font-medium">
+                      {isConnected ? "Live" : "Offline"}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isConnected 
+                    ? "WebSocket connected - Real-time updates active" 
+                    : "WebSocket disconnected - Click refresh to reconnect"}
+                </TooltipContent>
+              </Tooltip>
+              {!isConnected && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={reconnect}
+                      data-testid="button-reconnect"
+                    >
+                      <RefreshCw className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Reconnect to real-time updates</TooltipContent>
               </Tooltip>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleSound}
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
-                  data-testid="button-toggle-sound"
-                >
-                  {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {soundEnabled ? "Sound alerts on" : "Sound alerts off"}
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => refetch()}
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
-                  data-testid="button-refresh"
-                >
-                  <RefreshCw className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Refresh</TooltipContent>
-            </Tooltip>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => markAllAsReadMutation.mutate()}
-              disabled={markAllAsReadMutation.isPending || !unreadCount?.count}
-              className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground hidden sm:flex"
-              data-testid="button-mark-all-read"
-            >
-              <CheckCheck className="h-4 w-4 mr-2" />
-              Mark All Read
-            </Button>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={exportNotificationsAsCSV}
-                  disabled={!data?.notifications?.length}
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
-                  data-testid="button-export-csv"
-                >
-                  <Download className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Export to CSV</TooltipContent>
-            </Tooltip>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSound}
+                data-testid="button-toggle-sound"
+              >
+                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => refetch()}
+                data-testid="button-refresh"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => markAllAsReadMutation.mutate()}
+                disabled={markAllAsReadMutation.isPending || !unreadCount?.count}
+                className="hidden sm:flex"
+                data-testid="button-mark-all-read"
+              >
+                <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                Mark All
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={exportNotificationsAsCSV}
+                disabled={!data?.notifications?.length}
+                data-testid="button-export-csv"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
+      </div>
 
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
+          <Card>
             <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <Bell className="h-4 w-4 text-blue-300" />
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <Bell className="h-4 w-4 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary-foreground">{stats.total}</p>
-                <p className="text-xs text-primary-foreground/80">Total</p>
+                <p className="text-xl font-bold">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
+          <Card>
             <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <AlertCircle className="h-4 w-4 text-yellow-300" />
+              <div className="p-2 rounded-lg bg-yellow-500/10">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary-foreground">{stats.unread}</p>
-                <p className="text-xs text-primary-foreground/80">Unread</p>
+                <p className="text-xl font-bold">{stats.unread}</p>
+                <p className="text-xs text-muted-foreground">Unread</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
+          <Card>
             <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-red-500/20">
-                <XCircle className="h-4 w-4 text-red-300" />
+              <div className="p-2 rounded-lg bg-red-500/10">
+                <XCircle className="h-4 w-4 text-red-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary-foreground">{stats.critical}</p>
-                <p className="text-xs text-primary-foreground/80">Critical</p>
+                <p className="text-xl font-bold">{stats.critical}</p>
+                <p className="text-xs text-muted-foreground">Critical</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
+          <Card>
             <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-orange-500/20">
-                <AlertTriangle className="h-4 w-4 text-orange-300" />
+              <div className="p-2 rounded-lg bg-orange-500/10">
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary-foreground">{stats.warning}</p>
-                <p className="text-xs text-primary-foreground/80">Warning</p>
+                <p className="text-xl font-bold">{stats.warning}</p>
+                <p className="text-xs text-muted-foreground">Warning</p>
               </div>
             </CardContent>
           </Card>
