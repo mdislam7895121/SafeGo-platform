@@ -27,6 +27,48 @@ const FRAUD_SCORE_PENALTIES = {
   multipleLowRatings24h: 15,
 };
 
+const RATING_WEIGHTS = {
+  customer: {
+    overall: 0.6,
+    behavior: 0.25,
+    communication: 0.15,
+  },
+  driver: {
+    overall: 0.4,
+    safety: 0.25,
+    navigation: 0.15,
+    behavior: 0.1,
+    vehicleCondition: 0.1,
+  },
+  partner: {
+    overall: 0.4,
+    foodQuality: 0.25,
+    accuracy: 0.2,
+    speed: 0.15,
+  },
+};
+
+function calculateWeightedScore(
+  overallRating: number,
+  subRatings: Record<string, number> | null | undefined,
+  userType: "customer" | "driver" | "partner"
+): number {
+  const weights = RATING_WEIGHTS[userType];
+  let weightedSum = overallRating * weights.overall;
+  let usedWeight = weights.overall;
+
+  if (subRatings) {
+    Object.entries(weights).forEach(([key, weight]) => {
+      if (key !== "overall" && subRatings[key] !== undefined) {
+        weightedSum += subRatings[key] * weight;
+        usedWeight += weight;
+      }
+    });
+  }
+
+  return Math.round((weightedSum / usedWeight) * 100) / 100;
+}
+
 async function updateFraudScoreForRating(
   userId: string,
   userRole: string,
@@ -174,11 +216,13 @@ router.post("/customer", async (req: Request, res: Response) => {
 
     const previousAverage = customerRating?.averageRating || 5.0;
 
+    const weightedScore = calculateWeightedScore(rating, subRatings, "customer");
+
     if (!customerRating) {
       customerRating = await prisma.customerRating.create({
         data: {
           customerId,
-          averageRating: rating,
+          averageRating: weightedScore,
           totalRatings: 1,
           oneStarCount: rating === 1 ? 1 : 0,
           twoStarCount: rating === 2 ? 1 : 0,
@@ -191,7 +235,7 @@ router.post("/customer", async (req: Request, res: Response) => {
       const starCountField = `${["one", "two", "three", "four", "five"][rating - 1]}StarCount` as const;
       const newTotal = customerRating.totalRatings + 1;
       const newAverage =
-        (customerRating.averageRating * customerRating.totalRatings + rating) / newTotal;
+        (customerRating.averageRating * customerRating.totalRatings + weightedScore) / newTotal;
 
       const updateData: any = {
         totalRatings: newTotal,
@@ -232,6 +276,11 @@ router.post("/customer", async (req: Request, res: Response) => {
         where: { customerId },
         data: updateData,
       });
+    }
+
+    if (rating <= 2) {
+      const penalty = rating === 1 ? FRAUD_SCORE_PENALTIES.veryLowRating : FRAUD_SCORE_PENALTIES.lowRating;
+      await updateFraudScoreForRating(customerId, "customer", rating, penalty);
     }
 
     const lowRatingCount = await checkMultipleLowRatings(customerId, "customer");
@@ -305,26 +354,31 @@ router.post("/driver", async (req: Request, res: Response) => {
     });
 
     const previousAverage = driverRating?.averageRating || 5.0;
+    const weightedScore = calculateWeightedScore(rating, subRatings, "driver");
 
     if (!driverRating) {
       driverRating = await prisma.driverRating.create({
         data: {
           driverId,
-          averageRating: rating,
+          averageRating: weightedScore,
           totalRatings: 1,
           oneStarCount: rating === 1 ? 1 : 0,
           twoStarCount: rating === 2 ? 1 : 0,
           threeStarCount: rating === 3 ? 1 : 0,
           fourStarCount: rating === 4 ? 1 : 0,
           fiveStarCount: rating === 5 ? 1 : 0,
-          priorityScore: rating >= 4 ? 100 : rating >= 3 ? 75 : 50,
+          priorityScore: weightedScore >= 4 ? 100 : weightedScore >= 3 ? 75 : 50,
+          safetyScore: subRatings?.safety,
+          navigationScore: subRatings?.navigation,
+          behaviorScore: subRatings?.behavior,
+          vehicleCondition: subRatings?.vehicleCondition,
         },
       });
     } else {
       const starCountField = `${["one", "two", "three", "four", "five"][rating - 1]}StarCount` as const;
       const newTotal = driverRating.totalRatings + 1;
       const newAverage =
-        (driverRating.averageRating * driverRating.totalRatings + rating) / newTotal;
+        (driverRating.averageRating * driverRating.totalRatings + weightedScore) / newTotal;
 
       let newPriorityScore = driverRating.priorityScore;
       if (newAverage >= 4.5) newPriorityScore = 100;
@@ -380,6 +434,11 @@ router.post("/driver", async (req: Request, res: Response) => {
         where: { driverId },
         data: updateData,
       });
+    }
+
+    if (rating <= 2) {
+      const penalty = rating === 1 ? FRAUD_SCORE_PENALTIES.veryLowRating : FRAUD_SCORE_PENALTIES.lowRating;
+      await updateFraudScoreForRating(driverId, "driver", rating, penalty);
     }
 
     const lowRatingCount = await checkMultipleLowRatings(driverId, "driver");
@@ -465,13 +524,14 @@ router.post("/partner", async (req: Request, res: Response) => {
 
     const previousAverage = partnerRating?.averageRating || 5.0;
     const isDriverRating = raterRole === "driver";
+    const weightedScore = calculateWeightedScore(rating, subRatings, "partner");
 
     if (!partnerRating) {
       partnerRating = await prisma.partnerRating.create({
         data: {
           partnerId,
           partnerType: partnerType || "restaurant",
-          averageRating: isDriverRating ? 5.0 : rating,
+          averageRating: isDriverRating ? 5.0 : weightedScore,
           totalRatings: isDriverRating ? 0 : 1,
           oneStarCount: !isDriverRating && rating === 1 ? 1 : 0,
           twoStarCount: !isDriverRating && rating === 2 ? 1 : 0,
@@ -504,7 +564,7 @@ router.post("/partner", async (req: Request, res: Response) => {
         const starCountField = `${["one", "two", "three", "four", "five"][rating - 1]}StarCount` as const;
         const newTotal = partnerRating.totalRatings + 1;
         const newAverage =
-          (partnerRating.averageRating * partnerRating.totalRatings + rating) / newTotal;
+          (partnerRating.averageRating * partnerRating.totalRatings + weightedScore) / newTotal;
 
         updateData.totalRatings = newTotal;
         updateData.averageRating = Math.round(newAverage * 100) / 100;
@@ -553,6 +613,11 @@ router.post("/partner", async (req: Request, res: Response) => {
         where: { partnerId },
         data: updateData,
       });
+    }
+
+    if (rating <= 2) {
+      const penalty = rating === 1 ? FRAUD_SCORE_PENALTIES.veryLowRating : FRAUD_SCORE_PENALTIES.lowRating;
+      await updateFraudScoreForRating(partnerId, "partner", rating, penalty);
     }
 
     await logReputationEvent(

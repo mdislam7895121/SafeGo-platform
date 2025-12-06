@@ -440,6 +440,113 @@ router.post("/thresholds", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/distribution", async (req: Request, res: Response) => {
+  try {
+    const { userRole = "all" } = req.query;
+    
+    const distribution = {
+      1: { customer: 0, driver: 0, partner: 0 },
+      2: { customer: 0, driver: 0, partner: 0 },
+      3: { customer: 0, driver: 0, partner: 0 },
+      4: { customer: 0, driver: 0, partner: 0 },
+      5: { customer: 0, driver: 0, partner: 0 },
+    };
+
+    if (userRole === "all" || userRole === "customer") {
+      const customerRatings = await prisma.customerRating.findMany({
+        select: { oneStarCount: true, twoStarCount: true, threeStarCount: true, fourStarCount: true, fiveStarCount: true },
+      });
+      customerRatings.forEach(r => {
+        distribution[1].customer += r.oneStarCount;
+        distribution[2].customer += r.twoStarCount;
+        distribution[3].customer += r.threeStarCount;
+        distribution[4].customer += r.fourStarCount;
+        distribution[5].customer += r.fiveStarCount;
+      });
+    }
+
+    if (userRole === "all" || userRole === "driver") {
+      const driverRatings = await prisma.driverRating.findMany({
+        select: { oneStarCount: true, twoStarCount: true, threeStarCount: true, fourStarCount: true, fiveStarCount: true },
+      });
+      driverRatings.forEach(r => {
+        distribution[1].driver += r.oneStarCount;
+        distribution[2].driver += r.twoStarCount;
+        distribution[3].driver += r.threeStarCount;
+        distribution[4].driver += r.fourStarCount;
+        distribution[5].driver += r.fiveStarCount;
+      });
+    }
+
+    if (userRole === "all" || userRole === "partner") {
+      const partnerRatings = await prisma.partnerRating.findMany({
+        select: { oneStarCount: true, twoStarCount: true, threeStarCount: true, fourStarCount: true, fiveStarCount: true },
+      });
+      partnerRatings.forEach(r => {
+        distribution[1].partner += r.oneStarCount;
+        distribution[2].partner += r.twoStarCount;
+        distribution[3].partner += r.threeStarCount;
+        distribution[4].partner += r.fourStarCount;
+        distribution[5].partner += r.fiveStarCount;
+      });
+    }
+
+    const formattedDistribution = Object.entries(distribution).map(([stars, counts]) => ({
+      stars: parseInt(stars),
+      ...counts,
+      total: counts.customer + counts.driver + counts.partner,
+    }));
+
+    res.json({ distribution: formattedDistribution });
+  } catch (error) {
+    console.error("[AdminReputation] Distribution error:", error);
+    res.status(500).json({ error: "Failed to get rating distribution" });
+  }
+});
+
+router.get("/daily-trend", async (req: Request, res: Response) => {
+  try {
+    const { days = "30" } = req.query;
+    const daysCount = parseInt(days as string);
+    const startDate = new Date(Date.now() - daysCount * 24 * 60 * 60 * 1000);
+
+    const submissions = await prisma.ratingSubmission.findMany({
+      where: { createdAt: { gte: startDate } },
+      select: { createdAt: true, rating: true, targetRole: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const dailyData: Record<string, { date: string; count: number; avgRating: number; total: number; customer: number; driver: number; partner: number }> = {};
+
+    for (let i = 0; i < daysCount; i++) {
+      const date = new Date(Date.now() - (daysCount - 1 - i) * 24 * 60 * 60 * 1000);
+      const dateKey = date.toISOString().split("T")[0];
+      dailyData[dateKey] = { date: dateKey, count: 0, avgRating: 0, total: 0, customer: 0, driver: 0, partner: 0 };
+    }
+
+    submissions.forEach(s => {
+      const dateKey = s.createdAt.toISOString().split("T")[0];
+      if (dailyData[dateKey]) {
+        dailyData[dateKey].count++;
+        dailyData[dateKey].total += s.rating;
+        if (s.targetRole === "customer") dailyData[dateKey].customer++;
+        else if (s.targetRole === "driver") dailyData[dateKey].driver++;
+        else if (s.targetRole === "partner") dailyData[dateKey].partner++;
+      }
+    });
+
+    const trend = Object.values(dailyData).map(d => ({
+      ...d,
+      avgRating: d.count > 0 ? Math.round((d.total / d.count) * 100) / 100 : 0,
+    }));
+
+    res.json({ trend });
+  } catch (error) {
+    console.error("[AdminReputation] Daily trend error:", error);
+    res.status(500).json({ error: "Failed to get daily trend" });
+  }
+});
+
 router.post("/clear-restriction/:userId", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
