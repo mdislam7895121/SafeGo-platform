@@ -293,6 +293,16 @@ model AdminProfile {
   profilePhotoThumbnail   String?   // Thumbnail URL (128x128)
   profilePhotoLastUpdated DateTime? // When photo was last updated
 
+  // Privacy & Consent Fields (additive only)
+  privacyPolicyVersion String?   // The policy version the user last accepted (e.g., "v1.0.3")
+  termsAccepted        Boolean   @default(false) // Has the user accepted the Terms & Conditions?
+  privacyAccepted      Boolean   @default(false) // Has the user accepted the Privacy Policy?
+  policyAcceptedAt     DateTime? // When Terms + Privacy were last accepted
+  marketingOptIn       Boolean   @default(false) // Whether the user consents to receive marketing/promotional messages
+  dataSharingOptIn     Boolean   @default(true) // Whether the user allows data processing by SafeGo's required third parties
+  locationPermission   Boolean   @default(false) // Has the user granted location tracking permission inside the app?
+  trackingConsent      Boolean   @default(true) // Whether the user allows analytics, crash logs, and technical tracking
+
   @@index([countryCode])
   @@index([cityCode])
   @@map("admin_profiles")
@@ -380,6 +390,16 @@ model CustomerProfile {
 
   // Phase 4: Enterprise Admin relations
   complaints     Complaint[]
+
+  // Privacy & Consent Fields (additive only)
+  privacyPolicyVersion String?   // The policy version the user last accepted (e.g., "v1.0.3")
+  termsAccepted        Boolean   @default(false) // Has the user accepted the Terms & Conditions?
+  privacyAccepted      Boolean   @default(false) // Has the user accepted the Privacy Policy?
+  policyAcceptedAt     DateTime? // When Terms + Privacy were last accepted
+  marketingOptIn       Boolean   @default(false) // Whether the user consents to receive marketing/promotional messages
+  dataSharingOptIn     Boolean   @default(true) // Whether the user allows data processing by SafeGo's required third parties
+  locationPermission   Boolean   @default(false) // Has the user granted location tracking permission inside the app?
+  trackingConsent      Boolean   @default(true) // Whether the user allows analytics, crash logs, and technical tracking
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -757,6 +777,16 @@ model DriverProfile {
   // Phase 4: Enterprise Admin relations
   complaints                Complaint[]
   enterpriseSafetyIncidents SafetyIncident[] @relation("SafetyIncidentDriver")
+
+  // Privacy & Consent Fields (additive only)
+  privacyPolicyVersion String?   // The policy version the user last accepted (e.g., "v1.0.3")
+  termsAccepted        Boolean   @default(false) // Has the user accepted the Terms & Conditions?
+  privacyAccepted      Boolean   @default(false) // Has the user accepted the Privacy Policy?
+  policyAcceptedAt     DateTime? // When Terms + Privacy were last accepted
+  marketingOptIn       Boolean   @default(false) // Whether the user consents to receive marketing/promotional messages
+  dataSharingOptIn     Boolean   @default(true) // Whether the user allows data processing by SafeGo's required third parties
+  locationPermission   Boolean   @default(false) // Has the user granted location tracking permission inside the app?
+  trackingConsent      Boolean   @default(true) // Whether the user allows analytics, crash logs, and technical tracking
 
   @@map("driver_profiles")
 }
@@ -1198,6 +1228,16 @@ model RestaurantProfile {
   profilePhotoUrl         String?   // Main profile photo URL (512x512)
   profilePhotoThumbnail   String?   // Thumbnail URL (128x128)
   profilePhotoLastUpdated DateTime? // When photo was last updated
+
+  // Privacy & Consent Fields (additive only)
+  privacyPolicyVersion String?   // The policy version the user last accepted (e.g., "v1.0.3")
+  termsAccepted        Boolean   @default(false) // Has the user accepted the Terms & Conditions?
+  privacyAccepted      Boolean   @default(false) // Has the user accepted the Privacy Policy?
+  policyAcceptedAt     DateTime? // When Terms + Privacy were last accepted
+  marketingOptIn       Boolean   @default(false) // Whether the user consents to receive marketing/promotional messages
+  dataSharingOptIn     Boolean   @default(true) // Whether the user allows data processing by SafeGo's required third parties
+  locationPermission   Boolean   @default(false) // Has the user granted location tracking permission inside the app?
+  trackingConsent      Boolean   @default(true) // Whether the user allows analytics, crash logs, and technical tracking
 
   @@index([cityCode])
   @@index([countryCode])
@@ -7629,6 +7669,123 @@ model AnonymizationJob {
   @@map("anonymization_jobs")
 }
 
+// ===================================================
+// PRIVACY & CONSENT MANAGEMENT SYSTEM (Admin-Controlled)
+// ===================================================
+
+// Policy version management for admin to control active policies
+model PolicyVersion {
+  id String @id @default(uuid())
+
+  version    String  // e.g., "v1.0.3"
+  title      String  // e.g., "Global Privacy Policy"
+  contentUrl String  // Link to static page or PDF
+  summary    String? // Brief summary of changes
+
+  isActive Boolean @default(false) // Only one should be active at a time
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  // Admin who created this version
+
+  @@unique([version])
+  @@index([isActive])
+  @@map("policy_versions")
+}
+
+// User role enum for consent logging
+enum ConsentUserRole {
+  customer
+  driver
+  restaurant
+  admin
+  shop_partner
+  ticket_operator
+  rental_operator
+}
+
+// Consent type for logging
+enum ConsentType {
+  terms
+  privacy
+  marketing
+  tracking
+  data_sharing
+  location
+}
+
+// Audit trail for all consent changes
+model ConsentLog {
+  id String @id @default(uuid())
+
+  userId   String          // Reference to user (UUID)
+  userRole ConsentUserRole // Which role the user has
+
+  consentType   ConsentType // What type of consent was changed
+  value         Boolean     // The new value (true = granted, false = withdrawn)
+  policyVersion String?     // Which policy version this relates to
+
+  ipAddress  String? // IP address when consent was given/withdrawn
+  deviceInfo String? // User agent or device info
+  source     String? // "app", "web", "admin_override"
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([consentType])
+  @@index([createdAt])
+  @@map("consent_logs")
+}
+
+// Privacy delete/export request status
+enum PrivacyDeleteRequestStatus {
+  pending
+  processing
+  completed
+  rejected
+}
+
+// Admin-managed privacy delete/export requests (simplified from PrivacyRequest)
+model PrivacyDeleteRequest {
+  id String @id @default(uuid())
+
+  userId   String          // Reference to user
+  userRole ConsentUserRole // Which role the user has
+
+  requestType String // "delete" or "export"
+  status      PrivacyDeleteRequestStatus @default(pending)
+
+  rejectionReason String? // Reason if rejected
+
+  requestedAt DateTime @default(now())
+  processedAt DateTime?
+  processedBy String? // Admin who processed
+
+  notes String? // Admin notes
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([status])
+  @@index([requestedAt])
+  @@map("privacy_delete_requests")
+}
+
+// Data retention configuration for admin
+model PrivacyDataRetentionConfig {
+  id String @id @default(uuid())
+
+  configKey   String @unique // e.g., "ride_history_retention_years"
+  configValue String         // Value as string (parse as needed)
+  description String?        // Human-readable description
+
+  updatedAt       DateTime @default(now()) @updatedAt
+  updatedByAdminId String?
+
+  @@index([configKey])
+  @@map("privacy_data_retention_configs")
+}
+
 // Breach Response System
 enum BreachSeverity {
   low
@@ -7903,6 +8060,16 @@ model ShopPartner {
   products ShopProduct[]
   orders   ProductOrder[]
 
+  // Privacy & Consent Fields (additive only)
+  privacyPolicyVersion String?   // The policy version the user last accepted (e.g., "v1.0.3")
+  termsAccepted        Boolean   @default(false) // Has the user accepted the Terms & Conditions?
+  privacyAccepted      Boolean   @default(false) // Has the user accepted the Privacy Policy?
+  policyAcceptedAt     DateTime? // When Terms + Privacy were last accepted
+  marketingOptIn       Boolean   @default(false) // Whether the user consents to receive marketing/promotional messages
+  dataSharingOptIn     Boolean   @default(true) // Whether the user allows data processing by SafeGo's required third parties
+  locationPermission   Boolean   @default(false) // Has the user granted location tracking permission inside the app?
+  trackingConsent      Boolean   @default(true) // Whether the user allows analytics, crash logs, and technical tracking
+
   @@index([userId])
   @@index([verificationStatus])
   @@index([partnerStatus])
@@ -8160,6 +8327,16 @@ model TicketOperator {
   ticketBookings TicketBooking[]
   rentalVehicles RentalVehicle[]
   rentalBookings RentalBooking[]
+
+  // Privacy & Consent Fields (additive only)
+  privacyPolicyVersion String?   // The policy version the user last accepted (e.g., "v1.0.3")
+  termsAccepted        Boolean   @default(false) // Has the user accepted the Terms & Conditions?
+  privacyAccepted      Boolean   @default(false) // Has the user accepted the Privacy Policy?
+  policyAcceptedAt     DateTime? // When Terms + Privacy were last accepted
+  marketingOptIn       Boolean   @default(false) // Whether the user consents to receive marketing/promotional messages
+  dataSharingOptIn     Boolean   @default(true) // Whether the user allows data processing by SafeGo's required third parties
+  locationPermission   Boolean   @default(false) // Has the user granted location tracking permission inside the app?
+  trackingConsent      Boolean   @default(true) // Whether the user allows analytics, crash logs, and technical tracking
 
   @@index([userId])
   @@index([verificationStatus])

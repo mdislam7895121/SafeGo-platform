@@ -1,0 +1,379 @@
+You must now implement the SafeGo Privacy & Consent Field Layer across the platform, in a strictly NON-BREAKING way.
+
+Your ONLY scope in this task:
+- Add privacy/consent-related fields to existing user models.
+- Add system tables for policy versions, consent logs, and delete/export requests.
+- Add Admin settings and UI wiring to manage privacy behavior.
+- DO NOT modify business logic for rides, food_orders, or deliveries beyond reading these flags where needed.
+- DO NOT touch tax logic, pricing logic, or core KYC rules.
+
+You MUST obey ALL SafeGo Master Rules below. Do not violate or weaken any of them.
+
+====================================================
+SECTION 0 — SAFEGO MASTER RULES (ALWAYS IN FORCE)
+====================================================
+
+(1) ROLES — Four core roles:
+- Customer
+- Driver
+- Restaurant (Merchant)
+- Admin
+
+Each role MUST have:
+- Its own signup/onboarding flow (multi-step: basic info → address → KYC → emergency contact → verification_status="pending").
+- Its own dashboard.
+- Its own permissions.
+- Its own status flows.
+
+Partners (shop, ticket, rental) are created via separate onboarding after login. Do NOT merge or confuse those with customer signup.
+
+(2) GLOBAL SERVICES — Must remain intact:
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+You must NOT break, rename, or delete:
+- rides collection
+- food_orders collection
+- deliveries collection
+
+(3) COUNTRY-SPECIFIC KYC — Must remain untouched:
+Bangladesh (BD) mandatory fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front/back images)
+- emergency_contact details
+- verification_status + is_verified
+
+United States (US) mandatory fields:
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified
+
+You are NOT allowed to remove or change any KYC field.
+
+(4) ADMIN PANEL — Must remain powerful and isolated:
+Admin can:
+- verify customers, drivers, restaurants, shop partners, ticket partners, rental partners
+- approve/reject KYC with rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user or partner
+- manage payouts
+- view driver negative balance, restaurant negative balance, partner negative balance
+- mark balances as settled/paid
+
+(5) COMMISSION & PAYOUT RULES — Must remain intact:
+- If customer pays CASH for rides:
+  - Driver gets all cash.
+  - SafeGo commission becomes negative driver_wallet_balance.
+  - Driver must settle weekly; Admin can mark as settled.
+
+- If food order is CASH:
+  - Restaurant gets all cash.
+  - Commission becomes negative restaurant_wallet_balance.
+
+- If payment is ONLINE:
+  - SafeGo automatically keeps commission.
+  - Driver/restaurant/partner gets net payout.
+
+(6) SECURITY RULES — Never break:
+- Customers cannot view driver documents (NID, license, KYC images).
+- Drivers cannot view customer NID or sensitive KYC info.
+- Restaurant / partners cannot view other restaurants/partners.
+- Only Admin can change pricing, commission, verification, blocking.
+- Users can update only their own profile.
+- Role-based access control must be preserved.
+
+(7) STATUS FLOWS — Must remain:
+Ride:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+Do NOT alter these flows.
+
+(8) ONBOARDING — Must remain:
+All user types:
+- Multi-step onboarding.
+- verification_status = "pending" until Admin approves.
+- Block core access until approved.
+
+(9) NOTIFICATIONS — Must remain:
+System must send notifications for:
+- New rides / orders / parcels
+- Status updates
+- Verification approval/rejection
+- Important admin alerts
+
+All of the above rules remain active during your work.
+
+====================================================
+SECTION 1 — GOAL OF THIS TASK
+====================================================
+
+Implement a unified Privacy & Consent layer in SafeGo that:
+
+1) Adds standard consent and privacy fields to all relevant user models.
+2) Adds system tables to track:
+   - policy versions,
+   - user consents,
+   - data delete/export requests.
+3) Adds Admin controls to manage which policy version is active, and to configure basic data retention values.
+4) Provides a simple mechanism to enforce “must accept new policy before using app”, without breaking existing flows.
+
+You MUST do this in an additive, non-breaking way.
+
+====================================================
+SECTION 2 — DISCOVER ACTUAL MODEL NAMES
+====================================================
+
+Before adding any fields, scan the schema to determine the REAL model names for:
+
+- Customer model (e.g., Customer, User, AppUser)
+- Driver model (e.g., Driver, RideDriver)
+- Restaurant model (e.g., Restaurant, Merchant)
+- Admin model
+- Partner models:
+   * shop_partner (or equivalent)
+   * ticket_partner (or equivalent)
+   * rental_partner (or equivalent)
+
+Produce an internal mapping like:
+
+- customers model: ______
+- drivers model: ______
+- restaurants model: ______
+- admins model: ______
+- shop_partner model: ______
+- ticket_partner model: ______
+- rental_partner model: ______
+
+Use those exact model names for field additions.
+
+====================================================
+SECTION 3 — ADD PRIVACY & CONSENT FIELDS TO USER MODELS
+====================================================
+
+For EACH of these models:
+- customers
+- drivers
+- restaurants
+- admins
+- shop_partner
+- ticket_partner
+- rental_partner
+
+ADD the following fields (ADD ONLY, no renames, no deletions):
+
+- privacy_policy_version: string | null
+  (The policy version the user last accepted, e.g., "v1.0.3")
+
+- terms_accepted: boolean (default: false)
+  (Has the user accepted the Terms & Conditions?)
+
+- privacy_accepted: boolean (default: false)
+  (Has the user accepted the Privacy Policy?)
+
+- policy_accepted_at: datetime | null
+  (When Terms + Privacy were last accepted.)
+
+- marketing_opt_in: boolean (default: false)
+  (Whether the user consents to receive marketing/promotional messages.)
+
+- data_sharing_opt_in: boolean (default: true)
+  (Whether the user allows data processing by SafeGo’s required third parties such as maps, payment gateway.)
+
+- location_permission: boolean (default: false)
+  (Has the user granted location tracking permission inside the app?)
+
+- tracking_consent: boolean (default: true)
+  (Whether the user allows analytics, crash logs, and technical tracking.)
+
+Migrations must be additive and safe:
+- Existing rows should get safe defaults (false/null), not break any login or onboarding flow.
+
+====================================================
+SECTION 4 — SYSTEM TABLES FOR PRIVACY & CONSENT
+====================================================
+
+4.1) Create a new table: policy_versions
+
+Fields:
+- id (primary)
+- version (string, e.g., "v1.0.3")
+- title (string, e.g., "Global Privacy Policy")
+- content_url (string; link to static page or PDF)
+- created_at (datetime)
+- is_active (boolean)
+
+Constraints:
+- There can be multiple rows.
+- At most one row should be the "active" policy at a time (enforced via Admin panel logic, not required at DB level).
+
+4.2) Create a new table: consent_logs
+
+Fields:
+- id (primary)
+- user_id (foreign key, generic user reference or union-type depending on existing architecture)
+- user_role (enum/string: "customer", "driver", "restaurant", "admin", "shop_partner", "ticket_partner", "rental_partner")
+- consent_type (string: "terms", "privacy", "marketing", "tracking", "data_sharing")
+- value (boolean)
+- policy_version (string | null)
+- ip_address (string | null)
+- device_info (string | null)
+- created_at (datetime)
+
+Purpose:
+- Every time a user changes consent, a row is recorded.
+
+4.3) Create a new table: privacy_delete_requests
+
+Fields:
+- id (primary)
+- user_id
+- user_role
+- request_type (string: "delete", "export")
+- status (enum/string: "pending", "processing", "completed", "rejected")
+- rejection_reason (string | null)
+- requested_at (datetime)
+- processed_at (datetime | null)
+
+This table will be used by Admin to process “delete my account” and “export my data” requests without breaking core flows.
+
+4.4) OPTIONAL — If an audit_logs table already exists:
+- Extend it to include an action_type "view_personal_data" and a details field if not present.
+If there is no audit_logs table:
+- Create one with minimal fields:
+  - id
+  - admin_id
+  - target_user_id
+  - target_user_role
+  - action_type (e.g., "view_personal_data", "edit_profile", "approve_kyc")
+  - description (string)
+  - created_at (datetime)
+
+====================================================
+SECTION 5 — ADMIN PANEL: PRIVACY SETTINGS MODULE
+====================================================
+
+Add a new section in the Admin Panel:
+   “Privacy & Consent Settings”
+
+This section must be visible only to Super Admin or a dedicated “Privacy Admin” role (if role exists).
+
+Features:
+
+5.1) Active Policy Selection
+- Display the list of policy_versions.
+- Allow Admin to set one version as:
+   * current_active_policy_version
+- When a new version is activated:
+   * All users should, on next login / app open, be forced to accept the new version before they can perform core actions (rides, food, parcel, etc.).
+- Store active version in a global config (can be in DB or config store).
+
+5.2) Data Retention Settings
+If not present, add a simple config store or table for:
+
+- ride_history_retention_years (default: 5)
+- payment_record_retention_years (default: 7)
+- deleted_account_data_retention_days (default: 30–90)
+
+Link these to back-office retention jobs/cron in future; for now just store them.
+
+5.3) Data Request Management (using privacy_delete_requests)
+- List all privacy_delete_requests.
+- Filter by status.
+- Allow Admin to set status to:
+   * processing
+   * completed
+   * rejected (with rejection_reason)
+- Do NOT delete user data automatically in this task; only manage the request lifecycle.
+
+====================================================
+SECTION 6 — ENFORCEMENT HOOKS (HIGH-LEVEL, NON-BREAKING)
+====================================================
+
+You MUST NOT break or rewrite all flows, but you should add lightweight checks in the appropriate layers to enforce:
+
+6.1) On login or app open:
+- If:
+   * user.verification_status is "verified"
+   AND
+   * there is an active policy version
+   AND
+   * (user.privacy_policy_version is null OR user.privacy_policy_version != active_policy_version)
+  THEN:
+   - Mark a flag in the session or API response: must_accept_new_policy = true
+
+6.2) On core actions requests (customer side):
+- For customers:
+   - If must_accept_new_policy == true OR privacy_accepted == false OR terms_accepted == false:
+       → Block new ride/food/parcel/shop/ticket/rental actions with a clear error: "You must review and accept the latest Terms & Privacy Policy to continue."
+
+Do NOT block:
+- login
+- viewing history
+- viewing account settings
+- reading the policy
+
+6.3) For other roles (driver, restaurant, partners):
+- Apply the SAME logic: block access to core money-generating actions until they accept the latest policy.
+
+All checks must be additive, behind flags, and must NOT break non-consenting flows where the user is in the middle of accepting.
+
+====================================================
+SECTION 7 — FRONTEND FLAGS (API LEVEL ONLY)
+====================================================
+
+Extend customer/driver/partner “me” or profile endpoints to return:
+
+- privacy_policy_version
+- terms_accepted
+- privacy_accepted
+- policy_accepted_at
+- marketing_opt_in
+- data_sharing_opt_in
+- location_permission
+- tracking_consent
+- must_accept_new_policy (computed based on active policy + user state)
+
+Do NOT implement full UI here; only ensure API shape supports the apps.
+
+====================================================
+SECTION 8 — QA & NON-BREAKING VALIDATION
+====================================================
+
+Before marking this task complete:
+
+1) Confirm:
+   - No existing field in any model was renamed or deleted.
+   - rides, food_orders, deliveries collections remain unchanged structurally (except for any previously planned tax/pricing fields).
+
+2) Confirm:
+   - All user models now contain the new privacy/consent fields with safe defaults.
+   - policy_versions, consent_logs, privacy_delete_requests (and audit_logs if added) are created and migrated successfully.
+
+3) Confirm:
+   - Admin Panel shows the new “Privacy & Consent Settings” section.
+   - Admin can set active policy version.
+   - Admin can view and manage privacy_delete_requests.
+
+4) Confirm:
+   - Login still works for all roles.
+   - Ride/Food/Parcel booking still works for existing users after they accept policy.
+   - No impact on US-specific behavior, tax, or KYC logic.
+
+Only when EVERYTHING passes cleanly, report:
+
+“Privacy & Consent Field Layer — PRODUCTION READY (Non-breaking, BD + US compliant).”
