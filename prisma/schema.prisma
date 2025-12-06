@@ -13143,3 +13143,347 @@ model SettlementThreshold {
   @@index([isActive])
   @@map("settlement_thresholds")
 }
+
+// ============================================================
+// SECURITY HARDENING LAYER (Tasks 29-36)
+// ============================================================
+
+// TASK 29: JWT Token Rotation System
+model AuthToken {
+  id String @id @default(uuid())
+
+  userId          String
+  userRole        String
+  userEmail       String?
+
+  // Token details
+  accessTokenHash   String // Hashed access token
+  refreshTokenHash  String // Hashed refresh token
+  tokenFamily       String // For detecting reuse attacks
+  tokenVersion      Int @default(1)
+
+  // Expiry management
+  accessExpiresAt   DateTime
+  refreshExpiresAt  DateTime
+
+  // Device binding
+  deviceId          String?
+  deviceFingerprint String?
+  ipAddress         String?
+  userAgent         String?
+
+  // Status
+  isRevoked         Boolean @default(false)
+  revokedAt         DateTime?
+  revokedReason     String?
+
+  // Reuse detection
+  usedAt            DateTime?
+  reuseDetected     Boolean @default(false)
+  reuseDetectedAt   DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tokenFamily])
+  @@index([accessTokenHash])
+  @@index([refreshTokenHash])
+  @@index([isRevoked])
+  @@index([accessExpiresAt])
+  @@map("auth_tokens")
+}
+
+// TASK 30-31: Login Attempts & OTP Rate Limiting
+model LoginAttempt {
+  id String @id @default(uuid())
+
+  // Identifier (can be email, phone, userId)
+  identifier      String
+  identifierType  String // email, phone, user_id
+
+  // Attempt details
+  attemptType     String // login, otp_request, password_reset
+  success         Boolean @default(false)
+  failureReason   String?
+
+  // Device/network info
+  deviceId        String?
+  deviceFingerprint String?
+  ipAddress       String?
+  userAgent       String?
+  countryCode     String?
+
+  // OTP specific
+  otpSent         Boolean @default(false)
+  otpVerified     Boolean @default(false)
+
+  // Throttling metadata
+  attemptCount    Int @default(1) // Running count in current window
+  isBlocked       Boolean @default(false)
+  blockedUntil    DateTime?
+  blockReason     String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([identifier])
+  @@index([identifierType])
+  @@index([attemptType])
+  @@index([ipAddress])
+  @@index([deviceId])
+  @@index([createdAt])
+  @@index([isBlocked])
+  @@map("login_attempts")
+}
+
+// TASK 33: User Device History
+model DeviceHistory {
+  id String @id @default(uuid())
+
+  userId          String
+  userRole        String
+
+  // Device info
+  deviceId        String
+  deviceName      String?
+  deviceModel     String?
+  osName          String?
+  osVersion       String?
+  appVersion      String?
+  platform        String? // ios, android, web
+
+  // Network/location info
+  ipAddress       String?
+  ipCountry       String?
+  ipCity          String?
+  geoLatitude     Decimal? @db.Decimal(10, 8)
+  geoLongitude    Decimal? @db.Decimal(11, 8)
+
+  // Security info
+  riskScore       Int @default(0) // 0-100 from fraud module
+  riskFactors     Json?
+
+  // Activity tracking
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  loginCount      Int @default(1)
+  lastLoginIp     String?
+
+  // User management
+  isActive        Boolean @default(true)
+  isTrusted       Boolean @default(false)
+  removedByUser   Boolean @default(false)
+  removedAt       DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([deviceId])
+  @@index([lastSeenAt])
+  @@index([isActive])
+  @@index([riskScore])
+  @@map("device_history")
+}
+
+// TASK 34: Admin Full Activity Audit Log
+model AdminFullAuditLog {
+  id String @id @default(uuid())
+
+  // Admin info
+  adminId         String
+  adminEmail      String?
+  adminRole       String
+
+  // Action details
+  actionCategory  String // login, user_management, kyc, payout, settings, fraud, settlement
+  actionType      String // login_success, kyc_approved, payout_completed, etc.
+  actionSeverity  String @default("normal") // low, normal, high, critical
+
+  // Resource info
+  resourceType    String?
+  resourceId      String?
+
+  // Target info (if action affects another user)
+  targetUserId    String?
+  targetUserType  String?
+  targetUserName  String?
+
+  // Change tracking
+  beforeValue     Json?
+  afterValue      Json?
+  changeDescription String? @db.Text
+
+  // Request context
+  ipAddress       String?
+  userAgent       String?
+  deviceFingerprint String?
+  countryCode     String?
+  requestPath     String?
+  requestMethod   String?
+
+  // Immutability
+  hashChain       String? // SHA-256 chain for tamper detection
+  isVerified      Boolean @default(true)
+
+  // Metadata
+  metadata        Json?
+  reason          String?
+
+  createdAt       DateTime @default(now())
+
+  // Note: No updatedAt - logs are immutable
+
+  @@index([adminId])
+  @@index([actionCategory])
+  @@index([actionType])
+  @@index([actionSeverity])
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@map("admin_full_audit_logs")
+}
+
+// TASK 35: API Rate Limit Blocks
+model RateLimitBlock {
+  id String @id @default(uuid())
+
+  // Identifier (IP, userId, deviceId)
+  identifier      String
+  identifierType  String // ip, user_id, device_id, api_key
+
+  // Block details
+  routeCategory   String // auth, public, partner, admin
+  routePath       String?
+  requestCount    Int @default(1)
+  limitThreshold  Int
+
+  // Block status
+  isBlocked       Boolean @default(false)
+  blockedAt       DateTime?
+  blockedUntil    DateTime?
+  blockDurationMinutes Int?
+
+  // Context
+  ipAddress       String?
+  userAgent       String?
+  countryCode     String?
+
+  // Resolution
+  unblockedAt     DateTime?
+  unblockedBy     String? // admin_id or "auto"
+  unblockReason   String?
+
+  windowStart     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([identifierType])
+  @@index([routeCategory])
+  @@index([isBlocked])
+  @@index([blockedUntil])
+  @@index([createdAt])
+  @@map("rate_limit_blocks")
+}
+
+// TASK 36: WAF (Web Application Firewall) Logs
+model WafLog {
+  id String @id @default(uuid())
+
+  // Request info
+  requestPath     String
+  requestMethod   String
+  requestHeaders  Json?
+  requestBody     String? @db.Text
+
+  // Threat detection
+  threatType      String // sqli, xss, path_traversal, invalid_header, bad_user_agent
+  threatPattern   String? // The pattern that was matched
+  threatSeverity  String @default("medium") // low, medium, high, critical
+  threatScore     Int @default(0) // 0-100
+
+  // Action taken
+  actionTaken     String // blocked, logged, challenged
+  wasBlocked      Boolean @default(true)
+
+  // Source info
+  sourceIp        String
+  sourceCountry   String?
+  userAgent       String?
+  deviceFingerprint String?
+
+  // User info (if authenticated)
+  userId          String?
+  userRole        String?
+
+  // Metadata
+  ruleId          String? // Which WAF rule triggered
+  ruleName        String?
+  metadata        Json?
+
+  createdAt       DateTime @default(now())
+
+  @@index([sourceIp])
+  @@index([threatType])
+  @@index([threatSeverity])
+  @@index([actionTaken])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("waf_logs")
+}
+
+// TASK 32: Security Alerts (for suspicious login notifications)
+model SecurityAlert {
+  id String @id @default(uuid())
+
+  userId          String
+  userRole        String
+  userEmail       String?
+  userPhone       String?
+
+  // Alert details
+  alertType       String // new_device, new_country, rapid_ip_change, high_risk_location
+  alertSeverity   String @default("medium") // low, medium, high, critical
+  alertMessage    String @db.Text
+
+  // Trigger context
+  triggerDeviceId String?
+  triggerIpAddress String?
+  triggerCountry  String?
+  triggerCity     String?
+
+  // Previous vs current context
+  previousContext Json?
+  currentContext  Json?
+
+  // Notification status
+  emailSent       Boolean @default(false)
+  emailSentAt     DateTime?
+  smsSent         Boolean @default(false)
+  smsSentAt       DateTime?
+  pushSent        Boolean @default(false)
+  pushSentAt      DateTime?
+
+  // User acknowledgment
+  acknowledged    Boolean @default(false)
+  acknowledgedAt  DateTime?
+  wasLegitimate   Boolean?
+
+  // Admin review
+  reviewedByAdmin Boolean @default(false)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNote      String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([alertType])
+  @@index([alertSeverity])
+  @@index([acknowledged])
+  @@index([reviewedByAdmin])
+  @@index([createdAt])
+  @@map("security_alerts")
+}
