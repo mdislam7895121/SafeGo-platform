@@ -1,0 +1,199 @@
+Your next and ONLY authorized task is to implement the TAX SYSTEM for Bangladesh in SafeGo, without changing or introducing any tax behavior for the United States.
+
+You MUST:
+- Follow ALL SafeGo Master Rules:
+  - 4 roles: Customer, Driver, Restaurant, Admin
+  - 3 services: rides, food_orders, deliveries
+  - Country-specific KYC for BD and US (existing flows must remain intact)
+  - Existing commission logic, security rules, status flows, onboarding, notifications
+- NOT rename or delete any existing fields, routes, or tables.
+- ONLY add new tax-related fields and logic.
+- Apply tax ONLY when country_code == "BD". For US, behavior must remain exactly as it is now.
+
+====================================================
+PHASE 1 — NON-BREAKING DATA MODEL EXTENSION
+====================================================
+Extend these collections with ADD-ONLY fields:
+- rides
+- food_orders
+- deliveries
+
+New fields:
+- bd_tax_rate           (numeric, percentage)
+- bd_tax_amount         (numeric)
+- bd_tax_type           (string, e.g. "vat")
+- bd_fare_before_tax    (numeric)
+- bd_fare_after_tax     (numeric)
+
+Do NOT modify any existing fields or status flows.
+
+====================================================
+PHASE 2 — BANGLADESH TAX CONFIG STORE
+====================================================
+Create a new configuration/table: bd_tax_rules
+
+Fields:
+- id
+- service_type ("ride", "food", "parcel")
+- bd_tax_type ("vat")
+- bd_tax_rate_percentage (e.g. 15)
+- active (boolean)
+- created_at
+- updated_at
+
+Seed default rules:
+- rides: 15% VAT
+- food_orders: 15% VAT
+- deliveries (parcel): 15% VAT
+
+These rules MUST only apply when:
+- country_code == "BD"
+
+====================================================
+PHASE 3 — BD TAX ENGINE
+====================================================
+Implement a reusable function:
+
+calculateBangladeshTax({
+  service_type,
+  country_code,
+  base_amount
+}) → BdTaxResult
+
+Rules:
+1) If country_code != "BD":
+     - Return zero tax:
+       bd_tax_rate = 0
+       bd_tax_amount = 0
+       bd_fare_before_tax = base_amount
+       bd_fare_after_tax  = base_amount
+     - Do NOT change any behavior for US or other countries.
+
+2) If country_code == "BD":
+     - Load active bd_tax_rules for the given service_type.
+     - bd_fare_before_tax = base_amount
+     - bd_tax_amount = bd_fare_before_tax * (bd_tax_rate_percentage / 100)
+     - bd_fare_after_tax  = bd_fare_before_tax + bd_tax_amount
+
+Return:
+- bd_tax_type
+- bd_tax_rate
+- bd_tax_amount
+- bd_fare_before_tax
+- bd_fare_after_tax
+
+====================================================
+PHASE 4 — INTEGRATE BD TAX INTO PRICING ENGINES
+====================================================
+For each existing pricing engine:
+
+1) Ride Pricing (Bangladesh):
+   - After computing fare (including distance, time, booking fee, surge):
+       base_amount = subtotal_before_tax
+       BdTaxResult = calculateBangladeshTax(service_type="ride", country_code, base_amount)
+
+   - Store results in rides:
+       bd_tax_type
+       bd_tax_rate
+       bd_tax_amount
+       bd_fare_before_tax = base_amount
+       bd_fare_after_tax  = BdTaxResult.bd_fare_after_tax
+
+   - Use bd_fare_after_tax as the final fare shown to the customer.
+
+2) Food Orders (Bangladesh):
+   - Same pattern with service_type="food"
+
+3) Parcel Deliveries (Bangladesh):
+   - Same pattern with service_type="parcel"
+
+For ANY record where country_code != "BD":
+   - Do NOT change existing totals.
+   - Leave bd_tax_* fields zero or null.
+   - Total behavior for US must be unchanged.
+
+====================================================
+PHASE 5 — COMMISSION & WALLET INTEGRATION (BD ONLY)
+====================================================
+For Bangladesh:
+
+- Commission calculation:
+    safego_commission_base = computed commission BEFORE tax
+    bd_tax_on_commission   = safego_commission_base * (bd_tax_rate / 100)
+
+- SafeGo keeps:
+    safego_commission_total = safego_commission_base + bd_tax_on_commission
+
+- Driver earnings:
+    driver_earnings remain based on fare_before_tax, consistent with existing rules.
+
+- For CASH rides/deliveries in BD:
+    - Driver collects full bd_fare_after_tax from customer.
+    - safego_commission_total becomes negative balance in driver_wallet, as per existing SafeGo rules.
+
+- For ONLINE payments in BD:
+    - SafeGo automatically retains safego_commission_total.
+
+For US:
+- DO NOT apply any new tax logic.
+- Existing online-only rules remain unchanged.
+
+====================================================
+PHASE 6 — ADMIN PANEL: BD TAX MANAGEMENT
+====================================================
+Create a section in the Admin Panel named:
+   “Bangladesh Tax Settings”
+
+Capabilities (Super Admin only):
+- View bd_tax_rules (ride, food, parcel)
+- Edit bd_tax_rate_percentage (e.g. update VAT if law changes)
+- Enable/disable per-service BD tax
+- Preview example calculations for each service
+
+Restrictions:
+- Only Admin roles with proper permission can edit BD tax settings.
+- Customer, Driver, Restaurant cannot access this page.
+- No US tax configuration is allowed here.
+
+====================================================
+PHASE 7 — CUSTOMER & DRIVER UI (BD ONLY)
+====================================================
+Update fare breakdown for BD customers:
+
+- Show:
+   - Fare before tax
+   - VAT (15%)
+   - Total fare with tax
+
+For drivers in BD:
+- Show:
+   - Total fare customer pays (with tax)
+   - Driver earnings (as per existing rules)
+   - Clear note that SafeGo handles VAT on commission.
+
+For customers and drivers in US:
+- UI must remain exactly as it is (no BD tax lines).
+
+====================================================
+PHASE 8 — QA VALIDATION (BD vs NON-BD)
+====================================================
+Test scenarios:
+
+1) Bangladesh:
+   - Ride booking (cash + online) → confirm VAT applied and stored.
+   - Food order → VAT applied correctly.
+   - Parcel delivery → VAT applied correctly.
+   - Negative wallet balances for cash rides reflect total commission including VAT.
+   - Admin can change bd_tax_rate and system responds correctly.
+
+2) Non-BD (US):
+   - No changes in pricing, behavior, or UI.
+   - No bd_tax fields affect existing flows.
+
+3) General:
+   - No changes to KYC, onboarding, or security.
+   - No regression in rides, food_orders, deliveries.
+   - All four roles work exactly as before, but BD services now include VAT.
+
+When ALL tests pass cleanly, report:
+“Bangladesh Tax System — PRODUCTION READY (US behavior unchanged).”
