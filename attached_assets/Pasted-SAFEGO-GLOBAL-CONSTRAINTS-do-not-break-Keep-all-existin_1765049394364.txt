@@ -1,0 +1,56 @@
+SAFEGO GLOBAL CONSTRAINTS (do not break):
+- Keep all existing roles (Customer, Driver, Restaurant, Admin), KYC logic, country-specific rules, DB schemas, and APIs unchanged.
+- Do NOT rename or remove any fields in the restaurants collection (country, KYC, status, commission, etc.).
+- Only improve the UI/UX of the Admin > Restaurants > Restaurant Management table.
+
+TASK: Make the Restaurant Management table fully visible and professionally responsive on a standard laptop screen.
+
+1) Table container with horizontal scroll:
+   - Wrap the restaurants table in a container that allows horizontal scrolling:
+       overflow-x: auto;
+       overflow-y: visible;
+       max-width: 100%;
+   - The horizontal scrollbar must appear inside the table area, not on the whole page.
+   - Do NOT hide overflow on the x-axis for this table.
+
+2) Table width and layout:
+   - Use a responsive table layout with:
+       table-layout: auto;
+       min-width: max-content;  // so columns don’t squish unreadably
+   - Ensure the table can grow wider than the viewport, but is always scrollable.
+
+3) Sticky first column:
+   - Make the “Restaurant” column (name + address) sticky on the left:
+       position: sticky;
+       left: 0;
+       z-index: 2;
+       background: same as table background;
+   - This way, when scrolling horizontally, the restaurant name remains visible.
+
+4) Column priority and responsive behavior:
+   - On laptop widths, always keep these columns visible without hiding:
+       Restaurant, Email, Country, KYC, Status.
+   - Less critical columns (e.g., created_at, updated_at, internal IDs, advanced flags) can:
+       - either be collapsed into a “More”/“Details” popover per row, or
+       - be hidden behind a “Show/Hide Columns” control.
+   - Do NOT remove any data; only change how it is displayed.
+
+5) Column visibility / settings:
+   - Add a small “Columns” button above the table (next to Search / Filters) that lets the admin toggle visibility of non-critical columns.
+   - Persist the user’s column preferences in local storage or in a safe admin setting (optional, but preferred).
+
+6) Maintain the glow-card layout:
+   - Keep the existing purple glow and card styling for the Search & Filters block at the top.
+   - If the table itself is wrapped in a card, keep that card’s radius, padding, and glow consistent with the rest of the Admin panel.
+
+7) Scrolling and performance:
+   - Ensure that horizontal scrolling is smooth and does not cause the page layout to shake.
+   - Test with many restaurant rows (e.g., 50–100) to confirm the table remains responsive and readable.
+
+8) Testing:
+   - Test on a 13–15 inch laptop resolution.
+   - Verify that all important columns are accessible by scrolling right.
+   - Confirm that no columns are clipped off-screen and that the admin can always reach every column either by horizontal scroll or via the “More / Columns” options.
+
+Goal:
+Make the Admin > Restaurants > Restaurant Management table feel like a professional Uber / DoorDash admin grid: fully scrollable horizontally, with a sticky name column, clear column priorities, and no hidden data off the right edge of the screen.
