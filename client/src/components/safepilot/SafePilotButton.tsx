@@ -837,12 +837,18 @@ export function SafePilotButton() {
 
   return createPortal(
     <>
-      <Button
+      <button
         data-testid="button-safepilot-launcher"
-        size="icon"
-        className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg shadow-primary/25 z-[9999] bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-all duration-200 active:scale-95 border border-white/20 ring-2 ring-white/10 hover:ring-primary/30 hover:shadow-xl hover:shadow-primary/30"
+        type="button"
         onClick={() => setIsOpen(true)}
+        className="rounded-full shadow-lg shadow-primary/25 bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-all duration-200 active:scale-95 border border-white/20 ring-2 ring-white/10 hover:ring-primary/30 hover:shadow-xl hover:shadow-primary/30 flex items-center justify-center"
         style={{ 
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '48px',
+          height: '48px',
+          zIndex: 9999,
           WebkitTapHighlightColor: 'transparent',
         }}
       >
@@ -852,7 +858,7 @@ export function SafePilotButton() {
             {alertCount > 9 ? '9+' : alertCount}
           </span>
         )}
-      </Button>
+      </button>
 
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent 
