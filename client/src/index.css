@@ -1156,6 +1156,7 @@ html, body {
 }
 
 /* ---- PREMIUM GLOW-EDGE REFLECTION CARD SYSTEM ---- */
+/* Stable hover: uses only transform + box-shadow, no layout changes */
 .premium-glow-card {
   position: relative;
   background: #FFFFFF;
@@ -1166,7 +1167,8 @@ html, body {
     0 2px 4px rgba(0, 0, 0, 0.04),
     0 8px 20px rgba(0, 0, 0, 0.06),
     0 0 18px rgba(140, 92, 255, 0.25);
-  transition: all 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  will-change: transform;
 }
 
 .dark .premium-glow-card {
@@ -1179,18 +1181,18 @@ html, body {
 }
 
 .premium-glow-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-3px) scale(1.01);
   box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.05),
-    0 12px 30px rgba(140, 92, 255, 0.35),
-    0 0 22px rgba(140, 92, 255, 0.45);
+    0 4px 10px rgba(0, 0, 0, 0.05),
+    0 12px 32px rgba(140, 92, 255, 0.35),
+    0 0 28px rgba(120, 70, 255, 0.45);
 }
 
 .dark .premium-glow-card:hover {
   box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.15),
-    0 12px 30px rgba(140, 92, 255, 0.45),
-    0 0 22px rgba(140, 92, 255, 0.55);
+    0 4px 10px rgba(0, 0, 0, 0.15),
+    0 12px 32px rgba(140, 92, 255, 0.45),
+    0 0 28px rgba(120, 70, 255, 0.55);
 }
 
 .premium-glow-card::before {
@@ -1199,7 +1201,7 @@ html, body {
   inset: -2px;
   border-radius: inherit;
   background: linear-gradient(
-    120deg,
+    135deg,
     rgba(255, 255, 255, 0.0),
     rgba(255, 255, 255, 0.55),
     rgba(255, 255, 255, 0.0)
@@ -1210,7 +1212,7 @@ html, body {
 
 .dark .premium-glow-card::before {
   background: linear-gradient(
-    120deg,
+    135deg,
     rgba(255, 255, 255, 0.0),
     rgba(255, 255, 255, 0.15),
     rgba(255, 255, 255, 0.0)

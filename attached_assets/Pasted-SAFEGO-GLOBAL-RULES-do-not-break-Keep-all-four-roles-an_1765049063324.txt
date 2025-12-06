@@ -1,0 +1,73 @@
+SAFEGO GLOBAL RULES (do not break):
+
+- Keep all four roles and permissions unchanged: Customer, Driver, Restaurant, Admin.
+- Do NOT touch KYC logic, country rules, wallets, rides/food_orders/deliveries collections, or commission logic.
+- Do NOT rename or remove any API route, DB field, or existing page. Only ADD or refine UI components.
+- Admin panel must stay fully functional for verifying customers/drivers/restaurants and managing payouts, balances, and KYC.
+
+TASK: Fix the UX and hover behavior in the Admin "Promotions Center" without breaking any existing SafeGo logic.
+
+1) Back Navigation from Promotions Center
+- In the Promotions Center header, add a clear back navigation:
+  - A left-aligned back button: arrow icon + label “Back to Dashboard”
+  - Or a breadcrumb: Dashboard / Promotions Center
+- Default behavior: go to the main admin dashboard route (/admin or the existing dashboard route).
+- If router history is available, it is acceptable to use “back” to return to the previous admin page.
+- Make sure the back button is visible and usable on both desktop and mobile.
+
+2) Prevent page shaking when hovering promotion cards
+- For all promotion tiles (Driver Promotions, Ride Promotions, Referral Bonuses, Opportunity Bonuses) and the Quick Stats cards below:
+  - Hover must NOT change the layout box model.
+  - DO NOT change width, height, margin, padding, or border-width on hover.
+  - Glow and lift must be done only using transform and box-shadow.
+
+- Implement this hover pattern for every card:
+
+  Base state:
+    - Same width/height for all cards.
+    - min-height set so all cards in a row have identical height.
+    - display: flex or grid so content is vertically centered and stable.
+
+  Hover state:
+    - Use:
+        transform: translateY(-3px) scale(1.01);
+        box-shadow:
+          0 4px 10px rgba(0,0,0,0.05),
+          0 12px 32px rgba(140,92,255,0.35),
+          0 0 28px rgba(120,70,255,0.45);
+    - Add:
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        will-change: transform;
+
+- The purple glow / edge effect must be implemented using absolutely positioned pseudo-elements so it does not affect layout:
+
+  .promo-card::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(255,255,255,0.0),
+      rgba(255,255,255,0.55),
+      rgba(255,255,255,0.0)
+    );
+    pointer-events: none;
+  }
+
+3) Apply the same stable hover behavior to:
+   - Promotion type tiles
+   - Quick Stats cards in the Promotions Center
+   - Any new promo cards added later
+
+4) Scroll / jitter fix:
+   - Ensure the page does not “jump” or “shake” when hovering between cards.
+   - If needed, keep the vertical scrollbar always visible (overflow-y: scroll on the main container) so hover does not toggle the scrollbar.
+
+5) Testing:
+   - Test Promotions Center on desktop and laptop resolutions.
+   - Rapidly move the mouse across all cards: the content must stay stable, no shaking.
+   - Confirm that the new Back to Dashboard control works reliably and does not affect other SafeGo routes.
+
+Goal:
+Keep the existing purple hover glow on the card you touch, but make the layout fully stable (no page shaking) and add a clear back navigation so admins can return from Promotions Center to the main dashboard easily.

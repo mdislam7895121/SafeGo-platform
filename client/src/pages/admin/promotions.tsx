@@ -5,8 +5,11 @@ import {
   Target,
   Gift,
   Percent,
-  Calendar
+  Calendar,
+  ArrowLeft,
+  ChevronRight
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { StatCard, ManagementCard } from "@/components/ui/stat-card";
 import { SectionHeader } from "@/components/ui/section-header";
 
@@ -47,7 +50,31 @@ export default function AdminPromotions() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-y-scroll min-h-0">
+      {/* Back Navigation / Breadcrumb */}
+      <div className="flex items-center gap-4">
+        <Link href="/admin">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 text-[#6B7280] hover:text-[#111827] dark:text-[#9CA3AF] dark:hover:text-white"
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </Link>
+        <nav className="flex items-center gap-1.5 text-[13px] text-[#9CA3AF]" aria-label="Breadcrumb">
+          <Link href="/admin" className="hover:text-[#6B7280] dark:hover:text-[#D1D5DB] transition-colors" data-testid="breadcrumb-dashboard">
+            Dashboard
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="text-[#111827] dark:text-white font-medium" data-testid="breadcrumb-promotions">
+            Promotions Center
+          </span>
+        </nav>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[24px] font-semibold text-[#111827] dark:text-white tracking-[-0.02em]">
