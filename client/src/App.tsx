@@ -315,6 +315,7 @@ import PaymentVerification from "@/pages/admin/payment-verification";
 import PolicyManager from "@/pages/admin/policy-manager";
 import PolicySafetyHub from "@/pages/admin/policy-safety-hub";
 import ReportsManagement from "@/pages/admin/reports-management";
+import FraudPreventionCenter from "@/pages/admin/fraud-prevention-center";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
@@ -2334,6 +2335,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Reports Management">
             <ReportsManagement />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/fraud-prevention">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Fraud Prevention Center">
+            <FraudPreventionCenter />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
