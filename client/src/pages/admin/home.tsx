@@ -394,55 +394,17 @@ export default function AdminHome() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground px-4 sm:px-6 md:px-8 py-5 sm:py-6 rounded-b-2xl sm:rounded-b-3xl shadow-lg">
-        <div className="flex items-center justify-between mb-4 sm:mb-6 gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold truncate">Admin Dashboard</h1>
-            <p className="text-xs sm:text-sm opacity-90 truncate">{user?.email}</p>
+      {/* Dashboard Header - Slim, Modern Design */}
+      <div className="bg-primary/90 dark:bg-primary/80 text-primary-foreground px-4 sm:px-6 py-3 sm:py-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary-foreground/10 rounded-lg shrink-0">
+            <Shield className="h-5 w-5" />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link href="/admin/notifications">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground relative h-10 w-10 sm:h-9 sm:w-9"
-                data-testid="button-notifications"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadCount && unreadCount.count > 0 && (
-                  <Badge 
-                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-primary"
-                  >
-                    {unreadCount.count > 9 ? "9+" : unreadCount.count}
-                  </Badge>
-                )}
-              </Button>
-            </Link>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={logout}
-              className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground h-10 sm:h-9 px-3 sm:px-4 text-sm"
-              data-testid="button-logout"
-            >
-              <span className="hidden xs:inline">Logout</span>
-              <span className="xs:hidden">Exit</span>
-            </Button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-semibold truncate">Admin Dashboard</h1>
+            <p className="text-xs opacity-80 truncate">SafeGo Platform Management</p>
           </div>
         </div>
-
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-3">
-              <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
-              <div className="min-w-0">
-                <p className="font-semibold text-sm sm:text-base truncate">SafeGo Platform Management</p>
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Control and monitor the entire platform</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Welcome Message for New Admins */}

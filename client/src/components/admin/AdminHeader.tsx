@@ -106,23 +106,37 @@ export function AdminHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center justify-between gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 lg:px-6">
-      <div className="flex items-center gap-4">
-        <SidebarTrigger className="-ml-1" data-testid="button-sidebar-toggle" />
+    <header className="sticky top-0 z-50 flex h-12 items-center justify-between gap-2 sm:gap-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-2 sm:px-3 lg:px-4">
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+        <SidebarTrigger className="-ml-1 shrink-0" data-testid="button-sidebar-toggle" />
         
-        <div className="hidden md:flex">
+        {/* Dashboard Title & Badge - hidden on mobile */}
+        <div className="hidden lg:flex items-center gap-2 shrink-0">
+          <span className="font-semibold text-sm text-foreground">Dashboard</span>
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-medium uppercase tracking-wide">
+            Admin Panel
+          </Badge>
+        </div>
+        
+        <Separator orientation="vertical" className="hidden lg:block h-5 shrink-0" />
+        
+        {/* Search - visible on all sizes, responsive width */}
+        <div className="flex-1 min-w-0 max-w-xs">
           <GlobalSearch />
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <QuickActionsPanel />
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Quick actions - hidden on small screens */}
+        <div className="hidden sm:block">
+          <QuickActionsPanel />
+        </div>
         
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="h-9 w-9"
+          className="h-8 w-8"
           data-testid="button-theme-toggle"
         >
           {theme === "dark" ? (
@@ -138,13 +152,13 @@ export function AdminHeader() {
             <Button
               variant="ghost"
               size="icon"
-              className="relative h-9 w-9"
+              className="relative h-8 w-8"
               data-testid="button-notifications"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
                 <Badge
-                  className="absolute -top-1 -right-1 h-5 min-w-5 p-0 flex items-center justify-center text-[10px] bg-red-500 text-white border-2 border-background"
+                  className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[9px] bg-red-500 text-white border border-background"
                   data-testid="badge-notification-count"
                 >
                   {unreadCount > 99 ? "99+" : unreadCount}
@@ -238,21 +252,21 @@ export function AdminHeader() {
           </PopoverContent>
         </Popover>
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        <Separator orientation="vertical" className="h-5 mx-0.5 sm:mx-1" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="gap-2 h-9 px-2"
+              className="gap-1.5 h-8 px-1.5 sm:px-2"
               data-testid="button-admin-menu"
             >
-              <Avatar className="h-7 w-7 border">
-                <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+              <Avatar className="h-6 w-6 border">
+                <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <span className="hidden lg:inline-block text-sm font-medium max-w-24 truncate">
+              <span className="hidden lg:inline-block text-sm font-medium max-w-20 truncate">
                 {adminName}
               </span>
             </Button>
@@ -290,6 +304,19 @@ export function AdminHeader() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Quick Logout Button - always visible */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={logout}
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          title="Log out"
+          data-testid="button-header-logout"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="sr-only">Log out</span>
+        </Button>
       </div>
     </header>
   );
