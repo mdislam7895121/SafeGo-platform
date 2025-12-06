@@ -129,41 +129,49 @@ export default function AdminActivityLog() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin")}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Admin Activity Log</h1>
-            <p className="text-sm text-primary-foreground/80">
-              Security and compliance audit trail
-            </p>
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/admin")}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <Shield className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-semibold text-foreground">Admin Activity Log</h1>
+              <p className="text-[11px] text-muted-foreground">Security and compliance audit trail</p>
+            </div>
           </div>
         </div>
+      </div>
 
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-foreground/60" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             placeholder="Search by admin email..."
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10 bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/60 border-primary-foreground/20"
+            className="pl-10"
             data-testid="input-search"
           />
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="px-6 mt-6 space-y-4">
+        {/* Filters */}
+        <div className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Filter className="h-4 w-4" />
           Filters
@@ -232,19 +240,16 @@ export default function AdminActivityLog() {
             </SelectContent>
           </Select>
         </div>
-      </div>
+        </div>
 
-      {/* Results Summary */}
-      {data && !isLoading && (
-        <div className="px-6 mt-4">
+        {/* Results Summary */}
+        {data && !isLoading && (
           <p className="text-sm text-muted-foreground" data-testid="text-results-summary">
             Showing {data.logs.length} of {data.pagination.total} audit events
           </p>
-        </div>
-      )}
+        )}
 
-      {/* Audit Logs Table */}
-      <div className="px-6 mt-4">
+        {/* Audit Logs Table */}
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
@@ -319,32 +324,32 @@ export default function AdminActivityLog() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Pagination */}
-      {data && data.pagination.totalPages > 1 && (
-        <div className="px-6 mt-6 flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            data-testid="button-previous-page"
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground" data-testid="text-page-info">
-            Page {currentPage} of {data.pagination.totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage((p) => Math.min(data.pagination.totalPages, p + 1))}
-            disabled={currentPage === data.pagination.totalPages}
-            data-testid="button-next-page"
-          >
-            Next
-          </Button>
-        </div>
-      )}
+        {/* Pagination */}
+        {data && data.pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              data-testid="button-previous-page"
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground" data-testid="text-page-info">
+              Page {currentPage} of {data.pagination.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((p) => Math.min(data.pagination.totalPages, p + 1))}
+              disabled={currentPage === data.pagination.totalPages}
+              data-testid="button-next-page"
+            >
+              Next
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

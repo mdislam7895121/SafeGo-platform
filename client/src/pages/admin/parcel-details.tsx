@@ -79,23 +79,32 @@ export default function AdminParcelDetails() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-6">
-        <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/admin/parcels")}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Parcel Details</h1>
-              <p className="text-sm opacity-90">Loading...</p>
+        <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+          <div className="px-4 sm:px-6 py-3">
+            <div className="mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/admin/parcels")}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Back to Parcels</span>
+                <span className="sm:hidden">Back</span>
+              </Button>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+                <Package className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-semibold text-foreground">Parcel Details</h1>
+                <p className="text-[11px] text-muted-foreground">Loading...</p>
+              </div>
             </div>
           </div>
         </div>
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4">
           <Skeleton className="h-48 w-full" />
         </div>
       </div>
@@ -105,18 +114,28 @@ export default function AdminParcelDetails() {
   if (!parcel) {
     return (
       <div className="min-h-screen bg-background pb-6">
-        <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/admin/parcels")}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Parcel Not Found</h1>
+        <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+          <div className="px-4 sm:px-6 py-3">
+            <div className="mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/admin/parcels")}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Back to Parcels</span>
+                <span className="sm:hidden">Back</span>
+              </Button>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+                <Package className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-semibold text-foreground">Parcel Not Found</h1>
+                <p className="text-[11px] text-muted-foreground">The requested parcel could not be found</p>
+              </div>
             </div>
           </div>
         </div>
@@ -126,43 +145,38 @@ export default function AdminParcelDetails() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin/parcels")}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Parcel Details</h1>
-            <p className="text-sm opacity-90 font-mono">{parcel.id}</p>
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/admin/parcels")}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Back to Parcels</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+                <Package className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-semibold text-foreground">Parcel Details</h1>
+                <p className="text-[11px] text-muted-foreground font-mono">{parcel.id}</p>
+              </div>
+            </div>
+            {getStatusBadge(parcel.status)}
           </div>
         </div>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Package className="h-6 w-6 text-primary" />
-                <div>
-                  <p className="font-semibold">Parcel Delivery</p>
-                  <p className="text-sm text-muted-foreground">
-                    Created {format(new Date(parcel.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                  </p>
-                </div>
-              </div>
-              {getStatusBadge(parcel.status)}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Overview */}
         <Card>
           <CardHeader>
