@@ -837,7 +837,7 @@ export function SafePilotButton() {
 
   return (
     <>
-      {createPortal(
+      {!isOpen && createPortal(
         <button
           data-testid="button-safepilot-launcher"
           type="button"
