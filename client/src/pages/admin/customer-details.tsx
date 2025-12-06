@@ -328,27 +328,55 @@ export default function CustomerDetails() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setLocation("/admin/customers")}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight" data-testid="heading-customer-details">Customer Details</h2>
-            <p className="text-muted-foreground" data-testid="text-email">{customer.user.email}</p>
+    <div className="min-h-screen bg-background pb-6">
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocation("/admin/customers")}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Back to Customers</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <User className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-lg font-semibold text-foreground" data-testid="heading-customer-details">Customer Details</h1>
+              <p className="text-[11px] text-muted-foreground truncate" data-testid="text-email">{customer.user.email}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {getKycBadge()}
+            <Badge variant="outline" data-testid="badge-country">
+              <MapPin className="h-3 w-3 mr-1" />
+              {customer.user.countryCode}
+            </Badge>
+            {customer.user.isBlocked && (
+              <Badge variant="destructive" data-testid="badge-blocked">Blocked</Badge>
+            )}
+            {customer.isSuspended && (
+              <Badge variant="secondary" data-testid="badge-suspended">Suspended</Badge>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+      </div>
+
+      <div className="p-4 md:p-6 space-y-4">
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-2">
           {customer.isSuspended ? (
             <Button
               variant="default"
+              size="sm"
               onClick={() => unsuspendMutation.mutate()}
               disabled={unsuspendMutation.isPending}
               data-testid="button-unsuspend"
@@ -358,6 +386,7 @@ export default function CustomerDetails() {
           ) : (
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => setShowSuspendDialog(true)}
               disabled={customer.user.isBlocked}
               data-testid="button-suspend"
@@ -368,6 +397,7 @@ export default function CustomerDetails() {
           {customer.user.isBlocked ? (
             <Button
               variant="default"
+              size="sm"
               onClick={() => setShowUnblockDialog(true)}
               data-testid="button-unblock"
             >
@@ -376,6 +406,7 @@ export default function CustomerDetails() {
           ) : (
             <Button
               variant="destructive"
+              size="sm"
               onClick={() => setShowBlockDialog(true)}
               data-testid="button-block"
             >
@@ -383,24 +414,8 @@ export default function CustomerDetails() {
             </Button>
           )}
         </div>
-      </div>
 
-      {/* Status Badges */}
-      <div className="flex gap-2">
-        {getKycBadge()}
-        <Badge variant="outline" data-testid="badge-country">
-          <MapPin className="h-3 w-3 mr-1" />
-          {customer.user.countryCode}
-        </Badge>
-        {customer.user.isBlocked && (
-          <Badge variant="destructive" data-testid="badge-blocked">Blocked</Badge>
-        )}
-        {customer.isSuspended && (
-          <Badge variant="secondary" data-testid="badge-suspended">Suspended</Badge>
-        )}
-      </div>
-
-      {/* Suspension Notice */}
+        {/* Suspension Notice */}
       {customer.isSuspended && customer.suspensionReason && (
         <Card className="border-orange-500">
           <CardHeader>
@@ -1016,6 +1031,7 @@ export default function CustomerDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

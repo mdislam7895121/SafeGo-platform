@@ -1006,27 +1006,40 @@ export default function AdminDriverDetails() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin/drivers")}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">Driver Details</h1>
-            {isLoading ? (
-              <Skeleton className="h-4 w-48 mt-1 bg-primary-foreground/20" />
-            ) : (
-              <p className="text-sm opacity-90" data-testid="text-email">{driver?.email}</p>
-            )}
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/admin/drivers")}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Back to Drivers</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
           </div>
-          {!isLoading && driver && getStatusBadge()}
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <Car className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-lg font-semibold text-foreground">Driver Details</h1>
+              {isLoading ? (
+                <Skeleton className="h-3 w-48 mt-1" />
+              ) : (
+                <p className="text-[11px] text-muted-foreground truncate" data-testid="text-email">{driver?.email}</p>
+              )}
+            </div>
+          </div>
+          {!isLoading && driver && (
+            <div className="flex gap-1.5 flex-wrap mt-2">
+              {getStatusBadge()}
+            </div>
+          )}
         </div>
       </div>
 

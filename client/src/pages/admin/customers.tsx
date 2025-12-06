@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Users, Search, Filter, ShoppingBag, Car, Package, UserCheck, UserX, Clock } from "lucide-react";
+import { Users, Search, Filter, ShoppingBag, Car, Package, UserCheck, UserX, Clock, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -86,28 +86,37 @@ export default function AdminCustomers() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-6 lg:p-8 pt-4 sm:pt-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight" data-testid="heading-customer-management">Customer Management</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage all customer accounts, KYC status, and usage statistics
-          </p>
-        </div>
-        <div className="flex items-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLocation("/admin")}
-            data-testid="button-back-dashboard"
-            className="min-h-[44px] sm:min-h-9"
-          >
-            Back to Dashboard
-          </Button>
+    <div className="min-h-screen bg-background pb-6">
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocation("/admin")}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back-dashboard"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <Users className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-semibold text-foreground" data-testid="heading-customer-management">Customer Management</h1>
+              <p className="text-[11px] text-muted-foreground">Manage all customer accounts and KYC status</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
+      <div className="p-4 md:p-6 space-y-4">
+        {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -283,6 +292,7 @@ export default function AdminCustomers() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

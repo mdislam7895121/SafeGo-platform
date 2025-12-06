@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, CheckCircle, XCircle, Clock, Store, Bus } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Clock, Store, Bus, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -227,19 +227,37 @@ export default function AdminKYC() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Link href="/admin">
-            <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">KYC Approvals</h1>
+    <div className="min-h-screen bg-background pb-6">
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Link href="/admin">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Back to Dashboard</span>
+                <span className="sm:hidden">Back</span>
+              </Button>
+            </Link>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <Shield className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-semibold text-foreground">KYC Approvals</h1>
+              <p className="text-[11px] text-muted-foreground">Review and approve partner documents</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <Tabs defaultValue="driver" onValueChange={setSelectedRole}>
           <TabsList className="flex flex-wrap gap-3 items-center h-auto p-2 w-full">
             <TabsTrigger 
