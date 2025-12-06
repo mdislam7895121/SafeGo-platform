@@ -320,6 +320,7 @@ import FinanceCenter from "@/pages/admin/finance-center";
 import PayoutCenter from "@/pages/admin/payout-center";
 import FinanceLogs from "@/pages/admin/finance-logs";
 import SecurityCenter from "@/pages/admin/SecurityCenter";
+import ReputationCenter from "@/pages/admin/ReputationCenter";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
@@ -2374,6 +2375,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Security Center">
             <SecurityCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/reputation-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Reputation Center">
+            <ReputationCenter />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
