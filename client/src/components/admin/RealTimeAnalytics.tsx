@@ -99,12 +99,12 @@ function MetricCard({ title, value, change, icon: Icon, format = "number", chart
   return (
     <BaseAnalyticsCard icon={Icon} testId={testId}>
       <div className="flex flex-col justify-between h-full min-h-[92px]">
-        <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">
           {title}
         </p>
 
         <div className="flex-1 flex items-center justify-between">
-          <p className="text-[32px] font-semibold text-[#111827] dark:text-white tracking-tight">
+          <p className="text-[32px] font-semibold text-[#111827] dark:text-white tracking-[-0.02em]">
             {typeof value === "number" ? (
               <AnimatedNumber value={format === "percent" ? Math.max(0, value) : value} format={format} />
             ) : (
@@ -118,10 +118,10 @@ function MetricCard({ title, value, change, icon: Icon, format = "number", chart
 
         <div className="flex items-center gap-1">
           <TrendIcon className={cn("w-3 h-3", getChangeColor())} />
-          <span className={cn("text-xs font-normal", getChangeColor())}>
+          <span className={cn("text-[12px] font-normal", getChangeColor())}>
             {Math.abs(safeChange).toFixed(1)}%
           </span>
-          <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+          <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">
             vs last hour
           </span>
         </div>

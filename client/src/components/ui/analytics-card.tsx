@@ -82,73 +82,26 @@ export function BaseAnalyticsCard({
   return (
     <div
       className={cn(
-        "relative",
-        "bg-white dark:bg-[#1C1C1E]",
-        "p-6",
-        "rounded-[16px]",
-        "min-h-[140px]",
-        "border border-white/35 dark:border-white/10",
-        "backdrop-blur-[8px]",
-        "transition-all duration-[250ms] ease-out",
-        "hover:-translate-y-[3px]",
-        "group",
         "premium-glow-card",
+        "p-6",
+        "min-h-[140px]",
+        "group",
         className
       )}
-      style={{
-        boxShadow: `
-          0 2px 4px rgba(0, 0, 0, 0.04),
-          0 8px 20px rgba(0, 0, 0, 0.06),
-          0 0 18px rgba(140, 92, 255, 0.25)
-        `,
-      }}
       data-testid={testId}
     >
-      <div
-        className="absolute inset-[-2px] rounded-[inherit] pointer-events-none z-0"
-        style={{
-          background: `linear-gradient(
-            120deg,
-            rgba(255, 255, 255, 0.0),
-            rgba(255, 255, 255, 0.55),
-            rgba(255, 255, 255, 0.0)
-          )`,
-        }}
-      />
-      
-      <div className="relative z-10">
-        {Icon && (
-          <Icon
-            className={cn(
-              "absolute top-0 right-0 w-9 h-9 text-[#111827] dark:text-white opacity-[0.12]",
-              iconClassName
-            )}
-            strokeWidth={1.5}
-          />
-        )}
-        {children}
-      </div>
+      {Icon && (
+        <Icon
+          className={cn(
+            "premium-icon-watermark",
+            iconClassName
+          )}
+          strokeWidth={1.5}
+        />
+      )}
+      {children}
     </div>
   );
-}
-
-const glowCardStyles = `
-  .premium-glow-card:hover {
-    box-shadow:
-      0 4px 12px rgba(0, 0, 0, 0.05),
-      0 12px 30px rgba(140, 92, 255, 0.35),
-      0 0 22px rgba(140, 92, 255, 0.45) !important;
-  }
-`;
-
-if (typeof document !== 'undefined') {
-  const styleId = 'premium-glow-card-styles';
-  if (!document.getElementById(styleId)) {
-    const styleElement = document.createElement('style');
-    styleElement.id = styleId;
-    styleElement.textContent = glowCardStyles;
-    document.head.appendChild(styleElement);
-  }
 }
 
 interface AnalyticsCardProps {
@@ -376,6 +329,23 @@ export function AnalyticsGrid({ children, className }: AnalyticsGridProps) {
         "lg:grid-cols-5",
         className
       )}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface PremiumGlowSurfaceProps {
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+}
+
+export function PremiumGlowSurface({ children, className, testId }: PremiumGlowSurfaceProps) {
+  return (
+    <div
+      className={cn("premium-glow-card p-6", className)}
+      data-testid={testId}
     >
       {children}
     </div>

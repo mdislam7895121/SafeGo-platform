@@ -28,7 +28,7 @@ export function StatCard({
   return (
     <BaseAnalyticsCard icon={icon} iconClassName={iconColor} testId={testId} className={className}>
       <div className="flex flex-col justify-between h-full min-h-[92px]">
-        <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">
           {label}
         </p>
 
@@ -75,7 +75,7 @@ export function ManagementCard({
   className,
 }: ManagementCardProps) {
   return (
-    <BaseAnalyticsCard testId={testId} className={cn("group cursor-pointer", className)}>
+    <BaseAnalyticsCard testId={testId} className={cn("cursor-pointer", className)}>
       <div className="flex items-start justify-between mb-4 gap-3">
         <div 
           className={cn(
@@ -88,7 +88,7 @@ export function ManagementCard({
         </div>
         {badge !== undefined && badge > 0 && (
           <span 
-            className="min-w-[1.5rem] h-6 px-2 flex items-center justify-center rounded-full bg-[#EF4444] text-white text-xs font-bold shadow-sm shrink-0"
+            className="min-w-[1.5rem] h-6 px-2 flex items-center justify-center rounded-full bg-[#EF4444] text-white text-[12px] font-bold shadow-sm shrink-0"
             data-testid={testId ? `badge-${testId.replace('card-', '')}` : undefined}
           >
             {badge > 99 ? "99+" : badge}
@@ -98,7 +98,7 @@ export function ManagementCard({
       <h3 className="font-semibold text-base text-[#111827] dark:text-white mb-1 group-hover:text-primary transition-colors leading-tight">
         {title}
       </h3>
-      <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed line-clamp-2">
+      <p className="text-[14px] text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed line-clamp-2">
         {description}
       </p>
     </BaseAnalyticsCard>
