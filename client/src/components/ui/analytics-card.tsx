@@ -85,28 +85,70 @@ export function BaseAnalyticsCard({
         "relative",
         "bg-white dark:bg-[#1C1C1E]",
         "p-6",
-        "rounded-[14px]",
-        "shadow-[0_4px_16px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.2)]",
+        "rounded-[16px]",
         "min-h-[140px]",
-        "transition-all duration-200 ease-out",
-        "hover:scale-[1.01] hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_6px_20px_rgba(0,0,0,0.3)]",
-        "overflow-hidden",
+        "border border-white/35 dark:border-white/10",
+        "backdrop-blur-[8px]",
+        "transition-all duration-[250ms] ease-out",
+        "hover:-translate-y-[3px]",
+        "group",
+        "premium-glow-card",
         className
       )}
+      style={{
+        boxShadow: `
+          0 2px 4px rgba(0, 0, 0, 0.04),
+          0 8px 20px rgba(0, 0, 0, 0.06),
+          0 0 18px rgba(140, 92, 255, 0.25)
+        `,
+      }}
       data-testid={testId}
     >
-      {Icon && (
-        <Icon
-          className={cn(
-            "absolute top-4 right-4 w-9 h-9 text-[#111827] dark:text-white opacity-[0.10] dark:opacity-[0.12]",
-            iconClassName
-          )}
-          strokeWidth={1.5}
-        />
-      )}
-      {children}
+      <div
+        className="absolute inset-[-2px] rounded-[inherit] pointer-events-none z-0"
+        style={{
+          background: `linear-gradient(
+            120deg,
+            rgba(255, 255, 255, 0.0),
+            rgba(255, 255, 255, 0.55),
+            rgba(255, 255, 255, 0.0)
+          )`,
+        }}
+      />
+      
+      <div className="relative z-10">
+        {Icon && (
+          <Icon
+            className={cn(
+              "absolute top-0 right-0 w-9 h-9 text-[#111827] dark:text-white opacity-[0.12]",
+              iconClassName
+            )}
+            strokeWidth={1.5}
+          />
+        )}
+        {children}
+      </div>
     </div>
   );
+}
+
+const glowCardStyles = `
+  .premium-glow-card:hover {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.05),
+      0 12px 30px rgba(140, 92, 255, 0.35),
+      0 0 22px rgba(140, 92, 255, 0.45) !important;
+  }
+`;
+
+if (typeof document !== 'undefined') {
+  const styleId = 'premium-glow-card-styles';
+  if (!document.getElementById(styleId)) {
+    const styleElement = document.createElement('style');
+    styleElement.id = styleId;
+    styleElement.textContent = glowCardStyles;
+    document.head.appendChild(styleElement);
+  }
 }
 
 interface AnalyticsCardProps {
@@ -152,7 +194,7 @@ export function AnalyticsCard({
   return (
     <BaseAnalyticsCard icon={icon} testId={testId} className={className}>
       <div className="flex flex-col justify-between h-full min-h-[92px]">
-        <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">
           {label}
         </p>
 
@@ -172,10 +214,10 @@ export function AnalyticsCard({
         {change !== undefined && (
           <div className="flex items-center gap-1">
             <TrendIcon className={cn("w-3 h-3", getChangeColor())} />
-            <span className={cn("text-xs font-normal", getChangeColor())}>
+            <span className={cn("text-[12px] font-normal", getChangeColor())}>
               {Math.abs(change).toFixed(1)}%
             </span>
-            <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+            <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">
               {changeLabel}
             </span>
           </div>
@@ -207,7 +249,7 @@ export function AnalyticsStatCard({
   return (
     <BaseAnalyticsCard icon={icon} iconClassName={iconColor} testId={testId} className={className}>
       <div className="flex flex-col justify-between h-full min-h-[92px]">
-        <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">
           {label}
         </p>
 
@@ -254,7 +296,7 @@ export function AnalyticsManagementCard({
   className,
 }: AnalyticsManagementCardProps) {
   return (
-    <BaseAnalyticsCard testId={testId} className={cn("group cursor-pointer", className)}>
+    <BaseAnalyticsCard testId={testId} className={cn("cursor-pointer", className)}>
       <div className="flex items-start justify-between mb-4 gap-3">
         <div
           className={cn(
@@ -267,7 +309,7 @@ export function AnalyticsManagementCard({
         </div>
         {badge !== undefined && badge > 0 && (
           <span
-            className="min-w-[1.5rem] h-6 px-2 flex items-center justify-center rounded-full bg-[#EF4444] text-white text-xs font-bold shadow-sm shrink-0"
+            className="min-w-[1.5rem] h-6 px-2 flex items-center justify-center rounded-full bg-[#EF4444] text-white text-[12px] font-bold shadow-sm shrink-0"
             data-testid={testId ? `badge-${testId}` : undefined}
           >
             {badge > 99 ? "99+" : badge}
@@ -278,7 +320,7 @@ export function AnalyticsManagementCard({
       <h3 className="font-semibold text-base text-[#111827] dark:text-white mb-1 group-hover:text-primary transition-colors leading-tight">
         {title}
       </h3>
-      <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed line-clamp-2">
+      <p className="text-[14px] text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed line-clamp-2">
         {description}
       </p>
     </BaseAnalyticsCard>
@@ -297,7 +339,7 @@ export function ConnectionBadge({ isConnected, className }: ConnectionBadgeProps
         "inline-flex items-center gap-1.5",
         "px-3 py-1.5",
         "rounded-md",
-        "text-xs font-medium",
+        "text-[12px] font-medium",
         isConnected
           ? "bg-[#DCFCE7] text-[#166534] dark:bg-[#14532D] dark:text-[#86EFAC]"
           : "bg-[#FEF3C7] text-[#92400E] dark:bg-[#78350F] dark:text-[#FEF3C7]",
