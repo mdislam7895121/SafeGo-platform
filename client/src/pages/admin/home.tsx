@@ -394,21 +394,30 @@ export default function AdminHome() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Dashboard Header - Slim, Modern Design */}
-      <div className="bg-primary/90 dark:bg-primary/80 text-primary-foreground px-4 sm:px-6 py-3 sm:py-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-foreground/10 rounded-lg shrink-0">
-            <Shield className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg sm:text-xl font-semibold truncate">Admin Dashboard</h1>
-            <p className="text-xs opacity-80 truncate">SafeGo Platform Management</p>
+      {/* Dashboard Header - Premium Minimal Design */}
+      <div className="relative border-b border-border/50 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+        <div className="px-4 sm:px-6 md:px-8 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <Shield className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-semibold text-foreground">Admin Dashboard</h1>
+                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-medium uppercase tracking-wide hidden sm:inline-flex">
+                  Platform
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground">SafeGo Platform Management</p>
+            </div>
           </div>
         </div>
+        {/* Subtle bottom glow line */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
       </div>
 
       {/* Welcome Message for New Admins */}
-      <div className="px-4 sm:px-6 md:px-8 pt-4 sm:pt-6">
+      <div className="px-4 sm:px-6 md:px-8 pt-4">
         <WelcomeMessage
           title="Welcome to SafeGo Admin!"
           message="You have full access to manage drivers, restaurants, customers, and platform settings. Use the quick actions below to get started or explore the management sections."
@@ -420,14 +429,14 @@ export default function AdminHome() {
       </div>
 
       {/* Real-Time Analytics Dashboard */}
-      <div className="px-4 sm:px-6 md:px-8 pt-4 sm:pt-6">
+      <div className="px-4 sm:px-6 md:px-8 pt-5">
         <RealTimeAnalytics />
       </div>
 
       {/* Quick Actions */}
-      <div className="px-4 sm:px-6 md:px-8 pt-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">Quick Actions</h2>
+      <div className="px-4 sm:px-6 md:px-8 pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[13px] font-medium text-muted-foreground">Quick Actions</h2>
         </div>
         <div className="flex flex-wrap gap-3">
           <Link href="/admin/drivers?action=add">
@@ -465,7 +474,7 @@ export default function AdminHome() {
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 md:px-8 pt-8 pb-6 space-y-8">
+      <div className="px-4 sm:px-6 md:px-8 pt-6 pb-6 space-y-6">
         {/* Quick Stats */}
         <div>
           <SectionHeader 

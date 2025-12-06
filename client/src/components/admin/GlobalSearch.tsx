@@ -110,14 +110,14 @@ export function GlobalSearch() {
       <Button
         variant="outline"
         onClick={() => setOpen(true)}
-        className="relative h-9 w-full max-w-xs justify-start gap-2 rounded-lg bg-muted/50 px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground border-transparent shadow-sm"
+        className="relative h-8 w-full justify-start gap-2 rounded-md bg-muted/40 px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground border-border/50 shadow-none"
         data-testid="button-global-search"
       >
-        <Search className="h-4 w-4 shrink-0" />
-        <span className="hidden sm:inline-flex">Search everything...</span>
-        <span className="sm:hidden">Search...</span>
-        <kbd className="pointer-events-none absolute right-2 hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-          <span className="text-xs">⌘</span>K
+        <Search className="h-3.5 w-3.5 shrink-0" />
+        <span className="hidden sm:inline-flex truncate">Search everything...</span>
+        <span className="sm:hidden">Search</span>
+        <kbd className="pointer-events-none absolute right-2 hidden h-4 select-none items-center gap-0.5 rounded border bg-background/80 px-1 font-mono text-[9px] font-medium opacity-80 sm:flex">
+          <span className="text-[9px]">⌘</span>K
         </kbd>
       </Button>
 
