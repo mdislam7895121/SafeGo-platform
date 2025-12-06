@@ -316,6 +316,9 @@ import PolicyManager from "@/pages/admin/policy-manager";
 import PolicySafetyHub from "@/pages/admin/policy-safety-hub";
 import ReportsManagement from "@/pages/admin/reports-management";
 import FraudPreventionCenter from "@/pages/admin/fraud-prevention-center";
+import FinanceCenter from "@/pages/admin/finance-center";
+import PayoutCenter from "@/pages/admin/payout-center";
+import FinanceLogs from "@/pages/admin/finance-logs";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
@@ -2342,6 +2345,27 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Fraud Prevention Center">
             <FraudPreventionCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Finance Center">
+            <FinanceCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payout-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Payout Center">
+            <PayoutCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance-logs">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Finance Audit Logs">
+            <FinanceLogs />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
