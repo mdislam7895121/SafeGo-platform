@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users,
   TrendingUp,
@@ -12,11 +9,11 @@ import {
   AlertCircle,
   RefreshCw,
   Activity,
-  Wifi,
-  WifiOff,
+  Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { AnalyticsGrid, ConnectionBadge, BaseAnalyticsCard, AnimatedNumber } from "@/components/ui/analytics-card";
 
 interface AnalyticsData {
   activeUsers: number;
@@ -37,16 +34,6 @@ interface ChartDataPoint {
   value: number;
 }
 
-interface MetricCardProps {
-  title: string;
-  value: number | string;
-  change: number;
-  icon: any;
-  color: string;
-  format?: "number" | "percent" | "currency";
-  chartData?: ChartDataPoint[];
-}
-
 function MiniSparkline({ data, color }: { data: ChartDataPoint[]; color: string }) {
   if (!data || data.length < 2) return null;
   
@@ -61,7 +48,7 @@ function MiniSparkline({ data, color }: { data: ChartDataPoint[]; color: string 
   }).join(" ");
 
   return (
-    <svg className="w-20 h-8" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <svg className="w-16 h-6 opacity-60" viewBox="0 0 100 100" preserveAspectRatio="none">
       <polyline
         fill="none"
         stroke={color}
@@ -74,63 +61,72 @@ function MiniSparkline({ data, color }: { data: ChartDataPoint[]; color: string 
   );
 }
 
-function MetricCard({ title, value, change, icon: Icon, color, format = "number", chartData }: MetricCardProps) {
-  const isPositive = change >= 0;
-  const TrendIcon = isPositive ? TrendingUp : TrendingDown;
+interface MetricCardProps {
+  title: string;
+  value: number | string;
+  change: number;
+  icon: any;
+  format?: "number" | "percent" | "currency";
+  chartData?: ChartDataPoint[];
+  testId?: string;
+}
+
+function MetricCard({ title, value, change, icon: Icon, format = "number", chartData, testId }: MetricCardProps) {
+  const safeChange = format === "percent" && typeof value === "number" && value === 0 ? 0 : change;
+  const isPositive = safeChange > 0;
+  const isNegative = safeChange < 0;
   
-  const formatValue = (val: number | string) => {
-    if (typeof val === "string") return val;
-    switch (format) {
-      case "percent":
-        return `${val.toFixed(1)}%`;
-      case "currency":
-        return new Intl.NumberFormat("en-US", { 
-          style: "currency", 
-          currency: "USD",
-          minimumFractionDigits: 0 
-        }).format(val);
-      default:
-        return new Intl.NumberFormat("en-US").format(val);
-    }
+  const getTrendIcon = () => {
+    if (isPositive) return TrendingUp;
+    if (isNegative) return TrendingDown;
+    return Minus;
+  };
+  
+  const TrendIcon = getTrendIcon();
+
+  const getChangeColor = () => {
+    if (isPositive) return "text-[#22C55E]";
+    if (isNegative) return "text-[#EF4444]";
+    return "text-[#9CA3AF]";
+  };
+
+  const getSparklineColor = () => {
+    if (isPositive) return "#22C55E";
+    if (isNegative) return "#EF4444";
+    return "#9CA3AF";
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground font-medium">{title}</p>
-            <p className="text-2xl font-bold tracking-tight">{formatValue(value)}</p>
-            <div className="flex items-center gap-1">
-              <Badge 
-                variant="secondary" 
-                className={cn(
-                  "text-xs font-medium gap-0.5 px-1.5",
-                  isPositive 
-                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
-                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                )}
-              >
-                <TrendIcon className="h-3 w-3" />
-                {Math.abs(change).toFixed(1)}%
-              </Badge>
-              <span className="text-xs text-muted-foreground">vs last hour</span>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className={cn("p-2 rounded-lg", color)}>
-              <Icon className="h-5 w-5" />
-            </div>
-            {chartData && (
-              <MiniSparkline 
-                data={chartData} 
-                color={isPositive ? "#22c55e" : "#ef4444"} 
-              />
+    <BaseAnalyticsCard icon={Icon} testId={testId}>
+      <div className="flex flex-col justify-between h-full min-h-[92px]">
+        <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+          {title}
+        </p>
+
+        <div className="flex-1 flex items-center justify-between">
+          <p className="text-[32px] font-semibold text-[#111827] dark:text-white tracking-tight">
+            {typeof value === "number" ? (
+              <AnimatedNumber value={format === "percent" ? Math.max(0, value) : value} format={format} />
+            ) : (
+              value
             )}
-          </div>
+          </p>
+          {chartData && chartData.length > 1 && (
+            <MiniSparkline data={chartData} color={getSparklineColor()} />
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="flex items-center gap-1">
+          <TrendIcon className={cn("w-3 h-3", getChangeColor())} />
+          <span className={cn("text-xs font-normal", getChangeColor())}>
+            {Math.abs(safeChange).toFixed(1)}%
+          </span>
+          <span className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+            vs last hour
+          </span>
+        </div>
+      </div>
+    </BaseAnalyticsCard>
   );
 }
 
@@ -261,48 +257,28 @@ export function RealTimeAnalytics() {
 
   if (isLoading && !analytics) {
     return (
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+      <AnalyticsGrid>
         {[...Array(5)].map((_, i) => (
-          <Card key={i}>
-            <CardContent className="p-4">
-              <Skeleton className="h-4 w-24 mb-2" />
-              <Skeleton className="h-8 w-20 mb-2" />
-              <Skeleton className="h-4 w-16" />
-            </CardContent>
-          </Card>
+          <div
+            key={i}
+            className="bg-white dark:bg-[#1C1C1E] p-6 rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] min-h-[140px]"
+          >
+            <div className="h-4 w-24 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-4" />
+            <div className="h-8 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-4" />
+            <div className="h-3 w-16 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+          </div>
         ))}
-      </div>
+      </AnalyticsGrid>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Real-Time Analytics</h2>
-          <Badge 
-            variant="secondary" 
-            className={cn(
-              "text-xs gap-1",
-              isConnected 
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
-                : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-            )}
-            data-testid="badge-connection-status"
-          >
-            {isConnected ? (
-              <>
-                <Wifi className="h-3 w-3" />
-                Live
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3 w-3" />
-                Reconnecting...
-              </>
-            )}
-          </Badge>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <Activity className="h-5 w-5 text-[#111827] dark:text-white" />
+          <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Real-Time Analytics</h2>
+          <ConnectionBadge isConnected={isConnected} />
         </div>
         <Button 
           variant="outline" 
@@ -316,51 +292,51 @@ export function RealTimeAnalytics() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+      <AnalyticsGrid>
         <MetricCard
           title="Active Users"
           value={analytics?.activeUsers || 0}
           change={analytics?.activeUsersChange || 0}
           icon={Users}
-          color="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
           chartData={chartHistory.activeUsers}
+          testId="card-active-users"
         />
         <MetricCard
           title="Partner Growth"
           value={analytics?.partnerGrowth || 0}
           change={analytics?.partnerGrowthChange || 0}
           icon={TrendingUp}
-          color="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+          testId="card-partner-growth"
         />
         <MetricCard
           title="Total Orders"
           value={analytics?.totalOrders || 0}
           change={analytics?.ordersChange || 0}
           icon={ShoppingBag}
-          color="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
           chartData={chartHistory.orders}
+          testId="card-total-orders"
         />
         <MetricCard
           title="Active Rides"
           value={analytics?.activeRides || 0}
           change={analytics?.ridesChange || 0}
           icon={Car}
-          color="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
           chartData={chartHistory.rides}
+          testId="card-active-rides"
         />
         <MetricCard
           title="Failure Rate"
-          value={analytics?.failureRate || 0}
+          value={Math.max(0, analytics?.failureRate || 0)}
           change={analytics?.failureRateChange || 0}
           icon={AlertCircle}
-          color="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
           format="percent"
           chartData={chartHistory.failures}
+          testId="card-failure-rate"
         />
-      </div>
+      </AnalyticsGrid>
 
       {analytics?.lastUpdated && (
-        <p className="text-xs text-muted-foreground text-right">
+        <p className="text-xs text-[#9CA3AF] text-right">
           Last updated: {new Date(analytics.lastUpdated).toLocaleString()}
         </p>
       )}
