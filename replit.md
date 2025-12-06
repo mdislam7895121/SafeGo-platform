@@ -20,6 +20,7 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
     *   **SafeGo Parcel System (BD)**: Comprehensive parcel delivery for Bangladesh with 4-zone domestic and 4-corridor international pricing, dynamic pricing (volumetric weight, speed tiers), and COD settlement.
     *   **Bangladesh Tax System**: Comprehensive VAT calculation (15% default) for all 6 SafeGo services in Bangladesh, configurable via Admin Panel.
 *   **Privacy & Consent Management System**: GDPR-compliant privacy management with consent tracking, policy versioning, configurable data retention, and user data deletion/export requests.
+    *   **Post-Verification Enforcement**: Policy acceptance required ONLY after KYC/onboarding is complete and user is verified - unverified users can complete sign-up, onboarding, and KYC without being blocked. Admins are never blocked from Admin Panel.
 *   **Loyalty & Incentives**: SafeGo Points System, Opportunity Bonus Management System, and Driver Incentive Engine.
 *   **Real-Time & Optimization**: AI Marketplace Balancer, Real-Time Dispatch System (WebSocket-based), dynamic routing optimization, personalized push notifications, and Admin Notifications.
 *   **Profit-Focused Automation Systems**: A suite of 32 services covering core automation, security, risk intelligence, experience optimization, and platform operations.
