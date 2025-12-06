@@ -289,6 +289,18 @@ const phase3aNavItems: NavItem[] = [
     icon: ScrollText,
     navKey: "auditLog",
   },
+  {
+    title: "System Health Center",
+    href: "/admin/system-health-center",
+    icon: Activity,
+    navKey: "dashboard",
+  },
+  {
+    title: "Launch Readiness",
+    href: "/admin/launch-readiness",
+    icon: Rocket,
+    navKey: "settings",
+  },
 ];
 
 const phase3cNavItems: NavItem[] = [

@@ -323,6 +323,8 @@ import FinanceLogs from "@/pages/admin/finance-logs";
 import SecurityCenter from "@/pages/admin/SecurityCenter";
 import ReputationCenter from "@/pages/admin/ReputationCenter";
 import DataGovernanceCenter from "@/pages/admin/DataGovernanceCenter";
+import SystemHealthCenter from "@/pages/admin/SystemHealthCenter";
+import LaunchReadinessCenter from "@/pages/admin/LaunchReadinessCenter";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
@@ -2410,6 +2412,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Audit Console">
             <AuditConsole />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/system-health-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="System Health Center">
+            <SystemHealthCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/launch-readiness">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Launch Readiness Center">
+            <LaunchReadinessCenter />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
