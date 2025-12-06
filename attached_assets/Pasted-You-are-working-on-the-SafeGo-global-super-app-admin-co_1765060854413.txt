@@ -1,0 +1,339 @@
+You are working on the SafeGo global super-app admin console. 
+Follow ALL SafeGo master rules below. Do NOT skip, simplify, or remove any requirement. 
+All changes must be NON-BREAKING and additive.
+
+====================================================
+A) ROLES – ALWAYS 4 SEPARATE ROLES
+====================================================
+SafeGo has exactly four core roles:
+
+1. Customer
+2. Driver
+3. Restaurant / Merchant
+4. Admin
+
+Each role must have its own:
+- Signup/onboarding steps
+- KYC/verification rules
+- Dashboard views
+- Permissions
+- Status flows
+
+Never mix access:
+- Customers never see admin tools.
+- Drivers never see other drivers’ private data.
+- Restaurants never see other restaurants’ data.
+- Only Admin can see and use the admin console, enterprise tools, and SafePilot AI.
+
+====================================================
+B) GLOBAL APP LOGIC – 3 CORE SERVICES
+====================================================
+SafeGo must always support all three services:
+
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+All data models, admin tools, and analytics must remain compatible with these three services across all countries.
+
+====================================================
+C) COUNTRY-SPECIFIC KYC RULES (BD vs US)
+====================================================
+
+BANGLADESH (BD) – required KYC fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front & back image URLs)
+- emergency_contact (name + phone + relationship)
+- verification_status (pending/approved/rejected)
+- is_verified (boolean)
+
+UNITED STATES (US) – required KYC fields:
+- date_of_birth
+- home_address
+- emergency_contact (name + phone + relationship)
+- government_id_type (SSN, State ID, Passport, etc.)
+- government_id_last4
+- For drivers: driver_license_number + image + expiry_date
+- For drivers: ssn_last4 (optional)
+- verification_status (pending/approved/rejected)
+- is_verified (boolean)
+
+You must NOT rename or remove these fields. Only add new optional fields if needed.
+
+====================================================
+D) ADMIN PANEL – REQUIRED CAPABILITIES
+====================================================
+The admin panel must always provide:
+
+- View & verify customers (BD + US)
+- View & verify drivers (BD + US)
+- View & verify restaurants/merchants (BD + US)
+- Approve/reject KYC with rejection_reason
+- Update pricing, fees, and commissions per country and per service
+- Block/unblock any user (all roles)
+- Manage payouts and settlement schedules
+- View driver negative balance
+- View restaurant negative balance
+
+Do not remove or break any existing admin features.
+
+====================================================
+E) COLLECTIONS – rides, food_orders, deliveries
+====================================================
+These three collections already exist and MUST be preserved:
+
+1) rides
+2) food_orders
+3) deliveries
+
+For EACH collection, ensure it has:
+
+- Identity fields:
+  - customer_id
+  - driver_id
+  - restaurant_id (where applicable)
+- Address + geolocation:
+  - pickup_address, pickup_lat, pickup_lng
+  - dropoff_address, dropoff_lat, dropoff_lng
+- Fees and commission fields:
+  - base_fare, distance_fare, time_fare, service_fee
+  - safego_commission_amount
+- Payment details:
+  - payment_method (cash / online)
+  - payment_status
+- Timestamps:
+  - created_at, updated_at
+  - per-status timestamps if already present
+- Rating & feedback fields:
+  - rating_from_customer, rating_from_driver, feedback_text
+
+Do NOT rename or remove existing fields or status values.
+
+====================================================
+F) COMMISSION & PAYOUT RULES
+====================================================
+
+1) Rides – CASH payment:
+   - Driver receives full cash from customer.
+   - SafeGo commission is recorded as a NEGATIVE BALANCE in driver_wallet_balance.
+   - Driver must settle weekly.
+   - Admin can see and manually settle this negative balance.
+
+2) Food orders – CASH payment:
+   - Restaurant receives all cash from customer.
+   - SafeGo commission is recorded as NEGATIVE BALANCE in restaurant_wallet.
+   - Admin can see and settle this balance.
+
+3) Any ONLINE payment (rides/food/parcel):
+   - SafeGo automatically keeps its commission.
+   - Driver/Restaurant payout is adjusted accordingly.
+
+4) Admin can always:
+   - Mark balances as settled
+   - Record settlement timestamps and references
+
+You must NOT break this commission logic.
+
+====================================================
+G) SECURITY RULES
+====================================================
+- Customers cannot view driver documents (NID, license, etc.).
+- Drivers cannot view customer NID or other sensitive KYC information.
+- Restaurants cannot view other restaurants’ details or balances.
+- Only Admin can:
+  - change pricing and commissions
+  - update verification_status / is_verified
+  - block/unblock any user
+- Each user can only update their own profile (limited fields).
+- Enterprise tools and SafePilot AI are **Admin-only**.
+
+====================================================
+H) STATUS FLOWS (MUST STAY INTACT)
+====================================================
+
+Rides:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+Food orders:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+Parcels:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+Do not rename or delete these statuses. Only extend metadata if necessary.
+
+====================================================
+I) ONBOARDING FLOWS
+====================================================
+
+Customers:
+- Simple global signup (name, email, phone, password, country)
+- Address + emergency contact
+- Country-specific KYC fields (BD / US rules)
+- verification_status defaults to "pending"
+- Access to sensitive/paid features can be limited until approved.
+
+Drivers and Restaurants:
+- Created via separate “partner onboarding” after login
+- Steps:
+  1) Basic identity info
+  2) Business/vehicle info
+  3) KYC document upload (BD / US rules)
+  4) Payout/bank details
+  5) Emergency contact
+- verification_status = "pending" until admin approval.
+
+====================================================
+J) NOTIFICATIONS
+====================================================
+System must support notifications for:
+- New ride requests (to drivers)
+- Order status changes (customers/drivers/restaurants)
+- Parcel status changes
+- KYC approval/rejection (with rejection_reason)
+- Admin alerts (negative balance, fraud flags, etc.)
+
+Keep existing notification logic intact.
+
+====================================================
+CURRENT TASK – FIX SAFEGO SAFEPILOT AI BUTTON (ADMIN CONSOLE)
+====================================================
+
+Context from latest screenshots (Dec 6, 2025):
+
+- In the admin console, at route /admin/access-reviews (Periodic Access Review page), a SafePilot AI floating button is visible in the bottom-right corner.
+- The button is now mostly visible and positioned, but:
+  - Clicking the SafePilot AI button does **nothing**. No panel, no chat, no action.
+  - There may be missing onClick wiring, disabled state, or an overlay with pointer-events blocking the click.
+- The SafePilot AI button is part of the SafeGo Admin experience, not Replit’s tooling. It must look professional and behave like a modern AI helper.
+
+Your job now is to:
+
+1) Make the SafePilot AI button **fully functional**.
+2) Ensure it is correctly positioned as a global floating assistant (not page-specific).
+3) Keep all existing SafeGo business logic untouched.
+
+====================================================
+FUNCTIONAL SPEC – SAFEPILOT AI BUTTON
+====================================================
+
+General behavior:
+- The SafePilot AI button is a single global component rendered once inside the root AdminLayout (or equivalent), not inside individual page components.
+- It must be visible on all admin pages (Security, People & KYC, Configuration, Intelligence, etc.)
+- It must be accessible only to admin/super-admin roles.
+
+Placement:
+- position: fixed
+- bottom: 24px
+- right: 24px
+- z-index: high enough to appear above content and sidebar (e.g. 9999)
+- Do NOT nest it inside page content containers that scroll.
+- Do NOT allow it to be clipped by sidebars or footers.
+
+Visual design:
+- Circular or pill-shaped button (around 44–52px height).
+- Icon: AI/“spark” icon.
+- Label: “SafePilot AI” (can shrink to “AI” on small screens).
+- Hover: light glow and tooltip such as “Smart Admin Assistant”.
+- Must respect current theme and color tokens; do not hardcode new color system.
+
+Click behavior (main bug to fix):
+- On click, open an AI Assistant panel.
+- Recommended: right-side drawer or modal sliding in from the right.
+- The panel should contain:
+  - Header: SafePilot AI + close button
+  - Body: chat history + input box
+  - Footer: optional quick actions (e.g., “Explain this page”, “Summarize recent logs”, etc. – can be stubs for now)
+
+If the AI backend is not fully implemented yet, you can:
+- Implement a UI-only mock:
+  - Chat messages stored in local component state
+  - A placeholder system message like: “SafePilot AI is coming soon. This is a preview interface.”
+- But the **button must open and close the panel** reliably.
+
+Accessibility:
+- Clicking outside the panel should close it (if consistent with other modals).
+- Escape key should close the panel.
+- Button must have aria-label="Open SafePilot AI assistant".
+
+====================================================
+BUG-FIX REQUIREMENTS – WHY THE BUTTON DOESN’T WORK NOW
+====================================================
+
+You must explicitly check and fix the following potential issues:
+
+1) Missing onClick handler:
+   - Ensure the floating button actually calls an event handler that toggles the AI panel open/close.
+
+2) Pointer-events:
+   - Check if any parent container or overlay near the bottom-right has `pointer-events: none` or covers the button.
+   - Ensure the SafePilot wrapper has `pointer-events: auto`.
+
+3) Disabled / loading state:
+   - Confirm the button is not rendered in disabled state by default.
+   - If an async init is needed, show a spinner but still make click work when ready.
+
+4) Routing and context:
+   - The SafePilot state (open/closed) should not be reset on every minor component re-render.
+   - The button must work from pages like:
+     - /admin/access-reviews
+     - /admin/safety-center
+     - /admin/activity-log
+     - /admin/feature-flags
+     - /admin/revenue-analytics
+     - /admin/payouts-reports
+
+====================================================
+SECURITY & PERMISSIONS FOR SAFEPILOT
+====================================================
+
+- SafePilot AI must be visible and usable only for admin/super-admin roles.
+- Do NOT expose any customer/driver/restaurant sensitive KYC data directly in the assistant unless already allowed in the admin UI.
+- Respect existing role-based access control:
+  - If a non-admin somehow reaches an admin route, hide or disable SafePilot and redirect as per existing logic.
+
+No changes to:
+- Customer apps
+- Driver apps
+- Restaurant portals
+- Authentication / KYC flows
+
+====================================================
+TESTING SCENARIOS
+====================================================
+
+After implementing, manually verify:
+
+1) On /admin/access-reviews:
+   - SafePilot button is clearly visible at bottom-right.
+   - On click → AI panel opens.
+   - On click again (or close icon) → AI panel closes.
+
+2) On /admin/safety-center and /admin/activity-log:
+   - Same behavior: visible button, opens/closes panel.
+
+3) Scroll test:
+   - Scroll the page vertically.
+   - SafePilot button stays fixed in bottom-right and remains clickable.
+
+4) Responsiveness:
+   - Narrow window width: ensure button is not hidden behind mobile bottom bar or sidebar.
+   - On very small screens, label can shorten but button must still be usable.
+
+5) Regression:
+   - Ensure no existing admin routes, business logic, collections, or commission rules are modified.
+
+====================================================
+DELIVERABLES
+====================================================
+
+1) A global SafePilot AI floating button rendered at the root admin layout with correct fixed placement.
+2) Fully working click behavior: opens/closes an AI assistant panel.
+3) No broken routes, no console errors on click.
+4) Short code comments summarizing:
+   - Where SafePilot is rendered
+   - How the open/close state is managed
+   - That this is a non-breaking, UI-only enhancement.

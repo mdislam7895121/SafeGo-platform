@@ -835,30 +835,35 @@ export function SafePilotButton() {
 
   const alertCount = contextData?.alerts?.length || 0;
 
-  return createPortal(
+  return (
     <>
-      <button
-        data-testid="button-safepilot-launcher"
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="rounded-full shadow-lg shadow-primary/25 bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-all duration-200 active:scale-95 border border-white/20 ring-2 ring-white/10 hover:ring-primary/30 hover:shadow-xl hover:shadow-primary/30 flex items-center justify-center"
-        style={{ 
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '48px',
-          height: '48px',
-          zIndex: 9999,
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <SafePilotIcon size="sm" className="text-white" />
-        {alertCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium ring-2 ring-white">
-            {alertCount > 9 ? '9+' : alertCount}
-          </span>
-        )}
-      </button>
+      {createPortal(
+        <button
+          data-testid="button-safepilot-launcher"
+          type="button"
+          aria-label="Open SafePilot AI assistant"
+          onClick={() => setIsOpen(true)}
+          className="rounded-full shadow-lg shadow-primary/25 bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-all duration-200 active:scale-95 border border-white/20 ring-2 ring-white/10 hover:ring-primary/30 hover:shadow-xl hover:shadow-primary/30 flex items-center justify-center cursor-pointer"
+          style={{ 
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            width: '48px',
+            height: '48px',
+            zIndex: 9999,
+            WebkitTapHighlightColor: 'transparent',
+            pointerEvents: 'auto',
+          }}
+        >
+          <SafePilotIcon size="sm" className="text-white" />
+          {alertCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium ring-2 ring-white">
+              {alertCount > 9 ? '9+' : alertCount}
+            </span>
+          )}
+        </button>,
+        document.body
+      )}
 
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent 
@@ -2018,8 +2023,7 @@ export function SafePilotButton() {
           </div>
         </SheetContent>
       </Sheet>
-    </>,
-    document.body
+    </>
   );
 }
 
