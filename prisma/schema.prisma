@@ -11890,3 +11890,494 @@ model SafePilotInsight {
   @@index([createdAt])
   @@map("safepilot_insights")
 }
+
+// ===================================================
+// SAFEGO MASTER TASKS 1-15: POLICY & SAFETY MODELS
+// ===================================================
+
+// TASK 1: Terms & Conditions Versioning System
+model TermsVersion {
+  id String @id @default(uuid())
+
+  version    String
+  title      String
+  contentUrl String
+  content    String? @db.Text
+  summary    String?
+
+  isActive Boolean @default(false)
+
+  countryCode String? // BD, US, or null for global
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@unique([version])
+  @@index([isActive])
+  @@index([countryCode])
+  @@map("terms_versions")
+}
+
+// TASK 2: Refund Policy Versioning
+model RefundPolicyVersion {
+  id String @id @default(uuid())
+
+  version     String
+  title       String
+  contentUrl  String?
+  content     String? @db.Text
+  summary     String?
+  serviceType String? // ride, food, parcel, or null for all
+
+  isActive Boolean @default(false)
+
+  countryCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@unique([version])
+  @@index([isActive])
+  @@index([serviceType])
+  @@index([countryCode])
+  @@map("refund_policy_versions")
+}
+
+// TASK 3: Cancellation Policy Versioning
+enum CancellationPolicyActor {
+  customer
+  driver
+  merchant
+  system
+}
+
+model CancellationPolicyVersion {
+  id String @id @default(uuid())
+
+  version     String
+  title       String
+  contentUrl  String?
+  content     String? @db.Text
+  summary     String?
+  actor       CancellationPolicyActor
+  serviceType String? // ride, food, parcel, or null for all
+
+  feePercentage Decimal? @db.Decimal(5, 2)
+  feeFlat       Decimal? @db.Decimal(10, 2)
+  gracePeriodMinutes Int? @default(5)
+
+  isActive Boolean @default(false)
+
+  countryCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@unique([version, actor])
+  @@index([isActive])
+  @@index([actor])
+  @@index([serviceType])
+  @@index([countryCode])
+  @@map("cancellation_policy_versions")
+}
+
+// TASK 4: Customer Community Guidelines
+model CommunityGuideline {
+  id String @id @default(uuid())
+
+  version     String
+  title       String
+  contentUrl  String?
+  content     String? @db.Text
+  summary     String?
+  targetRole  String  @default("customer") // customer, all
+
+  isActive Boolean @default(false)
+
+  countryCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@unique([version, targetRole])
+  @@index([isActive])
+  @@index([targetRole])
+  @@index([countryCode])
+  @@map("community_guidelines")
+}
+
+// TASKS 5 & 6: Code of Conduct (Drivers & Partners)
+enum CodeOfConductTargetRole {
+  driver
+  restaurant
+  shop_partner
+  ticket_operator
+  rental_partner
+  all_partners
+}
+
+model CodeOfConduct {
+  id String @id @default(uuid())
+
+  version    String
+  title      String
+  contentUrl String?
+  content    String? @db.Text
+  summary    String?
+  targetRole CodeOfConductTargetRole
+
+  isActive Boolean @default(false)
+
+  countryCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@unique([version, targetRole])
+  @@index([isActive])
+  @@index([targetRole])
+  @@index([countryCode])
+  @@map("code_of_conduct")
+}
+
+// TASK 7: Safety Policy Versioning
+model SafetyPolicyVersion {
+  id String @id @default(uuid())
+
+  version    String
+  title      String
+  contentUrl String?
+  content    String? @db.Text
+  summary    String?
+
+  isActive Boolean @default(false)
+
+  countryCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@unique([version])
+  @@index([isActive])
+  @@index([countryCode])
+  @@map("safety_policy_versions")
+}
+
+// TASK 8: Partner Agreement with E-Signature
+enum PartnerType {
+  driver
+  restaurant
+  shop_partner
+  ticket_operator
+  rental_partner
+}
+
+model PartnerAgreement {
+  id String @id @default(uuid())
+
+  partnerId   String
+  partnerType PartnerType
+
+  version       String
+  agreementUrl  String?
+  agreementText String? @db.Text
+
+  signedAt        DateTime?
+  signatureImage  String?
+  signatureData   String? @db.Text
+  signatureMethod String? // typed, drawn, uploaded
+
+  ipAddress  String?
+  deviceInfo String?
+
+  isValid Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partnerId])
+  @@index([partnerType])
+  @@index([signedAt])
+  @@index([isValid])
+  @@map("partner_agreements")
+}
+
+// TASK 9: SOS Emergency Logs
+enum SosStatus {
+  triggered
+  acknowledged
+  responding
+  resolved
+  false_alarm
+  cancelled
+}
+
+model SosLog {
+  id String @id @default(uuid())
+
+  triggeredBy     String
+  triggeredByRole String // customer, driver
+  rideId          String?
+
+  latitude  Float?
+  longitude Float?
+  address   String?
+
+  status         SosStatus @default(triggered)
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  resolutionNote String?   @db.Text
+
+  emergencyContacts Json?
+  notificationsSent Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([triggeredBy])
+  @@index([rideId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sos_logs")
+}
+
+// TASK 10: Safety Monitoring - Extended fields for ride monitoring
+// Note: SafetyEvent model already exists at line ~6359, using that for events
+// Adding a dedicated monitoring log table for speeding/route tracking
+model RideSafetyMonitoringLog {
+  id String @id @default(uuid())
+
+  rideId   String
+  driverId String
+  userId   String?
+
+  eventType String // speeding, route_deviation, harsh_braking, rapid_acceleration, long_stop
+  severity  String @default("low") // low, medium, high, critical
+
+  latitude  Float?
+  longitude Float?
+
+  speedRecorded    Float?
+  speedLimit       Float?
+  deviationMeters  Float?
+  description      String? @db.Text
+
+  isAcknowledged Boolean   @default(false)
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([rideId])
+  @@index([driverId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("ride_safety_monitoring_logs")
+}
+
+// TASK 11: Encrypted Audio Recording Sessions
+model AudioRecordingSession {
+  id String @id @default(uuid())
+
+  rideId    String
+  startedBy String
+  startedByRole String // customer, driver
+
+  encryptedFileUrl String?
+  encryptionKeyId  String?
+  durationSeconds  Int?
+
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+
+  isDecrypted   Boolean   @default(false)
+  decryptedBy   String?
+  decryptedAt   DateTime?
+  decryptReason String?
+
+  metadata Json?
+
+  @@index([rideId])
+  @@index([startedBy])
+  @@index([startedAt])
+  @@map("audio_recording_sessions")
+}
+
+// TASK 12: Background Check Status (Extended fields on DriverProfile - handled separately)
+// Adding BackgroundCheckRecord for tracking
+model BackgroundCheckRecord {
+  id String @id @default(uuid())
+
+  driverId String
+  userId   String?
+
+  provider    String? // checkr, internal, etc.
+  externalId  String?
+  status      String  @default("pending") // pending, in_progress, passed, failed, expired
+
+  submittedAt DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime?
+
+  resultSummary String? @db.Text
+  resultDetails Json?
+
+  reviewedBy String?
+  reviewedAt DateTime?
+  reviewNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([status])
+  @@index([completedAt])
+  @@map("background_check_records")
+}
+
+// TASK 13: Report System (Driver ↔ Customer)
+enum ReportStatus {
+  pending
+  under_review
+  action_taken
+  resolved
+  dismissed
+}
+
+enum ReportCategory {
+  safety_concern
+  inappropriate_behavior
+  harassment
+  fraud
+  poor_service
+  vehicle_issue
+  route_issue
+  payment_issue
+  other
+}
+
+model Report {
+  id String @id @default(uuid())
+
+  reporterId     String
+  reporterRole   String // customer, driver
+
+  targetId       String
+  targetRole     String // customer, driver
+
+  rideId         String?
+  orderId        String?
+
+  category       ReportCategory
+  reason         String
+  description    String? @db.Text
+  evidence       Json?   // Array of image URLs, etc.
+
+  status         ReportStatus @default(pending)
+  priority       Int          @default(0)
+
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  reviewNote     String?   @db.Text
+  actionTaken    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reporterId])
+  @@index([targetId])
+  @@index([rideId])
+  @@index([status])
+  @@index([category])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+// TASK 14: Auto-Restriction System
+enum UserRestrictionStatus {
+  active
+  restricted
+  blocked
+  under_review
+  suspended
+}
+
+enum RestrictionReason {
+  multiple_reports
+  safety_events
+  background_check_failed
+  policy_violation
+  fraud_detected
+  manual_admin_action
+  system_auto_action
+}
+
+model UserRestriction {
+  id String @id @default(uuid())
+
+  userId   String
+  userRole String // customer, driver, restaurant, etc.
+
+  status          UserRestrictionStatus
+  previousStatus  String?
+  reason          RestrictionReason
+  reasonDetails   String? @db.Text
+
+  restrictedAt    DateTime @default(now())
+  expiresAt       DateTime?
+  isActive        Boolean  @default(true)
+
+  triggeredBy     String? // admin_id or "system"
+  triggeredByType String? // admin, system
+
+  reportsCount      Int @default(0)
+  safetyEventsCount Int @default(0)
+
+  reviewRequired    Boolean   @default(false)
+  reviewedBy        String?
+  reviewedAt        DateTime?
+  reviewNote        String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([status])
+  @@index([isActive])
+  @@index([restrictedAt])
+  @@map("user_restrictions")
+}
+
+// TASK 15: Safety Center - Emergency Contacts
+model EmergencyContact {
+  id String @id @default(uuid())
+
+  userId   String
+  userRole String // customer, driver
+
+  name         String
+  phone        String
+  relationship String?
+  isPrimary    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userRole])
+  @@map("emergency_contacts")
+}
