@@ -81,6 +81,7 @@ import releasesRoutes from "./routes/releases"; // Release & Environment Promoti
 import observabilityRoutes from "./routes/observability"; // Phase 5A: Admin Observability Center
 import safePilotRoutes from "./routes/safepilot"; // SafePilot: AI Admin Assistant
 import profilePhotoRoutes from "./routes/profile-photo"; // Profile Picture System
+import bdRidesRoutes from "./routes/bd-rides"; // BD Ride Pricing Engine
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -357,6 +358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/referral-settings", referralSettingsRoutes);
   app.use("/api/admin/opportunity-settings", opportunitySettingsRoutes);
   app.use("/api/rides", rideRoutes);
+  app.use("/api/rides/bd", bdRidesRoutes); // BD Ride Pricing Engine (fare-estimate, request, vehicle-types)
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
   app.use("/api/support", rateLimitSupport, supportChatRoutes); // Rate limited
