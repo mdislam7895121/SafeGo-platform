@@ -13530,9 +13530,10 @@ model CustomerRating {
 
   customerId     String
   
-  // Aggregate scores
-  averageRating  Float   @default(5.0)
-  totalRatings   Int     @default(0)
+  // Aggregate scores (weighted)
+  averageRating     Float   @default(5.0)
+  weightedScoreSum  Float   @default(0.0)
+  totalRatings      Int     @default(0)
   
   // Rating breakdown (1-5 star counts)
   oneStarCount   Int     @default(0)
@@ -13540,6 +13541,14 @@ model CustomerRating {
   threeStarCount Int     @default(0)
   fourStarCount  Int     @default(0)
   fiveStarCount  Int     @default(0)
+  
+  // Sub-category weighted averages
+  behaviorScore           Float?
+  behaviorScoreSum        Float @default(0.0)
+  behaviorScoreCount      Int   @default(0)
+  communicationScore      Float?
+  communicationScoreSum   Float @default(0.0)
+  communicationScoreCount Int   @default(0)
   
   // Trend tracking
   last30DaysAverage Float?
@@ -13568,9 +13577,10 @@ model DriverRating {
 
   driverId       String
   
-  // Aggregate scores
-  averageRating  Float   @default(5.0)
-  totalRatings   Int     @default(0)
+  // Aggregate scores (weighted)
+  averageRating     Float   @default(5.0)
+  weightedScoreSum  Float   @default(0.0)
+  totalRatings      Int     @default(0)
   
   // Rating breakdown (1-5 star counts)
   oneStarCount   Int     @default(0)
@@ -13579,11 +13589,19 @@ model DriverRating {
   fourStarCount  Int     @default(0)
   fiveStarCount  Int     @default(0)
   
-  // Sub-category scores (optional detailed ratings)
-  safetyScore       Float?
-  navigationScore   Float?
-  behaviorScore     Float?
-  vehicleCondition  Float?
+  // Sub-category scores with cumulative tracking
+  safetyScore        Float?
+  safetyScoreSum     Float @default(0.0)
+  safetyScoreCount   Int   @default(0)
+  navigationScore    Float?
+  navigationScoreSum Float @default(0.0)
+  navigationScoreCount Int @default(0)
+  behaviorScore      Float?
+  behaviorScoreSum   Float @default(0.0)
+  behaviorScoreCount Int   @default(0)
+  vehicleCondition   Float?
+  vehicleConditionSum   Float @default(0.0)
+  vehicleConditionCount Int   @default(0)
   
   // Trend tracking
   last30DaysAverage Float?
@@ -13617,8 +13635,9 @@ model PartnerRating {
   partnerId      String
   partnerType    String // restaurant, merchant, parcel_hub
   
-  // Customer ratings
+  // Customer ratings (weighted)
   averageRating     Float   @default(5.0)
+  weightedScoreSum  Float   @default(0.0)
   totalRatings      Int     @default(0)
   
   // Rating breakdown (1-5 star counts)
@@ -13628,16 +13647,30 @@ model PartnerRating {
   fourStarCount     Int     @default(0)
   fiveStarCount     Int     @default(0)
   
-  // Sub-category scores (for restaurants)
-  foodQualityScore    Float?
-  packingQualityScore Float?
-  onTimeScore         Float?
+  // Sub-category scores with cumulative tracking (for restaurants)
+  foodQualityScore      Float?
+  foodQualityScoreSum   Float @default(0.0)
+  foodQualityScoreCount Int   @default(0)
+  packingQualityScore   Float?
+  packingScoreSum       Float @default(0.0)
+  packingScoreCount     Int   @default(0)
+  onTimeScore           Float?
+  onTimeScoreSum        Float @default(0.0)
+  onTimeScoreCount      Int   @default(0)
+  accuracyScore         Float?
+  accuracyScoreSum      Float @default(0.0)
+  accuracyScoreCount    Int   @default(0)
   
   // Driver ratings (for pickup experience)
-  driverRatingAvg     Float?
-  driverRatingCount   Int     @default(0)
-  pickupDelayScore    Float?
-  behaviorScore       Float?
+  driverRatingAvg         Float?
+  driverRatingSum         Float @default(0.0)
+  driverRatingCount       Int   @default(0)
+  pickupDelayScore        Float?
+  pickupDelayScoreSum     Float @default(0.0)
+  pickupDelayScoreCount   Int   @default(0)
+  behaviorScore           Float?
+  driverBehaviorScoreSum   Float @default(0.0)
+  driverBehaviorScoreCount Int   @default(0)
   
   // Trend tracking
   last30DaysAverage Float?
