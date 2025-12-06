@@ -14049,3 +14049,238 @@ model BackupStatus {
   @@index([createdAt])
   @@map("backup_status")
 }
+
+// =====================================================================
+// SAFEGO MASTER TASKS 48-51: FINAL PRE-LAUNCH SYSTEM READINESS LAYER
+// =====================================================================
+
+// TASK 48: Payment Gateway Health Check
+model PaymentHealthLog {
+  id String @id @default(uuid())
+
+  gateway       String // bkash, nagad, stripe
+  endpoint      String
+  checkType     String @default("ping") // ping, transaction_test, credential_verify
+  
+  status        String // healthy, degraded, unhealthy, unknown
+  responseTimeMs Int?
+  statusCode    Int?
+  
+  errorMessage  String?
+  errorCode     String?
+  
+  credentialsValid Boolean @default(true)
+  
+  checkedAt     DateTime @default(now())
+  
+  @@index([gateway])
+  @@index([status])
+  @@index([checkedAt])
+  @@map("payment_health_logs")
+}
+
+// TASK 49: Notification System Health Check
+model NotificationHealthLog {
+  id String @id @default(uuid())
+
+  channel       String // sms, email, push
+  provider      String // twilio, smtp, fcm
+  
+  checkType     String @default("ping") // ping, send_test, queue_check
+  
+  status        String // healthy, degraded, unhealthy, unknown
+  responseTimeMs Int?
+  
+  queueDepth    Int? // Messages waiting in queue
+  errorRate     Float? // Error rate percentage
+  
+  errorMessage  String?
+  errorCode     String?
+  
+  consecutiveFailures Int @default(0)
+  alertTriggered      Boolean @default(false)
+  
+  checkedAt     DateTime @default(now())
+  
+  @@index([channel])
+  @@index([provider])
+  @@index([status])
+  @@index([checkedAt])
+  @@map("notification_health_logs")
+}
+
+// TASK 50: Map Service Health Check
+model MapHealthLog {
+  id String @id @default(uuid())
+
+  provider      String // google, mapbox
+  service       String // geocoding, reverse_geocoding, directions, autocomplete, route_cost
+  
+  checkType     String @default("latency") // latency, availability, load_test
+  
+  status        String // healthy, degraded, unhealthy, unknown
+  responseTimeMs Int?
+  
+  requestCount  Int? // For load tests
+  avgLatencyMs  Int? // Average latency across requests
+  maxLatencyMs  Int? // Max latency observed
+  minLatencyMs  Int? // Min latency observed
+  
+  errorRate     Float? // Error rate percentage
+  successRate   Float? // Success rate percentage
+  
+  errorMessage  String?
+  errorCode     String?
+  
+  isLoadTest    Boolean @default(false)
+  loadTestSize  Int? // Number of simulated requests
+  
+  checkedAt     DateTime @default(now())
+  
+  @@index([provider])
+  @@index([service])
+  @@index([status])
+  @@index([checkedAt])
+  @@map("map_health_logs")
+}
+
+// TASK 51: UAT Reports
+model UATReport {
+  id String @id @default(uuid())
+
+  reportName    String
+  version       String @default("1.0")
+  
+  status        String @default("in_progress") // in_progress, completed, failed, certified
+  
+  totalItems    Int @default(0)
+  passedItems   Int @default(0)
+  failedItems   Int @default(0)
+  pendingItems  Int @default(0)
+  
+  passRate      Float? // Percentage of passed items
+  
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  
+  createdBy     String
+  
+  notes         String?
+  
+  items         UATChecklistItem[]
+  signoffs      UATSignoffRecord[]
+  certificates  LaunchCertificate[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([status])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@map("uat_reports")
+}
+
+// TASK 51: UAT Checklist Items
+model UATChecklistItem {
+  id String @id @default(uuid())
+
+  reportId      String
+  report        UATReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  
+  category      String // kyc_flows, ride_booking, delivery_booking, food_ordering, partner_onboarding, finance_settlement, fraud_system, security_layer, notification_layer, rating_engine, data_export_delete
+  
+  itemCode      String // Unique code for the item
+  title         String
+  description   String?
+  
+  testSteps     String? // Instructions for testing
+  expectedResult String?
+  
+  status        String @default("pending") // pending, passed, failed, blocked, skipped
+  
+  actualResult  String?
+  notes         String?
+  screenshotUrl String?
+  
+  testedBy      String?
+  testedAt      DateTime?
+  
+  priority      Int @default(1) // 1 = critical, 2 = high, 3 = medium, 4 = low
+  
+  orderIndex    Int @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([reportId, itemCode])
+  @@index([reportId])
+  @@index([category])
+  @@index([status])
+  @@index([priority])
+  @@map("uat_checklist_items")
+}
+
+// TASK 51: UAT Signoff Records
+model UATSignoffRecord {
+  id String @id @default(uuid())
+
+  reportId      String
+  report        UATReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  
+  category      String // Category being signed off
+  
+  signedOffBy   String // Admin user ID
+  signedOffByName String
+  signedOffAt   DateTime @default(now())
+  
+  status        String @default("approved") // approved, rejected
+  
+  notes         String?
+  
+  createdAt     DateTime @default(now())
+  
+  @@unique([reportId, category])
+  @@index([reportId])
+  @@index([signedOffBy])
+  @@map("uat_signoff_records")
+}
+
+// TASK 51: Launch Certificates
+model LaunchCertificate {
+  id String @id @default(uuid())
+
+  reportId      String
+  report        UATReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  
+  certificateNumber String @unique
+  
+  version       String @default("1.0")
+  
+  status        String @default("valid") // valid, revoked, expired
+  
+  issuedAt      DateTime @default(now())
+  issuedBy      String
+  issuedByName  String
+  
+  expiresAt     DateTime?
+  
+  revokedAt     DateTime?
+  revokedBy     String?
+  revokedReason String?
+  
+  summary       Json // Summary of all tests
+  passRate      Float
+  
+  signatureHash String? // Hash for verification
+  
+  pdfUrl        String? // URL to generated PDF
+  jsonData      Json? // Full certificate data
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([certificateNumber])
+  @@index([reportId])
+  @@index([status])
+  @@index([issuedAt])
+  @@map("launch_certificates")
+}
