@@ -1,0 +1,136 @@
+Your next and ONLY authorized task is to build the complete Customer-Facing Parcel Request Page for SafeGo. This must follow ALL SafeGo Master Rules, Security Rules, Role Isolation Rules, BD/US KYC Rules, Commission Logic, and Non-Breaking Architecture requirements.
+
+You must NOT modify or rename any existing parcel backend logic. Only integrate UI/UX on top of the existing parcel engine.
+
+=====================================================
+PHASE 1 — PAGE STRUCTURE (Customer App Only)
+=====================================================
+Build a new customer screen named:
+   ParcelRequestPage
+
+It must include:
+
+1. Parcel Type Selector
+   - Domestic (Bangladesh)
+   - International
+
+2. Pickup Details
+   - Pickup address (autocomplete + map picker)
+   - Pickup geo coordinates
+   - Optional: "Pickup Now" or "Schedule Pickup"
+
+3. Dropoff Details
+   Domestic:
+       - Dropoff address (autocomplete)
+       - Dropoff geo
+   International:
+       - Destination country dropdown
+       - City name field
+
+4. Parcel Weight Section
+   - Actual weight (kg)
+   - Dimensions (L × W × H)
+   - Auto-compute volumetric weight
+   - Highlight which one is chargeable
+
+5. Delivery Speed Selector
+   - Regular
+   - Quick
+   - Express
+   - Super Express
+
+6. Parcel Options
+   - Fragile item toggle
+   - Cash-on-Delivery toggle (Domestic only)
+   - COD amount input (if enabled)
+
+=====================================================
+PHASE 2 — LIVE PRICING ENGINE (Frontend)
+=====================================================
+Integrate the backend calculation API:
+   POST /api/parcel/bd/request
+   POST /api/parcel/int/request (if exists)
+   OR use pricing endpoint if available.
+
+Show a real-time pricing card:
+   - Base delivery charge
+   - Speed surcharge
+   - Fragile surcharge
+   - COD fee
+   - Fuel surcharge (international)
+   - Remote area surcharge
+   - Final Total
+
+All values must update instantly when user edits any input.
+
+=====================================================
+PHASE 3 — PLACE ORDER FLOW
+=====================================================
+Add “Confirm Parcel Request” button.
+
+On press:
+- Validate BD KYC (date of birth, address, NID for BD)
+- Validate US KYC if customer is in US
+- Handle missing fields with safe error messages
+- Create parcel delivery request via backend
+- Redirect customer to:
+        Parcel Tracking Page
+
+=====================================================
+PHASE 4 — PARCEL TRACKING PAGE (Customer)
+=====================================================
+Create a new screen:
+   ParcelTrackingPage
+
+Must display:
+- Parcel status:
+     requested
+     searching_driver
+     accepted
+     picked_up
+     on_the_way
+     delivered
+     cancelled_x
+- Driver details (only name + phone, NOT documents)
+- Live map tracking (driver-to-dropoff)
+- Estimated delivery time
+- COD amount (if applicable)
+
+=====================================================
+PHASE 5 — SECURITY & ROLE RULES
+=====================================================
+- Customer cannot view driver license or ID.
+- Customer cannot modify driver location.
+- Admin cannot override customer parcel UI.
+- Restaurant partners cannot access parcel pages.
+- Driver cannot see parcel value except COD amount.
+
+=====================================================
+PHASE 6 — RESPONSIVE UI REQUIREMENTS
+=====================================================
+The Parcel Request Page must work perfectly on:
+- Mobile portrait
+- Mobile landscape
+- Tablet
+- Desktop web
+
+Ensure no overflowing layout, broken map, or missing fields.
+
+=====================================================
+PHASE 7 — QA VALIDATION
+=====================================================
+Before marking complete, test:
+1. Domestic parcel request
+2. International parcel request
+3. Pickup scheduling
+4. COD flow
+5. Live pricing accuracy
+6. Status updates reflected real-time
+7. Driver assignment works
+8. No KYC violation
+9. No broken UI on any device
+10. No new unauthorized routes added
+
+When all tests pass CLEANLY:
+Return:
+“Customer Parcel Request Page — PRODUCTION READY”
