@@ -91,6 +91,7 @@ import settlementFinanceRoutes from "./routes/settlement-finance"; // SafeGo Mas
 import securityHardeningRoutes from "./routes/security"; // SafeGo Master Tasks 29-36: Security Hardening Layer
 import ratingRoutes from "./routes/rating"; // SafeGo Master Tasks 37-42: Ratings & Reputation Engine
 import adminReputationRoutes from "./routes/admin-reputation"; // SafeGo Master Tasks 37-42: Admin Reputation Center
+import dataRightsRoutes from "./routes/data-rights"; // SafeGo Master Tasks 43-47: Data Rights & Retention Layer
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -377,6 +378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/security-hardening", securityHardeningRoutes); // SafeGo Master Tasks 29-36: Security Hardening Layer
   app.use("/api/rating", ratingRoutes); // SafeGo Master Tasks 37-42: Ratings & Reputation Engine
   app.use("/api/admin/reputation", adminReputationRoutes); // SafeGo Master Tasks 37-42: Admin Reputation Center
+  app.use(dataRightsRoutes); // SafeGo Master Tasks 43-47: Data Rights & Retention Layer
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
   app.use("/api/support", rateLimitSupport, supportChatRoutes); // Rate limited

@@ -63,6 +63,7 @@ import CustomerDeliveryAddresses from "@/pages/customer/delivery-addresses";
 import CustomerSavedPlaces from "@/pages/customer/saved-places";
 import CustomerRidePreferences from "@/pages/customer/ride-preferences";
 import CustomerPrivacyPolicy from "@/pages/customer/privacy-policy";
+import CustomerDataPrivacy from "@/pages/customer/data-privacy";
 import CustomerSafetyCenter from "@/pages/customer/safety-center";
 import CustomerSupportHub from "@/pages/customer-app/support-hub";
 import CustomerSupportHelp from "@/pages/customer-app/support-help";
@@ -321,6 +322,7 @@ import PayoutCenter from "@/pages/admin/payout-center";
 import FinanceLogs from "@/pages/admin/finance-logs";
 import SecurityCenter from "@/pages/admin/SecurityCenter";
 import ReputationCenter from "@/pages/admin/ReputationCenter";
+import DataGovernanceCenter from "@/pages/admin/DataGovernanceCenter";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
@@ -613,6 +615,11 @@ function Router() {
       <Route path="/customer/privacy-policy">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerPrivacyPolicy />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/data-privacy">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerDataPrivacy />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/safety-center">
@@ -2382,6 +2389,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Reputation Center">
             <ReputationCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/data-governance">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Data Governance Center">
+            <DataGovernanceCenter />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

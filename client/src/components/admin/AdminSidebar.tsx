@@ -248,6 +248,12 @@ const phase3aNavItems: NavItem[] = [
     navKey: "peopleKyc",
   },
   {
+    title: "Data Governance",
+    href: "/admin/data-governance",
+    icon: Database,
+    navKey: "settings",
+  },
+  {
     title: "Health Monitor",
     href: "/admin/health-monitor",
     icon: Activity,
