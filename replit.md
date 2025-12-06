@@ -36,6 +36,18 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **SafePilot Intelligence Engine**: Upgraded business automation engine with 8 intelligence modules (Growth, Cost Reduction, Fraud & Safety, Partner Success, Customer Retention, Marketing, Financial, Legal & Compliance).
     *   **SafePilot Master Upgrade (v2.0)**: Enterprise-grade intelligence features including One-Click Crisis Report, Explain This Decision Mode, Background Autonomous Monitoring, Company Survival Mode, and enhanced mobile responsiveness.
 *   **Backup & Disaster Recovery**: Comprehensive backup management system with metadata tracking, retention settings, and restore operations.
+*   **Policy & Safety Hub (SafeGo Master Tasks 1-15)**: Comprehensive policy management and safety system including:
+    *   **Terms & Conditions System**: Version-controlled terms with country-specific support and activation workflow.
+    *   **Refund & Cancellation Policies**: Service-specific and actor-based policies with fee configuration.
+    *   **Community Guidelines & Code of Conduct**: Role-specific guidelines for customers and partners.
+    *   **Safety Policy Management**: Platform-wide safety rules and procedures with version control.
+    *   **Partner Agreement E-Signature**: Digital agreement signing with typed/drawn signature support.
+    *   **Emergency SOS System**: One-touch emergency alerts with GPS location and emergency contact notification.
+    *   **Safety Monitoring**: Real-time ride safety events (speeding, route deviation, harsh braking).
+    *   **Audio Recording Sessions**: Encrypted ride audio recording for safety disputes.
+    *   **Report System**: User-submitted reports with category-based classification and admin review workflow.
+    *   **User Restrictions & Auto-Restriction**: Account status management with suspension/ban capabilities.
+    *   **Safety Center**: Customer and driver safety tools including emergency contacts, trip sharing, and safety policies.
 
 ## External Dependencies
 

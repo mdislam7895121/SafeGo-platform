@@ -63,6 +63,7 @@ import CustomerDeliveryAddresses from "@/pages/customer/delivery-addresses";
 import CustomerSavedPlaces from "@/pages/customer/saved-places";
 import CustomerRidePreferences from "@/pages/customer/ride-preferences";
 import CustomerPrivacyPolicy from "@/pages/customer/privacy-policy";
+import CustomerSafetyCenter from "@/pages/customer/safety-center";
 import CustomerSupportHub from "@/pages/customer-app/support-hub";
 import CustomerSupportHelp from "@/pages/customer-app/support-help";
 import CustomerSupportArticle from "@/pages/customer-app/support-article";
@@ -312,6 +313,8 @@ import HealthMonitor from "@/pages/admin/health-monitor";
 import PushNotifications from "@/pages/admin/push-notifications";
 import PaymentVerification from "@/pages/admin/payment-verification";
 import PolicyManager from "@/pages/admin/policy-manager";
+import PolicySafetyHub from "@/pages/admin/policy-safety-hub";
+import ReportsManagement from "@/pages/admin/reports-management";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
@@ -604,6 +607,11 @@ function Router() {
       <Route path="/customer/privacy-policy">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerPrivacyPolicy />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/safety-center">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSafetyCenter />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/rides/:id">
@@ -2312,6 +2320,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Policy Manager">
             <PolicyManager />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/policy-safety-hub">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Policy & Safety Hub">
+            <PolicySafetyHub />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/reports-management">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Reports Management">
+            <ReportsManagement />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
