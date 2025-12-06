@@ -82,8 +82,8 @@ const BD_TEXTS: PartnerTexts = {
 };
 
 const US_TEXTS: PartnerTexts = {
-  masterTagline: "Turn your time into income. Become a SafeGo Partner.",
-  sectionTitle: "SafeGo Partner Programs",
+  masterTagline: "Turn your free time into income. Flexible opportunities that fit your schedule.",
+  sectionTitle: "Earn with SafeGo",
   cards: [
     {
       kind: "driver_ride",

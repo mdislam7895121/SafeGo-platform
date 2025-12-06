@@ -2933,10 +2933,8 @@ export default function UnifiedBookingPage() {
                       />
                     </div>
 
-                    {/* Partner Programs Section - BD Only */}
-                    {isBDCustomer && (
-                      <PartnerProgramsSection />
-                    )}
+                    {/* Partner Programs / Earn with SafeGo Section */}
+                    <PartnerProgramsSection />
                   </>
                 )}
 
