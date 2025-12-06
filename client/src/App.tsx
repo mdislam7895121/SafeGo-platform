@@ -44,6 +44,7 @@ import FoodOrderReceipt from "@/pages/customer/food-order-receipt";
 import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import CustomerMyReviews from "@/pages/customer/my-reviews";
 import ParcelRequest from "@/pages/customer/parcel-request";
+import BDRideBooking from "@/pages/customer/bd-ride-booking";
 import ParcelTracking from "@/pages/customer/parcel-tracking";
 import UnifiedBooking from "@/pages/customer/unified-booking";
 import CustomerSupport from "@/pages/customer/support";
@@ -504,6 +505,11 @@ function Router() {
       <Route path="/customer/parcel-tracking/:id">
         <ProtectedRoute allowedRoles={["customer"]}>
           <ParcelTracking />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/ride/bd">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <BDRideBooking />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/unified-booking">
