@@ -191,38 +191,46 @@ export default function RestaurantDetails() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin/restaurants")}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold" data-testid="text-restaurant-name">{restaurant.restaurantName}</h1>
-            <p className="text-sm opacity-90">{restaurant.email}</p>
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+        <div className="px-4 sm:px-6 py-3">
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/admin/restaurants")}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Back to Restaurants</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
           </div>
-        </div>
-
-        {/* Status Badges */}
-        <div className="flex gap-2 flex-wrap">
-          {restaurant.isBlocked && (
-            <Badge variant="destructive" data-testid="badge-blocked">Blocked</Badge>
-          )}
-          {restaurant.isSuspended && (
-            <Badge className="bg-orange-500" data-testid="badge-suspended">Suspended</Badge>
-          )}
-          {restaurant.isVerified && (
-            <Badge className="bg-green-500" data-testid="badge-verified">Verified</Badge>
-          )}
-          {!restaurant.isVerified && (
-            <Badge variant="secondary" data-testid="badge-pending-kyc">Pending KYC</Badge>
-          )}
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <UtensilsCrossed className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate" data-testid="text-restaurant-name">{restaurant.restaurantName}</h1>
+              <p className="text-[11px] text-muted-foreground truncate">{restaurant.email}</p>
+            </div>
+          </div>
+          {/* Status Badges */}
+          <div className="flex gap-1.5 flex-wrap mt-2">
+            {restaurant.isBlocked && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0" data-testid="badge-blocked">Blocked</Badge>
+            )}
+            {restaurant.isSuspended && (
+              <Badge className="bg-orange-500 text-[10px] px-1.5 py-0" data-testid="badge-suspended">Suspended</Badge>
+            )}
+            {restaurant.isVerified && (
+              <Badge className="bg-green-500 text-[10px] px-1.5 py-0" data-testid="badge-verified">Verified</Badge>
+            )}
+            {!restaurant.isVerified && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0" data-testid="badge-pending-kyc">Pending KYC</Badge>
+            )}
+          </div>
         </div>
       </div>
 

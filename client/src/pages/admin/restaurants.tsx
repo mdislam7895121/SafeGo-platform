@@ -194,21 +194,30 @@ export default function AdminRestaurants() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Responsive */}
-      <div className={`bg-primary text-primary-foreground ${headerPadding} rounded-b-3xl shadow-lg`}>
-        <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin")}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className={`font-bold ${isMobile ? "text-xl" : "text-2xl"}`}>Restaurant Management</h1>
-            <p className={`opacity-90 ${isMobile ? "text-xs" : "text-sm"}`}>View and manage all restaurants</p>
+      {/* Header - Premium Minimal Design */}
+      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+        <div className={`${headerPadding}`}>
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/admin")}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+              <UtensilsCrossed className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h1 className={`font-semibold text-foreground ${isMobile ? "text-base" : "text-lg"}`}>Restaurant Management</h1>
+              <p className="text-[11px] text-muted-foreground">View and manage all restaurants</p>
+            </div>
           </div>
         </div>
       </div>

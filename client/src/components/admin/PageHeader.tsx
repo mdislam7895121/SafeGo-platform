@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
-import { Link } from "wouter";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { ArrowLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -9,12 +9,18 @@ interface BreadcrumbItem {
   href?: string;
 }
 
+interface BackButtonConfig {
+  label: string;
+  href: string;
+}
+
 interface PageHeaderProps {
   title: string;
   description?: string;
   icon?: LucideIcon;
   iconColor?: string;
   breadcrumbs?: BreadcrumbItem[];
+  backButton?: BackButtonConfig;
   actions?: ReactNode;
   className?: string;
   children?: ReactNode;
@@ -26,14 +32,45 @@ export function PageHeader({
   icon: Icon,
   iconColor = "text-primary",
   breadcrumbs,
+  backButton,
   actions,
   className,
   children,
 }: PageHeaderProps) {
+  const [, setLocation] = useLocation();
+
+  const handleBack = () => {
+    if (backButton?.href) {
+      if (window.history.length > 2) {
+        window.history.back();
+      } else {
+        setLocation(backButton.href);
+      }
+    }
+  };
+
   return (
-    <div className={cn("border-b bg-background", className)}>
-      <div className="px-4 py-4 sm:px-6 lg:px-8">
-        {breadcrumbs && breadcrumbs.length > 0 && (
+    <div className={cn("border-b border-black/[0.06] dark:border-white/[0.06] bg-background", className)}>
+      <div className="px-4 py-3 sm:px-6 lg:px-8">
+        {/* Back Button - always shown if provided */}
+        {backButton && (
+          <div className="mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBack}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{backButton.label}</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+          </div>
+        )}
+
+        {/* Breadcrumbs - shown if no back button */}
+        {!backButton && breadcrumbs && breadcrumbs.length > 0 && (
           <nav className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
             {breadcrumbs.map((item, index) => (
               <div key={item.label} className="flex items-center gap-1">
@@ -52,19 +89,19 @@ export function PageHeader({
           </nav>
         )}
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2.5">
             {Icon && (
-              <div className={cn("p-2 rounded-lg bg-primary/10 shrink-0", iconColor)}>
-                <Icon className="h-5 w-5" />
+              <div className={cn("p-1.5 rounded-md bg-primary/10 shrink-0", iconColor)}>
+                <Icon className="h-4 w-4" />
               </div>
             )}
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight" data-testid="page-title">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate" data-testid="page-title">
                 {title}
               </h1>
               {description && (
-                <p className="text-sm text-muted-foreground mt-0.5" data-testid="page-description">
+                <p className="text-[11px] text-muted-foreground truncate" data-testid="page-description">
                   {description}
                 </p>
               )}
@@ -78,7 +115,7 @@ export function PageHeader({
           )}
         </div>
 
-        {children && <div className="mt-4">{children}</div>}
+        {children && <div className="mt-3">{children}</div>}
       </div>
     </div>
   );
