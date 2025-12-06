@@ -7677,19 +7677,37 @@ model AnonymizationJob {
 model PolicyVersion {
   id String @id @default(uuid())
 
+  policyType String @default("privacy") // terms, privacy, refund, safety, community_guidelines
   version    String  // e.g., "v1.0.3"
+  versionNum Int     @default(1) // Numeric version for comparison
   title      String  // e.g., "Global Privacy Policy"
-  contentUrl String  // Link to static page or PDF
+  content    String? // Full policy text (optional if using contentUrl)
+  contentUrl String? // Link to static page or PDF
   summary    String? // Brief summary of changes
 
-  isActive Boolean @default(false) // Only one should be active at a time
+  // Localization
+  country    String? // null = global, or country code
+  language   String  @default("en")
+
+  isActive Boolean @default(false) // Only one should be active at a time per policyType
+  publishedAt DateTime?
+  publishedBy String?
+
+  // Change tracking
+  previousVersionId String?
+  changeNotes       String?
+
+  // Stats
+  acceptanceCount Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String?  // Admin who created this version
 
-  @@unique([version])
+  @@unique([policyType, versionNum, country, language])
+  @@index([policyType])
   @@index([isActive])
+  @@index([publishedAt])
   @@map("policy_versions")
 }
 
@@ -13844,4 +13862,190 @@ model RatingThreshold {
   @@index([userRole])
   @@index([isActive])
   @@map("rating_thresholds")
+}
+
+// =====================================================================
+// TASKS 43-47: DATA RIGHTS + DATA RETENTION LAYER
+// =====================================================================
+
+// TASK 43: Data Export Request Logs
+model DataRequestLog {
+  id String @id @default(uuid())
+
+  userId       String
+  userRole     String // customer, driver, partner, restaurant
+  requestType  String // export, download
+  
+  // Request details
+  status       String @default("pending") // pending, processing, completed, failed
+  dataTypes    String[] // profile, kyc, rides, deliveries, orders, settlements, devices, logins, ratings, fraud
+  
+  // File info
+  fileName     String?
+  fileSize     Int?
+  fileUrl      String?
+  expiresAt    DateTime?
+  
+  // Processing
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+  
+  // Audit
+  ipAddress    String?
+  userAgent    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([status])
+  @@index([createdAt])
+  @@map("data_request_logs")
+}
+
+// TASK 44: Account Delete Requests
+model DeleteRequest {
+  id String @id @default(uuid())
+
+  userId       String @unique
+  userRole     String // customer, driver, partner, restaurant
+  
+  // Request details
+  reason       String?
+  status       String @default("pending") // pending, scheduled, processing, completed, denied, cancelled
+  
+  // Scheduling (72-hour delay)
+  requestedAt    DateTime @default(now())
+  scheduledFor   DateTime // 72 hours after request
+  processedAt    DateTime?
+  
+  // Admin review
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  reviewNote     String?
+  denialReason   String?
+  
+  // Anonymization tracking
+  anonymizedRecords Json? // {rides: 10, orders: 5, ...}
+  preservedRecords  Json? // {settlements: 3, audit_logs: 15, ...}
+  
+  // Notifications
+  confirmationSentAt DateTime?
+  reminderSentAt     DateTime?
+  completionSentAt   DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([createdAt])
+  @@map("delete_requests")
+}
+
+// TASK 45: Data Retention Logs
+model RetentionLog {
+  id String @id @default(uuid())
+
+  // What was cleaned
+  dataType     String // login_logs, device_fingerprints, fraud_logs, ratings_logs, location_traces, etc.
+  tableName    String
+  
+  // Retention rule applied
+  retentionDays  Int
+  cutoffDate     DateTime
+  
+  // Results
+  recordsScanned   Int @default(0)
+  recordsDeleted   Int @default(0)
+  recordsArchived  Int @default(0)
+  recordsPreserved Int @default(0) // For mandatory retention
+  
+  // Status
+  status       String @default("completed") // running, completed, failed
+  errorMessage String?
+  
+  // Execution time
+  startedAt    DateTime
+  completedAt  DateTime?
+  durationMs   Int?
+  
+  createdAt DateTime @default(now())
+
+  @@index([dataType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("retention_logs")
+}
+
+// TASK 46: Policy Acceptance Tracking (PolicyVersion already exists at line 7677)
+model PolicyAcceptance {
+  id String @id @default(uuid())
+
+  userId           String
+  userRole         String
+  
+  policyType       String
+  policyVersionId  String
+  policyVersion    Int
+  
+  acceptedAt       DateTime @default(now())
+  
+  // Context
+  ipAddress        String?
+  userAgent        String?
+  
+  @@unique([userId, policyType])
+  @@index([userId])
+  @@index([policyVersionId])
+  @@index([policyType])
+  @@index([acceptedAt])
+  @@map("policy_acceptances")
+}
+
+// TASK 47: Backup Status
+model BackupStatus {
+  id String @id @default(uuid())
+
+  // Check type
+  checkType    String // manual, scheduled, triggered
+  
+  // Component health checks
+  databaseHealth      String @default("unknown") // healthy, degraded, unhealthy, unknown
+  databaseLatencyMs   Int?
+  fileStorageHealth   String @default("unknown")
+  policyVersionHealth String @default("unknown")
+  fraudEngineHealth   String @default("unknown")
+  ratingEngineHealth  String @default("unknown")
+  cacheHealth         String @default("unknown")
+  
+  // Overall status
+  overallStatus    String @default("unknown") // healthy, degraded, critical, unknown
+  statusMessage    String?
+  
+  // Backup simulation
+  simulationRan    Boolean @default(false)
+  simulationResult String? // success, partial, failed
+  simulationDetails Json?
+  
+  // Recovery readiness
+  recoveryReady    Boolean @default(false)
+  lastBackupAt     DateTime?
+  backupSizeBytes  BigInt?
+  
+  // Execution
+  executedBy       String?
+  startedAt        DateTime @default(now())
+  completedAt      DateTime?
+  durationMs       Int?
+  
+  createdAt DateTime @default(now())
+
+  @@index([checkType])
+  @@index([overallStatus])
+  @@index([createdAt])
+  @@map("backup_status")
 }
