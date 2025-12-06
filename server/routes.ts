@@ -86,6 +86,7 @@ import adminRidePricingRoutes from "./routes/admin-ride-pricing"; // Admin Ride 
 import bdTaxRoutes from "./routes/bd-tax"; // Bangladesh Tax System
 import privacyConsentRoutes from "./routes/privacy-consent"; // Privacy & Consent Management
 import policySafetyRoutes from "./routes/policy-safety"; // SafeGo Master Tasks 1-15: Policy & Safety
+import fraudPreventionRoutes from "./routes/fraud-prevention"; // SafeGo Master Tasks 16-22: Fraud Prevention
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -367,6 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/bd-tax", bdTaxRoutes); // Bangladesh Tax System
   app.use("/api/privacy", privacyConsentRoutes); // Privacy & Consent Management
   app.use("/api/policy-safety", policySafetyRoutes); // SafeGo Master Tasks 1-15: Policy & Safety
+  app.use("/api/fraud-prevention", fraudPreventionRoutes); // SafeGo Master Tasks 16-22: Fraud Prevention
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
   app.use("/api/support", rateLimitSupport, supportChatRoutes); // Rate limited
