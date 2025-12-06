@@ -62,6 +62,7 @@ import CustomerPaymentMethods from "@/pages/customer/payment-methods";
 import CustomerDeliveryAddresses from "@/pages/customer/delivery-addresses";
 import CustomerSavedPlaces from "@/pages/customer/saved-places";
 import CustomerRidePreferences from "@/pages/customer/ride-preferences";
+import CustomerPrivacyPolicy from "@/pages/customer/privacy-policy";
 import CustomerSupportHub from "@/pages/customer-app/support-hub";
 import CustomerSupportHelp from "@/pages/customer-app/support-help";
 import CustomerSupportArticle from "@/pages/customer-app/support-article";
@@ -153,6 +154,7 @@ import DriverMap from "@/pages/driver/map";
 import DriverFoodDeliveries from "@/pages/driver/food-deliveries";
 import DriverFoodDeliveryActive from "@/pages/driver/food-delivery-active";
 import DriverFoodDeliveryHistory from "@/pages/driver/food-delivery-history";
+import DriverPrivacyPolicy from "@/pages/driver/privacy-policy";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -208,6 +210,7 @@ import RestaurantSupport from "@/pages/restaurant/support";
 import RestaurantSupportTickets from "@/pages/restaurant/support-tickets";
 import RestaurantSupportTicketDetail from "@/pages/restaurant/support-ticket-detail";
 import RestaurantWallet from "@/pages/restaurant/wallet";
+import RestaurantPrivacyPolicy from "@/pages/restaurant/privacy-policy";
 import StaffManagement from "@/pages/restaurant/staff";
 import StaffActivity from "@/pages/restaurant/staff-activity";
 import RestaurantKitchen from "@/pages/restaurant/kitchen";
@@ -278,6 +281,7 @@ import AdminRidePricingConfig from "@/pages/admin/ride-pricing-config";
 import AdminRideRequests from "@/pages/admin/ride-requests";
 import AdminBdTaxSettings from "@/pages/admin/bd-tax-settings";
 import AdminPrivacyConsentSettings from "@/pages/admin/privacy-consent-settings";
+import AdminPrivacyPolicyPreview from "@/pages/admin/privacy-policy-preview";
 import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
@@ -359,6 +363,7 @@ import ShopPartnerSettings from "@/pages/shop-partner/settings";
 import ShopPartnerProfile from "@/pages/shop-partner/profile";
 import ShopPartnerReviews from "@/pages/shop-partner/reviews";
 import ShopPartnerNotifications from "@/pages/shop-partner/notifications";
+import ShopPartnerPrivacyPolicy from "@/pages/shop-partner/privacy-policy";
 
 // Customer BD Shop pages
 import BDShops from "@/pages/customer/bd-shops";
@@ -378,6 +383,7 @@ import TicketOperatorRentals from "@/pages/ticket-operator/rentals";
 import TicketOperatorBookings from "@/pages/ticket-operator/bookings";
 import TicketOperatorWallet from "@/pages/ticket-operator/wallet";
 import TicketOperatorProfile from "@/pages/ticket-operator/profile";
+import TicketOperatorPrivacyPolicy from "@/pages/ticket-operator/privacy-policy";
 
 // Customer BD Tickets & Rentals
 import BDTickets from "@/pages/customer/bd-tickets";
@@ -592,6 +598,11 @@ function Router() {
       <Route path="/customer/ride-preferences">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerRidePreferences />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/privacy-policy">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerPrivacyPolicy />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/rides/:id">
@@ -1206,6 +1217,11 @@ function Router() {
           </DriverLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/driver/privacy-policy">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverPrivacyPolicy />
+        </ProtectedRoute>
+      </Route>
       <Route path="/driver/account">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Account Settings">
@@ -1702,6 +1718,11 @@ function Router() {
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/restaurant/privacy-policy">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantPrivacyPolicy />
+        </ProtectedRoute>
+      </Route>
       <Route path="/restaurant/wallet">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
@@ -1884,6 +1905,11 @@ function Router() {
           <AdminLayout pageTitle="Privacy & Consent Settings">
             <AdminPrivacyConsentSettings />
           </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/privacy-policy-preview">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPrivacyPolicyPreview />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/kyc-verification">
@@ -2650,6 +2676,11 @@ function Router() {
           </ShopPartnerLayout>
         </ShopPartnerGuard>
       </Route>
+      <Route path="/shop-partner/privacy-policy">
+        <ShopPartnerGuard>
+          <ShopPartnerPrivacyPolicy />
+        </ShopPartnerGuard>
+      </Route>
       <Route path="/shop-partner/dashboard">
         <ShopPartnerGuard>
           <ShopPartnerLayout>
@@ -2767,6 +2798,11 @@ function Router() {
           <TicketOperatorLayout>
             <TicketOperatorProfile />
           </TicketOperatorLayout>
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/privacy-policy">
+        <TicketOperatorGuard>
+          <TicketOperatorPrivacyPolicy />
         </TicketOperatorGuard>
       </Route>
       <Route path="/ticket-operator/dashboard">

@@ -260,7 +260,7 @@ export default function PrivacyConsentSettingsPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <Link href="/admin">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
@@ -273,6 +273,12 @@ export default function PrivacyConsentSettingsPage() {
           </h1>
           <p className="text-muted-foreground">Manage privacy policies, consent logs, and data requests</p>
         </div>
+        <Link href="/admin/privacy-policy-preview">
+          <Button variant="outline" className="gap-2" data-testid="button-preview-policy">
+            <Eye className="h-4 w-4" />
+            Preview as User
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
