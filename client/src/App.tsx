@@ -243,6 +243,7 @@ import AdminOpportunityBonuses from "@/pages/admin/opportunity-bonuses";
 import AdminOpportunityBonusesEdit from "@/pages/admin/opportunity-bonuses-edit";
 import AdminDriverPromotions from "@/pages/admin/driver-promotions";
 import AdminRidePromotions from "@/pages/admin/ride-promotions";
+import AdminPromotions from "@/pages/admin/promotions";
 import AdminReviews from "@/pages/admin/reviews";
 import AdminMedia from "@/pages/admin/media";
 import AdminSupportChat from "@/pages/admin/support-chat";
@@ -1994,6 +1995,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Opportunity Bonuses">
             <AdminOpportunityBonuses />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/promotions">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Promotions Center">
+            <AdminPromotions />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

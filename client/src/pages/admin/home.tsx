@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { StatCard, ManagementCard } from "@/components/ui/stat-card";
+import { StatCard, ManagementCard, QuickActionCard } from "@/components/ui/stat-card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
@@ -463,59 +463,47 @@ export default function AdminHome() {
       </div>
 
       {/* Quick Actions */}
-      <div className="px-4 sm:px-6 md:px-8 pt-4 sm:pt-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-muted-foreground">Quick Actions</h2>
+      <div className="px-4 sm:px-6 md:px-8 pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">Quick Actions</h2>
         </div>
-        <div className="flex flex-wrap gap-2 sm:gap-3">
+        <div className="flex flex-wrap gap-3">
           <Link href="/admin/drivers?action=add">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full gap-1.5"
-              data-testid="button-quick-add-driver"
-            >
-              <UserPlus className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              <span>Add Driver</span>
-            </Button>
+            <QuickActionCard
+              icon={UserPlus}
+              iconColor="text-purple-600 dark:text-purple-400"
+              label="Add Driver"
+              testId="button-quick-add-driver"
+            />
           </Link>
           <Link href="/admin/restaurants?action=add">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full gap-1.5"
-              data-testid="button-quick-add-restaurant"
-            >
-              <Store className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-              <span>Add Restaurant</span>
-            </Button>
+            <QuickActionCard
+              icon={Store}
+              iconColor="text-orange-600 dark:text-orange-400"
+              label="Add Restaurant"
+              testId="button-quick-add-restaurant"
+            />
           </Link>
-          <Link href="/admin/promotions?action=create">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full gap-1.5"
-              data-testid="button-quick-create-promotion"
-            >
-              <Sparkles className="h-4 w-4 text-pink-600 dark:text-pink-400" />
-              <span>Create Promotion</span>
-            </Button>
+          <Link href="/admin/promotions">
+            <QuickActionCard
+              icon={Sparkles}
+              iconColor="text-pink-600 dark:text-pink-400"
+              label="Create Promotion"
+              testId="button-quick-create-promotion"
+            />
           </Link>
           <Link href="/admin/settings?tab=pricing">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full gap-1.5"
-              data-testid="button-quick-adjust-pricing"
-            >
-              <Calculator className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <span>Adjust Pricing</span>
-            </Button>
+            <QuickActionCard
+              icon={Calculator}
+              iconColor="text-green-600 dark:text-green-400"
+              label="Adjust Pricing"
+              testId="button-quick-adjust-pricing"
+            />
           </Link>
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 md:px-8 py-6 sm:py-8 space-y-10 sm:space-y-14">
+      <div className="px-4 sm:px-6 md:px-8 pt-8 pb-6 space-y-8">
         {/* Quick Stats */}
         <div>
           <SectionHeader 
