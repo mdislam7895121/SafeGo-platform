@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, Search, Filter, UtensilsCrossed, Eye, Columns, Check } from "lucide-react";
+import { ArrowLeft, Search, Filter, UtensilsCrossed, Eye, Columns, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,23 +23,50 @@ import { useQuery } from "@tanstack/react-query";
 
 const COLUMN_STORAGE_KEY = "safego-restaurant-columns";
 
+// Breakpoint detection hook
+function useBreakpoint() {
+  const [breakpoint, setBreakpoint] = useState<"mobile" | "tablet" | "laptop" | "desktop">("desktop");
+  
+  useEffect(() => {
+    const updateBreakpoint = () => {
+      const width = window.innerWidth;
+      if (width < 768) {
+        setBreakpoint("mobile");
+      } else if (width < 1024) {
+        setBreakpoint("tablet");
+      } else if (width < 1280) {
+        setBreakpoint("laptop");
+      } else {
+        setBreakpoint("desktop");
+      }
+    };
+    
+    updateBreakpoint();
+    window.addEventListener("resize", updateBreakpoint);
+    return () => window.removeEventListener("resize", updateBreakpoint);
+  }, []);
+  
+  return breakpoint;
+}
+
 interface ColumnConfig {
   id: string;
   label: string;
   priority: "high" | "medium" | "low";
   defaultVisible: boolean;
+  tabletVisible: boolean; // Whether column is shown by default on tablet
 }
 
 const COLUMNS: ColumnConfig[] = [
-  { id: "restaurant", label: "Restaurant", priority: "high", defaultVisible: true },
-  { id: "email", label: "Email", priority: "high", defaultVisible: true },
-  { id: "country", label: "Country", priority: "high", defaultVisible: true },
-  { id: "kyc", label: "KYC", priority: "high", defaultVisible: true },
-  { id: "status", label: "Status", priority: "high", defaultVisible: true },
-  { id: "pending", label: "Commission Pending", priority: "medium", defaultVisible: true },
-  { id: "balance", label: "Wallet Balance", priority: "medium", defaultVisible: true },
-  { id: "orders", label: "Orders", priority: "medium", defaultVisible: true },
-  { id: "actions", label: "Actions", priority: "high", defaultVisible: true },
+  { id: "restaurant", label: "Restaurant", priority: "high", defaultVisible: true, tabletVisible: true },
+  { id: "email", label: "Email", priority: "high", defaultVisible: true, tabletVisible: true },
+  { id: "country", label: "Country", priority: "high", defaultVisible: true, tabletVisible: true },
+  { id: "kyc", label: "KYC", priority: "high", defaultVisible: true, tabletVisible: false },
+  { id: "status", label: "Status", priority: "high", defaultVisible: true, tabletVisible: true },
+  { id: "pending", label: "Commission Pending", priority: "medium", defaultVisible: true, tabletVisible: false },
+  { id: "balance", label: "Wallet Balance", priority: "medium", defaultVisible: true, tabletVisible: false },
+  { id: "orders", label: "Orders", priority: "medium", defaultVisible: true, tabletVisible: false },
+  { id: "actions", label: "Actions", priority: "high", defaultVisible: true, tabletVisible: true },
 ];
 
 interface Restaurant {
@@ -66,9 +93,13 @@ export default function AdminRestaurants() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const breakpoint = useBreakpoint();
+  const isMobile = breakpoint === "mobile";
+  const isTabletOrSmaller = breakpoint === "mobile" || breakpoint === "tablet";
+  const isLaptop = breakpoint === "laptop";
   
   // Column visibility state with localStorage persistence
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+  const [userColumnPrefs, setUserColumnPrefs] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem(COLUMN_STORAGE_KEY);
       if (saved) {
@@ -84,19 +115,41 @@ export default function AdminRestaurants() {
   // Persist column visibility to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns));
+      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(userColumnPrefs));
     } catch (e) {
       console.error("Failed to save column preferences", e);
     }
-  }, [visibleColumns]);
+  }, [userColumnPrefs]);
+
+  // Compute column visibility based on breakpoint and user preferences
+  const getColumnVisibility = (columnId: string): boolean => {
+    const col = COLUMNS.find(c => c.id === columnId);
+    if (!col) return false;
+    
+    // User explicitly toggled off
+    if (userColumnPrefs[columnId] === false) return false;
+    
+    // On tablet, auto-hide columns not marked as tabletVisible (unless user explicitly enabled)
+    if (isTabletOrSmaller && !col.tabletVisible) {
+      return userColumnPrefs[columnId] === true; // Only show if user explicitly enabled
+    }
+    
+    return userColumnPrefs[columnId] !== false;
+  };
 
   const toggleColumn = (columnId: string) => {
     // Don't allow hiding restaurant or actions columns
     if (columnId === "restaurant" || columnId === "actions") return;
-    setVisibleColumns(prev => ({ ...prev, [columnId]: !prev[columnId] }));
+    
+    // Get current effective visibility (not just stored preference)
+    const currentlyVisible = getColumnVisibility(columnId);
+    
+    // Toggle: if currently visible → hide (false), if currently hidden → show (true)
+    setUserColumnPrefs(prev => ({ ...prev, [columnId]: !currentlyVisible }));
   };
 
-  const isColumnVisible = (columnId: string) => visibleColumns[columnId] !== false;
+  // Responsive column visibility - memoized version for render efficiency
+  const isColumnVisible = useMemo(() => getColumnVisibility, [userColumnPrefs, isTabletOrSmaller]);
 
   // Build query params
   const queryParams = new URLSearchParams();
@@ -134,11 +187,16 @@ export default function AdminRestaurants() {
     return <Badge variant="secondary">Pending</Badge>;
   };
 
+  // Responsive padding classes
+  const containerPadding = isMobile ? "p-3" : isTabletOrSmaller ? "p-4" : "p-6";
+  const headerPadding = isMobile ? "p-4" : isTabletOrSmaller ? "p-5" : "p-6";
+  const cardPadding = isMobile ? "p-3" : isTabletOrSmaller ? "p-4" : "";
+
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-4 mb-4">
+      {/* Header - Responsive */}
+      <div className={`bg-primary text-primary-foreground ${headerPadding} rounded-b-3xl shadow-lg`}>
+        <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
           <Button
             variant="ghost"
             size="icon"
@@ -149,40 +207,51 @@ export default function AdminRestaurants() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Restaurant Management</h1>
-            <p className="text-sm opacity-90">View and manage all restaurants</p>
+            <h1 className={`font-bold ${isMobile ? "text-xl" : "text-2xl"}`}>Restaurant Management</h1>
+            <p className={`opacity-90 ${isMobile ? "text-xs" : "text-sm"}`}>View and manage all restaurants</p>
           </div>
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Search and Filters */}
+      <div className={`${containerPadding} space-y-4 md:space-y-6`}>
+        {/* Search and Filters - Responsive */}
         <Card className="premium-glow-card">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+          <CardHeader className={cardPadding}>
+            <CardTitle className={`flex items-center gap-2 ${isMobile ? "text-base" : "text-lg"}`}>
+              <Filter className={`${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
               Search & Filters
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-3 flex-wrap">
-              <div className="flex-1 min-w-[200px] relative">
+          <CardContent className={`space-y-3 md:space-y-4 ${cardPadding}`}>
+            {/* Search row - stacks on mobile */}
+            <div className={`flex gap-2 md:gap-3 ${isMobile ? "flex-col" : "flex-wrap"}`}>
+              <div className={`relative ${isMobile ? "w-full" : "flex-1 min-w-[200px]"}`}>
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className={`pl-10 ${isMobile ? "text-sm" : ""}`}
                   data-testid="input-search"
                 />
               </div>
               
-              {/* Column Visibility Toggle */}
+              {/* Column Visibility Toggle - Always visible */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="default" className="gap-2" data-testid="button-columns">
+                  <Button 
+                    variant="outline" 
+                    size={isMobile ? "sm" : "default"} 
+                    className={`gap-2 ${isMobile ? "w-full justify-center" : ""}`} 
+                    data-testid="button-columns"
+                  >
                     <Columns className="h-4 w-4" />
-                    Columns
+                    <span>Columns</span>
+                    {isTabletOrSmaller && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                        {COLUMNS.filter(c => isColumnVisible(c.id)).length}
+                      </Badge>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-3" align="end">
@@ -201,8 +270,8 @@ export default function AdminRestaurants() {
                           className="pointer-events-none"
                         />
                         <span className="text-sm flex-1">{col.label}</span>
-                        {col.priority === "high" && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
+                        {!col.tabletVisible && isTabletOrSmaller && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">Hidden</Badge>
                         )}
                       </div>
                     ))}
@@ -211,9 +280,10 @@ export default function AdminRestaurants() {
               </Popover>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Status filter */}
+            <div className={`grid gap-2 md:gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"}`}>
               <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value)}>
-                <SelectTrigger data-testid="select-status">
+                <SelectTrigger data-testid="select-status" className={isMobile ? "text-sm" : ""}>
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -229,17 +299,17 @@ export default function AdminRestaurants() {
 
         {/* Restaurants List */}
         <Card className="premium-glow-card overflow-hidden">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center justify-between">
+          <CardHeader className={cardPadding}>
+            <CardTitle className={`flex items-center justify-between ${isMobile ? "text-base" : "text-lg"}`}>
               <span className="flex items-center gap-2">
-                <UtensilsCrossed className="h-5 w-5" />
+                <UtensilsCrossed className={`${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
                 Restaurants ({isLoading ? "..." : restaurants?.length || 0})
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="space-y-3 p-6">
+              <div className={`space-y-3 ${containerPadding}`}>
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="border rounded-lg p-4">
                     <Skeleton className="h-6 w-3/4 mb-2" />
@@ -252,7 +322,43 @@ export default function AdminRestaurants() {
                 <UtensilsCrossed className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No restaurants found</p>
               </div>
+            ) : isMobile ? (
+              /* Mobile Card View */
+              <div className="divide-y">
+                {restaurants.map((restaurant) => (
+                  <div 
+                    key={restaurant.id}
+                    className="p-3 hover-elevate cursor-pointer transition-colors"
+                    onClick={() => navigate(`/admin/restaurants/${restaurant.id}`)}
+                    data-testid={`card-restaurant-${restaurant.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate" data-testid={`text-name-${restaurant.id}`}>
+                          {restaurant.restaurantName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {restaurant.address}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5" data-testid={`text-email-${restaurant.id}`}>
+                          {restaurant.email}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0" data-testid={`badge-country-${restaurant.id}`}>
+                        {restaurant.country}
+                      </Badge>
+                      {getKYCBadge(restaurant.verificationStatus)}
+                      {getStatusBadge(restaurant)}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
+              /* Table View for Tablet+ */
               <div 
                 className="overflow-x-auto overflow-y-visible"
                 style={{ maxWidth: "100%" }}
@@ -267,35 +373,39 @@ export default function AdminRestaurants() {
                       {/* Sticky Restaurant Column */}
                       {isColumnVisible("restaurant") && (
                         <th 
-                          className="text-left p-3 font-semibold whitespace-nowrap sticky left-0 z-10 bg-card dark:bg-[#1C1C1E] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
-                          style={{ minWidth: "200px" }}
+                          className={`text-left font-semibold whitespace-nowrap sticky left-0 z-10 bg-card dark:bg-[#1C1C1E] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isLaptop ? "p-2 text-sm" : "p-3"}`}
+                          style={{ minWidth: isLaptop ? "160px" : "200px" }}
                         >
                           Restaurant
                         </th>
                       )}
                       {isColumnVisible("email") && (
-                        <th className="text-left p-3 font-semibold whitespace-nowrap" style={{ minWidth: "180px" }}>Email</th>
+                        <th className={`text-left font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: isLaptop ? "140px" : "180px" }}>Email</th>
                       )}
                       {isColumnVisible("country") && (
-                        <th className="text-left p-3 font-semibold whitespace-nowrap" style={{ minWidth: "100px" }}>Country</th>
+                        <th className={`text-left font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: "80px" }}>Country</th>
                       )}
                       {isColumnVisible("kyc") && (
-                        <th className="text-left p-3 font-semibold whitespace-nowrap" style={{ minWidth: "100px" }}>KYC</th>
+                        <th className={`text-left font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: "80px" }}>KYC</th>
                       )}
                       {isColumnVisible("status") && (
-                        <th className="text-left p-3 font-semibold whitespace-nowrap" style={{ minWidth: "100px" }}>Status</th>
+                        <th className={`text-left font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: "80px" }}>Status</th>
                       )}
                       {isColumnVisible("pending") && (
-                        <th className="text-right p-3 font-semibold whitespace-nowrap" style={{ minWidth: "140px" }}>Commission Pending</th>
+                        <th className={`text-right font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: isLaptop ? "100px" : "140px" }}>
+                          {isLaptop ? "Commission" : "Commission Pending"}
+                        </th>
                       )}
                       {isColumnVisible("balance") && (
-                        <th className="text-right p-3 font-semibold whitespace-nowrap" style={{ minWidth: "120px" }}>Wallet Balance</th>
+                        <th className={`text-right font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: isLaptop ? "90px" : "120px" }}>
+                          {isLaptop ? "Balance" : "Wallet Balance"}
+                        </th>
                       )}
                       {isColumnVisible("orders") && (
-                        <th className="text-left p-3 font-semibold whitespace-nowrap" style={{ minWidth: "80px" }}>Orders</th>
+                        <th className={`text-left font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: "60px" }}>Orders</th>
                       )}
                       {isColumnVisible("actions") && (
-                        <th className="text-left p-3 font-semibold whitespace-nowrap" style={{ minWidth: "100px" }}>Actions</th>
+                        <th className={`text-left font-semibold whitespace-nowrap ${isLaptop ? "p-2 text-sm" : "p-3"}`} style={{ minWidth: "80px" }}>Actions</th>
                       )}
                     </tr>
                   </thead>
@@ -309,73 +419,79 @@ export default function AdminRestaurants() {
                         {/* Sticky Restaurant Column */}
                         {isColumnVisible("restaurant") && (
                           <td 
-                            className="p-3 sticky left-0 z-10 bg-card dark:bg-[#1C1C1E] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                            className={`sticky left-0 z-10 bg-card dark:bg-[#1C1C1E] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isLaptop ? "p-2" : "p-3"}`}
                           >
-                            <div className="min-w-[180px]">
-                              <p className="font-medium truncate" data-testid={`text-name-${restaurant.id}`}>
+                            <div style={{ maxWidth: isLaptop ? "140px" : "180px" }}>
+                              <p className={`font-medium truncate ${isLaptop ? "text-sm" : ""}`} data-testid={`text-name-${restaurant.id}`}>
                                 {restaurant.restaurantName}
                               </p>
-                              <p className="text-sm text-muted-foreground truncate max-w-[180px]">
+                              <p className={`text-muted-foreground truncate ${isLaptop ? "text-xs" : "text-sm"}`}>
                                 {restaurant.address}
                               </p>
                             </div>
                           </td>
                         )}
                         {isColumnVisible("email") && (
-                          <td className="p-3">
-                            <p className="text-sm whitespace-nowrap" data-testid={`text-email-${restaurant.id}`}>
+                          <td className={isLaptop ? "p-2" : "p-3"}>
+                            <p 
+                              className={`truncate ${isLaptop ? "text-xs" : "text-sm"}`} 
+                              style={{ maxWidth: isLaptop ? "120px" : "160px" }}
+                              data-testid={`text-email-${restaurant.id}`}
+                              title={restaurant.email}
+                            >
                               {restaurant.email}
                             </p>
                           </td>
                         )}
                         {isColumnVisible("country") && (
-                          <td className="p-3">
-                            <Badge variant="outline" data-testid={`badge-country-${restaurant.id}`}>
+                          <td className={isLaptop ? "p-2" : "p-3"}>
+                            <Badge variant="outline" className={isLaptop ? "text-xs px-1.5" : ""} data-testid={`badge-country-${restaurant.id}`}>
                               {restaurant.country}
                             </Badge>
                           </td>
                         )}
                         {isColumnVisible("kyc") && (
-                          <td className="p-3" data-testid={`badge-kyc-${restaurant.id}`}>
+                          <td className={isLaptop ? "p-2" : "p-3"} data-testid={`badge-kyc-${restaurant.id}`}>
                             {getKYCBadge(restaurant.verificationStatus)}
                           </td>
                         )}
                         {isColumnVisible("status") && (
-                          <td className="p-3">
+                          <td className={isLaptop ? "p-2" : "p-3"}>
                             {getStatusBadge(restaurant)}
                           </td>
                         )}
                         {isColumnVisible("pending") && (
-                          <td className="p-3 text-right">
-                            <p className={`text-sm font-medium whitespace-nowrap ${restaurant.negativeBalance > 0 ? 'text-orange-600' : 'text-muted-foreground'}`} data-testid={`text-pending-${restaurant.id}`}>
+                          <td className={`text-right ${isLaptop ? "p-2" : "p-3"}`}>
+                            <p className={`font-medium whitespace-nowrap ${isLaptop ? "text-xs" : "text-sm"} ${restaurant.negativeBalance > 0 ? 'text-orange-600' : 'text-muted-foreground'}`} data-testid={`text-pending-${restaurant.id}`}>
                               ${Number(restaurant.negativeBalance || 0).toFixed(2)}
                             </p>
                           </td>
                         )}
                         {isColumnVisible("balance") && (
-                          <td className="p-3 text-right">
-                            <p className="text-sm text-green-600 font-medium whitespace-nowrap" data-testid={`text-balance-${restaurant.id}`}>
+                          <td className={`text-right ${isLaptop ? "p-2" : "p-3"}`}>
+                            <p className={`text-green-600 font-medium whitespace-nowrap ${isLaptop ? "text-xs" : "text-sm"}`} data-testid={`text-balance-${restaurant.id}`}>
                               ${Number(restaurant.balance || 0).toFixed(2)}
                             </p>
                           </td>
                         )}
                         {isColumnVisible("orders") && (
-                          <td className="p-3">
-                            <p className="text-sm" data-testid={`text-orders-${restaurant.id}`}>
+                          <td className={isLaptop ? "p-2" : "p-3"}>
+                            <p className={isLaptop ? "text-xs" : "text-sm"} data-testid={`text-orders-${restaurant.id}`}>
                               {restaurant.totalOrders}
                             </p>
                           </td>
                         )}
                         {isColumnVisible("actions") && (
-                          <td className="p-3">
+                          <td className={isLaptop ? "p-2" : "p-3"}>
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => navigate(`/admin/restaurants/${restaurant.id}`)}
+                              className={isLaptop ? "text-xs h-7 px-2" : ""}
                               data-testid={`button-manage-${restaurant.id}`}
                             >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Manage
+                              <Eye className={`mr-1 ${isLaptop ? "h-3 w-3" : "h-4 w-4"}`} />
+                              {isLaptop ? "" : "Manage"}
                             </Button>
                           </td>
                         )}
