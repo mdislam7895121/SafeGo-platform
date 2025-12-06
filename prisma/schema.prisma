@@ -12381,3 +12381,447 @@ model EmergencyContact {
   @@index([userRole])
   @@map("emergency_contacts")
 }
+
+// =====================================================================
+// SAFEGO MASTER TASKS 16-22: FRAUD PREVENTION LAYER
+// =====================================================================
+
+// TASK 16 & 17: Device Fingerprinting System
+model DeviceFingerprint {
+  id String @id @default(uuid())
+
+  userId   String
+  userRole String // customer, driver, restaurant, etc.
+
+  deviceId       String   // Hashed unique device identifier
+  deviceHash     String   // Full fingerprint hash for matching
+  os             String   // iOS, Android, Web
+  osVersion      String?
+  model          String?  // Device model
+  manufacturer   String?
+  appVersion     String?
+  browserInfo    String?  // For web users
+
+  ipAddress      String?
+  lastKnownIp    String?
+  countryCode    String?
+  regionCode     String?
+
+  isWhitelisted  Boolean  @default(false)
+  whitelistedBy  String?  // admin_id
+  whitelistedAt  DateTime?
+  whitelistReason String?
+
+  isBlocked      Boolean  @default(false)
+  blockedReason  String?
+
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+
+  loginCount     Int      @default(1)
+
+  metadata       Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([deviceId])
+  @@index([deviceHash])
+  @@index([isWhitelisted])
+  @@index([isBlocked])
+  @@index([lastSeenAt])
+  @@map("device_fingerprints")
+}
+
+// TASK 16-22: Unified Fraud Events Log
+enum FraudEventType {
+  device_mismatch         // Task 16: Different device detected
+  multi_device_login      // Task 16: Same account on multiple devices
+  fake_gps_detected       // Task 18: GPS spoofing detected
+  impossible_movement     // Task 18: Impossible location jump
+  gps_ip_mismatch         // Task 18/21: GPS location doesn't match IP
+  cod_fraud_suspected     // Task 19: COD manipulation
+  cod_cancellation_abuse  // Task 19: Repeated COD cancellations
+  partner_manipulation    // Task 20: Merchant fraud patterns
+  self_ordering           // Task 20: Ordering from own restaurant
+  order_padding           // Task 20: Fake orders to boost metrics
+  fake_delivery_cycle     // Task 20: Fake delivery confirmations
+  ip_anomaly              // Task 21: Suspicious IP behavior
+  vpn_detected            // Task 21: VPN/proxy usage
+  ip_country_mismatch     // Task 21: IP from different country
+  rapid_ip_change         // Task 21: Too many IP changes
+  high_fraud_score        // Task 22: Fraud score exceeded threshold
+  suspicious_cancellation // General: Unusual cancellation pattern
+  suspicious_report_pattern // General: Filing too many reports
+}
+
+enum FraudEventSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum FraudEventStatus {
+  detected
+  investigating
+  confirmed
+  false_positive
+  resolved
+  escalated
+}
+
+model FraudEvent {
+  id String @id @default(uuid())
+
+  userId   String
+  userRole String
+
+  eventType   FraudEventType
+  severity    FraudEventSeverity @default(medium)
+  status      FraudEventStatus   @default(detected)
+
+  description String  @db.Text
+  details     Json?   // Event-specific data
+
+  // Location data for GPS-related events
+  latitude    Float?
+  longitude   Float?
+  previousLat Float?
+  previousLng Float?
+  distanceKm  Float?
+  timeSeconds Int?
+
+  // IP data for IP-related events
+  ipAddress   String?
+  previousIp  String?
+  vpnProvider String?
+
+  // Device data
+  deviceId    String?
+  deviceHash  String?
+
+  // Related entities
+  rideId      String?
+  orderId     String?
+  parcelId    String?
+
+  // Fraud score impact
+  scoreImpact Int @default(0)
+
+  // Auto-action taken
+  autoActionTaken   String?
+  autoRestrictApplied Boolean @default(false)
+
+  // Admin review
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewNote    String?   @db.Text
+
+  resolvedBy    String?
+  resolvedAt    DateTime?
+  resolution    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([eventType])
+  @@index([severity])
+  @@index([status])
+  @@index([deviceId])
+  @@index([ipAddress])
+  @@index([createdAt])
+  @@map("fraud_events")
+}
+
+// TASK 19: COD Fraud Logs
+enum CodFraudType {
+  repeated_cancellation
+  high_value_abuse
+  location_mismatch
+  delivery_not_received_claim
+  payment_dispute
+  fake_cod_amount
+  collection_tampering
+}
+
+model CodFraudLog {
+  id String @id @default(uuid())
+
+  userId   String
+  userRole String // customer or driver
+
+  parcelId   String?
+  orderId    String?
+
+  fraudType  CodFraudType
+  severity   FraudEventSeverity @default(medium)
+  status     FraudEventStatus   @default(detected)
+
+  codAmount        Decimal  @db.Decimal(12, 2)
+  expectedAmount   Decimal? @db.Decimal(12, 2)
+  collectedAmount  Decimal? @db.Decimal(12, 2)
+  discrepancy      Decimal? @db.Decimal(12, 2)
+
+  cancellationCount   Int @default(0)
+  disputeCount        Int @default(0)
+
+  pickupLocation  String?
+  dropoffLocation String?
+  locationMismatchDetails String?
+
+  description String @db.Text
+
+  autoRestricted Boolean @default(false)
+
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  reviewNote  String?  @db.Text
+  resolution  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([parcelId])
+  @@index([orderId])
+  @@index([fraudType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("cod_fraud_logs")
+}
+
+// TASK 20: Partner/Merchant Fraud Logs
+enum PartnerFraudType {
+  self_ordering
+  order_padding
+  fake_delivery_cycle
+  acceptance_cancellation_loop
+  rating_manipulation
+  promotion_abuse
+  commission_evasion
+  fake_menu_items
+  delivery_time_manipulation
+}
+
+model PartnerFraudLog {
+  id String @id @default(uuid())
+
+  partnerId   String
+  partnerType String // restaurant, driver, merchant
+
+  fraudType   PartnerFraudType
+  severity    FraudEventSeverity @default(medium)
+  status      FraudEventStatus   @default(detected)
+
+  description String @db.Text
+  evidence    Json?  // Screenshots, logs, patterns
+
+  relatedOrderIds String[] @default([])
+  relatedRideIds  String[] @default([])
+
+  // Pattern detection data
+  patternStartDate DateTime?
+  patternEndDate   DateTime?
+  occurrenceCount  Int       @default(1)
+
+  // Financial impact
+  estimatedLoss    Decimal?  @db.Decimal(12, 2)
+  recoveredAmount  Decimal?  @db.Decimal(12, 2)
+
+  autoRestricted Boolean @default(false)
+
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  reviewNote  String?  @db.Text
+  resolution  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partnerId])
+  @@index([partnerType])
+  @@index([fraudType])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("partner_fraud_logs")
+}
+
+// TASK 21: IP Anomaly Logs
+enum IpAnomalyType {
+  vpn_detected
+  proxy_detected
+  tor_detected
+  country_mismatch
+  rapid_country_change
+  rapid_ip_change
+  datacenter_ip
+  known_fraud_ip
+  gps_ip_region_mismatch
+}
+
+model IpAnomalyLog {
+  id String @id @default(uuid())
+
+  userId   String
+  userRole String
+
+  anomalyType IpAnomalyType
+  severity    FraudEventSeverity @default(medium)
+  status      FraudEventStatus   @default(detected)
+
+  currentIp       String
+  previousIp      String?
+  currentCountry  String?
+  previousCountry String?
+  currentRegion   String?
+  previousRegion  String?
+
+  // GPS comparison data
+  gpsLatitude    Float?
+  gpsLongitude   Float?
+  gpsCountry     String?
+  gpsRegion      String?
+
+  // VPN/Proxy detection
+  isVpn          Boolean @default(false)
+  isProxy        Boolean @default(false)
+  isTor          Boolean @default(false)
+  isDatacenter   Boolean @default(false)
+  vpnProvider    String?
+  ispName        String?
+
+  // Time between location changes
+  timeBetweenChangesSeconds Int?
+
+  description String @db.Text
+
+  requiresReverification Boolean @default(false)
+  reverificationCompleted Boolean @default(false)
+
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  reviewNote  String?  @db.Text
+  resolution  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([currentIp])
+  @@index([anomalyType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ip_anomaly_logs")
+}
+
+// TASK 22: Fraud Score System
+model FraudScore {
+  id String @id @default(uuid())
+
+  userId   String @unique
+  userRole String
+
+  // Overall score (0-100)
+  currentScore     Int @default(0)
+  previousScore    Int @default(0)
+  peakScore        Int @default(0)
+
+  // Component scores
+  deviceMismatchScore    Int @default(0)
+  fakeGpsScore           Int @default(0)
+  ipAnomalyScore         Int @default(0)
+  codFraudScore          Int @default(0)
+  reportFrequencyScore   Int @default(0)
+  cancellationAbuseScore Int @default(0)
+  partnerManipulationScore Int @default(0)
+
+  // Event counts
+  deviceMismatchCount    Int @default(0)
+  fakeGpsCount           Int @default(0)
+  ipAnomalyCount         Int @default(0)
+  codFraudCount          Int @default(0)
+  reportsReceivedCount   Int @default(0)
+  cancellationCount      Int @default(0)
+  manipulationCount      Int @default(0)
+
+  // Status
+  isRestricted     Boolean @default(false)
+  restrictedAt     DateTime?
+  restrictionReason String?
+
+  requiresManualClearance Boolean @default(false)
+  clearedBy               String?
+  clearedAt               DateTime?
+  clearanceNote           String?
+
+  // Thresholds (can be customized per user)
+  customThreshold  Int?
+
+  // Last calculation timestamp
+  lastCalculatedAt DateTime @default(now())
+
+  // Historical data
+  scoreHistory     Json? // Array of {date, score, reason}
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([currentScore])
+  @@index([isRestricted])
+  @@index([requiresManualClearance])
+  @@index([lastCalculatedAt])
+  @@map("fraud_scores")
+}
+
+// Fraud Prevention Settings (Admin configurable thresholds)
+model FraudPreventionSettings {
+  id String @id @default(uuid())
+
+  settingKey   String @unique
+  settingValue String
+  description  String?
+  category     String  // gps, device, ip, cod, partner, score
+
+  minValue     Float?
+  maxValue     Float?
+  defaultValue String?
+
+  isActive     Boolean @default(true)
+
+  updatedBy    String?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@index([category])
+  @@index([isActive])
+  @@map("fraud_prevention_settings")
+}
+
+// Device Whitelist for special accounts (Task 16)
+model DeviceWhitelist {
+  id String @id @default(uuid())
+
+  userId     String
+  userRole   String
+  deviceId   String
+  deviceHash String?
+
+  reason     String?
+  expiresAt  DateTime?
+
+  createdBy  String // admin_id
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([deviceId])
+  @@index([expiresAt])
+  @@map("device_whitelist")
+}
