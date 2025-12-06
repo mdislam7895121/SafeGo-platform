@@ -12825,3 +12825,321 @@ model DeviceWhitelist {
   @@index([expiresAt])
   @@map("device_whitelist")
 }
+
+// =====================================================================
+// SAFEGO MASTER TASKS 23-28: SETTLEMENT & FINANCE AUTOMATION LAYER
+// =====================================================================
+
+// Settlement Status Enum for Weekly Settlements
+enum WeeklySettlementStatus {
+  pending
+  processing
+  completed
+  failed
+  requires_review
+}
+
+// Payout Request Status
+enum PayoutRequestStatus {
+  pending
+  approved
+  processing
+  completed
+  rejected
+  cancelled
+}
+
+// Finance Audit Action Types
+enum FinanceAuditActionType {
+  settlement_created
+  settlement_adjusted
+  settlement_completed
+  payout_initiated
+  payout_approved
+  payout_rejected
+  payout_completed
+  threshold_change
+  balance_adjustment
+  manual_override
+  restriction_applied
+  restriction_removed
+}
+
+// TASK 23: Weekly Settlement Records
+model WeeklySettlement {
+  id String @id @default(uuid())
+
+  // Settlement period
+  periodStart    DateTime
+  periodEnd      DateTime
+  countryCode    String
+  timezone       String // e.g., "Asia/Dhaka", "America/New_York"
+
+  // Owner info
+  ownerId        String
+  ownerType      WalletOwnerType // driver, restaurant, shop
+  ownerRole      String?
+
+  // Earnings breakdown
+  totalEarnings       Decimal @default(0) @db.Decimal(12, 2)
+  cashCollected       Decimal @default(0) @db.Decimal(12, 2)
+  onlinePayments      Decimal @default(0) @db.Decimal(12, 2)
+  tipsEarned          Decimal @default(0) @db.Decimal(12, 2)
+  bonusesEarned       Decimal @default(0) @db.Decimal(12, 2)
+
+  // Deductions
+  commissionDue       Decimal @default(0) @db.Decimal(12, 2)
+  taxDeducted         Decimal @default(0) @db.Decimal(12, 2)
+  penaltiesApplied    Decimal @default(0) @db.Decimal(12, 2)
+  previousNegBal      Decimal @default(0) @db.Decimal(12, 2) // Carried over negative balance
+
+  // Net calculation
+  netSettlement       Decimal @default(0) @db.Decimal(12, 2) // Positive = owes SafeGo, Negative = SafeGo owes
+
+  // Trips/orders in this settlement
+  totalTrips          Int @default(0)
+  totalOrders         Int @default(0)
+  totalDeliveries     Int @default(0)
+
+  // Status tracking
+  status              WeeklySettlementStatus @default(pending)
+  settlementNote      String? @db.Text
+  errorMessage        String?
+
+  // Generated record reference
+  statementNumber     String? @unique
+
+  // Processing info
+  processedAt         DateTime?
+  processedBy         String? // admin_id or "system"
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([ownerType])
+  @@index([countryCode])
+  @@index([status])
+  @@index([periodStart, periodEnd])
+  @@index([createdAt])
+  @@map("weekly_settlements")
+}
+
+// TASK 24: Driver Negative Balance Tracking
+model DriverNegativeBalance {
+  id String @id @default(uuid())
+
+  driverId        String @unique
+  driverName      String?
+  countryCode     String
+
+  // Balance tracking
+  currentBalance  Decimal @default(0) @db.Decimal(12, 2) // Positive = owes SafeGo
+  lastUpdated     DateTime @default(now())
+
+  // History of changes
+  totalCashTrips        Int @default(0)
+  totalCashCollected    Decimal @default(0) @db.Decimal(12, 2)
+  totalOnlineSettled    Decimal @default(0) @db.Decimal(12, 2)
+  totalManualPayments   Decimal @default(0) @db.Decimal(12, 2)
+
+  // Commission tracking
+  totalCommissionDue    Decimal @default(0) @db.Decimal(12, 2)
+  totalCommissionPaid   Decimal @default(0) @db.Decimal(12, 2)
+
+  // Restriction status (Task 25)
+  isRestricted          Boolean @default(false)
+  restrictedAt          DateTime?
+  restrictionReason     String?
+  restrictionThreshold  Decimal? @db.Decimal(12, 2) // Custom threshold for this driver
+
+  // Last settlement reference
+  lastSettlementId      String?
+  lastSettlementDate    DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([countryCode])
+  @@index([currentBalance])
+  @@index([isRestricted])
+  @@map("driver_negative_balances")
+}
+
+// TASK 24: Restaurant Negative Balance Tracking
+model RestaurantNegativeBalance {
+  id String @id @default(uuid())
+
+  restaurantId    String @unique
+  restaurantName  String?
+  countryCode     String
+
+  // Balance tracking
+  currentBalance  Decimal @default(0) @db.Decimal(12, 2) // Positive = owes SafeGo
+  lastUpdated     DateTime @default(now())
+
+  // History of changes
+  totalCashOrders       Int @default(0)
+  totalCashCollected    Decimal @default(0) @db.Decimal(12, 2)
+  totalOnlineSettled    Decimal @default(0) @db.Decimal(12, 2)
+  totalManualPayments   Decimal @default(0) @db.Decimal(12, 2)
+
+  // Commission tracking
+  totalCommissionDue    Decimal @default(0) @db.Decimal(12, 2)
+  totalCommissionPaid   Decimal @default(0) @db.Decimal(12, 2)
+
+  // Restriction status (Task 25)
+  isRestricted          Boolean @default(false)
+  restrictedAt          DateTime?
+  restrictionReason     String?
+  restrictionThreshold  Decimal? @db.Decimal(12, 2)
+
+  // Last settlement reference
+  lastSettlementId      String?
+  lastSettlementDate    DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([countryCode])
+  @@index([currentBalance])
+  @@index([isRestricted])
+  @@map("restaurant_negative_balances")
+}
+
+// TASK 27: Payout Requests for Universal Payout Center
+model PayoutRequest {
+  id String @id @default(uuid())
+
+  // Requester info
+  requesterId     String
+  requesterType   WalletOwnerType // driver, restaurant, shop
+  requesterRole   String?
+  requesterName   String?
+  countryCode     String
+
+  // Request details
+  requestedAmount Decimal @db.Decimal(12, 2)
+  currency        String @default("BDT")
+  payoutMethod    String // bkash, nagad, bank_transfer, stripe
+
+  // Payment destination info
+  accountNumber   String?
+  accountName     String?
+  bankName        String?
+  routingNumber   String?
+
+  // Status tracking
+  status          PayoutRequestStatus @default(pending)
+  statusNote      String?
+
+  // Processing info
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectedBy      String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  processedBy     String?
+  processedAt     DateTime?
+  completedAt     DateTime?
+
+  // External reference (from payment gateway)
+  externalRefId   String?
+  gatewayResponse Json?
+
+  // Fees
+  feeAmount       Decimal @default(0) @db.Decimal(12, 2)
+  netAmount       Decimal @default(0) @db.Decimal(12, 2)
+
+  // Batch processing
+  batchId         String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([requesterId])
+  @@index([requesterType])
+  @@index([countryCode])
+  @@index([status])
+  @@index([createdAt])
+  @@index([payoutMethod])
+  @@map("payout_requests")
+}
+
+// TASK 28: Finance Audit Logs (Immutable)
+model FinanceAuditLog {
+  id String @id @default(uuid())
+
+  // Actor info
+  adminId         String
+  adminEmail      String?
+  adminRole       String?
+
+  // Action details
+  actionType      FinanceAuditActionType
+  resourceType    String // settlement, payout, balance, threshold
+  resourceId      String?
+
+  // Target user (if applicable)
+  targetUserId    String?
+  targetUserType  String?
+  targetUserName  String?
+
+  // Value changes
+  beforeValue     Json?
+  afterValue      Json?
+  changeAmount    Decimal? @db.Decimal(12, 2)
+  currency        String?
+
+  // Context
+  description     String @db.Text
+  reason          String?
+
+  // Security info
+  ipAddress       String?
+  userAgent       String?
+  deviceFingerprint String?
+  countryCode     String?
+
+  // Immutability marker (prevents soft-delete abuse)
+  hashChain       String? // SHA-256 of previous log's hash + this log's data
+  isVerified      Boolean @default(true)
+
+  createdAt       DateTime @default(now())
+
+  // Note: No updatedAt - these logs are immutable
+
+  @@index([adminId])
+  @@index([actionType])
+  @@index([resourceType])
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@map("finance_audit_logs")
+}
+
+// Settlement Thresholds Configuration
+model SettlementThreshold {
+  id String @id @default(uuid())
+
+  countryCode     String
+  ownerType       WalletOwnerType // driver, restaurant, shop
+  thresholdType   String // negative_balance_max, min_payout, etc.
+
+  thresholdValue  Decimal @db.Decimal(12, 2)
+  currency        String @default("BDT")
+
+  isActive        Boolean @default(true)
+  description     String?
+
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([countryCode, ownerType, thresholdType])
+  @@index([countryCode])
+  @@index([ownerType])
+  @@index([isActive])
+  @@map("settlement_thresholds")
+}

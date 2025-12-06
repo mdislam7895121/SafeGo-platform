@@ -1,0 +1,154 @@
+You must now implement SafeGo Master Serial Tasks 23–28 (Settlement & Finance Automation Layer) in one unified, non-breaking update. All SafeGo Master Rules remain fully enforced.
+
+=====================================================================
+SECTION 0 — SAFEGO MASTER RULES (MANDATORY)
+=====================================================================
+Do NOT break:
+• ride, food_orders, deliveries collections  
+• commission rules (cash → negative balance; online → auto-settle)  
+• BD/US KYC  
+• status flows for ride/food/parcel  
+• privacy & consent system  
+• fraud detection just implemented  
+
+All updates must be additive, backward compatible, and production-safe.
+
+=====================================================================
+SECTION 1 — TASK SET (23–28)
+=====================================================================
+
+---------------------------------------------------------------------
+TASK 23 — Automatic Weekly Settlement Engine
+---------------------------------------------------------------------
+Implement a cron-based settlement engine that:
+• Runs every Sunday 23:59 BD time + US local time (dual-country support)
+• Calculates:
+    - driver earnings
+    - restaurant earnings
+    - SafeGo commissions
+    - negative balances
+• Auto-generates a weekly settlement record stored in:
+    settlements table
+• If user owes money:
+    negative_balance = commission_due
+
+---------------------------------------------------------------------
+TASK 24 — Negative Balance Auto-Tracking
+---------------------------------------------------------------------
+Create:
+• driver_negative_balance table  
+• restaurant_negative_balance table  
+
+Rules:
+• Cash trips/orders increase negative balance
+• Online payments reduce negative balance
+• Fraud-restricted users cannot bypass settlement
+• All balances visible in Admin → Finance Center → Balances tab
+
+---------------------------------------------------------------------
+TASK 25 — Auto-Block if Negative Balance Too High
+---------------------------------------------------------------------
+Implement:
+• If negative_balance > threshold:
+    role_status = "restricted_settlement"
+• User cannot accept rides, deliveries, or orders until settled
+• Admin can:
+    - adjust threshold
+    - manually override
+
+---------------------------------------------------------------------
+TASK 26 — Online Settlement Options (bkash, nagad, card)
+---------------------------------------------------------------------
+Add unified settlement endpoint:
+POST /api/settlement/pay
+
+Supports:
+• bkash
+• nagad
+• debit/credit card (Stripe placeholder)
+
+Flow:
+1. User pays outstanding negative balance
+2. Payment gateway verifies success
+3. Negative balance resets to zero
+4. Settlement record generated
+5. Account restrictions removed
+
+---------------------------------------------------------------------
+TASK 27 — Universal Payout Center (All Roles)
+---------------------------------------------------------------------
+Add a new Admin Panel module:
+**Payout Center**
+
+Admin can:
+• Initiate payouts to:
+    - drivers
+    - restaurants
+    - shop partners
+    - delivery partners
+• Filter by:
+    - date range
+    - role
+    - region
+• Download payout CSV
+• Approve or reject payout requests
+
+Add payout_requests table.
+
+---------------------------------------------------------------------
+TASK 28 — Finance Audit Logs (Internal Security)
+---------------------------------------------------------------------
+Add:
+finance_audit_logs table storing:
+• admin_id
+• action_type (settlement_adjust, payout, threshold_change, override)
+• before_value
+• after_value
+• timestamp
+• IP + device fingerprint
+
+Admin Panel:
+• New tab → “Finance Logs”
+• Logs must be immutable (no delete or update allowed)
+
+=====================================================================
+SECTION 2 — DATABASE REQUIREMENTS
+=====================================================================
+Add tables (non-breaking):
+• settlements
+• driver_negative_balance
+• restaurant_negative_balance
+• payout_requests
+• finance_audit_logs
+
+Do NOT modify existing fields; only extend safely.
+
+=====================================================================
+SECTION 3 — ADMIN PANEL UPDATES
+=====================================================================
+Add:
+1. Finance Center
+   • Weekly settlements list
+   • Balances tab
+   • Threshold controls
+
+2. Payout Center
+   • Role filters
+   • Approve, reject, export CSV
+
+3. Finance Logs
+   • Immutable audit records
+
+=====================================================================
+SECTION 4 — ENFORCEMENT RULES
+=====================================================================
+• Users with restricted_settlement cannot accept rides/orders.  
+• Settlement engine must never modify commissions or core fare logic.  
+• All financial operations must be logged in finance_audit_logs.  
+
+=====================================================================
+SECTION 5 — COMPLETION REPORT
+=====================================================================
+When complete, return:
+
+“Tasks 23–28 (SafeGo Settlement & Finance Automation Layer) fully implemented and validated. All features are non-breaking and SafeGo Master Rule compliant.”
