@@ -872,26 +872,16 @@ export function SafePilotButton() {
           side="right"
         >
           <SheetHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b shrink-0">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-[#2F80ED]/10 to-[#56CCF2]/10 flex items-center justify-center shrink-0">
-                  <SafePilotIcon size="sm" />
-                </div>
-                <div className="min-w-0">
-                  <SheetTitle className="text-base sm:text-lg bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent font-semibold">SafePilot</SheetTitle>
-                  <SheetDescription className="text-xs truncate">
-                    AI Intelligence Engine
-                  </SheetDescription>
-                </div>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-[#2F80ED]/10 to-[#56CCF2]/10 flex items-center justify-center shrink-0">
+                <SafePilotIcon size="sm" />
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsOpen(false)}
-                className="min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9 shrink-0"
-              >
-                <X className="h-5 w-5 sm:h-4 sm:w-4" />
-              </Button>
+              <div className="min-w-0">
+                <SheetTitle className="text-base sm:text-lg bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent font-semibold">SafePilot</SheetTitle>
+                <SheetDescription className="text-xs truncate">
+                  AI Intelligence Engine
+                </SheetDescription>
+              </div>
             </div>
           </SheetHeader>
 
