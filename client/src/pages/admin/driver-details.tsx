@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Car, Shield, Ban, Unlock, Trash2, Clock, DollarSign, Star, TrendingUp, AlertCircle, User, Edit, Wallet, Plus } from "lucide-react";
+import { Car, Shield, Ban, Unlock, Trash2, Clock, DollarSign, Star, TrendingUp, AlertCircle, User, Edit, Wallet, Plus } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { VEHICLE_BRANDS_MODELS, VEHICLE_COLORS } from "@shared/vehicleCatalog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1006,42 +1007,18 @@ export default function AdminDriverDetails() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Premium Minimal Design */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/admin/drivers")}
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Back to Drivers</span>
-              <span className="sm:hidden">Back</span>
-            </Button>
+      <PageHeader
+        title="Driver Details"
+        description={isLoading ? undefined : driver?.email}
+        icon={Car}
+        backButton={{ label: "Back to Drivers", href: "/admin/drivers" }}
+      >
+        {!isLoading && driver && (
+          <div className="flex gap-1.5 flex-wrap">
+            {getStatusBadge()}
           </div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-              <Car className="h-4 w-4 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-base sm:text-lg font-semibold text-foreground">Driver Details</h1>
-              {isLoading ? (
-                <Skeleton className="h-3 w-48 mt-1" />
-              ) : (
-                <p className="text-[11px] text-muted-foreground truncate" data-testid="text-email">{driver?.email}</p>
-              )}
-            </div>
-          </div>
-          {!isLoading && driver && (
-            <div className="flex gap-1.5 flex-wrap mt-2">
-              {getStatusBadge()}
-            </div>
-          )}
-        </div>
-      </div>
+        )}
+      </PageHeader>
 
       <div className="p-6 space-y-6">
         {isLoading ? (

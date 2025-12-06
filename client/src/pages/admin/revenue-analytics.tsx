@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { 
-  ArrowLeft, DollarSign, TrendingUp, TrendingDown, 
+  DollarSign, TrendingUp, TrendingDown, 
   Calendar, Car, UtensilsCrossed, Package, Users,
   RefreshCw, Download, Filter, BarChart3
 } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -227,66 +227,49 @@ export default function RevenueAnalytics() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Premium Minimal Design */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="mb-2">
-            <Link href="/admin">
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5" data-testid="button-back">
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Back to Dashboard</span>
-                <span className="sm:hidden">Back</span>
-              </Button>
-            </Link>
+      <PageHeader
+        title="Revenue Analytics"
+        description="Financial performance and insights"
+        icon={TrendingUp}
+        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={range} onValueChange={setRange}>
+              <SelectTrigger className="w-32 h-8 text-xs" data-testid="select-range">
+                <Calendar className="h-3 w-3 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                <SelectItem value="last_30_days">Last 30 Days</SelectItem>
+                <SelectItem value="this_month">This Month</SelectItem>
+                <SelectItem value="last_month">Last Month</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={countryCode} onValueChange={setCountryCode}>
+              <SelectTrigger className="w-28 h-8 text-xs" data-testid="select-country">
+                <SelectValue placeholder="Country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Countries</SelectItem>
+                <SelectItem value="BD">Bangladesh</SelectItem>
+                <SelectItem value="US">United States</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="h-8 text-xs"
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh
+            </Button>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-                <BarChart3 className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-semibold text-foreground">Revenue Analytics</h1>
-                <p className="text-[11px] text-muted-foreground">Financial performance and insights</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={range} onValueChange={setRange}>
-                <SelectTrigger className="w-32 h-8 text-xs" data-testid="select-range">
-                  <Calendar className="h-3 w-3 mr-1" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-                  <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-                  <SelectItem value="this_month">This Month</SelectItem>
-                  <SelectItem value="last_month">Last Month</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={countryCode} onValueChange={setCountryCode}>
-                <SelectTrigger className="w-28 h-8 text-xs" data-testid="select-country">
-                  <SelectValue placeholder="Country" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Countries</SelectItem>
-                  <SelectItem value="BD">Bangladesh</SelectItem>
-                  <SelectItem value="US">United States</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className="h-8 text-xs"
-                data-testid="button-refresh"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Refresh
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="flex items-center gap-4 text-sm text-muted-foreground">

@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import {
-  ArrowLeft,
   Bell,
   Plus,
   Settings,
@@ -15,6 +13,7 @@ import {
   Zap,
   ArrowUpRight,
 } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +63,6 @@ interface RulesResponse {
 }
 
 export default function NotificationRules() {
-  const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -215,41 +213,22 @@ export default function NotificationRules() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Premium Minimal Design */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="mb-2 flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/admin")}
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Back to Dashboard</span>
-              <span className="sm:hidden">Back</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowCreateDialog(true)}
-              data-testid="button-create-rule"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Create Rule
-            </Button>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-              <Bell className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold text-foreground">Notification Rules Engine</h1>
-              <p className="text-[11px] text-muted-foreground">Configure automated notification triggers</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Notification Rules Engine"
+        description="Configure automated notification triggers"
+        icon={Bell}
+        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+        actions={
+          <Button
+            size="sm"
+            onClick={() => setShowCreateDialog(true)}
+            data-testid="button-create-rule"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Create Rule
+          </Button>
+        }
+      />
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="grid grid-cols-3 gap-4">

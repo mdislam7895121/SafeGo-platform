@@ -6,16 +6,17 @@ Last Updated: 2024-12-06
 This document catalogs all admin pages, their routes, header styles, and back button configurations.
 
 ## Design Standard
-All admin pages use the premium minimal header design with:
+All admin pages now use the shared `PageHeader` component (`client/src/components/admin/PageHeader.tsx`) with:
 - Gradient background: `bg-gradient-to-r from-primary/5 via-primary/3 to-transparent`
+- Dark mode support: `dark:from-primary/10 dark:via-primary/5 dark:to-transparent`
 - Border: `border-b border-black/[0.06] dark:border-white/[0.06]`
-- Back button: ghost variant, sm size, h-7 height, responsive text
+- Back button: ghost variant, sm size, h-7 height, responsive text ("Back to X" on desktop, "Back" on mobile)
 - Icon badge: `p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md`
 - Title: `text-base sm:text-lg font-semibold`
 - Subtitle: `text-[11px] text-muted-foreground`
 - Sticky positioning with `backdrop-blur-sm`
 
-**Future Enhancement:** Consider refactoring to use the reusable `PageHeader` component (`client/src/components/admin/PageHeader.tsx`) for centralized maintenance.
+**Status:** All admin pages have been refactored to use the shared PageHeader component for centralized maintenance and consistent styling.
 
 ---
 

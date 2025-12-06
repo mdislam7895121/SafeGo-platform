@@ -1,9 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import {
   Star,
-  ArrowLeft,
   Filter,
   Flag,
   Eye,
@@ -17,6 +15,7 @@ import {
   BarChart3,
   MessageSquare,
 } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -156,7 +155,6 @@ interface DisputesResponse {
 const RATING_COLORS = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e"];
 
 export default function RatingsCenter() {
-  const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -366,33 +364,12 @@ export default function RatingsCenter() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Premium Minimal Design */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/admin")}
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Back to Dashboard</span>
-              <span className="sm:hidden">Back</span>
-            </Button>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-              <Star className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold text-foreground">Ratings & Review Center</h1>
-              <p className="text-[11px] text-muted-foreground">Manage driver ratings and restaurant reviews</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Ratings & Review Center"
+        description="Manage driver ratings and restaurant reviews"
+        icon={Star}
+        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+      />
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

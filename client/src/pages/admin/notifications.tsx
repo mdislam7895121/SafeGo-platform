@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Link } from "wouter";
 import { 
-  ArrowLeft, Bell, CheckCheck, Filter, Search, X, BellOff,
+  Bell, CheckCheck, Filter, Search, X, BellOff,
   Car, UtensilsCrossed, ShoppingBag, Ticket, Key, Server,
   AlertTriangle, Volume2, VolumeX, ChevronRight, Clock, User,
   MapPin, History, RefreshCw, ExternalLink, Shield, AlertCircle,
   Info, XCircle, Settings, Activity, Layers, Wifi, WifiOff, Download
 } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { useAdminNotificationsWs } from "@/hooks/use-admin-notifications-ws";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -612,108 +612,86 @@ export default function AdminNotifications() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Premium Minimal Design */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="mb-2">
-            <Link href="/admin">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Back to Dashboard</span>
-                <span className="sm:hidden">Back</span>
-              </Button>
-            </Link>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-                <Bell className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-semibold text-foreground">Notification Center</h1>
-                <p className="text-[11px] text-muted-foreground">Real-time alerts and system notifications</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
+      <PageHeader
+        title="Notification Center"
+        description="Real-time alerts and system notifications"
+        icon={Bell}
+        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+        actions={
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted">
+                  {isConnected ? (
+                    <Wifi className="h-3 w-3 text-green-600" />
+                  ) : (
+                    <WifiOff className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className="text-xs font-medium">
+                    {isConnected ? "Live" : "Offline"}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isConnected 
+                  ? "WebSocket connected - Real-time updates active" 
+                  : "WebSocket disconnected - Click refresh to reconnect"}
+              </TooltipContent>
+            </Tooltip>
+            {!isConnected && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted">
-                    {isConnected ? (
-                      <Wifi className="h-3 w-3 text-green-600" />
-                    ) : (
-                      <WifiOff className="h-3 w-3 text-red-500" />
-                    )}
-                    <span className="text-xs font-medium">
-                      {isConnected ? "Live" : "Offline"}
-                    </span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isConnected 
-                    ? "WebSocket connected - Real-time updates active" 
-                    : "WebSocket disconnected - Click refresh to reconnect"}
-                </TooltipContent>
-              </Tooltip>
-              {!isConnected && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={reconnect}
-                      data-testid="button-reconnect"
-                    >
-                      <RefreshCw className="h-4 w-4" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={reconnect}
+                    data-testid="button-reconnect"
+                  >
+                    <RefreshCw className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Reconnect to real-time updates</TooltipContent>
               </Tooltip>
             )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSound}
-                data-testid="button-toggle-sound"
-              >
-                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => refetch()}
-                data-testid="button-refresh"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => markAllAsReadMutation.mutate()}
-                disabled={markAllAsReadMutation.isPending || !unreadCount?.count}
-                className="hidden sm:flex"
-                data-testid="button-mark-all-read"
-              >
-                <CheckCheck className="h-3.5 w-3.5 mr-1" />
-                Mark All
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={exportNotificationsAsCSV}
-                disabled={!data?.notifications?.length}
-                data-testid="button-export-csv"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSound}
+              data-testid="button-toggle-sound"
+            >
+              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => refetch()}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAllAsReadMutation.mutate()}
+              disabled={markAllAsReadMutation.isPending || !unreadCount?.count}
+              className="hidden sm:flex"
+              data-testid="button-mark-all-read"
+            >
+              <CheckCheck className="h-3.5 w-3.5 mr-1" />
+              Mark All
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={exportNotificationsAsCSV}
+              disabled={!data?.notifications?.length}
+              data-testid="button-export-csv"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </>
+        }
+      />
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { ArrowLeft, Map, Car, Users, MapPin, Layers, Filter, RefreshCw, AlertTriangle, Circle, Square, Hexagon, Eye, EyeOff } from "lucide-react";
+import { Map, Car, Users, MapPin, Layers, RefreshCw, AlertTriangle, Circle, Square, Hexagon, Eye } from "lucide-react";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,6 @@ interface MapControlData {
 }
 
 export default function MapControl() {
-  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
   const [showDrivers, setShowDrivers] = useState(true);
   const [showGeofences, setShowGeofences] = useState(true);
@@ -85,32 +84,12 @@ export default function MapControl() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/admin")}
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Back to Dashboard</span>
-              <span className="sm:hidden">Back</span>
-            </Button>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-              <Map className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold text-foreground">Real-time Admin Map Control</h1>
-              <p className="text-[11px] text-muted-foreground">Monitor and manage live operations on the map</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Real-time Admin Map Control"
+        description="Monitor and manage live operations on the map"
+        icon={Map}
+        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+      />
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-7 gap-4">

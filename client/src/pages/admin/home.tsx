@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw, Home } from "lucide-react";
 import { SystemAlert } from "@/components/ui/system-alert";
 import { WelcomeMessage } from "@/components/ui/welcome-message";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StatCard, ManagementCard, QuickActionCard } from "@/components/ui/stat-card";
 import { SectionHeader } from "@/components/ui/section-header";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
@@ -394,25 +395,16 @@ export default function AdminHome() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Dashboard Header - Premium Minimal Design */}
-      <div className="relative bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent border-b border-black/[0.06] dark:border-white/[0.06]">
-        <div className="px-4 sm:px-6 md:px-8 py-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-              <Shield className="h-4 w-4 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold text-foreground">Admin Dashboard</h1>
-                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-medium uppercase tracking-wide hidden sm:inline-flex">
-                  Platform
-                </Badge>
-              </div>
-              <p className="text-[11px] text-muted-foreground">SafeGo Platform Management</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Admin Dashboard"
+        description="SafeGo Platform Management"
+        icon={Home}
+        actions={
+          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-medium uppercase tracking-wide hidden sm:inline-flex">
+            Platform
+          </Badge>
+        }
+      />
 
       {/* Welcome Message for New Admins */}
       <div className="px-4 sm:px-6 md:px-8 pt-4">

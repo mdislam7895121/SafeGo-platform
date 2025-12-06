@@ -1,7 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { 
-  ArrowLeft, AlertTriangle, Shield, CheckCircle, XCircle,
+  AlertTriangle, Shield, CheckCircle, XCircle,
   RefreshCw, Filter, Clock, User, Car, CreditCard, MapPin,
   ChevronRight, AlertOctagon, AlertCircle, Info
 } from "lucide-react";
@@ -15,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -257,44 +257,24 @@ export default function FraudAlerts() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Premium Minimal Design */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <Link href="/admin">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Back to Dashboard</span>
-                <span className="sm:hidden">Back</span>
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="h-7 text-xs"
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-              <Shield className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold text-foreground">Fraud Alerts</h1>
-              <p className="text-[11px] text-muted-foreground">Monitor and resolve fraud detection alerts</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Fraud Alerts"
+        description="Monitor and resolve fraud detection alerts"
+        icon={AlertTriangle}
+        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="h-7 text-xs"
+            data-testid="button-refresh"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+        }
+      />
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

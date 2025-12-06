@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { 
-  ArrowLeft, Car, UtensilsCrossed, Package, Users, 
+  Car, UtensilsCrossed, Package, Users, LayoutDashboard,
   RefreshCw, MapPin, Clock, DollarSign, AlertTriangle, 
   TrendingUp, TrendingDown, CheckCircle, XCircle
 } from "lucide-react";
@@ -12,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { useState, useEffect } from "react";
 
 interface MonitoringOverview {
@@ -237,68 +237,49 @@ export default function OperationsDashboard() {
 
   return (
     <div className="min-h-screen bg-background pb-6">
-      {/* Header - Premium Minimal Design */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06] bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent sticky top-0 z-10 backdrop-blur-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-            <Link href="/admin">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Back to Dashboard</span>
-                <span className="sm:hidden">Back</span>
-              </Button>
-            </Link>
-            <div className="flex items-center gap-2">
-              <Select value={countryFilter} onValueChange={setCountryFilter}>
-                <SelectTrigger className="h-7 w-28 text-xs" data-testid="select-country">
-                  <SelectValue placeholder="Country" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Countries</SelectItem>
-                  <SelectItem value="BD">Bangladesh</SelectItem>
-                  <SelectItem value="US">United States</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant={autoRefresh ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`h-7 text-xs ${autoRefresh ? "bg-green-600 hover:bg-green-700" : ""}`}
-                data-testid="button-auto-refresh"
-              >
-                {autoRefresh ? "Auto" : "Paused"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className="h-7 text-xs"
-                data-testid="button-refresh"
-              >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
-            </div>
+      <PageHeader
+        title="Operations Dashboard"
+        description="Real-time monitoring of all services"
+        icon={LayoutDashboard}
+        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+        actions={
+          <div className="flex items-center gap-2">
+            <Select value={countryFilter} onValueChange={setCountryFilter}>
+              <SelectTrigger className="h-7 w-28 text-xs" data-testid="select-country">
+                <SelectValue placeholder="Country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Countries</SelectItem>
+                <SelectItem value="BD">Bangladesh</SelectItem>
+                <SelectItem value="US">United States</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant={autoRefresh ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`h-7 text-xs ${autoRefresh ? "bg-green-600 hover:bg-green-700" : ""}`}
+              data-testid="button-auto-refresh"
+            >
+              {autoRefresh ? "Auto" : "Paused"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="h-7 text-xs"
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
           </div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
-              <Car className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold text-foreground">Operations Dashboard</h1>
-              <p className="text-[11px] text-muted-foreground">Real-time monitoring of all services</p>
-            </div>
-          </div>
-        </div>
+        }
+      >
         <div className="text-xs opacity-75">
           Last updated: {monitoringData?.timestamp ? new Date(monitoringData.timestamp).toLocaleTimeString() : 'Loading...'}
         </div>
-      </div>
+      </PageHeader>
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

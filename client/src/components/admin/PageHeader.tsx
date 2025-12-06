@@ -50,8 +50,13 @@ export function PageHeader({
   };
 
   return (
-    <div className={cn("border-b border-black/[0.06] dark:border-white/[0.06] bg-background", className)}>
-      <div className="px-4 py-3 sm:px-6 lg:px-8">
+    <div className={cn(
+      "border-b border-black/[0.06] dark:border-white/[0.06]",
+      "bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent",
+      "sticky top-0 z-10 backdrop-blur-sm",
+      className
+    )}>
+      <div className="px-4 sm:px-6 py-3">
         {/* Back Button - always shown if provided */}
         {backButton && (
           <div className="mb-2">
@@ -92,8 +97,8 @@ export function PageHeader({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2.5">
             {Icon && (
-              <div className={cn("p-1.5 rounded-md bg-primary/10 shrink-0", iconColor)}>
-                <Icon className="h-4 w-4" />
+              <div className="p-1.5 bg-primary/10 dark:bg-primary/20 rounded-md shrink-0">
+                <Icon className={cn("h-4 w-4", iconColor)} />
               </div>
             )}
             <div className="min-w-0">
