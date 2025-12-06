@@ -117,21 +117,21 @@ export async function refreshTokenPair(
     if (!existingToken) {
       console.warn(`[JWTRotation] Refresh token not found for family ${decoded.tokenFamily}`);
 
-      const reuseAttempt = await prisma.authToken.findFirst({
-        where: {
-          tokenFamily: decoded.tokenFamily,
-          isRevoked: true,
-        },
+      const anyTokenInFamily = await prisma.authToken.findFirst({
+        where: { tokenFamily: decoded.tokenFamily },
       });
 
-      if (reuseAttempt) {
-        console.error(`[JWTRotation] TOKEN REUSE DETECTED for family ${decoded.tokenFamily}`);
+      if (anyTokenInFamily) {
+        console.error(`[JWTRotation] TOKEN REUSE DETECTED for family ${decoded.tokenFamily} - token not found but family exists`);
 
         await prisma.authToken.updateMany({
           where: { tokenFamily: decoded.tokenFamily },
           data: {
             reuseDetected: true,
             reuseDetectedAt: new Date(),
+            isRevoked: true,
+            revokedAt: new Date(),
+            revokedReason: "Token reuse detected - entire family revoked",
           },
         });
 
@@ -140,7 +140,7 @@ export async function refreshTokenPair(
           data: {
             isRevoked: true,
             revokedAt: new Date(),
-            revokedReason: "Token reuse detected - security breach",
+            revokedReason: "Token reuse detected - all sessions revoked",
           },
         });
 
@@ -161,15 +161,52 @@ export async function refreshTokenPair(
         } catch (e) {
           console.warn("[JWTRotation] Could not create fraud event:", e);
         }
-
-        return null;
       }
 
       return null;
     }
 
-    if (existingToken.usedAt) {
-      console.warn(`[JWTRotation] Refresh token already used at ${existingToken.usedAt}`);
+    if (existingToken.usedAt || existingToken.isRevoked) {
+      console.error(`[JWTRotation] TOKEN REPLAY DETECTED - token already used/revoked for family ${decoded.tokenFamily}`);
+
+      await prisma.authToken.updateMany({
+        where: { tokenFamily: decoded.tokenFamily },
+        data: {
+          reuseDetected: true,
+          reuseDetectedAt: new Date(),
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: "Token replay attack - family revoked",
+        },
+      });
+
+      await prisma.authToken.updateMany({
+        where: { userId: decoded.userId, isRevoked: false },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: "Token replay detected - all sessions revoked",
+        },
+      });
+
+      try {
+        await prisma.fraudEvent.create({
+          data: {
+            userId: decoded.userId,
+            userRole: decoded.userRole,
+            eventType: "token_replay",
+            severity: "critical",
+            description: `Token replay attack detected. Family: ${decoded.tokenFamily}. All sessions revoked.`,
+            status: "pending",
+            scoreImpact: 50,
+            deviceId: deviceInfo?.deviceId,
+            ipAddress: deviceInfo?.ipAddress,
+          },
+        });
+      } catch (e) {
+        console.warn("[JWTRotation] Could not create fraud event:", e);
+      }
+
       return null;
     }
 

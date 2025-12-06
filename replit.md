@@ -57,6 +57,16 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
     *   **IP Anomaly Detection**: VPN/proxy detection, rapid country changes, datacenter IP flagging, and GPS/IP region mismatch.
     *   **Suspicious Behavior Scoring**: 0-100 fraud score with component scores (device, GPS, IP, COD, reports, cancellations, manipulation), auto-restriction at threshold, and manual clearance workflow.
     *   **Fraud Prevention Center**: Admin dashboard with events, scores, devices, settings, and whitelist management.
+*   **Security Hardening Layer (SafeGo Master Tasks 29-36)**: Enterprise-grade security infrastructure including:
+    *   **JWT Rotation System (Task 29)**: Rotating access tokens (15min) and refresh tokens (7 days) with token family tracking, reuse detection, automatic revocation on suspicious activity, and device-bound sessions.
+    *   **OTP Rate Limiting (Task 30)**: Rate limiting for OTP requests (3/minute, 8/hour) with automatic 15-minute blocking on threshold violations.
+    *   **Login Throttling (Task 31)**: Progressive login protection with 5-attempt cooldown (5 min), 10-attempt lockout (30 min), and device/IP correlation.
+    *   **Suspicious Login Alerts (Task 32)**: Real-time detection of new devices, new countries, rapid IP changes, and high-risk locations with email/SMS notifications.
+    *   **Device History System (Task 33)**: Comprehensive device tracking with first/last seen timestamps, login count, risk scoring, trusted device management, and user-controlled device removal.
+    *   **Admin Audit Log Expansion (Task 34)**: Tamper-proof logging with SHA-256 hash chain verification, comprehensive action categories (login, user_management, kyc, payout, settings, fraud, settlement), severity levels, and regulator export support.
+    *   **API Rate Limiting + Auto-Block (Task 35)**: Category-based rate limits (auth: 20/min, public: 60/min, partner: 40/min, admin: 100/min) with automatic blocking and admin override capabilities.
+    *   **WAF Security Layer (Task 36)**: Web Application Firewall with detection rules for SQL injection, XSS, path traversal, command injection, bad user agents, and invalid headers. Threat scoring (0-100) with automatic blocking at threshold 50.
+    *   **Security Center**: Admin dashboard with 6 tabs (Overview, JWT Tokens, Rate Limits, WAF Logs, Audit Logs, Devices) for comprehensive security monitoring and management.
 
 ## External Dependencies
 

@@ -164,12 +164,40 @@ export async function recordLoginAttempt(
   });
 
   if (success) {
-    await prisma.loginAttempt.updateMany({
-      where: {
-        identifier,
+    const clearConditions: any[] = [
+      { identifier, attemptType: "login", isBlocked: true, blockedUntil: { gt: new Date() } },
+    ];
+
+    if (deviceInfo?.deviceId) {
+      clearConditions.push({
+        deviceId: deviceInfo.deviceId,
         attemptType: "login",
         isBlocked: true,
         blockedUntil: { gt: new Date() },
+      });
+    }
+
+    if (deviceInfo?.deviceFingerprint) {
+      clearConditions.push({
+        deviceFingerprint: deviceInfo.deviceFingerprint,
+        attemptType: "login",
+        isBlocked: true,
+        blockedUntil: { gt: new Date() },
+      });
+    }
+
+    if (deviceInfo?.ipAddress) {
+      clearConditions.push({
+        ipAddress: deviceInfo.ipAddress,
+        attemptType: "login",
+        isBlocked: true,
+        blockedUntil: { gt: new Date() },
+      });
+    }
+
+    await prisma.loginAttempt.updateMany({
+      where: {
+        OR: clearConditions,
       },
       data: {
         isBlocked: false,
