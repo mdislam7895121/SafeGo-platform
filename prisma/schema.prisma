@@ -1536,6 +1536,22 @@ model Ride {
   complaints      Complaint[]
   safetyIncidents SafetyIncident[]
 
+  // BD Ride Pricing Engine fields (additive only, non-breaking)
+  vehicleType      String?  // bike, cng, car_economy, car_premium
+  cityZone         String?  // core_city, suburb, remote
+  distanceKm       Float?   // Calculated distance in km
+  baseFareAmount   Decimal? @db.Decimal(10, 2) // Base fare component
+  distanceFareAmount Decimal? @db.Decimal(10, 2) // Distance-based fare
+  timeFareAmount   Decimal? @db.Decimal(10, 2) // Time-based fare
+  bookingFee       Decimal? @db.Decimal(10, 2) // Platform booking fee
+  nightMultiplier  Decimal? @db.Decimal(4, 2) @default(1.0) // Night surcharge multiplier
+  peakMultiplier   Decimal? @db.Decimal(4, 2) @default(1.0) // Peak hour multiplier
+  fareCurrency     String?  // BDT, USD
+  speedOption      String?  // normal, priority
+  driverEarnings   Decimal? @db.Decimal(10, 2) // Net driver earnings
+  pricingRuleId    String?  // FK to ride_pricing_rules
+  pricingRule      RidePricingRule? @relation(fields: [pricingRuleId], references: [id], onDelete: SetNull)
+
   @@index([countryCode])
   @@index([cityCode])
   @@index([isDemo])
@@ -1649,6 +1665,54 @@ model RideStop {
   @@index([rideId])
   @@index([stopOrder])
   @@map("ride_stops")
+}
+
+// BD Ride Pricing Engine: Configurable pricing rules by country/city/vehicle
+model RidePricingRule {
+  id              String   @id @default(uuid())
+  countryCode     String   // BD, US
+  cityCode        String   // DHK, CTG, KHL, SYL, NYC, etc.
+  vehicleType     String   // bike, cng, car_economy, car_premium
+  
+  // Core pricing components
+  baseFare        Decimal  @db.Decimal(10, 2) // Minimum starting charge
+  perKmRate       Decimal  @db.Decimal(10, 2) // Rate per kilometer
+  perMinRate      Decimal  @db.Decimal(10, 2) // Rate per minute
+  minimumFare     Decimal  @db.Decimal(10, 2) // Absolute minimum fare
+  bookingFee      Decimal  @db.Decimal(10, 2) // Platform booking fee
+  
+  // Time-based multipliers
+  nightStartHour  Int      @default(22) // Night surcharge start (e.g., 22 = 10PM)
+  nightEndHour    Int      @default(6)  // Night surcharge end (e.g., 6 = 6AM)
+  nightMultiplier Decimal  @db.Decimal(4, 2) @default(1.0) // Night pricing multiplier
+  peakMultiplier  Decimal  @db.Decimal(4, 2) @default(1.0) // Peak hour multiplier
+  peakTimeRanges  Json?    // JSON array of peak time windows [{start: 7, end: 9}, {start: 17, end: 20}]
+  
+  // Commission settings
+  commissionRate  Decimal  @db.Decimal(5, 2) @default(20.0) // SafeGo commission percentage
+  
+  // Currency and payment
+  currency        String   @default("BDT") // BDT, USD
+  allowCash       Boolean  @default(true)  // Allow cash payment (false for US)
+  allowOnline     Boolean  @default(true)  // Allow online payment
+  
+  // Status and metadata
+  isActive        Boolean  @default(true)
+  displayName     String?  // User-friendly name (e.g., "Dhaka Bike")
+  description     String?  // Description for admin panel
+  version         Int      @default(1)     // Version tracking for updates
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Rides using this pricing rule
+  rides           Ride[]
+
+  @@unique([countryCode, cityCode, vehicleType])
+  @@index([countryCode])
+  @@index([cityCode])
+  @@index([vehicleType])
+  @@index([isActive])
+  @@map("ride_pricing_rules")
 }
 
 model User {
