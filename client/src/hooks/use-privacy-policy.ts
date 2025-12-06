@@ -35,6 +35,8 @@ interface ConsentStatusResponse {
   consentStatus: ConsentStatus | null;
   activePolicy: PolicyData | null;
   mustAcceptNewPolicy: boolean;
+  verificationStatus: string | null;
+  isVerified: boolean;
 }
 
 export function usePrivacyPolicy() {
@@ -49,7 +51,7 @@ export function usePrivacyPolicy() {
       });
       if (!response.ok) {
         if (response.status === 401) {
-          return { success: false, consentStatus: null, activePolicy: null, mustAcceptNewPolicy: false };
+          return { success: false, consentStatus: null, activePolicy: null, mustAcceptNewPolicy: false, verificationStatus: null, isVerified: false };
         }
         throw new Error("Failed to fetch consent status");
       }
@@ -131,6 +133,8 @@ export function usePrivacyPolicy() {
     policy: data?.activePolicy || null,
     consentStatus: data?.consentStatus || null,
     mustAcceptNewPolicy: data?.mustAcceptNewPolicy || false,
+    verificationStatus: data?.verificationStatus || null,
+    isVerified: data?.isVerified || false,
     isLoading,
     error,
     refetch,

@@ -1,0 +1,279 @@
+Your next and ONLY authorized task is to UPDATE the Privacy & Consent enforcement logic so that:
+
+- Customers and all partners (drivers, restaurants, shop partners, ticket partners, rental partners) are forced to accept Terms & Privacy ONLY AFTER their onboarding & KYC are fully completed and they are approved for real use (business/operation).
+- Sign-up and KYC flows remain unblocked.
+- This change must be NON-BREAKING and must keep all SafeGo Master Rules intact.
+
+====================================================
+SECTION 0 — SAFEGO MASTER RULES (ALWAYS IN FORCE)
+====================================================
+
+You MUST continue to respect all existing SafeGo Master Rules:
+
+1) ROLES (4 core roles + partners)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+   + Partner types (shop_partner, ticket_partner, rental_partner)
+
+   Each has:
+   - its own onboarding,
+   - its own dashboard,
+   - its own permissions,
+   - its own status flows.
+
+2) SERVICES (3 core services)
+   - rides
+   - food_orders
+   - deliveries
+
+   You MUST NOT rename, break, or remove these collections.
+
+3) COUNTRY-SPECIFIC KYC
+   - BD: father_name, dob, present/permanent address, NID front/back, emergency_contact, verification_status + is_verified
+   - US: dob, home_address, emergency_contact, gov_id_type, gov_id_last4, (drivers) license+image+expiry, ssn_last4(optional), verification_status + is_verified
+
+   You MUST NOT modify any KYC fields.
+
+4) ADMIN PANEL
+   Admin can:
+   - verify all roles (customer, driver, restaurant, shop, ticket, rental)
+   - approve/reject KYC with rejection_reason
+   - update pricing, fees, commissions
+   - block/unblock users/partners
+   - manage payouts and negative balances
+
+5) COMMISSION & PAYOUT
+   - CASH rides → driver gets all cash, commission → negative driver_wallet_balance
+   - CASH food → restaurant gets all cash, commission → negative restaurant_wallet
+   - CASH partner flows → partner gets cash, commission → negative partner_wallet
+   - ONLINE → SafeGo keeps commission automatically
+
+6) SECURITY
+   - No user may see others’ KYC documents.
+   - Drivers cannot see customer NID.
+   - Customers cannot see driver license/NID.
+   - Only Admin can change verification & blocking.
+   - Users can change only their own profile.
+
+7) STATUS FLOWS
+   Ride:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+   Food:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+   Parcel:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+   Do NOT change these flows.
+
+8) ONBOARDING
+   - Multi-step
+   - verification_status = "pending" until Admin approves
+   - Core earning/usage blocked until verified
+
+9) NOTIFICATIONS
+   - Must still fire for ride/order/parcel updates, verifications, important alerts.
+
+All above MUST remain unchanged.
+
+====================================================
+SECTION 1 — GOAL OF THIS TASK
+====================================================
+
+Adjust the Privacy & Consent enforcement so that:
+
+- **Policy acceptance is required ONLY after KYC/onboarding is complete and the user is VERIFIED and about to actually use the app to work or do business.**
+- Sign-up, onboarding, KYC upload, and admin review are NOT blocked by policy acceptance.
+- Once verification_status = "verified", the very first time the user tries to use core features (ride, food, parcel, or partner operations), they must see and accept Terms & Privacy BEFORE continuing.
+
+This must work for:
+- customers
+- drivers
+- restaurants
+- shop_partner
+- ticket_partner
+- rental_partner
+
+====================================================
+SECTION 2 — CHANGE THE ENFORCEMENT CONDITION
+====================================================
+
+CURRENT (old) logic (conceptual):
+- If there is an active policy version AND
+- (policy_version mismatch OR terms_accepted == false OR privacy_accepted == false)
+→ must_accept_new_policy = true
+→ Block core actions (sometimes even at login).
+
+You MUST UPDATE this to include verification status:
+
+NEW logic:
+
+1) For ANY user (any role):
+
+   If user.verification_status != "verified":
+      - DO NOT force Terms/Privacy acceptance yet.
+      - Allow:
+         * login
+         * onboarding steps
+         * KYC uploads
+         * waiting for admin review
+      - You MAY show a banner like “You will be asked to accept Terms & Privacy after approval”, but DO NOT block.
+
+2) If user.verification_status == "verified":
+
+   Evaluate:
+   - active_policy_version = current policy_versions.is_active = true
+   - user_policy_version = user.privacy_policy_version
+
+   If:
+     (user_policy_version is null OR user_policy_version != active_policy_version OR
+      terms_accepted == false OR privacy_accepted == false)
+   THEN:
+     - Set must_accept_new_policy = true
+   ELSE:
+     - must_accept_new_policy = false
+
+This logic MUST be applied per role (customer, driver, restaurant, shop_partner, ticket_partner, rental_partner).
+
+====================================================
+SECTION 3 — WHEN TO BLOCK (AFTER EVERYTHING IS COMPLETE)
+====================================================
+
+You MUST update the middleware / guard logic for core actions:
+
+1) Customer core actions:
+   - Request ride
+   - Place food order
+   - Create parcel delivery
+   - Place shop order
+   - Book ticket
+   - Create rental booking
+
+   Enforcement:
+
+   If user.verification_status == "verified" AND must_accept_new_policy == true:
+      - BLOCK the action.
+      - Return an error such as:
+        "You must review and accept the latest Terms & Privacy Policy before using SafeGo services."
+
+   If user.verification_status != "verified":
+      - Do NOT block with policy acceptance.
+      - Block only with existing verification rules (if already in place).
+
+2) Driver core actions:
+   - Go online
+   - Accept ride
+   - Accept delivery/parcel
+   - Partner-specific tasks
+
+   If driver.verification_status == "verified" AND must_accept_new_policy == true:
+      - BLOCK going online and accepting trips.
+      - Show message: “Please accept the latest Terms & Privacy Policy before going online.”
+
+3) Restaurant / Shop / Ticket / Rental Partners:
+   - Accept orders/bookings
+   - Mark orders as prepared/ready
+   - Activate store/listings
+
+   If partner.verification_status == "verified" AND must_accept_new_policy == true:
+      - BLOCK these business actions.
+      - Allow them to log in and view dashboard, but NOT to operate until they accept.
+
+4) Admin:
+   - Admin should NEVER be blocked from Admin Panel because of policy acceptance.
+   - Admin may be required separately via company policy, but do NOT break Admin access in this task.
+
+====================================================
+SECTION 4 — UX BEHAVIOR (WHEN USER OPENS APP AFTER APPROVAL)
+====================================================
+
+Implement this high-level behavior:
+
+- User signs up → does onboarding → submits KYC.
+- Admin verifies → verification_status = "verified".
+- Next time the user opens the app to use core features:
+
+   On API side:
+     - must_accept_new_policy will be true.
+
+   On UI side:
+     - Show Terms & Privacy screen (modal or full page).
+     - User can only:
+        * read policy,
+        * toggle marketing/data/tracking consent,
+        * accept or decline.
+
+   If user ACCEPTS:
+     - Update:
+        terms_accepted = true
+        privacy_accepted = true
+        privacy_policy_version = active_policy_version
+        policy_accepted_at = now()
+        marketing_opt_in, data_sharing_opt_in, tracking_consent from UI
+     - Insert row into consent_logs.
+     - Clear must_accept_new_policy = false.
+     - Allow all normal business actions.
+
+   If user DECLINES:
+     - Keep must_accept_new_policy = true.
+     - Do NOT allow business actions.
+     - They may still:
+        * view profile,
+        * see status of KYC,
+        * contact support,
+        * read policies.
+
+====================================================
+SECTION 5 — BEHAVIOR FOR NEW POLICY VERSIONS (ALREADY VERIFIED USERS)
+====================================================
+
+When Admin activates a new policy version:
+
+- All verified users (any role) must accept the new version, but again:
+  - Do NOT block login.
+  - Block only business actions.
+
+Mechanics:
+
+- On next app open and first business attempt:
+   - must_accept_new_policy = true
+   - Show Terms/Privacy screen
+   - Same accept/decline logic as above.
+
+Unverified users:
+- No change. They continue onboarding, and will be required to accept terms/policy only after verification and before their first use.
+
+====================================================
+SECTION 6 — QA & NON-BREAKING VALIDATION
+====================================================
+
+You MUST verify:
+
+1) Unverified users (any role):
+   - Can sign up.
+   - Can complete onboarding, KYC.
+   - Are NOT forced to accept policy yet.
+   - Normal verification flow is unchanged.
+
+2) Verified users:
+   - On first attempt to use business features:
+       * Are forced to accept Terms & Privacy.
+   - After acceptance:
+       * Can use all services normally.
+   - If a new policy version is activated:
+       * They are again forced to accept before using business actions.
+
+3) Core collections:
+   - rides, food_orders, deliveries: untouched structurally.
+   - No KYC fields changed.
+   - No pricing/tax/commission logic changed.
+
+4) Admin:
+   - Admin Panel works as before.
+   - “Privacy & Consent Settings” still works.
+   - No unexpected blocks.
+
+When all tests pass cleanly, confirm:
+
+“Post-verification Terms & Privacy enforcement updated — Users sign and accept only AFTER account & KYC are fully completed and before starting real business use. No breaking changes introduced.”

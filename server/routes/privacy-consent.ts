@@ -456,6 +456,22 @@ router.post("/accept-policy", async (req: AuthRequest, res) => {
           data: consentData,
         });
       }
+    } else if (role === "shop_partner") {
+      const profile = await prisma.shopPartner.findFirst({ where: { userId } });
+      if (profile) {
+        await prisma.shopPartner.update({
+          where: { id: profile.id },
+          data: consentData,
+        });
+      }
+    } else if (role === "ticket_operator" || role === "ticket_partner" || role === "rental_partner") {
+      const profile = await prisma.ticketOperator.findFirst({ where: { userId } });
+      if (profile) {
+        await prisma.ticketOperator.update({
+          where: { id: profile.id },
+          data: consentData,
+        });
+      }
     } else if (role === "admin" || role === "super_admin") {
       const profile = await prisma.adminProfile.findFirst({ where: { userId } });
       if (profile) {
@@ -578,6 +594,22 @@ router.patch("/consent-preferences", async (req: AuthRequest, res) => {
           data: updateData,
         });
       }
+    } else if (role === "shop_partner") {
+      const profile = await prisma.shopPartner.findFirst({ where: { userId } });
+      if (profile) {
+        await prisma.shopPartner.update({
+          where: { id: profile.id },
+          data: updateData,
+        });
+      }
+    } else if (role === "ticket_operator" || role === "ticket_partner" || role === "rental_partner") {
+      const profile = await prisma.ticketOperator.findFirst({ where: { userId } });
+      if (profile) {
+        await prisma.ticketOperator.update({
+          where: { id: profile.id },
+          data: updateData,
+        });
+      }
     } else if (role === "admin" || role === "super_admin") {
       const profile = await prisma.adminProfile.findFirst({ where: { userId } });
       if (profile) {
@@ -617,10 +649,43 @@ router.get("/my-consent-status", async (req: AuthRequest, res) => {
 
     let consentStatus: any = null;
     let mustAcceptNewPolicy = false;
+    let verificationStatus: string | null = null;
+    let isVerified = false;
+
+    // Helper function to determine if policy acceptance is required
+    // Only require acceptance if: user is verified AND (policy version mismatch OR not accepted)
+    const checkPolicyRequired = (
+      profileVerificationStatus: string | null | undefined,
+      privacyPolicyVersion: string | null | undefined,
+      termsAccepted: boolean,
+      privacyAccepted: boolean
+    ): boolean => {
+      // Verified statuses vary by role: "verified", "approved" are considered verified
+      const verifiedStatuses = ["verified", "approved"];
+      const userIsVerified = verifiedStatuses.includes(profileVerificationStatus || "");
+      
+      if (!userIsVerified) {
+        // User is not verified yet - do NOT force policy acceptance during onboarding
+        return false;
+      }
+
+      // User is verified - check if they need to accept the policy
+      if (!activePolicy) {
+        return false; // No active policy to accept
+      }
+
+      // Must accept if: version mismatch OR terms not accepted OR privacy not accepted
+      const versionMismatch = privacyPolicyVersion !== activePolicy.version;
+      const notFullyAccepted = !termsAccepted || !privacyAccepted;
+      
+      return versionMismatch || notFullyAccepted;
+    };
 
     if (role === "customer") {
       const profile = await prisma.customerProfile.findFirst({ where: { userId } });
       if (profile) {
+        verificationStatus = profile.verificationStatus;
+        isVerified = ["verified", "approved"].includes(profile.verificationStatus || "");
         consentStatus = {
           privacyPolicyVersion: profile.privacyPolicyVersion,
           termsAccepted: profile.termsAccepted,
@@ -631,11 +696,18 @@ router.get("/my-consent-status", async (req: AuthRequest, res) => {
           locationPermission: profile.locationPermission,
           trackingConsent: profile.trackingConsent,
         };
-        mustAcceptNewPolicy = activePolicy && profile.privacyPolicyVersion !== activePolicy.version;
+        mustAcceptNewPolicy = checkPolicyRequired(
+          profile.verificationStatus,
+          profile.privacyPolicyVersion,
+          profile.termsAccepted,
+          profile.privacyAccepted
+        );
       }
     } else if (role === "driver") {
       const profile = await prisma.driverProfile.findFirst({ where: { userId } });
       if (profile) {
+        verificationStatus = profile.verificationStatus;
+        isVerified = ["verified", "approved"].includes(profile.verificationStatus || "");
         consentStatus = {
           privacyPolicyVersion: profile.privacyPolicyVersion,
           termsAccepted: profile.termsAccepted,
@@ -646,11 +718,18 @@ router.get("/my-consent-status", async (req: AuthRequest, res) => {
           locationPermission: profile.locationPermission,
           trackingConsent: profile.trackingConsent,
         };
-        mustAcceptNewPolicy = activePolicy && profile.privacyPolicyVersion !== activePolicy.version;
+        mustAcceptNewPolicy = checkPolicyRequired(
+          profile.verificationStatus,
+          profile.privacyPolicyVersion,
+          profile.termsAccepted,
+          profile.privacyAccepted
+        );
       }
     } else if (role === "restaurant") {
       const profile = await prisma.restaurantProfile.findFirst({ where: { userId } });
       if (profile) {
+        verificationStatus = profile.verificationStatus;
+        isVerified = ["verified", "approved"].includes(profile.verificationStatus || "");
         consentStatus = {
           privacyPolicyVersion: profile.privacyPolicyVersion,
           termsAccepted: profile.termsAccepted,
@@ -661,11 +740,63 @@ router.get("/my-consent-status", async (req: AuthRequest, res) => {
           locationPermission: profile.locationPermission,
           trackingConsent: profile.trackingConsent,
         };
-        mustAcceptNewPolicy = activePolicy && profile.privacyPolicyVersion !== activePolicy.version;
+        mustAcceptNewPolicy = checkPolicyRequired(
+          profile.verificationStatus,
+          profile.privacyPolicyVersion,
+          profile.termsAccepted,
+          profile.privacyAccepted
+        );
+      }
+    } else if (role === "shop_partner") {
+      const profile = await prisma.shopPartner.findFirst({ where: { userId } });
+      if (profile) {
+        verificationStatus = profile.verificationStatus;
+        isVerified = profile.verificationStatus === "approved";
+        consentStatus = {
+          privacyPolicyVersion: profile.privacyPolicyVersion,
+          termsAccepted: profile.termsAccepted,
+          privacyAccepted: profile.privacyAccepted,
+          policyAcceptedAt: profile.policyAcceptedAt,
+          marketingOptIn: profile.marketingOptIn,
+          dataSharingOptIn: profile.dataSharingOptIn,
+          locationPermission: profile.locationPermission,
+          trackingConsent: profile.trackingConsent,
+        };
+        mustAcceptNewPolicy = checkPolicyRequired(
+          profile.verificationStatus,
+          profile.privacyPolicyVersion,
+          profile.termsAccepted,
+          profile.privacyAccepted
+        );
+      }
+    } else if (role === "ticket_operator" || role === "ticket_partner" || role === "rental_partner") {
+      const profile = await prisma.ticketOperator.findFirst({ where: { userId } });
+      if (profile) {
+        verificationStatus = profile.verificationStatus;
+        isVerified = profile.verificationStatus === "approved";
+        consentStatus = {
+          privacyPolicyVersion: profile.privacyPolicyVersion,
+          termsAccepted: profile.termsAccepted,
+          privacyAccepted: profile.privacyAccepted,
+          policyAcceptedAt: profile.policyAcceptedAt,
+          marketingOptIn: profile.marketingOptIn,
+          dataSharingOptIn: profile.dataSharingOptIn,
+          locationPermission: profile.locationPermission,
+          trackingConsent: profile.trackingConsent,
+        };
+        mustAcceptNewPolicy = checkPolicyRequired(
+          profile.verificationStatus,
+          profile.privacyPolicyVersion,
+          profile.termsAccepted,
+          profile.privacyAccepted
+        );
       }
     } else if (role === "admin" || role === "super_admin") {
+      // Admins are never blocked from Admin Panel by policy acceptance
       const profile = await prisma.adminProfile.findFirst({ where: { userId } });
       if (profile) {
+        verificationStatus = "verified"; // Admins are always considered verified
+        isVerified = true;
         consentStatus = {
           privacyPolicyVersion: profile.privacyPolicyVersion,
           termsAccepted: profile.termsAccepted,
@@ -676,7 +807,8 @@ router.get("/my-consent-status", async (req: AuthRequest, res) => {
           locationPermission: profile.locationPermission,
           trackingConsent: profile.trackingConsent,
         };
-        mustAcceptNewPolicy = activePolicy && profile.privacyPolicyVersion !== activePolicy.version;
+        // Admins should NEVER be blocked - they may be reminded but not forced
+        mustAcceptNewPolicy = false;
       }
     }
 
@@ -687,8 +819,11 @@ router.get("/my-consent-status", async (req: AuthRequest, res) => {
         version: activePolicy.version,
         title: activePolicy.title,
         contentUrl: activePolicy.contentUrl,
+        summary: (activePolicy as any).summary,
       } : null,
       mustAcceptNewPolicy: !!mustAcceptNewPolicy,
+      verificationStatus,
+      isVerified,
     });
   } catch (error) {
     console.error("[Privacy] Get consent status error:", error);
