@@ -82,22 +82,86 @@ router.post("/device/register", async (req: AuthenticatedRequest, res: Response)
       return res.json({ device: updated, status: "existing" });
     }
 
-    const otherDevices = await prisma.deviceFingerprint.findMany({
+    // TASK 16: Check if this device is already registered to a DIFFERENT account (one-account-per-device)
+    const deviceOnOtherAccounts = await prisma.deviceFingerprint.findMany({
+      where: {
+        deviceId: data.deviceId,
+        userId: { not: userId },
+        isBlocked: false,
+      },
+    });
+
+    // Check if device is whitelisted for cross-account use
+    const deviceWhitelisted = await prisma.deviceWhitelist.findFirst({
+      where: {
+        deviceId: data.deviceId,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+    });
+
+    if (deviceOnOtherAccounts.length > 0 && !deviceWhitelisted) {
+      // Device is already used by another account - this is a fraud event
+      await prisma.fraudEvent.create({
+        data: {
+          userId,
+          userRole,
+          eventType: "device_mismatch",
+          severity: "high",
+          description: `Device already registered to ${deviceOnOtherAccounts.length} other account(s). Possible multi-account fraud.`,
+          deviceId: data.deviceId,
+          deviceHash: data.deviceHash,
+          ipAddress: data.ipAddress,
+          scoreImpact: 30,
+          autoRestrictApplied: true,
+        },
+      });
+
+      // Also log event for the other accounts using this device
+      for (const otherDevice of deviceOnOtherAccounts) {
+        await prisma.fraudEvent.create({
+          data: {
+            userId: otherDevice.userId,
+            userRole: otherDevice.userRole,
+            eventType: "device_mismatch",
+            severity: "high",
+            description: `Another account attempted to use this device. Device shared with user ${userId.slice(0, 8)}...`,
+            deviceId: data.deviceId,
+            deviceHash: data.deviceHash,
+            ipAddress: data.ipAddress,
+            scoreImpact: 20,
+          },
+        });
+        await updateFraudScore(otherDevice.userId, otherDevice.userRole, "deviceMismatch", 20);
+      }
+
+      await updateFraudScore(userId, userRole, "deviceMismatch", 30);
+
+      // Block this registration and restrict the user
+      return res.status(403).json({
+        error: "Device already in use",
+        message: "This device is already registered to another account. One account per device is enforced.",
+        restricted: true,
+        fraudEvent: "device_mismatch",
+      });
+    }
+
+    // Check if user has too many devices (multi_device_login)
+    const userDevices = await prisma.deviceFingerprint.findMany({
       where: { userId, isBlocked: false },
     });
 
-    const whitelisted = await prisma.deviceWhitelist.findFirst({
+    const userDeviceWhitelisted = await prisma.deviceWhitelist.findFirst({
       where: { userId, deviceId: data.deviceId, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
     });
 
-    if (otherDevices.length > 0 && !whitelisted) {
+    if (userDevices.length > 0 && !userDeviceWhitelisted) {
       await prisma.fraudEvent.create({
         data: {
           userId,
           userRole,
           eventType: "multi_device_login",
           severity: "medium",
-          description: `User attempted login from new device. Existing devices: ${otherDevices.length}`,
+          description: `User attempted login from new device. Existing devices: ${userDevices.length}`,
           deviceId: data.deviceId,
           deviceHash: data.deviceHash,
           ipAddress: data.ipAddress,
@@ -127,7 +191,11 @@ router.post("/device/register", async (req: AuthenticatedRequest, res: Response)
       },
     });
 
-    res.json({ device: newDevice, status: "new", warning: otherDevices.length > 0 && !whitelisted });
+    res.json({
+      device: newDevice,
+      status: "new",
+      warning: userDevices.length > 0 && !userDeviceWhitelisted,
+    });
   } catch (error: any) {
     console.error("[FraudPrevention] Device register error:", error);
     res.status(500).json({ error: error.message || "Failed to register device" });

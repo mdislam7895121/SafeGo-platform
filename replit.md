@@ -48,6 +48,15 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
     *   **Report System**: User-submitted reports with category-based classification and admin review workflow.
     *   **User Restrictions & Auto-Restriction**: Account status management with suspension/ban capabilities.
     *   **Safety Center**: Customer and driver safety tools including emergency contacts, trip sharing, and safety policies.
+*   **Fraud Prevention Layer (SafeGo Master Tasks 16-22)**: Comprehensive fraud detection and prevention system including:
+    *   **One-Account-Per-Device**: Device registration with multi-device detection and automatic flagging.
+    *   **Device Fingerprinting**: Hashed device IDs, OS/model tracking, app version monitoring, and device whitelisting.
+    *   **Fake GPS Detection**: Impossible movement detection (>5km in <5s), teleport pattern analysis, and GPS/IP mismatch alerts.
+    *   **COD Fraud Protection**: Repeated cancellation detection, high-value monitoring, and location mismatch flagging.
+    *   **Partner Manipulation Detection**: Self-ordering, order padding, fake delivery cycles, and acceptance-cancellation loop detection.
+    *   **IP Anomaly Detection**: VPN/proxy detection, rapid country changes, datacenter IP flagging, and GPS/IP region mismatch.
+    *   **Suspicious Behavior Scoring**: 0-100 fraud score with component scores (device, GPS, IP, COD, reports, cancellations, manipulation), auto-restriction at threshold, and manual clearance workflow.
+    *   **Fraud Prevention Center**: Admin dashboard with events, scores, devices, settings, and whitelist management.
 
 ## External Dependencies
 
