@@ -51,7 +51,6 @@ interface AuditLogsResponse {
 }
 
 export default function AdminActivityLog() {
-  const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [actionTypeFilter, setActionTypeFilter] = useState<string>("all");
   const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
@@ -130,10 +129,10 @@ export default function AdminActivityLog() {
   return (
     <div className="min-h-screen bg-background pb-6">
       <PageHeader
-        title="Admin Activity Log"
-        description="Security and compliance audit trail"
+        title="Activity Logs"
+        description="View admin and system activity across the platform"
         icon={Shield}
-        backButton={{ label: "Back to Dashboard", href: "/admin" }}
+        backButton={{ label: "Back to Security", href: "/admin" }}
       />
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">

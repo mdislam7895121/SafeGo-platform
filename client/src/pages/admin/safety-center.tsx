@@ -517,10 +517,7 @@ export default function SafetyCenter() {
         description="Monitor and manage platform safety incidents and risk cases"
         icon={ShieldAlert}
         iconColor="text-red-500"
-        breadcrumbs={[
-          { label: "Admin", href: "/admin" },
-          { label: "Safety & Risk Center" },
-        ]}
+        backButton={{ label: "Back to Security", href: "/admin" }}
         actions={
           <>
             <Button

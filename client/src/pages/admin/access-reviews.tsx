@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Link } from 'wouter';
+import { PageHeader } from '@/components/admin/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -698,23 +699,15 @@ export default function AccessReviewsPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ClipboardCheck className="w-6 h-6" />
-            Periodic Access Review
-          </h1>
-          <p className="text-muted-foreground">Audit and certify admin role assignments</p>
-        </div>
-        <Link href="/admin/security-center">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Security
-          </Button>
-        </Link>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        title="Periodic Access Review"
+        description="Audit and certify admin role assignments"
+        icon={ClipboardCheck}
+        backButton={{ label: "Back to Security", href: "/admin" }}
+      />
 
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {statsData && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -769,6 +762,7 @@ export default function AccessReviewsPage() {
           {selectedCycle ? renderCycleDetail() : renderCyclesList()}
         </CardContent>
       </Card>
+      </div>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-md">
