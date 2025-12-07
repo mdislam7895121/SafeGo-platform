@@ -78,13 +78,43 @@ export default function DriverStatus() {
   const rawStatus = profile?.verificationStatus || 'pending';
   
   const normalizeStatus = (status: string): VerificationState => {
-    const normalized = status.toLowerCase().replace(/_/g, '_');
-    if (normalized === 'under_review') return 'under_review';
-    if (normalized === 'approved') return 'approved';
-    if (normalized === 'rejected') return 'rejected';
-    if (normalized === 'needs_more_info') return 'needs_more_info';
-    if (normalized === 'blocked') return 'blocked';
-    return 'pending';
+    const normalized = status.toLowerCase().replace(/[-\s]/g, '_');
+    
+    // Map various status values to normalized states
+    const statusMappings: Record<string, VerificationState> = {
+      // Pending/Under Review states
+      'pending': 'pending',
+      'under_review': 'under_review',
+      'in_review': 'under_review',
+      'reviewing': 'under_review',
+      'submitted': 'pending',
+      'awaiting_review': 'pending',
+      
+      // Approved states
+      'approved': 'approved',
+      'verified': 'approved',
+      'active': 'approved',
+      
+      // Rejected states
+      'rejected': 'rejected',
+      'auto_rejected': 'rejected',
+      'declined': 'rejected',
+      'denied': 'rejected',
+      
+      // Needs more info states
+      'needs_more_info': 'needs_more_info',
+      'needs_info': 'needs_more_info',
+      'incomplete': 'needs_more_info',
+      'requires_action': 'needs_more_info',
+      
+      // Blocked states
+      'blocked': 'blocked',
+      'suspended': 'blocked',
+      'banned': 'blocked',
+      'deactivated': 'blocked',
+    };
+    
+    return statusMappings[normalized] || 'pending';
   };
 
   const verificationStatus = normalizeStatus(rawStatus);

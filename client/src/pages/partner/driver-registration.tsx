@@ -1129,23 +1129,8 @@ function DriverRegistrationV2() {
         <div className="border-t pt-6 space-y-4">
           <h4 className="font-semibold">FHV (For-Hire Vehicle) Permit</h4>
           
-          <FormField
-            control={nycForm.control}
-            name="fhvLicenseNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>FHV Number/Barcode (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter FHV number or scan barcode (optional)" {...field} data-testid="input-fhv-number" />
-                </FormControl>
-                <FormDescription>
-                  You can leave this blank - admin will fill it from your uploaded document if needed.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
+          {/* FHV Number field hidden per NYC rule - admin will extract from uploaded document */}
+          
           <div className="space-y-2">
             <Label>FHV Document/Sticker Image *</Label>
             <label htmlFor="fhv-doc" className="block cursor-pointer">
@@ -1509,12 +1494,7 @@ function DriverRegistrationV2() {
               <span className="font-mono">{formData.nycCompliance.tlcLicenseNumber}</span>
               <span className="text-muted-foreground">TLC Expiry:</span>
               <span>{formData.nycCompliance.tlcLicenseExpiry}</span>
-              <span className="text-muted-foreground">FHV #:</span>
-              {formData.nycCompliance.fhvLicenseNumber ? (
-                <span className="font-mono">{formData.nycCompliance.fhvLicenseNumber}</span>
-              ) : (
-                <span className="text-muted-foreground italic text-xs">Not provided (admin will extract from document)</span>
-              )}
+              {/* FHV Number hidden per NYC rule - admin will extract from uploaded document */}
               <span className="text-muted-foreground">DMV Inspection:</span>
               <span>{formData.nycCompliance.dmvInspectionDate} - {formData.nycCompliance.dmvInspectionExpiry}</span>
             </div>
