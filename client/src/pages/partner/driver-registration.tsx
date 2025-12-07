@@ -149,6 +149,8 @@ export default function DriverRegistration() {
   const [dmvInspectionFile, setDmvInspectionFile] = useState<File | null>(null);
   const [nidFrontFile, setNidFrontFile] = useState<File | null>(null);
   const [nidBackFile, setNidBackFile] = useState<File | null>(null);
+  
+  const [selectedLicenseState, setSelectedLicenseState] = useState<string>("");
 
   const urlParams = new URLSearchParams(window.location.search);
   const typeParam = urlParams.get('type');
@@ -605,9 +607,8 @@ export default function DriverRegistration() {
                 <FormItem>
                   <FormLabel>State *</FormLabel>
                   <Select 
-                    onValueChange={(value) => field.onChange(value)} 
-                    value={field.value || undefined}
-                    defaultValue={field.value || undefined}
+                    onValueChange={field.onChange}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger data-testid="select-state">
@@ -680,9 +681,8 @@ export default function DriverRegistration() {
               <FormItem className="mt-4">
                 <FormLabel>Relationship *</FormLabel>
                 <Select 
-                  onValueChange={(value) => field.onChange(value)} 
-                  value={field.value || undefined}
-                  defaultValue={field.value || undefined}
+                  onValueChange={field.onChange}
+                  value={field.value}
                 >
                   <FormControl>
                     <SelectTrigger data-testid="select-relationship">
@@ -756,14 +756,19 @@ export default function DriverRegistration() {
                 <FormLabel>License Issuing State *</FormLabel>
                 <Select 
                   onValueChange={(value) => {
+                    setSelectedLicenseState(value);
                     field.onChange(value);
-                  }} 
-                  value={field.value || undefined}
-                  defaultValue={field.value || undefined}
+                  }}
+                  value={selectedLicenseState || field.value}
                 >
                   <FormControl>
                     <SelectTrigger data-testid="select-license-state">
-                      <SelectValue placeholder="Select state" />
+                      <SelectValue placeholder="Select state">
+                        {selectedLicenseState || field.value ? 
+                          US_STATES.find(s => s.code === (selectedLicenseState || field.value))?.name || "Select state"
+                          : "Select state"
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -849,9 +854,8 @@ export default function DriverRegistration() {
             <FormItem>
               <FormLabel>Vehicle Type *</FormLabel>
               <Select 
-                onValueChange={(value) => field.onChange(value)} 
-                value={field.value || undefined}
-                defaultValue={field.value || undefined}
+                onValueChange={field.onChange}
+                value={field.value}
               >
                 <FormControl>
                   <SelectTrigger data-testid="select-vehicle-type">
