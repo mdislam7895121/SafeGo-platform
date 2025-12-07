@@ -1,0 +1,176 @@
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK)
+
+A) ROLES (4 fixed)
+1. customer
+2. driver
+3. restaurant (merchant)
+4. admin
+
+Each role must keep:
+- its own signup/onboarding
+- its own KYC/verification rules
+- its own dashboard
+- its own permissions
+- its own status flows
+
+Public signup is CUSTOMER ONLY.  
+Drivers/restaurants/admins onboard after login.  
+Never mix access between roles.
+
+B) GLOBAL SERVICES
+SafeGo must keep all 3 services working:
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+Do NOT break any existing ride/food/parcel flows while fixing this.
+
+C) COUNTRY-SPECIFIC KYC
+
+C.1 Bangladesh (BD) driver KYC must keep:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number + nid_front_image + nid_back_image
+- emergency_contact_name + emergency_contact_phone
+- verification_status + is_verified
+
+C.2 United States (US) base KYC:
+- date_of_birth
+- home_address (street, city, state, zip)
+- emergency_contact_name + emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status + is_verified
+
+C.3 United States (US) extra for DRIVERS:
+- driver_license_number
+- driver_license_state
+- driver_license_expiry
+- driver_license_front_image_url
+- driver_license_back_image_url
+- ssn_last4 (optional)
+- TLC fields for NYC 5 borough zone:
+  - tlc_license_number
+  - tlc_license_expiry
+  - tlc_license_front_image_url
+  - tlc_license_back_image_url
+  - any existing TLC training/medical/exam/drug-test fields
+
+Do NOT rename or delete any of these fields.
+
+D) ADMIN PANEL (MUST STAY)
+Admin must still be able to:
+- verify customers/drivers/restaurants
+- approve/reject KYC, see rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view driver negative balances
+- view restaurant negative balances
+
+E) CORE COLLECTIONS
+Collections that must remain:
+- rides
+- food_orders
+- deliveries
+
+Each must keep identity fields, addresses + geolocation, fee/commission breakdown, payment details, timestamps, rating and feedback.
+
+F) COMMISSION & PAYOUT RULES
+1. Cash ride → driver keeps full cash, SafeGo commission → negative driver_wallet_balance (settled weekly).
+2. Cash food → restaurant keeps cash, commission → negative restaurant_wallet.
+3. Online payment → SafeGo keeps commission automatically.
+4. Admin can settle balances and mark them paid.
+
+G) SECURITY RULES
+- Customers cannot view driver documents (NID, license, TLC).
+- Drivers cannot view customer KYC or NID.
+- Restaurants cannot view other restaurants.
+- Only admin can change pricing, commissions, verification, blocking.
+- Users can edit only their own profile.
+
+H) STATUS FLOWS
+Keep all status flows intact:
+
+Rides:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+I) ONBOARDING
+- Public signup = simple customer signup.
+- Partners onboard after login: basic info → address → KYC → emergency contact.
+- verification_status starts "pending"; access is blocked until admin approves.
+
+J) NOTIFICATIONS
+Keep notifications for:
+- new ride alerts to drivers
+- food/parcel status updates
+- KYC approval/rejection
+- important admin messages
+
+All changes must be additive and NON-BREAKING.
+
+================================================
+NOW THE REAL BUG: INPUTS ARE EMPTY BUT NOT TYPABLE
+================================================
+
+At `/partner/driver/register?type=ride` (US driver onboarding, V2):
+
+- After Personal Information → Next:
+  - Driver License fields are EMPTY (this is good).
+  - BUT when I tap/click "Driver License Number" and type, nothing appears.
+  - Same for other fields: they focus, but do not accept typing.
+
+So the inputs are rendered but effectively READ-ONLY.  
+You must fix the input bindings at component level.
+
+==========================
+1. OPEN THE V2 COMPONENT
+==========================
+
+1.1 Open the V2 driver onboarding file that renders the tabs:
+- Personal Information
+- Driver License
+- Vehicle Details
+- NYC Compliance
+
+1.2 Inside it, open the section/component for the Driver License step.
+
+We care about three fields:
+
+- Driver License Number (text input)
+- License Issuing State (select)
+- License Expiration Date (date input)
+
+===============================
+2. FIX THE LICENSE NUMBER INPUT
+===============================
+
+2.1 Find the code that renders the "Driver License Number" field.
+
+Right now it probably uses a shadcn `<Input>` with some wrapper.
+
+Replace it temporarily with a **plain native input** wired directly to React Hook Form, like this (adjust imports, but keep the idea):
+
+```tsx
+<Controller
+  name="driver_license_number"
+  control={control}
+  render={({ field }) => (
+    <input
+      type="text"
+      id="license-number-field"
+      autoComplete="off"
+      {...field}
+      // IMPORTANT:
+      // - do NOT override value or onChange after {...field}
+    />
+  )}
+/>

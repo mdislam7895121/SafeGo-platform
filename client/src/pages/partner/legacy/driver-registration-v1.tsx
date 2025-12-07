@@ -750,22 +750,13 @@ export default function DriverRegistration() {
             <FormItem>
               <FormLabel htmlFor="v1-license-number-field">Driver License Number *</FormLabel>
               <FormControl>
-                <input
+                <Input
                   id="v1-license-number-field"
                   type="text"
-                  inputMode="text"
-                  autoComplete="new-password"
-                  autoCorrect="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
                   placeholder="Enter your license number"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  autoComplete="off"
                   data-testid="input-license-number"
-                  value={field.value || ""}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  ref={field.ref}
+                  {...field}
                 />
               </FormControl>
               <FormMessage />
@@ -781,21 +772,16 @@ export default function DriverRegistration() {
               <FormItem>
                 <FormLabel htmlFor="v1-license-state-field">License Issuing State *</FormLabel>
                 <FormControl>
-                  <select
-                    id="v1-license-state-field"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
-                    data-testid="select-license-state"
-                    value={field.value || ""}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref as any}
-                  >
-                    <option value="">Select state</option>
-                    {US_STATES.map(state => (
-                      <option key={state.code} value={state.code}>{state.name}</option>
-                    ))}
-                  </select>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <SelectTrigger id="v1-license-state-field" data-testid="select-license-state">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {US_STATES.map(state => (
+                        <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -808,17 +794,12 @@ export default function DriverRegistration() {
               <FormItem>
                 <FormLabel htmlFor="v1-license-expiry-field">License Expiration Date *</FormLabel>
                 <FormControl>
-                  <input
+                  <Input
                     id="v1-license-expiry-field"
                     type="date"
-                    autoComplete="new-password"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    autoComplete="off"
                     data-testid="input-license-expiry"
-                    value={field.value || ""}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref}
+                    {...field}
                   />
                 </FormControl>
                 <FormMessage />
