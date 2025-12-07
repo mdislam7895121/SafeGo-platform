@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isPartnerAvailable, getPartnerConfig, type PartnerType } from "@shared/partnerAvailability";
 import { useFeatureFlags, FEATURE_FLAGS } from "@/hooks/useFeatureFlags";
-import DriverRegistrationV1 from "./legacy/driver-registration-v1";
+// V1 is kept in ./legacy/driver-registration-v1.tsx for backup/reference only - not used in routing
 
 const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
 
@@ -130,21 +130,6 @@ function isNycBorough(city: string | undefined): boolean {
 }
 
 export default function DriverRegistration() {
-  const { isEnabled, isLoading: flagLoading } = useFeatureFlags();
-  const isV2Enabled = isEnabled(FEATURE_FLAGS.DRIVER_ONBOARDING_V2);
-  
-  if (flagLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  if (!isV2Enabled) {
-    return <DriverRegistrationV1 />;
-  }
-  
   return <DriverRegistrationV2 />;
 }
 
@@ -308,7 +293,6 @@ function DriverRegistrationV2() {
 
   const [nidNumber, setNidNumber] = useState("");
   const [backgroundCheckConsent, setBackgroundCheckConsent] = useState(false);
-  const { driverOnboardingV2 } = useFeatureFlags();
 
   if (!user) {
     return <Redirect to={`/login?returnTo=/partner/${driverType === 'ride' ? 'ride' : 'delivery'}/start`} />;

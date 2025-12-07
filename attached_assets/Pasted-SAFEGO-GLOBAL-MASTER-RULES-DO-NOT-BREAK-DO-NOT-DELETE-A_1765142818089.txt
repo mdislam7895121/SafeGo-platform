@@ -1,0 +1,189 @@
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK, DO NOT DELETE ANY EXISTING FIELDS)
+
+A) ROLES – 4 fixed roles
+1. customer
+2. driver
+3. restaurant (merchant)
+4. admin
+
+Each role MUST keep:
+- its own signup/onboarding flow
+- its own KYC/verification rules
+- its own dashboard
+- its own permissions
+- its own status flows
+
+Public signup is CUSTOMER ONLY.  
+Drivers/restaurants/admins are created later through onboarding after login.  
+Never mix role access.
+
+B) GLOBAL SERVICES (3)
+SafeGo must always support:
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+Any change you make MUST NOT break any ride/food/parcel flow.
+
+C) COUNTRY-SPECIFIC KYC REQUIREMENTS
+
+C.1 Bangladesh (BD) mandatory fields for driver KYC:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified
+
+C.2 United States (US) base KYC:
+- date_of_birth
+- home_address (street, city, state, zip)
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+C.3 United States (US) extra for DRIVERS:
+- driver_license_number
+- driver_license_state
+- driver_license_expiry
+- driver_license_front_image_url
+- driver_license_back_image_url
+- ssn_last4 (optional)
+- for NYC 5 borough TLC zone:
+  - tlc_license_number
+  - tlc_license_expiry
+  - tlc_license_front_image_url
+  - tlc_license_back_image_url
+  - any existing TLC training/medical/exam/drug-test fields
+
+You MUST NOT rename or delete any of these fields. Only ADD new ones if needed.
+
+D) ADMIN PANEL – must remain fully functional
+Admin must still be able to:
+- verify customers, drivers, restaurants
+- approve/reject KYC and see rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view driver negative balances
+- view restaurant negative balances
+
+E) CORE COLLECTIONS – keep as-is
+Collections:
+- rides
+- food_orders
+- deliveries
+
+Each must keep:
+- identity fields (customer_id, driver_id, restaurant_id, etc.)
+- addresses + geolocation
+- fee + commission breakdown
+- payment details (cash/online, transaction_id, method)
+- status timestamps
+- rating and feedback fields
+
+F) COMMISSION & PAYOUT RULES
+1. If ride payment is CASH:
+   - Driver receives full cash.
+   - SafeGo commission becomes negative balance in driver_wallet_balance.
+   - Driver must settle weekly.
+
+2. If food order is CASH:
+   - Restaurant receives cash.
+   - Commission becomes negative balance in restaurant_wallet.
+
+3. If payment is ONLINE:
+   - SafeGo keeps commission automatically.
+
+4. Admin can settle balances and mark them paid.
+
+G) SECURITY RULES
+- Customers cannot view driver documents (NID, license, TLC).
+- Drivers cannot view customer KYC or NID.
+- Restaurants cannot view other restaurants.
+- Only admin can change pricing, commission, verification, blocking.
+- Users can update only their own profile.
+
+H) STATUS FLOWS – must stay intact
+Rides:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+I) ONBOARDING RULES
+- Public signup = simple customer account only.
+- Partners (drivers, restaurants, admins) onboard after login with multi-step flow:
+  basic info → address → KYC → emergency contact.
+- verification_status starts as "pending" and access is blocked until admin approval.
+
+J) NOTIFICATIONS
+Keep notifications for:
+- new ride alerts to drivers
+- food/parcel order status updates
+- verification approval/rejection
+- important admin announcements
+
+All changes MUST be additive and NON-BREAKING.
+
+====================================================
+TASK: STOP USING V1 IN ROUTES, USE V2 ONLY FOR DRIVER ONBOARDING
+====================================================
+
+Right now we have TWO driver onboarding implementations:
+- V1 (legacy driver registration)
+- V2 (new driver registration)
+
+For the path:
+- `/partner/driver/register?type=ride` (US driver onboarding for drivers)
+
+I want this behavior:
+
+- V1 stays in the codebase as LEGACY (for backup/reference), but is NOT used in routing.
+- V2 becomes the ONLY implementation actually used for customers/drivers.
+- All future fixes (like the Driver License typing bug) must be applied ONLY to V2.
+
+DO NOT delete V1 files.  
+Just REMOVE them from routing and feature-flag decisions.
+
+=========================================
+1. IDENTIFY V1 AND V2 COMPONENT FILES
+=========================================
+
+1.1 Find the files for:
+- V1 legacy driver onboarding component, e.g.:
+  - `client/src/pages/partner/legacy/driver-registration-v1.tsx` (or similar)
+- V2 driver onboarding component, e.g.:
+  - `client/src/pages/partner/driver-registration-v2.tsx` (or similar)
+
+1.2 Confirm which component is rendered for:
+- `/partner/driver/register`
+- `/partner/driver/register?type=ride`
+- any similar routes used for driver onboarding.
+
+=========================================
+2. ROUTING: FORCE V2 FOR ALL DRIVER ONBOARDING
+=========================================
+
+2.1 In the routing configuration for partner/driver register:
+
+- Where you currently do something like:
+
+```tsx
+const { isV2Enabled } = useFeatureFlags();
+return isV2Enabled ? (
+  <DriverOnboardingV2 />
+) : (
+  <DriverOnboardingV1 />
+);
