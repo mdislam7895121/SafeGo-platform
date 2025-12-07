@@ -726,15 +726,15 @@ function Router() {
       </Route>
 
       {/* Driver routes */}
-      {/* Drivers land on the live map screen by default (Uber-style experience) */}
+      {/* Drivers (including pending) land on the live map screen by default (Uber-style experience) */}
       <Route path="/driver">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <Redirect to="/driver/map" />
         </ProtectedRoute>
       </Route>
       {/* Driver home route - alias for dashboard */}
       <Route path="/driver/home">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Home">
             <DriverHome />
           </DriverLayout>
@@ -742,335 +742,335 @@ function Router() {
       </Route>
       {/* All driver routes wrapped with unified DriverLayout */}
       <Route path="/driver/dashboard">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Dashboard">
             <DriverDashboard />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/vehicle">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Vehicles">
             <DriverVehicle />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/settings">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Settings">
             <DriverSettings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/ride-preferences">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Ride Preferences">
             <DriverRidePreferences />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/profile/public">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Public Profile">
             <DriverPublicProfile />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/profile">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Profile">
             <DriverProfile />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/kyc-documents">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Documents">
             <DriverKYCDocuments />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/documents">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Document Center">
             <DriverDocuments />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Support">
             <DriverSupportHub />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support/help">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Help Center">
             <DriverSupportHelp />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support/contact">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Contact Support">
             <DriverSupportContact />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support/live-chat">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Live Chat">
             <DriverSupportLiveChat />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support/phone">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Phone Support">
             <DriverSupportPhone />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support/status">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="System Status">
             <DriverSupportStatus />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-help-center">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Help Center">
             <DriverSupportHelpCenter />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-tickets">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Support Tickets">
             <DriverSupportTicketsList />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-ticket/:id">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Ticket Details">
             <DriverSupportTicketView />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/wallet">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Wallet">
             <DriverWallet />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/wallet/balance">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Balance">
             <DriverWalletBalance />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/wallet/methods">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Payout Methods">
             <DriverWalletMethods />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/wallet/history">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Payout History">
             <DriverWalletHistory />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trips">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Trip History">
             <DriverTrips />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trip/active">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Active Trip">
             <DriverTripActive />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trip-requests">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverTripRequests />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/ride-request/:id">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverRideRequestDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/map">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Map">
             <DriverMap />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/food-deliveries">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Food Deliveries">
             <DriverFoodDeliveries />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/food-delivery/history">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Delivery History">
             <DriverFoodDeliveryHistory />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/food-delivery/:deliveryId">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Active Delivery">
             <DriverFoodDeliveryActive />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trips/:tripId">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Trip Details">
             <DriverTripDetail />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trips/:tripId/earnings">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Earnings Breakdown">
             <DriverTripEarnings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trip-summary/:tripId">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverTripSummary />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/ride/bd/:rideId">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <BDRideDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/performance">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Performance">
             <DriverPerformance />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/incentives">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Incentives & Milestones">
             <DriverIncentives />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/incentives/achievements">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Achievements">
             <DriverIncentivesAchievements />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/incentives/rewards">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Rewards & Tiers">
             <DriverIncentivesRewards />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/safety">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Safety Center">
             <DriverSafety />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/safety/report">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Report Incident">
             <DriverSafetyReport />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/safety-report">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Report Incident">
             <DriverSafetyReport />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/safety/history">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Incident History">
             <DriverSafetyHistory />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/safety/history/:id">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Incident Details">
             <DriverSafetyDetail />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/safety/emergency">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Emergency Toolkit">
             <DriverSafetyEmergency />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/safety-emergency">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Emergency Toolkit">
             <DriverSafetyEmergency />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trust-score">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Trust Score">
             <DriverTrustScore />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/earnings">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Earnings">
             <DriverEarnings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/payouts">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Payouts">
             <DriverPayouts />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/refer">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Refer & Earn">
             <DriverRefer />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/points">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="SafeGo Points">
             <DriverPoints />
           </DriverLayout>
@@ -1078,178 +1078,178 @@ function Router() {
       </Route>
       {/* Legacy redirect from old premium page */}
       <Route path="/driver/premium">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <Redirect to="/driver/points" />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/promotions">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Opportunity">
             <DriverPromotions />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/help">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Help Center">
             <DriverHelp />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/getting-started">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Getting Started">
             <DriverGettingStarted />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/onboarding">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Onboarding Wizard">
             <DriverOnboarding />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/tutorials">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Training Videos">
             <DriverTutorials />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/vehicles">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="My Vehicles">
             <DriverAccountVehicles />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/work-hub">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Work Hub">
             <DriverAccountWorkHub />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/payment">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Payment Methods">
             <DriverAccountPayment />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/payout-methods">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Payout Methods">
             <DriverAccountPayoutMethods />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/tax-info">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Tax Info">
             <DriverAccountTaxInfo />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/tax-info/edit">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Edit Tax Information">
             <DriverAccountTaxInfoEdit />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/manage">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Manage Account">
             <DriverAccountManage />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/address">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Edit Address">
             <DriverAccountAddress />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/notifications">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Notifications">
             <DriverAccountNotifications />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/privacy">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Privacy">
             <DriverAccountPrivacy />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/language">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Language">
             <DriverAccountLanguage />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/dark-mode">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Appearance">
             <DriverAccountDarkMode />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/map-settings">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Map Settings">
             <DriverAccountMapSettings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/map-theme">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Map Settings">
             <DriverAccountMapSettings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/navigation">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Navigation">
             <DriverAccountNavigation />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/blocked-users">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Blocked Users">
             <DriverAccountBlockedUsers />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/permissions">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="App Permissions">
             <DriverAccountPermissions />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/about">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="About">
             <DriverAccountAbout />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/privacy-policy">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverPrivacyPolicy />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Account Settings">
             <DriverAccount />
           </DriverLayout>
@@ -1257,63 +1257,63 @@ function Router() {
       </Route>
       {/* Driver Support Center Routes */}
       <Route path="/driver/support-center/tickets/:id">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Support Ticket">
             <DriverSupportTicketDetail />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center/tickets">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="My Tickets">
             <DriverSupportTickets />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center/live-chat">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Live Chat">
             <DriverSupportLiveChat />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center/phone">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Phone Support">
             <DriverSupportPhone />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center/articles/:id">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Help Article">
             <DriverSupportArticle />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center/help">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Help Center">
             <DriverSupportHelp />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center/contact">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Contact Support">
             <DriverSupportContact />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center/status">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="System Status">
             <DriverSupportStatus />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-center">
-        <ProtectedRoute allowedRoles={["driver"]}>
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Support Center">
             <DriverSupportHub />
           </DriverLayout>

@@ -1017,6 +1017,37 @@ export default function DriverMapPage() {
 
 
 
+        {/* Under Review Banner - Uber-style for pending verification */}
+        {!isVerified && (
+          <div
+            className="absolute top-4 left-4 right-4 z-[1001]"
+            data-testid="under-review-banner"
+          >
+            <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                      Your documents are under review
+                    </p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      Our team is reviewing your application. This usually takes 24-48 hours. You'll be notified when approved.
+                    </p>
+                    <button
+                      onClick={() => setLocation("/partner/driver/status")}
+                      className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300 underline hover:text-amber-900 dark:hover:text-amber-100 transition-colors"
+                      data-testid="link-view-application-status"
+                    >
+                      View Application Status
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {!activeTrip && isOnline && !incomingRequest && (
           <div
             className="absolute top-28 left-1/2 -translate-x-1/2 z-[999]"

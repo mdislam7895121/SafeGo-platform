@@ -67,8 +67,8 @@ export function getPostLoginPath(user: UserForRedirect | null | undefined): stri
 
     case "pending_driver":
       // Driver has submitted application, waiting for admin approval
-      // Show the driver onboarding status page while they wait
-      return "/partner/driver/status";
+      // Redirect to driver dashboard (Uber-style) - they can see dashboard but can't go online
+      return "/driver/map";
 
     case "restaurant":
       return "/restaurant";
