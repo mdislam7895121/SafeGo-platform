@@ -1541,12 +1541,18 @@ export default function AdminDriverDetails() {
                   {/* Address Section */}
                   {(driver.usaStreet || driver.usaCity || driver.usaState || driver.usaZipCode) && (
                     <div className="mt-4 space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Residential Address</p>
+                      <p className="text-sm font-medium text-muted-foreground">Residential Address (US Standard)</p>
                       <div className="grid gap-4 md:grid-cols-2">
                         {driver.usaStreet && (
                           <div>
-                            <p className="text-xs text-muted-foreground">Street</p>
+                            <p className="text-xs text-muted-foreground">Street Address 1</p>
                             <p className="text-sm" data-testid="text-usa-street">{driver.usaStreet}</p>
+                          </div>
+                        )}
+                        {driver.usaAptUnit && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Street Address 2 (Apt/Unit)</p>
+                            <p className="text-sm" data-testid="text-usa-apt">{driver.usaAptUnit}</p>
                           </div>
                         )}
                         {driver.usaCity && (
@@ -1570,6 +1576,51 @@ export default function AdminDriverDetails() {
                       </div>
                     </div>
                   )}
+
+                  {/* Driver License Documents Section */}
+                  <div className="mt-6 pt-6 border-t space-y-3">
+                    <p className="text-sm font-semibold text-foreground">Driver License Documents</p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">License Front</p>
+                        {driver.driverLicenseFrontUrl ? (
+                          <a
+                            href={driver.driverLicenseFrontUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                            data-testid="link-license-front"
+                          >
+                            View Front Image
+                          </a>
+                        ) : (
+                          <p className="text-sm text-destructive" data-testid="text-license-front-missing">Missing</p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">License Back</p>
+                        {driver.driverLicenseBackUrl ? (
+                          <a
+                            href={driver.driverLicenseBackUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                            data-testid="link-license-back"
+                          >
+                            View Back Image
+                          </a>
+                        ) : (
+                          <p className="text-sm text-destructive" data-testid="text-license-back-missing">Missing</p>
+                        )}
+                      </div>
+                      {(driver.driverLicenseState || driver.licenseStateIssued) && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">License State</p>
+                          <p className="text-sm" data-testid="text-license-state">{driver.driverLicenseState || driver.licenseStateIssued}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* DMV License Documents Section (All USA drivers) */}
                   <div className="mt-6 pt-6 border-t space-y-3">
@@ -1731,7 +1782,7 @@ export default function AdminDriverDetails() {
                   {(driver.emergencyContactName || driver.emergencyContactPhone) && (
                     <div className="mt-6 pt-6 border-t space-y-3">
                       <p className="text-sm font-semibold text-foreground">Emergency Contact</p>
-                      <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-4 md:grid-cols-3">
                         {driver.emergencyContactName && (
                           <div>
                             <p className="text-xs text-muted-foreground mb-1">Name</p>
@@ -1742,6 +1793,12 @@ export default function AdminDriverDetails() {
                           <div>
                             <p className="text-xs text-muted-foreground mb-1">Phone</p>
                             <p className="text-sm" data-testid="text-emergency-phone">{driver.emergencyContactPhone}</p>
+                          </div>
+                        )}
+                        {driver.emergencyContactRelationship && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Relationship</p>
+                            <p className="text-sm capitalize" data-testid="text-emergency-relationship">{driver.emergencyContactRelationship}</p>
                           </div>
                         )}
                       </div>
