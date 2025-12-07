@@ -1,0 +1,167 @@
+We still have a serious problem with the US Driver Onboarding V2.
+
+I can see from your log that you updated client/src/pages/partner/driver-registration... and replaced the license fields with native HTML inputs.
+
+But on the actual screen I am seeing at:
+  /partner/driver/register?type=ride
+
+the UI still looks like the OLD Driver License step:
+- Tabs at the top: Personal Information, Driver License, Vehicle Details, NYC Compliance
+- The fields show:
+  - "Driver License Number *"
+  - "License Issuing State *"
+  - "License Expiration Date *"
+  - "Driver License Images *"
+- This tells me there are TWO different driver license UIs in the codebase and the route is still wired to the legacy one.
+
+You must now treat this as a routing + legacy UI problem, not just an input binding problem.
+
+========================================
+A. SafeGo master rules (do not break)
+========================================
+While you fix this, you MUST respect all SafeGo master rules:
+
+1) Roles: customer, driver, restaurant, admin
+   - Separate onboarding, KYC, dashboards, permissions, status flows.
+   - Public signup is customer-only; drivers are created via onboarding after login.
+
+2) Services: ride-hailing, food delivery, parcel delivery
+   - Do not break any existing ride/food/parcel flows.
+
+3) Country-specific KYC:
+   - BD has its own required fields (father_name, NID, etc.) — do not change them.
+   - US has its own required driver fields:
+     - date_of_birth, home_address, emergency_contact
+     - government_id_type, government_id_last4
+     - driver_license_number, driver_license_state, driver_license_expiry, driver_license images
+     - optional ssn_last4
+     - For NYC TLC zone: tlc_license fields.
+   - Do NOT rename or remove any of these fields.
+
+4) Admin panel:
+   - Admin must still be able to verify all roles, approve/reject KYC, see rejection_reason,
+     adjust pricing/commission, block/unblock, and manage payouts & negative balances.
+
+5) Collections:
+   - rides, food_orders, deliveries must remain intact with identity, geo, fees+commission,
+     payments, timestamps, rating & feedback.
+
+6) Commission & payouts:
+   - Cash ride → driver keeps cash; commission → negative driver_wallet_balance.
+   - Cash food → restaurant keeps cash; commission → negative restaurant_wallet.
+   - Online payment → SafeGo keeps commission automatically.
+   - Admin can settle and mark paid.
+
+7) Security:
+   - Customers cannot see driver KYC docs.
+   - Drivers cannot see customer KYC.
+   - Restaurants cannot see other restaurants.
+   - Only admin can change pricing, commission, verification and blocking.
+   - Users can update only their own profile.
+
+8) Status flows:
+   - rides, food_orders, deliveries must keep their full status chains and not be broken.
+
+All changes must be non-breaking and additive: do not delete or rename core models, APIs, or routes.
+
+========================================
+B. Find and remove the legacy Driver License UI
+========================================
+
+Now focus specifically on the Driver Onboarding UI for US drivers.
+
+1) Search the codebase for ALL Driver License step implementations:
+   - search for headings like:
+     - "Driver License"
+     - "License details & images"
+     - "Driver license number is required"
+   - List every component/file that renders this step.
+
+2) Identify which component is actually used by:
+   - route: /partner/driver/register (and /partner/driver/register?type=ride)
+
+   Open the router definition for partner/driver:
+   - e.g. client/src/pages/partner/driver-register.tsx
+   - or any partner/driver route file.
+   - Find which component is currently imported and rendered for the Driver License step.
+
+3) Compare that with the file you recently edited:
+   - client/src/pages/partner/driver-registration... (the one you said you fixed).
+   - If the route is still using a different (legacy) component, then your fix is not visible.
+
+4) Fix the routing so that:
+   - /partner/driver/register uses ONLY the **new V2 implementation** for the full onboarding flow:
+     - Personal Information (V2)
+     - Driver License (V2 with native inputs that accept typing)
+     - Vehicle Details (V2)
+     - NYC Compliance (V2)
+   - Any old/legacy Driver License component must be:
+     - Moved to a legacy folder or clearly marked as legacy.
+     - NOT imported or used by the live route.
+
+Do NOT change the URL path; just swap the implementation behind it.
+
+========================================
+C. Verify the new Driver License V2 form on this route
+========================================
+
+After the routing is corrected:
+
+1) Open /partner/driver/register in dev/preview:
+   - Make sure the rendered component is the V2 version you actually edited.
+   - Confirm that the three key fields:
+     - Driver License Number
+     - License Issuing State
+     - License Expiration Date
+   are the native HTML inputs you wired to the form controller.
+
+2) Test typing:
+   - On desktop:
+     - Type a license number → text appears and stays.
+     - Choose a state from the dropdown → value is stored.
+     - Pick an expiration date → value is stored.
+   - On mobile:
+     - Repeat the same steps and confirm typing works.
+
+3) Ensure validation still works:
+   - Leaving a field empty on submit should show the red “required” message.
+   - Filling it in should clear the error without blocking typing.
+
+========================================
+D. Clean up feature flags and duplicates
+========================================
+
+1) If there is a feature flag like `driverOnboardingV2`:
+   - Ensure the flag is ON for this environment.
+   - Ensure the flag does NOT cause the legacy component to be rendered.
+
+2) Remove any duplicate rendering paths so that:
+   - There is one single authoritative V2 driver onboarding flow for US drivers.
+   - The old UI is not reachable by normal navigation (only kept as legacy code if needed).
+
+========================================
+E. Testing
+========================================
+
+After this refactor, run:
+
+1) Unit tests for the V2 Driver License step.
+2) Integration tests for:
+   - US Standard driver onboarding flow
+   - US NYC TLC driver onboarding flow
+3) E2E tests from:
+   - Login as customer → Become a driver → complete all steps up to Driver License.
+
+Make sure all tests pass with 0 failures.
+
+========================================
+F. Report back clearly
+========================================
+
+When you finish, explain clearly:
+
+1) How many Driver License components were in the project.
+2) Which one was actually wired to /partner/driver/register before.
+3) Which component is now used after the fix.
+4) That the route now renders the V2 component you edited.
+5) That I can type in the three fields on both desktop and mobile with no issues.

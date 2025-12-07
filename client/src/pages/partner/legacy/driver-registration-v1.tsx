@@ -755,7 +755,7 @@ export default function DriverRegistration() {
                   placeholder="Enter your license number"
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid="input-license-number"
-                  value={field.value}
+                  value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value)}
                   onBlur={field.onBlur}
                   name={field.name}
@@ -778,7 +778,7 @@ export default function DriverRegistration() {
                   <select
                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
                     data-testid="select-license-state"
-                    value={field.value}
+                    value={field.value || ""}
                     onChange={(e) => field.onChange(e.target.value)}
                     onBlur={field.onBlur}
                     name={field.name}
@@ -805,7 +805,7 @@ export default function DriverRegistration() {
                     type="date"
                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     data-testid="input-license-expiry"
-                    value={field.value}
+                    value={field.value || ""}
                     onChange={(e) => field.onChange(e.target.value)}
                     onBlur={field.onBlur}
                     name={field.name}
