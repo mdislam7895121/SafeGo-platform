@@ -309,24 +309,6 @@ function DriverRegistrationV2() {
   const [nidNumber, setNidNumber] = useState("");
   const [backgroundCheckConsent, setBackgroundCheckConsent] = useState(false);
   const { driverOnboardingV2 } = useFeatureFlags();
-  const [hasResetLicenseForm, setHasResetLicenseForm] = useState(false);
-
-  useEffect(() => {
-    if (currentStep === 2 && isUS && !hasResetLicenseForm) {
-      const timer = setTimeout(() => {
-        licenseForm.reset({
-          driverLicenseNumber: "",
-          driverLicenseState: "",
-          driverLicenseExpiry: "",
-        });
-        setHasResetLicenseForm(true);
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-    if (currentStep !== 2) {
-      setHasResetLicenseForm(false);
-    }
-  }, [currentStep, isUS, hasResetLicenseForm]);
 
   if (!user) {
     return <Redirect to={`/login?returnTo=/partner/${driverType === 'ride' ? 'ride' : 'delivery'}/start`} />;
@@ -409,6 +391,11 @@ function DriverRegistrationV2() {
           setFormData(prev => ({ ...prev, personalInfo: values }));
           const needsNycCompliance = values.usaState === 'NY' && isNycBorough(values.usaCity);
           setIsNycDriver(needsNycCompliance);
+          licenseForm.reset({
+            driverLicenseNumber: "",
+            driverLicenseState: "",
+            driverLicenseExpiry: "",
+          });
         }
       } else if (currentStep === 2) {
         isValid = await licenseForm.trigger();
