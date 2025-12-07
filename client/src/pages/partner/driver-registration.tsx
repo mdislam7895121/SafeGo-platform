@@ -215,6 +215,7 @@ export default function DriverRegistration() {
 
   const personalFormUS = useForm<PersonalInfoUSData>({
     resolver: zodResolver(personalInfoSchemaUS),
+    mode: "onChange",
     defaultValues: {
       usaFullLegalName: user?.email?.split('@')[0] || "",
       phone: "",
@@ -233,6 +234,7 @@ export default function DriverRegistration() {
 
   const personalFormBD = useForm<PersonalInfoBDData>({
     resolver: zodResolver(personalInfoSchemaBD),
+    mode: "onChange",
     defaultValues: {
       phone: "",
       dateOfBirth: "",
@@ -246,6 +248,7 @@ export default function DriverRegistration() {
 
   const licenseForm = useForm<LicenseInfoData>({
     resolver: zodResolver(licenseInfoSchema),
+    mode: "onChange",
     defaultValues: {
       driverLicenseNumber: "",
       driverLicenseState: "",
@@ -255,6 +258,7 @@ export default function DriverRegistration() {
 
   const vehicleForm = useForm<VehicleInfoData>({
     resolver: zodResolver(vehicleInfoSchema),
+    mode: "onChange",
     defaultValues: {
       vehicleType: "",
       vehicleMake: "",
@@ -267,6 +271,7 @@ export default function DriverRegistration() {
 
   const nycForm = useForm<NycComplianceData>({
     resolver: zodResolver(nycComplianceSchema),
+    mode: "onChange",
     defaultValues: {
       tlcLicenseNumber: "",
       tlcLicenseExpiry: "",
@@ -605,12 +610,8 @@ export default function DriverRegistration() {
                 <FormItem>
                   <FormLabel>State *</FormLabel>
                   <Select 
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      personalFormUS.setValue("usaState", value, { shouldValidate: true });
-                    }}
-                    value={field.value || ""}
-                    defaultValue={field.value}
+                    onValueChange={field.onChange}
+                    value={field.value ?? ""}
                   >
                     <FormControl>
                       <SelectTrigger data-testid="select-state">
@@ -683,12 +684,8 @@ export default function DriverRegistration() {
               <FormItem className="mt-4">
                 <FormLabel>Relationship *</FormLabel>
                 <Select 
-                  onValueChange={(value) => {
-                    field.onChange(value);
-                    personalFormUS.setValue("emergencyContactRelationship", value, { shouldValidate: true });
-                  }}
-                  value={field.value || ""}
-                  defaultValue={field.value}
+                  onValueChange={field.onChange}
+                  value={field.value ?? ""}
                 >
                   <FormControl>
                     <SelectTrigger data-testid="select-relationship">
@@ -761,12 +758,8 @@ export default function DriverRegistration() {
               <FormItem>
                 <FormLabel>License Issuing State *</FormLabel>
                 <Select 
-                  onValueChange={(value) => {
-                    field.onChange(value);
-                    licenseForm.setValue("driverLicenseState", value, { shouldValidate: true });
-                  }}
-                  value={field.value || ""}
-                  defaultValue={field.value}
+                  onValueChange={field.onChange}
+                  value={field.value ?? ""}
                 >
                   <FormControl>
                     <SelectTrigger data-testid="select-license-state">
@@ -856,12 +849,8 @@ export default function DriverRegistration() {
             <FormItem>
               <FormLabel>Vehicle Type *</FormLabel>
               <Select 
-                onValueChange={(value) => {
-                  field.onChange(value);
-                  vehicleForm.setValue("vehicleType", value, { shouldValidate: true });
-                }}
-                value={field.value || ""}
-                defaultValue={field.value}
+                onValueChange={field.onChange}
+                value={field.value ?? ""}
               >
                 <FormControl>
                   <SelectTrigger data-testid="select-vehicle-type">
