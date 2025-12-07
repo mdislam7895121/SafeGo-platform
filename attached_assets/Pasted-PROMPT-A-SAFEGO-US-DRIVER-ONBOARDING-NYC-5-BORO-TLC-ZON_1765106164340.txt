@@ -1,0 +1,93 @@
+PROMPT A — SAFEGO US DRIVER ONBOARDING (NYC 5 BORO TLC ZONE, TLC RULES) — FULL IMPLEMENTATION A→Z
+
+You are an expert full-stack engineer working on the SafeGo global super-app.  
+Your job: implement and wire up the **US NYC 5-Borough (TLC zone) driver onboarding + vehicle onboarding + admin verification** flows, fully production-ready, WITHOUT breaking any existing SafeGo features.
+
+=====================================================================
+0. ABSOLUTE NON-BREAKING RULES (DO NOT VIOLATE)
+=====================================================================
+- SafeGo already has multiple modules live. YOU MUST NOT:
+  - rename any existing fields
+  - rename or delete any APIs
+  - change existing routes/URLs
+  - remove or repurpose any existing components
+- All changes must be **additive**:
+  - only ADD new fields, components, routes, feature flags, or config
+  - if you must change behavior, do it behind clearly named feature flags
+- If something is ambiguous, choose the safest, backward-compatible approach.
+
+=====================================================================
+1. GLOBAL SAFEGO MASTER RULES (ALWAYS ENFORCE)
+=====================================================================
+Always respect these system-wide rules when implementing anything.
+
+1. ROLES (4 fixed roles)
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+   Each role has its own:
+   - signup or onboarding flow
+   - KYC/verification rules
+   - dashboard
+   - permissions
+   - status flows
+   NEVER mix role access.
+
+2. GLOBAL SERVICES (3 core)
+   SafeGo must always support all three:
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+   This prompt focuses on **drivers in US/NYC**, but you MUST NOT break existing flows for food_orders and deliveries, and you must keep the data models ready to support all three services for the same driver.
+
+3. COUNTRY-SPECIFIC KYC: BD vs US (ALWAYS INCLUDE)
+   SafeGo supports at least:
+   - Bangladesh (BD)
+   - United States (US)
+
+   3.1. BANGLADESH (BD) mandatory KYC fields (do NOT remove/change):
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID_number
+   - NID_front_image_url
+   - NID_back_image_url
+   - emergency_contact_name
+   - emergency_contact_phone
+   - verification_status (pending/approved/rejected)
+   - is_verified (boolean)
+
+   3.2. UNITED STATES (US) mandatory KYC fields (base)
+   - date_of_birth
+   - home_address
+   - emergency_contact_name
+   - emergency_contact_phone
+   - government_id_type (e.g. "state_id", "passport", "driver_license")
+   - government_id_last4
+   - verification_status
+   - is_verified
+
+   3.3. Extra for US DRIVERS (global rule, do not remove):
+   - driver_license_number
+   - driver_license_state
+   - driver_license_expiry
+   - driver_license_image_url
+   - ssn_last4 (optional but supported)
+   - for NYC TLC zone: tlc_license_number, tlc_license_image_urls, tlc_license_expiry
+
+   You MUST keep BD and US KYC completely separate, via `country` and conditional schemas/validation.
+
+4. ADMIN PANEL (MANDATORY CAPABILITIES)
+   Admin must be able to:
+   - verify customers
+   - verify drivers
+   - verify restaurants
+   - approve/reject KYC
+   - see `rejection_reason`
+   - update pricing, fees, commissions
+   - block/unblock any user
+   - manage payouts
+   - view driver negative balance
+   -
