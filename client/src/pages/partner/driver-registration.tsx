@@ -160,7 +160,10 @@ function DriverRegistrationV2() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const typeParam = urlParams.get('type');
+  const vehicleParam = urlParams.get('vehicle');
   const driverType: 'ride' | 'delivery' = typeParam === 'delivery' ? 'delivery' : 'ride';
+  const vehicleType: 'bicycle' | 'motorbike' | null = vehicleParam === 'bicycle' ? 'bicycle' : vehicleParam === 'motorbike' ? 'motorbike' : null;
+  const isBicycleDelivery = driverType === 'delivery' && vehicleType === 'bicycle';
   
   const countryCode = user?.countryCode || "US";
   const isBD = countryCode === "BD";
@@ -169,7 +172,14 @@ function DriverRegistrationV2() {
   const config = getPartnerConfig(partnerType, countryCode);
   const isAvailable = isPartnerAvailable(partnerType, countryCode);
 
-  const STEPS_US = isNycDriver ? [
+  const STEPS_US_BICYCLE_DELIVERY = [
+    { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
+    { id: 2, title: "Government ID", icon: FileText, desc: "ID verification (no license needed)" },
+    { id: 3, title: "Background Check", icon: ClipboardCheck, desc: "Consent & verification" },
+    { id: 4, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
+  ];
+
+  const STEPS_US = isBicycleDelivery ? STEPS_US_BICYCLE_DELIVERY : isNycDriver ? [
     { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
     { id: 2, title: "Driver License", icon: FileText, desc: "License details & images" },
     { id: 3, title: "Vehicle Details", icon: Car, desc: "Vehicle info & documents" },
@@ -1190,6 +1200,224 @@ function DriverRegistrationV2() {
     </Form>
   );
 
+  const renderGovernmentIdOnly = () => (
+    <div className="space-y-6">
+      <Card className="border-green-200 bg-green-50 dark:bg-green-950/30">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <div>
+              <h4 className="font-medium">Simplified Verification</h4>
+              <p className="text-sm text-muted-foreground">
+                As a bicycle delivery driver, no driver's license is required. Just provide your government ID.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="govt-id-type">Government ID Type *</Label>
+            <Select 
+              value={formData.licenseInfo?.governmentIdType || ""} 
+              onValueChange={(value) => setFormData(prev => ({ 
+                ...prev, 
+                licenseInfo: { ...prev.licenseInfo, governmentIdType: value } 
+              }))}
+            >
+              <SelectTrigger id="govt-id-type" data-testid="select-govt-id-type">
+                <SelectValue placeholder="Select ID type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="drivers_license">Driver's License (Optional)</SelectItem>
+                <SelectItem value="state_id">State ID</SelectItem>
+                <SelectItem value="passport">Passport</SelectItem>
+                <SelectItem value="passport_card">Passport Card</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="govt-id-last4">Last 4 Digits of ID *</Label>
+            <Input 
+              id="govt-id-last4"
+              placeholder="XXXX" 
+              maxLength={4}
+              value={formData.licenseInfo?.governmentIdLast4 || ""}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                licenseInfo: { ...prev.licenseInfo, governmentIdLast4: e.target.value } 
+              }))}
+              data-testid="input-govt-id-last4" 
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>ID Front *</Label>
+            <label htmlFor="govt-id-front" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${licenseFrontFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${licenseFrontFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{licenseFrontFile ? licenseFrontFile.name : 'Upload front of ID'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="govt-id-front" onChange={(e) => setLicenseFrontFile(e.target.files?.[0] || null)} data-testid="input-govt-id-front" />
+              </div>
+            </label>
+          </div>
+          <div className="space-y-2">
+            <Label>ID Back *</Label>
+            <label htmlFor="govt-id-back" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${licenseBackFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${licenseBackFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{licenseBackFile ? licenseBackFile.name : 'Upload back of ID'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="govt-id-back" onChange={(e) => setLicenseBackFile(e.target.files?.[0] || null)} data-testid="input-govt-id-back" />
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderReviewUSBicycle = () => (
+    <div className="space-y-4">
+      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <Bike className="h-6 w-6 text-green-600" />
+            <div>
+              <h4 className="font-medium">Bicycle Delivery Driver Application</h4>
+              <p className="text-sm text-muted-foreground">
+                Review your information below before submitting.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Personal Information</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Name:</span>
+            <span>{formData.personalInfo.usaFullLegalName}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Phone:</span>
+            <span>{formData.personalInfo.phone}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Date of Birth:</span>
+            <span>{formData.personalInfo.dateOfBirth}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Address:</span>
+            <span>
+              {formData.personalInfo.usaStreet}
+              {formData.personalInfo.usaAptUnit && `, ${formData.personalInfo.usaAptUnit}`}, 
+              {formData.personalInfo.usaCity}, {formData.personalInfo.usaState} {formData.personalInfo.usaZipCode}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Emergency Contact</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Name:</span>
+            <span>{formData.personalInfo.emergencyContactName}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Phone:</span>
+            <span>{formData.personalInfo.emergencyContactPhone}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Relationship:</span>
+            <span>{formData.personalInfo.emergencyContactRelationship}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Government ID</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">ID Type:</span>
+            <span>{formData.licenseInfo?.governmentIdType?.replace('_', ' ') || 'Not provided'}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Last 4 Digits:</span>
+            <span className="font-mono">****{formData.licenseInfo?.governmentIdLast4 || ''}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">ID Images:</span>
+            <span className="text-green-600 flex items-center gap-1">
+              {licenseFrontFile && licenseBackFile ? (
+                <><CheckCircle2 className="h-4 w-4" /> Uploaded</>
+              ) : 'Pending'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Vehicle & Services</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Vehicle Type:</span>
+            <span className="flex items-center gap-1">
+              <Bike className="h-4 w-4 text-green-600" /> Bicycle
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Services:</span>
+            <span>Food Delivery, Parcel Delivery</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Background Check Consent</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="flex items-center gap-2">
+            {formData.backgroundCheckConsent ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span className="text-green-600">Consent provided</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <span className="text-yellow-600">Consent not provided</span>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200">
+        <CardContent className="p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            By submitting this application, you agree to SafeGo's Terms of Service and Partner Agreement.
+            Your application will be reviewed and you'll receive a decision within 24 hours.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderBackgroundCheck = () => (
     <div className="space-y-6">
       <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
@@ -1578,14 +1806,22 @@ function DriverRegistrationV2() {
 
   const renderStepContent = () => {
     if (isUS) {
-      if (currentStep === 1) return renderUSPersonalInfo();
-      if (currentStep === 2) return renderLicenseInfo();
-      if (currentStep === 3) return renderVehicleInfo();
-      if (isNycDriver) {
+      if (isBicycleDelivery) {
+        if (currentStep === 1) return renderUSPersonalInfo();
+        if (currentStep === 2) return renderGovernmentIdOnly();
+        if (currentStep === 3) return renderBackgroundCheck();
+        if (currentStep === 4) return renderReviewUSBicycle();
+      } else if (isNycDriver) {
+        if (currentStep === 1) return renderUSPersonalInfo();
+        if (currentStep === 2) return renderLicenseInfo();
+        if (currentStep === 3) return renderVehicleInfo();
         if (currentStep === 4) return renderNycCompliance();
         if (currentStep === 5) return renderBackgroundCheck();
         if (currentStep === 6) return renderReviewUS();
       } else {
+        if (currentStep === 1) return renderUSPersonalInfo();
+        if (currentStep === 2) return renderLicenseInfo();
+        if (currentStep === 3) return renderVehicleInfo();
         if (currentStep === 4) return renderBackgroundCheck();
         if (currentStep === 5) return renderReviewUS();
       }

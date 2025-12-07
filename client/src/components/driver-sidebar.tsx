@@ -61,6 +61,8 @@ interface MenuItem {
   href: string;
   isNew?: boolean;
   isPro?: boolean;
+  rideOnly?: boolean;
+  deliveryOnly?: boolean;
 }
 
 interface MenuSection {
@@ -81,12 +83,14 @@ const menuSections: MenuSection[] = [
         title: "Active Trip",
         icon: Navigation,
         href: "/driver/trip/active",
+        rideOnly: true,
       },
       {
         title: "Food Deliveries",
         icon: UtensilsCrossed,
         href: "/driver/food-deliveries",
         isNew: true,
+        deliveryOnly: true,
       },
       {
         title: "Map",
@@ -97,6 +101,13 @@ const menuSections: MenuSection[] = [
         title: "Trip History",
         icon: History,
         href: "/driver/trips",
+        rideOnly: true,
+      },
+      {
+        title: "Delivery History",
+        icon: History,
+        href: "/driver/food-deliveries",
+        deliveryOnly: true,
       },
       {
         title: "Wallet",
@@ -227,6 +238,18 @@ export function DriverSidebar() {
   const countryCode = profile?.countryCode || 'US';
   const rating = Number(stats?.rating || 4.8);
 
+  const canRide = profile?.canRide !== false;
+  const canFoodDelivery = profile?.canFoodDelivery === true;
+  const canParcelDelivery = profile?.canParcelDelivery === true;
+  const isDeliveryOnly = !canRide && (canFoodDelivery || canParcelDelivery);
+  const isRideOnly = canRide && !canFoodDelivery && !canParcelDelivery;
+
+  const filterMenuItem = (item: MenuItem): boolean => {
+    if (item.rideOnly && isDeliveryOnly) return false;
+    if (item.deliveryOnly && isRideOnly) return false;
+    return true;
+  };
+
   const isActive = (href: string) => {
     if (href === '/driver/account') {
       return location === href || 
@@ -278,10 +301,10 @@ export function DriverSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {section.items.map((item) => {
+                {section.items.filter(filterMenuItem).map((item) => {
                   const active = isActive(item.href);
                   return (
-                    <SidebarMenuItem key={item.href}>
+                    <SidebarMenuItem key={`${item.title}-${item.href}`}>
                       <SidebarMenuButton 
                         asChild 
                         isActive={active} 
