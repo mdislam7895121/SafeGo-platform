@@ -77,6 +77,7 @@ const nestedDriverRegistrationSchema = z.object({
     dmvInspectionExpiry: z.string().optional(),
     dmvInspectionImageUrl: z.string().optional(),
   }).optional(),
+  backgroundCheckConsent: z.boolean().optional(),
 });
 
 function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSchema>, countryCode: string): { valid: boolean; errors: string[]; requiresNycCompliance: boolean } {
@@ -159,6 +160,10 @@ function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSc
       if (!nycCompliance?.dmvInspectionImageUrl) {
         errors.push('DMV inspection document is required for NYC drivers');
       }
+    }
+    
+    if (data.backgroundCheckConsent !== true) {
+      errors.push('Background check consent is required for US drivers');
     }
   }
   

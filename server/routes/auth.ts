@@ -707,4 +707,30 @@ router.get("/validate", authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/auth/feature-flags
+// Public endpoint to get enabled feature flags
+// Used by frontend to conditionally render UI based on feature flags
+// ====================================================
+router.get("/feature-flags", async (req, res) => {
+  try {
+    const flags = await prisma.featureFlag.findMany({
+      where: { isEnabled: true },
+      select: {
+        key: true,
+        isEnabled: true,
+        category: true,
+        countryScope: true,
+        roleScope: true,
+        serviceScope: true,
+        rolloutPercentage: true,
+      },
+    });
+    res.json(flags);
+  } catch (error) {
+    console.error("Error fetching public feature flags:", error);
+    res.status(500).json({ error: "Failed to fetch feature flags" });
+  }
+});
+
 export default router;

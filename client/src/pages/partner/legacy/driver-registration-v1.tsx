@@ -8,7 +8,7 @@ import { z } from "zod";
 import { 
   Car, Bike, ArrowLeft, ArrowRight, CheckCircle2, 
   Loader2, User, FileText, ShieldCheck,
-  Upload, AlertCircle, MapPin, Building2, ClipboardCheck
+  Upload, AlertCircle, MapPin, Building2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isPartnerAvailable, getPartnerConfig, type PartnerType } from "@shared/partnerAvailability";
-import { useFeatureFlags, FEATURE_FLAGS } from "@/hooks/useFeatureFlags";
-import DriverRegistrationV1 from "./legacy/driver-registration-v1";
 
 const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
 
@@ -120,7 +117,6 @@ interface RegistrationData {
   vehicleInfo: Partial<VehicleInfoData>;
   nycCompliance: Partial<NycComplianceData>;
   documents: { nidNumber?: string };
-  backgroundCheckConsent?: boolean;
 }
 
 function isNycBorough(city: string | undefined): boolean {
@@ -130,24 +126,6 @@ function isNycBorough(city: string | undefined): boolean {
 }
 
 export default function DriverRegistration() {
-  const { isEnabled: isV2Enabled, isLoading: flagLoading } = useFeatureFlags(FEATURE_FLAGS.DRIVER_ONBOARDING_V2);
-  
-  if (flagLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  if (!isV2Enabled) {
-    return <DriverRegistrationV1 />;
-  }
-  
-  return <DriverRegistrationV2 />;
-}
-
-function DriverRegistrationV2() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -188,14 +166,12 @@ function DriverRegistrationV2() {
     { id: 2, title: "Driver License", icon: FileText, desc: "License details & images" },
     { id: 3, title: "Vehicle Details", icon: Car, desc: "Vehicle info & documents" },
     { id: 4, title: "NYC Compliance", icon: Building2, desc: "TLC, FHV, DMV inspection" },
-    { id: 5, title: "Background Check", icon: ClipboardCheck, desc: "Consent & verification" },
-    { id: 6, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
+    { id: 5, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
   ] : [
     { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
     { id: 2, title: "Driver License", icon: FileText, desc: "License details & images" },
     { id: 3, title: "Vehicle Details", icon: Car, desc: "Vehicle info & documents" },
-    { id: 4, title: "Background Check", icon: ClipboardCheck, desc: "Consent & verification" },
-    { id: 5, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
+    { id: 4, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
   ];
 
   const STEPS_BD = [
@@ -306,8 +282,6 @@ function DriverRegistrationV2() {
   });
 
   const [nidNumber, setNidNumber] = useState("");
-  const [backgroundCheckConsent, setBackgroundCheckConsent] = useState(false);
-  const { driverOnboardingV2 } = useFeatureFlags();
 
   if (!user) {
     return <Redirect to={`/login?returnTo=/partner/${driverType === 'ride' ? 'ride' : 'delivery'}/start`} />;
@@ -430,17 +404,6 @@ function DriverRegistrationV2() {
           }
           setFormData(prev => ({ ...prev, nycCompliance: nycForm.getValues() }));
         }
-      } else if ((currentStep === 5 && isNycDriver) || (currentStep === 4 && !isNycDriver)) {
-        if (!backgroundCheckConsent) {
-          toast({
-            title: "Consent Required",
-            description: "You must consent to a background check to continue.",
-            variant: "destructive",
-          });
-          return;
-        }
-        isValid = true;
-        setFormData(prev => ({ ...prev, backgroundCheckConsent: true }));
       }
     } else {
       if (currentStep === 1) {
@@ -524,7 +487,6 @@ function DriverRegistrationV2() {
         dmvInspectionExpiry: formData.nycCompliance.dmvInspectionExpiry,
         dmvInspectionImageUrl: "pending_upload",
       } : undefined,
-      backgroundCheckConsent: formData.backgroundCheckConsent,
     } : {
       driverType,
       countryCode,
@@ -1219,89 +1181,6 @@ function DriverRegistrationV2() {
     </Form>
   );
 
-  const renderBackgroundCheck = () => (
-    <div className="space-y-6">
-      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <ClipboardCheck className="h-8 w-8 text-blue-600 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Background Check Required</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                To ensure the safety of our riders and community, all SafeGo drivers must undergo a background check. 
-                This includes verification of your driving record, criminal history, and identity.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <h4 className="font-semibold">What the background check includes:</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span>Motor Vehicle Records (MVR) - driving history, license status, violations</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span>Criminal Background - federal, state, and county records</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span>National Sex Offender Registry check</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span>Identity Verification - SSN trace and address history</span>
-            </li>
-            {isNycDriver && (
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                <span>NYC TLC license verification and compliance check</span>
-              </li>
-            )}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start space-x-3">
-            <Checkbox
-              id="background-check-consent"
-              checked={backgroundCheckConsent}
-              onCheckedChange={(checked) => setBackgroundCheckConsent(checked as boolean)}
-              data-testid="checkbox-background-consent"
-            />
-            <div className="grid gap-1.5 leading-none">
-              <label
-                htmlFor="background-check-consent"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                I consent to a background check
-              </label>
-              <p className="text-xs text-muted-foreground">
-                By checking this box, I authorize SafeGo and its third-party partners to conduct a background check 
-                as part of my driver application. I understand that I may be disqualified based on the results.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {!backgroundCheckConsent && (
-        <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 rounded-lg">
-          <AlertCircle className="h-4 w-4 text-yellow-600" />
-          <p className="text-sm text-yellow-700 dark:text-yellow-400">
-            You must consent to the background check to continue with your application.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-
   const renderBDPersonalInfo = () => (
     <Form {...personalFormBD}>
       <form className="space-y-4">
@@ -1613,11 +1492,9 @@ function DriverRegistrationV2() {
       if (currentStep === 3) return renderVehicleInfo();
       if (isNycDriver) {
         if (currentStep === 4) return renderNycCompliance();
-        if (currentStep === 5) return renderBackgroundCheck();
-        if (currentStep === 6) return renderReviewUS();
-      } else {
-        if (currentStep === 4) return renderBackgroundCheck();
         if (currentStep === 5) return renderReviewUS();
+      } else {
+        if (currentStep === 4) return renderReviewUS();
       }
     } else {
       if (currentStep === 1) return renderBDPersonalInfo();
