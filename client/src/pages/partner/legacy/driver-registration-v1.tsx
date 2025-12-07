@@ -282,19 +282,24 @@ export default function DriverRegistration() {
   });
 
   const [nidNumber, setNidNumber] = useState("");
+  const [hasResetLicenseForm, setHasResetLicenseForm] = useState(false);
 
   useEffect(() => {
-    if (currentStep === 2 && isUS) {
+    if (currentStep === 2 && isUS && !hasResetLicenseForm) {
       const timer = setTimeout(() => {
         licenseForm.reset({
           driverLicenseNumber: "",
           driverLicenseState: "",
           driverLicenseExpiry: "",
         });
+        setHasResetLicenseForm(true);
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [currentStep, isUS]);
+    if (currentStep !== 2) {
+      setHasResetLicenseForm(false);
+    }
+  }, [currentStep, isUS, hasResetLicenseForm]);
 
   if (!user) {
     return <Redirect to={`/login?returnTo=/partner/${driverType === 'ride' ? 'ride' : 'delivery'}/start`} />;

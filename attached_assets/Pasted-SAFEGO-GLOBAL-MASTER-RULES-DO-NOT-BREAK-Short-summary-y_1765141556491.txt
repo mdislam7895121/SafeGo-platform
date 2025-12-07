@@ -1,0 +1,98 @@
+SAFEGO GLOBAL MASTER RULES – DO NOT BREAK
+
+(Short summary, you must preserve all existing behavior.)
+
+A) Roles (4 roles)
+1. customer
+2. driver
+3. restaurant (merchant)
+4. admin
+
+Each role has its own signup/onboarding, KYC, dashboard, permissions, status flows.
+Public signup is CUSTOMER ONLY; drivers/restaurants/admins onboard after login.
+Do not mix role access.
+
+B) Services (3 services)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+Driver onboarding changes must NOT break any ride/food/parcel flows.
+
+C) Country-specific KYC
+- BD driver KYC: father_name, date_of_birth, present_address, permanent_address, NID (number + images), emergency contact, verification_status, is_verified.
+- US KYC: date_of_birth, home_address, emergency contacts, government_id_type, government_id_last4, verification_status, is_verified.
+- US drivers EXTRA: driver_license_number/state/expiry, license front/back images, optional ssn_last4, TLC fields for NYC zone.
+
+Do NOT rename/remove any of these fields.
+
+D) Admin panel
+Admin must still verify users, approve/reject KYC, see rejection_reason, manage pricing/fees/commissions, block/unblock, manage payouts, view negative balances.
+
+E) Collections
+Keep rides, food_orders, deliveries collections with identity, addresses+geo, fees+commission, payments, timestamps, rating+feedback.
+
+F) Commission & payouts
+- Cash ride → driver keeps cash, commission → negative driver_wallet_balance.
+- Cash food → restaurant keeps cash, commission → negative restaurant_wallet.
+- Online payments → SafeGo keeps commission automatically.
+- Admin can settle & mark paid.
+
+G) Security
+No cross-role KYC visibility, only admin can change pricing/commission/verification/blocking, users edit only their own profile.
+
+H) Status flows
+Keep full status flows for rides/food/deliveries unchanged.
+
+I) Onboarding
+Customer signup simple; partners onboard after login with multi-step flow and verification_status="pending" until approved.
+
+J) Notifications
+Keep all existing notifications (rides, orders, parcels, KYC decisions, admin messages).
+
+All changes must be additive and NON-BREAKING.
+
+====================================================
+NOW: DRIVER LICENSE INPUTS ARE EMPTY BUT NOT TYPABLE
+====================================================
+
+Current behavior at `/partner/driver/register?type=ride` (US driver onboarding):
+
+- After completing Personal Information and clicking Next:
+  - Driver License fields now start EMPTY (good).
+  - However, on the Driver License step:
+    - I can focus the "Driver License Number" field, but typing on the keyboard does NOTHING.
+    - The value does not change at all.
+- This happens on desktop and mobile.
+
+So the bug now is:
+> The inputs render but are effectively READ-ONLY / not bound to form state properly.
+
+You must now debug and fix the input bindings at the component level for the V2 driver onboarding form (and mirror the fix to V1 if necessary).
+
+====================================================
+1. DEBUG THE V2 DRIVER LICENSE INPUT COMPONENT
+====================================================
+
+1.1 Open the V2 Driver License step component used for `/partner/driver/register?type=ride` when `driver_onboarding_v2` is true.
+
+Look specifically at the JSX that renders:
+
+- Driver License Number
+- License Issuing State
+- License Expiration Date
+
+1.2 Confirm how you are integrating with React Hook Form (or your form library):
+
+For example, with Controller:
+
+```tsx
+<Controller
+  name="driver_license_number"
+  control={control}
+  render={({ field }) => (
+    <Input
+      {...field}
+      /* DO NOT override value/onChange below without using field */
+    />
+  )}
+/>
