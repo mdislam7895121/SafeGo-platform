@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, Link, Redirect } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { 
@@ -775,72 +775,74 @@ function DriverRegistrationV2() {
   );
 
   const renderLicenseInfo = () => (
-    <Form {...licenseForm}>
-      <form className="space-y-6" onSubmit={(e) => e.preventDefault()} autoComplete="off">
-        <FormField
-          control={licenseForm.control}
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="license-number-field">Driver License Number *</Label>
+        <Controller
           name="driverLicenseNumber"
+          control={licenseForm.control}
           render={({ field }) => (
-            <FormItem>
-              <FormLabel htmlFor="license-number-field">Driver License Number *</FormLabel>
-              <FormControl>
-                <Input
-                  id="license-number-field"
-                  type="text"
-                  placeholder="Enter your license number"
-                  autoComplete="off"
-                  data-testid="input-license-number"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+            <input
+              type="text"
+              id="license-number-field"
+              placeholder="Enter your license number"
+              autoComplete="off"
+              data-testid="input-license-number"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              {...field}
+            />
           )}
         />
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField
-            control={licenseForm.control}
+        {licenseForm.formState.errors.driverLicenseNumber && (
+          <p className="text-sm text-destructive">{licenseForm.formState.errors.driverLicenseNumber.message}</p>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="license-state-field">License Issuing State *</Label>
+          <Controller
             name="driverLicenseState"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel htmlFor="license-state-field">License Issuing State *</FormLabel>
-                <FormControl>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <SelectTrigger id="license-state-field" data-testid="select-license-state">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {US_STATES.map(state => (
-                        <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
             control={licenseForm.control}
-            name="driverLicenseExpiry"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel htmlFor="license-expiry-field">License Expiration Date *</FormLabel>
-                <FormControl>
-                  <Input
-                    id="license-expiry-field"
-                    type="date"
-                    autoComplete="off"
-                    data-testid="input-license-expiry"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+              <select
+                id="license-state-field"
+                data-testid="select-license-state"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                {...field}
+              >
+                <option value="">Select state</option>
+                {US_STATES.map(state => (
+                  <option key={state.code} value={state.code}>{state.name}</option>
+                ))}
+              </select>
             )}
           />
+          {licenseForm.formState.errors.driverLicenseState && (
+            <p className="text-sm text-destructive">{licenseForm.formState.errors.driverLicenseState.message}</p>
+          )}
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="license-expiry-field">License Expiration Date *</Label>
+          <Controller
+            name="driverLicenseExpiry"
+            control={licenseForm.control}
+            render={({ field }) => (
+              <input
+                type="date"
+                id="license-expiry-field"
+                autoComplete="off"
+                data-testid="input-license-expiry"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                {...field}
+              />
+            )}
+          />
+          {licenseForm.formState.errors.driverLicenseExpiry && (
+            <p className="text-sm text-destructive">{licenseForm.formState.errors.driverLicenseExpiry.message}</p>
+          )}
+        </div>
+      </div>
 
         <div className="border-t pt-6">
           <h4 className="font-semibold mb-4">Driver License Images *</h4>
@@ -886,8 +888,7 @@ function DriverRegistrationV2() {
             </div>
           </div>
         </div>
-      </form>
-    </Form>
+    </div>
   );
 
   const renderVehicleInfo = () => (
