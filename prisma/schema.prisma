@@ -650,6 +650,16 @@ model DriverProfile {
   usaState                     String?
   usaStreet                    String?
   usaZipCode                   String?
+  usaAptUnit                   String?        // Apartment/Unit number for US address
+  operatingCity                String?        // City where driver operates (for NYC detection)
+  hasNycCompliance             Boolean        @default(false) // Flag for NYC 5-borough drivers
+  driverLicenseFrontUrl        String?        // Driver license front image
+  driverLicenseBackUrl         String?        // Driver license back image
+  driverLicenseState           String?        // State that issued the driver license
+  fhvLicenseNumber             String?        // For-Hire Vehicle (FHV) license number (NYC)
+  fhvDocumentUrl               String?        // FHV document/sticker image (NYC)
+  fhvLicenseStatus             DocumentStatus @default(PENDING) // FHV document status
+  fhvLicenseRejectionReason    String?        // Reason for FHV rejection
   dmvLicenseImageUrl           String?
   dmvLicenseFrontUrl           String?
   dmvLicenseBackUrl            String?

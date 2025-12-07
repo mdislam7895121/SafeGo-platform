@@ -1908,6 +1908,18 @@ router.get("/drivers/:id", checkPermission(Permission.VIEW_USER), async (req: Au
         tlcLicenseBackUrl: driver.tlcLicenseBackUrl,
         tlcLicenseExpiry: driver.tlcLicenseExpiry,
         tlcLicenseNumber: driver.tlcLicenseNumber,
+        // FHV License (NYC drivers only)
+        fhvLicenseNumber: driver.fhvLicenseNumber,
+        fhvDocumentUrl: driver.fhvDocumentUrl,
+        // NYC Compliance flags
+        hasNycCompliance: driver.hasNycCompliance,
+        operatingCity: driver.operatingCity,
+        // USA Additional fields
+        usaAptUnit: driver.usaAptUnit,
+        driverLicenseState: driver.driverLicenseState,
+        driverLicenseFrontUrl: driver.driverLicenseFrontUrl,
+        driverLicenseBackUrl: driver.driverLicenseBackUrl,
+        emergencyContactRelationship: driver.emergencyContactRelationship,
         backgroundCheckStatus: driver.backgroundCheckStatus,
         backgroundCheckDate: driver.backgroundCheckDate,
         // Legacy US fields (deprecated but kept for backward compatibility)

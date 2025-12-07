@@ -1,0 +1,339 @@
+You are working on SafeGo global – update the USA Driver onboarding & KYC for normal US vs New York City (5 boroughs) drivers.
+
+You MUST follow ALL SafeGo master rules.
+All changes must be additive and non-breaking.
+
+====================================================
+A) SAFEGO MASTER RULES (DO NOT BREAK)
+====================================================
+
+1) Fixed Roles (4 only)
+- customer
+- driver
+- restaurant (merchant)
+- admin
+
+Each role has its own:
+- signup/onboarding flow
+- KYC/verification
+- dashboard
+- permissions
+- status flows
+
+No role mixing. Customers do customer things, drivers do driver things, restaurants do restaurant things, admins do control panel work.
+
+2) 3 Core Services (must always exist)
+- ride-hailing
+- food delivery
+- parcel delivery
+
+3) Country-Specific KYC (BD vs US)
+
+Bangladesh (BD) KYC – must remain unchanged:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number + front/back images
+- emergency contact details
+- verification_status, is_verified
+
+United States (US) KYC – this task extends this part only:
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- drivers: driver_license (number + image + expiry)
+- drivers: ssn_last4 (optional, DO NOT store full SSN)
+- verification_status, is_verified
+
+For US New York City drivers we will add extra fields but still keep these base requirements.
+
+4) Admin Panel (must keep working)
+Admin can:
+- verify customers / drivers / restaurants
+- approve/reject KYC with rejection_reason
+- change pricing, fees, commissions
+- block/unblock
+- manage payouts & negative balances
+
+Do not break any of this.
+
+5) Collections (DO NOT change schemas)
+- rides
+- food_orders
+- deliveries
+
+Each already has:
+- identity fields (customer_id, driver_id, restaurant_id)
+- addresses + geolocation
+- fees + commission
+- payment details
+- timestamps
+- ratings & feedback
+
+We do NOT modify these in this task.
+
+6) Commission & Payout Rules (US still has no cash)
+- Cash ride: driver keeps cash; commission becomes negative driver_wallet_balance; weekly settlement.
+- Cash food: restaurant keeps cash; commission → negative restaurant_wallet.
+- Online: SafeGo keeps commission automatically.
+
+For USA: do NOT introduce any new "cash" option. Keep existing behavior.
+
+7) Security Rules
+- Customers cannot see driver documents (license, TLC, SSN, etc.).
+- Drivers cannot see customer KYC or NID/SSN.
+- Restaurant cannot see other restaurants.
+- Only admin can change pricing, commission, verification, blocking.
+- Users can only update their own profile.
+
+8) Status Flows (do not rename)
+Rides:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+
+Food:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+
+Parcel:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+9) Onboarding General Rule
+- Public signup is customer-only.
+- Partner roles (driver, delivery, restaurant, shop, ticket, rentals) are created later via onboarding after login.
+- verification_status starts as "pending".
+- Access is blocked until admin approves.
+
+10) Notifications
+Keep all existing notifications (KYC decisions, rides, orders, etc.) intact.
+
+====================================================
+B) TASK – UPGRADE USA DRIVER ONBOARDING (WITH NYC SPECIAL RULES)
+====================================================
+
+We need a proper KYC flow for:
+- USA drivers in general (all states)
+- New York City drivers (5 boroughs: Manhattan, Brooklyn, Queens, Bronx, Staten Island) with extra TLC/FHV docs
+
+The user already described the requirements:
+
+COMMON US DRIVER PERSONAL data should include:
+- full legal name (already in profile but must be visible)
+- phone number
+- date of birth
+- structured US home address
+- emergency contact name
+- emergency contact phone
+- emergency contact relationship
+- ssn_last4 (optional, never full SSN)
+
+COMMON US DRIVER DOCUMENTS should include:
+- driver_license_number
+- driver_license_state
+- driver_license_expiry_date
+- driver_license_front_image
+- driver_license_back_image
+
+COMMON VEHICLE DOCUMENTS (all US):
+- vehicle make/model/year
+- vehicle type (car, SUV, etc.)
+- plate_number
+- vehicle_registration_image (front, or full document)
+- vehicle_insurance_image
+- optional: additional vehicle notes
+
+NEW YORK CITY SPECIFIC EXTRA DOCUMENTS (only if the driver's operating city is in NYC 5 boroughs):
+- TLC license number
+- TLC license front image
+- TLC license back image
+- FHV (For-Hire Vehicle) license / sticker:
+  - FHV_number or barcode (text field)
+  - FHV document / sticker image
+- DMV inspection document:
+  - inspection date
+  - inspection expiry date
+  - inspection paper/photo
+- Any extra NYC requirement field should be grouped under "NYC Compliance".
+
+====================================================
+C) IMPLEMENTATION – FLOW STRUCTURE
+====================================================
+
+The driver onboarding wizard for US drivers should have at least these steps:
+
+Step 1 – Personal Information (US Driver)
+Step 2 – Driver License
+Step 3 – Vehicle Details
+Step 4 – NYC Compliance (only for NYC 5 boroughs drivers)
+Step 5 – Review & Submit
+
+You should reuse existing steps/screens where possible and only ADD missing fields.
+
+----------------------------------------------------
+Step 1 – Personal Information (US Driver)
+----------------------------------------------------
+Fields (many already exist; just ensure they are correctly wired):
+
+- Full Name (read-only from profile, or editable with sync)
+- Phone Number (prefilled from customer profile)
+- Date of Birth (prefilled from customer profile)
+- Home Address:
+   - Street Address (line 1)
+   - Apt/Unit (optional)
+   - City
+   - State (US state dropdown)
+   - ZIP code
+- Emergency Contact:
+   - emergency_contact_name (required)
+   - emergency_contact_phone (required)
+   - emergency_contact_relationship (required: e.g., Spouse/Parent/Sibling/Friend/Other)
+- SSN last 4 digits:
+   - ssn_last4 (optional – input mask, max 4 digits)
+   - IMPORTANT: never store full SSN.
+
+Validation:
+- All required fields must be filled.
+- US address must be valid format.
+- ssn_last4 must be exactly 4 digits if provided.
+
+----------------------------------------------------
+Step 2 – Driver License (US)
+----------------------------------------------------
+Fields (some may already exist):
+
+- driver_license_number (required)
+- driver_license_state (dropdown)
+- driver_license_expiry_date (required, must be future)
+- driver_license_front_image (required upload)
+- driver_license_back_image (required upload)
+
+Data is stored under driver_kyc for US.
+
+----------------------------------------------------
+Step 3 – Vehicle Details (All US)
+----------------------------------------------------
+Fields:
+
+- vehicle_type (car, SUV, etc.)
+- make
+- model
+- year
+- color
+- plate_number (required)
+- vehicle_registration_image (required)
+- vehicle_insurance_image (required)
+
+For all US states, including New York.  
+This implements your requirement: “পুরো আমেরিকার গাড়ির রেজিস্ট্রেশনের ছবি, ইন্সুরেন্স ছবি, প্লেটের নাম্বার”.
+
+----------------------------------------------------
+Step 4 – NYC Compliance (Only for NYC 5 Boroughs)
+----------------------------------------------------
+
+Trigger:
+- This step appears only if:
+   - driver_country == "US"
+   - AND driver_state == "NY"
+   - AND driver_city (or operating_region) is within:
+     ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
+
+Fields:
+
+TLC License:
+- tlc_license_number (required for NYC)
+- tlc_license_front_image (required)
+- tlc_license_back_image (required)
+
+FHV License / Barcode:
+- fhv_license_number_or_barcode (required)
+- fhv_document_image (required)
+
+DMV Inspection:
+- dmv_inspection_date (required)
+- dmv_inspection_expiry (required)
+- dmv_inspection_document_image (required)
+
+These satisfy:  
+“নিউর্য়র্কের পাঁচ borough এর মধ্যে extra TLC license front & back, গাড়ি document, FHV barcode সহ insurance, registration, DMV inspection, plate number.”
+
+For other US cities/states, this step is skipped and not required.
+
+----------------------------------------------------
+Step 5 – Review & Submit
+----------------------------------------------------
+- Show a summary of all the above fields.
+- Make sure submission is allowed for any authenticated customer.
+- Create a driver onboarding record:
+  - role: "driver"
+  - country: "US"
+  - city/state
+  - has_nyc_compliance: true/false
+  - status: "pending_review"
+
+====================================================
+D) PERMISSIONS (IMPORTANT – FIX 403 ISSUE)
+====================================================
+
+- Any authenticated customer must be allowed to SUBMIT their own driver onboarding.
+- API route: POST /partner/driver/register (or equivalent) must allow:
+   roles: ["customer"] for submission.
+
+- Admin users keep permissions to:
+   - approve / reject driver onboarding,
+   - change verification_status,
+   - add rejection_reason.
+
+So:
+- Submission → allowed for customer (no more 403 "Insufficient permissions").
+- Approval/rejection → admin only.
+
+====================================================
+E) ADMIN KYC VIEW FOR US / NYC DRIVERS
+====================================================
+
+In the Admin People & KYC Center, extend driver card detail:
+
+- Show whether driver is:
+   - "US Driver"
+   - "US Driver – NYC (TLC/FHV)"
+
+- Show all uploaded documents grouped:
+   - Personal Info (name, DOB, address, emergency contact)
+   - License
+   - Vehicle
+   - NYC Compliance (TLC, FHV, DMV inspection)
+
+Admin can:
+- approve or reject each application,
+- provide rejection_reason related to missing docs.
+
+Customers/drivers must never see others' documents.
+
+====================================================
+F) NON-BREAKING REQUIREMENTS
+====================================================
+
+- Do NOT rename or remove existing fields in the database.
+- Add new fields only where needed (e.g., emergency_contact_relationship, tlc_license_number, etc.).
+- Do NOT modify rides/food_orders/deliveries schemas.
+- Do NOT change commission or payout logic.
+- Do NOT add cash options for USA.
+
+Only extend:
+- driver onboarding models,
+- US driver KYC schemas,
+- UI forms and validation rules.
+
+====================================================
+DELIVERABLE
+====================================================
+
+1) A complete USA Driver onboarding flow with:
+   - Proper personal info step,
+   - License + vehicle document steps,
+   - Extra NYC TLC/FHV/DMV inspection step only for the 5 boroughs.
+
+2) Customers can submit driver applications without 403 errors.
+
+3) Admins see all US/NYC-specific documents in People & KYC Center and can approve/reject according to SafeGo rules.

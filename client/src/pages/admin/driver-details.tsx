@@ -88,6 +88,15 @@ interface DriverDetails {
   tlcLicenseBackUrl?: string;
   tlcLicenseExpiry?: string;
   tlcLicenseNumber?: string;
+  fhvLicenseNumber?: string;
+  fhvDocumentUrl?: string;
+  hasNycCompliance?: boolean;
+  operatingCity?: string;
+  usaAptUnit?: string;
+  driverLicenseState?: string;
+  driverLicenseFrontUrl?: string;
+  driverLicenseBackUrl?: string;
+  emergencyContactRelationship?: string;
   usaStreet?: string;
   usaCity?: string;
   usaState?: string;
@@ -1669,6 +1678,50 @@ export default function AdminDriverDetails() {
                             <p className="text-xs text-muted-foreground mb-1">TLC License Number</p>
                             <p className="text-sm font-mono" data-testid="text-tlc-number">{driver.tlcLicenseNumber}</p>
                           </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FHV License Section (NYC Only) */}
+                  {(driver.fhvLicenseNumber || driver.fhvDocumentUrl) && (
+                    <div className="mt-6 pt-6 border-t space-y-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">FHV (For-Hire Vehicle) License</p>
+                        <Badge variant="secondary" className="text-xs">NYC</Badge>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {driver.fhvLicenseNumber && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">FHV License Number</p>
+                            <p className="text-sm font-mono" data-testid="text-fhv-number">{driver.fhvLicenseNumber}</p>
+                          </div>
+                        )}
+                        {driver.fhvDocumentUrl && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">FHV Document/Sticker</p>
+                            <a
+                              href={driver.fhvDocumentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:underline"
+                              data-testid="link-fhv-doc"
+                            >
+                              View Document
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* NYC Compliance Badge */}
+                  {driver.hasNycCompliance && (
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="default" className="bg-blue-600">NYC TLC/FHV Compliant</Badge>
+                        {driver.operatingCity && (
+                          <span className="text-sm text-blue-700 dark:text-blue-300">Operating in: {driver.operatingCity}</span>
                         )}
                       </div>
                     </div>

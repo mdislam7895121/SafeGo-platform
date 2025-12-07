@@ -5,17 +5,41 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
+  'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT',
+  'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+];
+
+function isNycBorough(city: string | undefined): boolean {
+  if (!city) return false;
+  const normalizedCity = city.trim().toLowerCase();
+  return NYC_BOROUGHS.some(borough => normalizedCity.includes(borough.toLowerCase()));
+}
+
 const nestedDriverRegistrationSchema = z.object({
   driverType: z.enum(['ride', 'delivery']).default('ride'),
+  countryCode: z.string().default('US'),
   personalInfo: z.object({
     phone: z.string().min(10, 'Phone number is required'),
     dateOfBirth: z.string().min(1, 'Date of birth is required'),
     emergencyContactName: z.string().min(2, 'Emergency contact name required'),
     emergencyContactPhone: z.string().min(10, 'Emergency contact phone required'),
+    emergencyContactRelationship: z.string().optional(),
     fatherName: z.string().optional(),
     presentAddress: z.string().optional(),
     permanentAddress: z.string().optional(),
     homeAddress: z.string().optional(),
+    usaFullLegalName: z.string().optional(),
+    usaStreet: z.string().optional(),
+    usaAptUnit: z.string().optional(),
+    usaCity: z.string().optional(),
+    usaState: z.string().optional(),
+    usaZipCode: z.string().optional(),
+    ssnLast4: z.string().max(4).optional(),
   }),
   vehicleInfo: z.object({
     vehicleType: z.string().min(1, 'Vehicle type required'),
@@ -24,23 +48,46 @@ const nestedDriverRegistrationSchema = z.object({
     vehicleYear: z.string().optional(),
     vehicleMake: z.string().optional(),
     vehicleColor: z.string().optional(),
+    registrationDocumentUrl: z.string().optional(),
+    insuranceDocumentUrl: z.string().optional(),
+    insurancePolicyNumber: z.string().optional(),
   }),
   documents: z.object({
     nidNumber: z.string().optional(),
     driverLicenseNumber: z.string().optional(),
     driverLicenseExpiry: z.string().optional(),
+    driverLicenseState: z.string().optional(),
+    driverLicenseFrontUrl: z.string().optional(),
+    driverLicenseBackUrl: z.string().optional(),
     governmentIdType: z.string().optional(),
     governmentIdLast4: z.string().optional(),
-    ssnLast4: z.string().optional(),
+    ssnLast4: z.string().max(4).optional(),
     nidFrontImageUrl: z.string().optional(),
     nidBackImageUrl: z.string().optional(),
     licenseImageUrl: z.string().optional(),
   }),
+  nycCompliance: z.object({
+    tlcLicenseNumber: z.string().optional(),
+    tlcLicenseFrontUrl: z.string().optional(),
+    tlcLicenseBackUrl: z.string().optional(),
+    tlcLicenseExpiry: z.string().optional(),
+    fhvLicenseNumber: z.string().optional(),
+    fhvDocumentUrl: z.string().optional(),
+    dmvInspectionDate: z.string().optional(),
+    dmvInspectionExpiry: z.string().optional(),
+    dmvInspectionImageUrl: z.string().optional(),
+  }).optional(),
 });
 
-function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSchema>, countryCode: string): { valid: boolean; errors: string[] } {
+function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSchema>, countryCode: string): { valid: boolean; errors: string[]; requiresNycCompliance: boolean } {
   const errors: string[] = [];
-  const { personalInfo, documents } = data;
+  const { personalInfo, documents, vehicleInfo, nycCompliance } = data;
+  
+  const operatingCity = personalInfo.usaCity;
+  const operatingState = personalInfo.usaState;
+  const requiresNycCompliance = countryCode === 'US' && 
+    operatingState === 'NY' && 
+    isNycBorough(operatingCity);
   
   if (countryCode === 'BD') {
     if (!documents.nidNumber || documents.nidNumber.length < 10) {
@@ -53,15 +100,69 @@ function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSc
       errors.push('Present address is required for Bangladesh drivers');
     }
   } else if (countryCode === 'US') {
+    if (!personalInfo.usaFullLegalName || personalInfo.usaFullLegalName.length < 2) {
+      errors.push('Full legal name is required for US drivers');
+    }
+    if (!personalInfo.usaStreet || personalInfo.usaStreet.length < 5) {
+      errors.push('Street address is required for US drivers');
+    }
+    if (!personalInfo.usaCity || personalInfo.usaCity.length < 2) {
+      errors.push('City is required for US drivers');
+    }
+    if (!personalInfo.usaState || !US_STATES.includes(personalInfo.usaState)) {
+      errors.push('Valid US state is required');
+    }
+    if (!personalInfo.usaZipCode || !/^\d{5}(-\d{4})?$/.test(personalInfo.usaZipCode)) {
+      errors.push('Valid ZIP code is required for US drivers (format: 12345 or 12345-6789)');
+    }
+    if (personalInfo.ssnLast4 && !/^\d{4}$/.test(personalInfo.ssnLast4)) {
+      errors.push('SSN last 4 digits must be exactly 4 digits');
+    }
     if (!documents.driverLicenseNumber || documents.driverLicenseNumber.length < 5) {
       errors.push('Driver license number is required for US drivers');
+    }
+    if (!documents.driverLicenseState || !US_STATES.includes(documents.driverLicenseState)) {
+      errors.push('Driver license state is required');
     }
     if (data.driverType === 'ride' && !documents.driverLicenseExpiry) {
       errors.push('Driver license expiry is required for US ride drivers');
     }
+    if (!vehicleInfo.registrationDocumentUrl) {
+      errors.push('Vehicle registration document is required for US drivers');
+    }
+    if (!vehicleInfo.insuranceDocumentUrl) {
+      errors.push('Vehicle insurance document is required for US drivers');
+    }
+    
+    if (requiresNycCompliance) {
+      if (!nycCompliance?.tlcLicenseNumber || nycCompliance.tlcLicenseNumber.length < 5) {
+        errors.push('TLC license number is required for NYC drivers');
+      }
+      if (!nycCompliance?.tlcLicenseFrontUrl) {
+        errors.push('TLC license front image is required for NYC drivers');
+      }
+      if (!nycCompliance?.tlcLicenseBackUrl) {
+        errors.push('TLC license back image is required for NYC drivers');
+      }
+      if (!nycCompliance?.fhvLicenseNumber) {
+        errors.push('FHV license number is required for NYC drivers');
+      }
+      if (!nycCompliance?.fhvDocumentUrl) {
+        errors.push('FHV document image is required for NYC drivers');
+      }
+      if (!nycCompliance?.dmvInspectionDate) {
+        errors.push('DMV inspection date is required for NYC drivers');
+      }
+      if (!nycCompliance?.dmvInspectionExpiry) {
+        errors.push('DMV inspection expiry date is required for NYC drivers');
+      }
+      if (!nycCompliance?.dmvInspectionImageUrl) {
+        errors.push('DMV inspection document is required for NYC drivers');
+      }
+    }
   }
   
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, requiresNycCompliance };
 }
 
 const restaurantRegistrationSchema = z.object({
@@ -163,12 +264,15 @@ router.get('/driver/registration/status', authenticateToken, async (req: AuthReq
 
     const driverType = (profile as any).driverType || 'ride';
 
+    const isNycDriver = (profile as any).hasNycCompliance || false;
+    
     return res.json({
       profile: {
         id: profile.id,
         driverType,
         verificationStatus: profile.verificationStatus,
         isVerified: profile.isVerified,
+        hasNycCompliance: isNycDriver,
         personalInfo: {
           phone: profile.phoneNumber,
           dateOfBirth: profile.dateOfBirth,
@@ -178,12 +282,34 @@ router.get('/driver/registration/status', authenticateToken, async (req: AuthReq
           homeAddress: profile.homeAddress,
           emergencyContactName: profile.emergencyContactName,
           emergencyContactPhone: profile.emergencyContactPhone,
+          emergencyContactRelationship: profile.emergencyContactRelationship,
+          usaFullLegalName: (profile as any).usaFullLegalName,
+          usaStreet: (profile as any).usaStreet,
+          usaAptUnit: (profile as any).usaAptUnit,
+          usaCity: (profile as any).usaCity,
+          usaState: (profile as any).usaState,
+          usaZipCode: (profile as any).usaZipCode,
+          ssnLast4: profile.ssnLast4,
         },
         documents: {
           nidNumber: profile.nidNumber,
           driverLicenseNumber: profile.driverLicenseNumber,
           driverLicenseExpiry: profile.driverLicenseExpiry,
+          driverLicenseState: (profile as any).driverLicenseState,
+          driverLicenseFrontUrl: (profile as any).driverLicenseFrontUrl,
+          driverLicenseBackUrl: (profile as any).driverLicenseBackUrl,
         },
+        nycCompliance: isNycDriver ? {
+          tlcLicenseNumber: profile.tlcLicenseNumber,
+          tlcLicenseFrontUrl: profile.tlcLicenseFrontUrl,
+          tlcLicenseBackUrl: profile.tlcLicenseBackUrl,
+          tlcLicenseExpiry: profile.tlcLicenseExpiry,
+          fhvLicenseNumber: (profile as any).fhvLicenseNumber,
+          fhvDocumentUrl: (profile as any).fhvDocumentUrl,
+          dmvInspectionDate: vehicle?.dmvInspectionDate,
+          dmvInspectionExpiry: vehicle?.dmvInspectionExpiry,
+          dmvInspectionImageUrl: vehicle?.dmvInspectionImageUrl,
+        } : null,
         vehicleInfo: vehicle ? {
           id: vehicle.id,
           vehicleType: vehicle.vehicleType,
@@ -192,6 +318,9 @@ router.get('/driver/registration/status', authenticateToken, async (req: AuthReq
           vehiclePlate: vehicle.vehiclePlate,
           vehicleColor: vehicle.color,
           vehicleYear: vehicle.year?.toString(),
+          registrationDocumentUrl: vehicle.registrationDocumentUrl,
+          insuranceDocumentUrl: vehicle.insuranceDocumentUrl,
+          insurancePolicyNumber: vehicle.insurancePolicyNumber,
         } : null,
         createdAt: profile.createdAt,
       },
@@ -231,54 +360,60 @@ router.post('/driver/registration/submit', authenticateToken, async (req: AuthRe
       });
     }
 
-    const { personalInfo, vehicleInfo, documents, driverType } = validatedData;
+    const { personalInfo, vehicleInfo, documents, driverType, nycCompliance } = validatedData;
+    const { requiresNycCompliance } = kycValidation;
 
     const result = await prisma.$transaction(async (tx) => {
       let driverProfile = user.driverProfile;
 
+      const profileData = {
+        driverType,
+        phoneNumber: personalInfo.phone,
+        dateOfBirth: new Date(personalInfo.dateOfBirth),
+        emergencyContactName: personalInfo.emergencyContactName,
+        emergencyContactPhone: personalInfo.emergencyContactPhone,
+        emergencyContactRelationship: personalInfo.emergencyContactRelationship || null,
+        fatherName: personalInfo.fatherName || null,
+        presentAddress: personalInfo.presentAddress || null,
+        permanentAddress: personalInfo.permanentAddress || null,
+        homeAddress: personalInfo.homeAddress || null,
+        usaFullLegalName: personalInfo.usaFullLegalName || null,
+        usaStreet: personalInfo.usaStreet || null,
+        usaAptUnit: personalInfo.usaAptUnit || null,
+        usaCity: personalInfo.usaCity || null,
+        usaState: personalInfo.usaState || null,
+        usaZipCode: personalInfo.usaZipCode || null,
+        operatingCity: personalInfo.usaCity || null,
+        ssnLast4: personalInfo.ssnLast4 || documents.ssnLast4 || null,
+        nidNumber: documents.nidNumber || null,
+        driverLicenseNumber: documents.driverLicenseNumber || null,
+        driverLicenseExpiry: documents.driverLicenseExpiry ? new Date(documents.driverLicenseExpiry) : null,
+        driverLicenseState: documents.driverLicenseState || null,
+        driverLicenseFrontUrl: documents.driverLicenseFrontUrl || null,
+        driverLicenseBackUrl: documents.driverLicenseBackUrl || null,
+        governmentIdType: documents.governmentIdType || null,
+        governmentIdLast4: documents.governmentIdLast4 || null,
+        hasNycCompliance: requiresNycCompliance,
+        tlcLicenseNumber: nycCompliance?.tlcLicenseNumber || null,
+        tlcLicenseFrontUrl: nycCompliance?.tlcLicenseFrontUrl || null,
+        tlcLicenseBackUrl: nycCompliance?.tlcLicenseBackUrl || null,
+        tlcLicenseExpiry: nycCompliance?.tlcLicenseExpiry ? new Date(nycCompliance.tlcLicenseExpiry) : null,
+        fhvLicenseNumber: nycCompliance?.fhvLicenseNumber || null,
+        fhvDocumentUrl: nycCompliance?.fhvDocumentUrl || null,
+        verificationStatus: 'pending',
+      };
+
       if (driverProfile) {
         driverProfile = await tx.driverProfile.update({
           where: { id: driverProfile.id },
-          data: {
-            driverType,
-            phoneNumber: personalInfo.phone,
-            dateOfBirth: new Date(personalInfo.dateOfBirth),
-            emergencyContactName: personalInfo.emergencyContactName,
-            emergencyContactPhone: personalInfo.emergencyContactPhone,
-            fatherName: personalInfo.fatherName || null,
-            presentAddress: personalInfo.presentAddress || null,
-            permanentAddress: personalInfo.permanentAddress || null,
-            homeAddress: personalInfo.homeAddress || null,
-            nidNumber: documents.nidNumber || null,
-            driverLicenseNumber: documents.driverLicenseNumber || null,
-            driverLicenseExpiry: documents.driverLicenseExpiry ? new Date(documents.driverLicenseExpiry) : null,
-            ssnLast4: documents.ssnLast4 || null,
-            governmentIdType: documents.governmentIdType || null,
-            governmentIdLast4: documents.governmentIdLast4 || null,
-            verificationStatus: 'pending',
-          },
+          data: profileData,
         });
       } else {
         driverProfile = await tx.driverProfile.create({
           data: {
             id: crypto.randomUUID(),
             userId,
-            driverType,
-            phoneNumber: personalInfo.phone,
-            dateOfBirth: new Date(personalInfo.dateOfBirth),
-            emergencyContactName: personalInfo.emergencyContactName,
-            emergencyContactPhone: personalInfo.emergencyContactPhone,
-            fatherName: personalInfo.fatherName || null,
-            presentAddress: personalInfo.presentAddress || null,
-            permanentAddress: personalInfo.permanentAddress || null,
-            homeAddress: personalInfo.homeAddress || null,
-            nidNumber: documents.nidNumber || null,
-            driverLicenseNumber: documents.driverLicenseNumber || null,
-            driverLicenseExpiry: documents.driverLicenseExpiry ? new Date(documents.driverLicenseExpiry) : null,
-            ssnLast4: documents.ssnLast4 || null,
-            governmentIdType: documents.governmentIdType || null,
-            governmentIdLast4: documents.governmentIdLast4 || null,
-            verificationStatus: 'pending',
+            ...profileData,
             isVerified: false,
           },
         });
@@ -288,29 +423,32 @@ router.post('/driver/registration/submit', authenticateToken, async (req: AuthRe
         where: { driverId: driverProfile.id, isPrimary: true },
       });
 
+      const vehicleData = {
+        vehicleType: vehicleInfo.vehicleType,
+        vehicleModel: vehicleInfo.vehicleModel,
+        vehiclePlate: vehicleInfo.vehiclePlate,
+        make: vehicleInfo.vehicleMake || null,
+        color: vehicleInfo.vehicleColor || null,
+        year: vehicleInfo.vehicleYear ? parseInt(vehicleInfo.vehicleYear) : null,
+        registrationDocumentUrl: vehicleInfo.registrationDocumentUrl || null,
+        insuranceDocumentUrl: vehicleInfo.insuranceDocumentUrl || null,
+        insurancePolicyNumber: vehicleInfo.insurancePolicyNumber || null,
+        dmvInspectionDate: nycCompliance?.dmvInspectionDate ? new Date(nycCompliance.dmvInspectionDate) : null,
+        dmvInspectionExpiry: nycCompliance?.dmvInspectionExpiry ? new Date(nycCompliance.dmvInspectionExpiry) : null,
+        dmvInspectionImageUrl: nycCompliance?.dmvInspectionImageUrl || null,
+      };
+
       if (existingVehicle) {
         await tx.vehicle.update({
           where: { id: existingVehicle.id },
-          data: {
-            vehicleType: vehicleInfo.vehicleType,
-            vehicleModel: vehicleInfo.vehicleModel,
-            vehiclePlate: vehicleInfo.vehiclePlate,
-            make: vehicleInfo.vehicleMake || null,
-            color: vehicleInfo.vehicleColor || null,
-            year: vehicleInfo.vehicleYear ? parseInt(vehicleInfo.vehicleYear) : null,
-          },
+          data: vehicleData,
         });
       } else {
         await tx.vehicle.create({
           data: {
             id: crypto.randomUUID(),
             driverId: driverProfile.id,
-            vehicleType: vehicleInfo.vehicleType,
-            vehicleModel: vehicleInfo.vehicleModel,
-            vehiclePlate: vehicleInfo.vehiclePlate,
-            make: vehicleInfo.vehicleMake || null,
-            color: vehicleInfo.vehicleColor || null,
-            year: vehicleInfo.vehicleYear ? parseInt(vehicleInfo.vehicleYear) : null,
+            ...vehicleData,
             isPrimary: true,
             isActive: true,
             updatedAt: new Date(),
