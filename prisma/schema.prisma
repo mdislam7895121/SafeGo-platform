@@ -603,6 +603,7 @@ model DriverComplaint {
 model DriverProfile {
   id                           String         @id @default(uuid())
   userId                       String         @unique
+  driverType                   String?        // "ride" or "delivery"
   fatherName                   String?
   presentAddress               String?
   permanentAddress             String?
