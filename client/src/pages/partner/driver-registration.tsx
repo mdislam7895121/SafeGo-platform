@@ -648,22 +648,18 @@ function DriverRegistrationV2() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>State *</FormLabel>
-                  <FormControl>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      data-testid="select-state"
-                      value={field.value}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                      ref={field.ref as any}
-                    >
-                      <option value="">Select</option>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-state">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
                       {US_STATES.map(state => (
-                        <option key={state.code} value={state.code}>{state.name}</option>
+                        <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
                       ))}
-                    </select>
-                  </FormControl>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -723,22 +719,18 @@ function DriverRegistrationV2() {
             render={({ field }) => (
               <FormItem className="mt-4">
                 <FormLabel>Relationship *</FormLabel>
-                <FormControl>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    data-testid="select-relationship"
-                    value={field.value}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref as any}
-                  >
-                    <option value="">Select relationship</option>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-relationship">
+                      <SelectValue placeholder="Select relationship" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
                     {EMERGENCY_RELATIONSHIPS.map(rel => (
-                      <option key={rel.value} value={rel.value}>{rel.label}</option>
+                      <SelectItem key={rel.value} value={rel.value}>{rel.label}</SelectItem>
                     ))}
-                  </select>
-                </FormControl>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -784,21 +776,12 @@ function DriverRegistrationV2() {
             <FormItem>
               <FormLabel>Driver License Number *</FormLabel>
               <FormControl>
-                <input
-                  type="text"
-                  inputMode="text"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
+                <Input
                   placeholder="Enter your license number"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  {...field}
                   data-testid="input-license-number"
-                  value={field.value}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  ref={field.ref}
                 />
               </FormControl>
               <FormMessage />
@@ -813,22 +796,18 @@ function DriverRegistrationV2() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>License Issuing State *</FormLabel>
-                <FormControl>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
-                    data-testid="select-license-state"
-                    value={field.value}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref as any}
-                  >
-                    <option value="">Select state</option>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-license-state">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
                     {US_STATES.map(state => (
-                      <option key={state.code} value={state.code}>{state.name}</option>
+                      <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
                     ))}
-                  </select>
-                </FormControl>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -840,15 +819,10 @@ function DriverRegistrationV2() {
               <FormItem>
                 <FormLabel>License Expiration Date *</FormLabel>
                 <FormControl>
-                  <input
+                  <Input
                     type="date"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    {...field}
                     data-testid="input-license-expiry"
-                    value={field.value}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref}
                   />
                 </FormControl>
                 <FormMessage />
@@ -914,35 +888,31 @@ function DriverRegistrationV2() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Vehicle Type *</FormLabel>
-              <FormControl>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  data-testid="select-vehicle-type"
-                  value={field.value}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  ref={field.ref as any}
-                >
-                  <option value="">Select vehicle type</option>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-vehicle-type">
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
                   {driverType === 'ride' ? (
                     <>
-                      <option value="sedan">Sedan</option>
-                      <option value="suv">SUV</option>
-                      <option value="minivan">Minivan</option>
-                      <option value="luxury">Luxury</option>
-                      {isBD && <option value="cng">CNG Auto</option>}
+                      <SelectItem value="sedan">Sedan</SelectItem>
+                      <SelectItem value="suv">SUV</SelectItem>
+                      <SelectItem value="minivan">Minivan</SelectItem>
+                      <SelectItem value="luxury">Luxury</SelectItem>
+                      {isBD && <SelectItem value="cng">CNG Auto</SelectItem>}
                     </>
                   ) : (
                     <>
-                      <option value="car">Car</option>
-                      <option value="motorcycle">Motorcycle</option>
-                      <option value="bicycle">Bicycle</option>
-                      <option value="scooter">Scooter</option>
+                      <SelectItem value="car">Car</SelectItem>
+                      <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                      <SelectItem value="bicycle">Bicycle</SelectItem>
+                      <SelectItem value="scooter">Scooter</SelectItem>
                     </>
                   )}
-                </select>
-              </FormControl>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
