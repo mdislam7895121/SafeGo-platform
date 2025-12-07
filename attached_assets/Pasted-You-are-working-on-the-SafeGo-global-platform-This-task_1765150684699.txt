@@ -1,0 +1,203 @@
+You are working on the SafeGo global platform.  
+This task must follow ALL SafeGo Master Rules and MUST be 100% non-breaking.
+
+=====================================================
+A) SAFEGO MASTER RULES (DO NOT BREAK)
+=====================================================
+
+1. ROLES (must always remain separate)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+   Each role has its own:
+   - signup requirements
+   - KYC rules
+   - dashboard
+   - permissions
+   - status flows
+
+2. GLOBAL SERVICES (all must remain supported)
+   - Ride-hailing
+   - Food Delivery
+   - Parcel Delivery
+
+3. COUNTRY-SPECIFIC KYC (BD vs US)
+   ALWAYS USE branching logic.
+
+   BANGLADESH (BD) mandatory:
+   - father_name, date_of_birth
+   - present_address, permanent_address
+   - NID_number, NID_front, NID_back
+   - emergency_contact_name/phone/relation
+   - verification_status, is_verified
+
+   UNITED STATES (US) mandatory:
+   - date_of_birth
+   - home_address (US format)
+   - emergency contact details
+   - government_id_type, government_id_last4
+   - driver_license_number + front/back + expiry
+   - ssn_last4 (optional)
+   - NYC TLC license images if applicable
+   - verification_status, is_verified
+
+   NYC rule: FHV Number MUST NOT be required in UI.
+
+4. ADMIN PANEL REQUIREMENTS
+   Admin must be able to:
+   - verify all customers/drivers/restaurants
+   - approve/reject KYC + rejection_reason
+   - block/unblock users
+   - update pricing/fees/commissions
+   - manage payouts and negative balances
+   - view driver/restaurant negative wallet
+
+5. REQUIRED COLLECTIONS (DO NOT REMOVE)
+   - rides
+   - food_orders
+   - deliveries
+   Each must include:
+   - identity fields (customer_id, driver_id, restaurant_id)
+   - address + geolocation
+   - fees + commissions
+   - payment details
+   - full status flows (ride, food, parcel)
+   - rating + feedback
+
+6. COMMISSION RULES (must remain active)
+   - Cash ride → driver keeps cash, SafeGo commission → negative driver_wallet
+   - Cash food → restaurant keeps cash, SafeGo commission → negative restaurant_wallet
+   - Online payments → SafeGo keeps commission automatically
+   - Admin can settle balances
+
+7. SECURITY RULES
+   - Customers cannot view driver documents
+   - Drivers cannot view customer documents
+   - Restaurants cannot view other restaurants
+   - Only Admin can change pricing/verification/blocking
+   - Users can edit only their own profile
+
+8. ONBOARDING (multi-step)
+   - Basic info → Address → ID/KYC → Emergency contact
+   - verification_status = pending until admin approves
+   - No access to live services until approved
+
+9. STATUS FLOWS (must remain unchanged)
+   - rides: requested → searching → accepted → arriving → in_progress → completed/cancelled
+   - food: placed → accepted → preparing → ready → picked_up → on_the_way → delivered/cancelled
+   - parcel: requested → searching → accepted → picked_up → on_the_way → delivered/cancelled
+
+10. NOTIFICATIONS
+   - ride alerts
+   - order updates
+   - parcel updates
+   - verification approvals/rejections
+   - admin important notifications
+
+11. NON-BREAKING RULE
+   - DO NOT remove or rename existing fields, APIs, or routes.
+   - Only ADD new components, flags, and logic.
+
+=====================================================
+B) NEW FEATURE: USA CUSTOMER HOME PAGE → DELIVERY DRIVER CARD
+=====================================================
+
+Add a NEW card on the **USA Customer Home Page** that allows users to easily sign up as:
+
+   “Food & Parcel Delivery Driver (Bike/Bicycle Friendly)”
+
+This card is ONLY for:
+   - USA region
+   - Delivery drivers who want to use a **Bike** or **Bicycle**
+
+=====================================================
+C) NEW CARD DESIGN & LOGIC REQUIREMENTS
+=====================================================
+
+1. WHERE TO PLACE THE CARD:
+   - Place it on the **Customer Home Page (USA version)**.
+   - It must appear alongside existing partner options (Ride driver, Restaurant partner, etc.).
+   - It must NOT break existing layout for BD users.
+
+2. CARD TEXT (exact):
+   Title:
+     “Delivery Driver (Bike & Bicycle)”
+   Description:
+     “Start earning with SafeGo using a bike or bicycle. Fast approval. Simple requirements.”
+
+3. CARD ACTION:
+   - Button: “Become a Delivery Driver”
+   - On click → navigate to the NEW delivery driver onboarding flow:
+       `/partner/delivery-driver/start`
+     (or the correct path that fits your routing)
+
+4. DELIVERY DRIVER SERVICE FLAG:
+   When this card is used, auto-set driver.services to:
+   - ["food_delivery", "parcel_delivery"]
+
+   And auto-set:
+   - can_ride = false
+   - can_food_delivery = true
+   - can_parcel_delivery = true
+
+   (Do NOT remove or change existing driver fields)
+
+5. DELIVERY DRIVER SIMPLIFIED KYC:
+   USA delivery driver onboarding MUST ask for:
+
+   Required:
+   - government_id_type
+   - government_id_last4
+   - emergency_contact fields
+   - date_of_birth
+   - home_address
+
+   Vehicle Type Selector (mandatory):
+   - bicycle
+   - motorbike
+
+   For BICYCLE:
+   - NO driver license required
+   - NO car documents required
+   - Optional: upload bicycle photo
+
+   For MOTORBIKE:
+   - driver_license_number + front/back + expiry
+   - motorbike registration if already implemented
+
+6. DRIVER DASHBOARD RULES:
+   Delivery-only drivers MUST NOT see:
+   - “Active Trip”
+   - Ride Trip History
+   - Ride map items
+
+   They SHOULD see:
+   - “Food Deliveries”
+   - “Active Delivery”
+   - “Delivery History”
+   - Wallet
+   - Incentives
+   - Trust Score
+
+7. MATCHING ENGINE UPDATE:
+   Filter drivers by service flags:
+   - delivery drivers receive only food_orders & deliveries
+   - ride-only drivers receive only rides
+
+8. ADMIN PANEL:
+   - Add ability to enable/disable “delivery driver” service for a driver.
+   - Must show their vehicle type (bike/bicycle/motorbike).
+
+=====================================================
+D) ACCEPTANCE CRITERIA (must pass all)
+=====================================================
+
+1. USA customer home page shows a new **Delivery Driver (Bike & Bicycle)** card.
+2. Clicking it opens a dedicated delivery-driver onboarding flow.
+3. Delivery-only drivers get simplified KYC.
+4. Delivery-only drivers NEVER see ride-only menu items.
+5. Ride-only drivers NEVER see Food Deliveries.
+6. Admin can verify these delivery drivers normally.
+7. All changes must be additive & non-breaking.
+8. BD customer home page + flows must stay untouched.

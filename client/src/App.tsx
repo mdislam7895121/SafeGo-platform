@@ -412,6 +412,7 @@ import BDBookingSuccess from "@/pages/bd/booking-success";
 // Partner Onboarding Start Pages
 import RideDriverStart from "@/pages/partner/ride-start";
 import DeliveryDriverStart from "@/pages/partner/delivery-start";
+import DeliveryDriverBikeStart from "@/pages/partner/delivery-driver-start";
 import RestaurantStart from "@/pages/partner/restaurant-start";
 import DriverRegistration from "@/pages/partner/driver-registration";
 import DriverStatus from "@/pages/partner/driver-status";
@@ -2983,6 +2984,11 @@ function Router() {
       <Route path="/partner/delivery/start">
         <ProtectedRoute allowedRoles={["customer"]}>
           <DeliveryDriverStart />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/partner/delivery-driver/start">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <DeliveryDriverBikeStart />
         </ProtectedRoute>
       </Route>
       <Route path="/partner/restaurant/start">

@@ -1,6 +1,6 @@
 import { Car, Bike, Truck, UtensilsCrossed, Store, Ticket, Bus } from "lucide-react";
 
-export type PartnerKind = "driver_ride" | "driver_delivery" | "restaurant" | "shop_partner" | "ticket_operator";
+export type PartnerKind = "driver_ride" | "driver_delivery" | "driver_delivery_bike" | "restaurant" | "shop_partner" | "ticket_operator";
 
 export interface PartnerCardText {
   kind: PartnerKind;
@@ -93,11 +93,11 @@ const US_TEXTS: PartnerTexts = {
       icon: Car,
     },
     {
-      kind: "driver_delivery",
-      title: "Food & Parcel Delivery Driver",
-      description: "Deliver more. Earn more.",
+      kind: "driver_delivery_bike",
+      title: "Delivery Driver (Bike & Bicycle)",
+      description: "Start earning with SafeGo using a bike or bicycle. Fast approval. Simple requirements.",
       buttonText: "Become a Delivery Driver",
-      icon: Truck,
+      icon: Bike,
     },
     {
       kind: "restaurant",

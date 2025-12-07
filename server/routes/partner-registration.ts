@@ -773,4 +773,106 @@ router.post('/restaurant/registration/submit', authenticateToken, async (req: Au
   }
 });
 
+const deliveryDriverInitSchema = z.object({
+  vehicleType: z.enum(['bicycle', 'motorbike']),
+  services: z.array(z.string()).optional(),
+  canRide: z.boolean().optional(),
+  canFoodDelivery: z.boolean().optional(),
+  canParcelDelivery: z.boolean().optional(),
+});
+
+router.post('/partner/delivery-driver/init', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = deliveryDriverInitSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, countryCode: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (driverProfile) {
+      await prisma.driverProfile.update({
+        where: { userId },
+        data: {
+          vehicleType: validatedData.vehicleType,
+          canRide: validatedData.canRide ?? false,
+          canFoodDelivery: validatedData.canFoodDelivery ?? true,
+          canParcelDelivery: validatedData.canParcelDelivery ?? true,
+          services: validatedData.services ?? ['food_delivery', 'parcel_delivery'],
+        },
+      });
+    } else {
+      driverProfile = await prisma.driverProfile.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId,
+          country: user.countryCode || 'US',
+          vehicleType: validatedData.vehicleType,
+          vehicleMake: '',
+          vehicleModel: '',
+          vehiclePlate: '',
+          partnerStatus: 'onboarding',
+          canRide: validatedData.canRide ?? false,
+          canFoodDelivery: validatedData.canFoodDelivery ?? true,
+          canParcelDelivery: validatedData.canParcelDelivery ?? true,
+          services: validatedData.services ?? ['food_delivery', 'parcel_delivery'],
+        },
+      });
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: userId,
+        actorEmail: user.email || 'unknown',
+        actorRole: 'customer',
+        actionType: 'DELIVERY_DRIVER_INIT',
+        entityType: 'driver_profile',
+        entityId: driverProfile.id,
+        description: `Delivery driver onboarding initiated with vehicle type: ${validatedData.vehicleType}`,
+        metadata: {
+          vehicleType: validatedData.vehicleType,
+          services: validatedData.services,
+          canFoodDelivery: validatedData.canFoodDelivery,
+          canParcelDelivery: validatedData.canParcelDelivery,
+        },
+      },
+    });
+
+    const nextUrl = validatedData.vehicleType === 'bicycle'
+      ? '/partner/driver/register?type=delivery&vehicle=bicycle'
+      : '/partner/driver/register?type=delivery&vehicle=motorbike';
+
+    return res.json({
+      success: true,
+      profileId: driverProfile.id,
+      vehicleType: validatedData.vehicleType,
+      nextUrl,
+      message: 'Delivery driver profile initialized',
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: error.errors,
+      });
+    }
+    console.error('[Partner Registration] Error initializing delivery driver:', error);
+    return res.status(500).json({ error: 'Failed to initialize delivery driver' });
+  }
+});
+
 export default router;

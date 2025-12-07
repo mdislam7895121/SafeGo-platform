@@ -119,6 +119,8 @@ export function PartnerProgramsSection() {
         return "/partner/ride/start";
       case "driver_delivery":
         return "/partner/delivery/start";
+      case "driver_delivery_bike":
+        return "/partner/delivery-driver/start";
       case "restaurant":
         return "/partner/restaurant/start";
       case "shop_partner":
