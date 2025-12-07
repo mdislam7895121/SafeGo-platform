@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link, Redirect } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -282,6 +282,19 @@ export default function DriverRegistration() {
   });
 
   const [nidNumber, setNidNumber] = useState("");
+
+  useEffect(() => {
+    if (currentStep === 2 && isUS) {
+      const timer = setTimeout(() => {
+        licenseForm.reset({
+          driverLicenseNumber: "",
+          driverLicenseState: "",
+          driverLicenseExpiry: "",
+        });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep, isUS]);
 
   if (!user) {
     return <Redirect to={`/login?returnTo=/partner/${driverType === 'ride' ? 'ride' : 'delivery'}/start`} />;
