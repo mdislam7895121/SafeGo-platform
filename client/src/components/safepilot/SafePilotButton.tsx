@@ -843,19 +843,19 @@ export function SafePilotButton() {
           type="button"
           aria-label="Open SafePilot AI assistant"
           onClick={() => setIsOpen(true)}
-          className="rounded-full shadow-lg shadow-primary/25 bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] hover:from-[#2670D3] hover:to-[#45B8DD] touch-manipulation transition-all duration-200 active:scale-95 border border-white/20 ring-2 ring-white/10 hover:ring-primary/30 hover:shadow-xl hover:shadow-primary/30 flex items-center justify-center cursor-pointer"
+          className="rounded-full shadow-lg shadow-primary/25 bg-gradient-to-br from-[#0a1929] to-[#0d2137] hover:from-[#0d2137] hover:to-[#112a45] touch-manipulation transition-all duration-200 active:scale-95 border border-[#1e4976]/50 ring-2 ring-[#2F80ED]/20 hover:ring-[#2F80ED]/40 hover:shadow-xl hover:shadow-[#2F80ED]/30 flex items-center justify-center cursor-pointer"
           style={{ 
             position: 'fixed',
             bottom: '24px',
             right: '24px',
-            width: '48px',
-            height: '48px',
+            width: '56px',
+            height: '56px',
             zIndex: 9999,
             WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
           }}
         >
-          <SafePilotIcon size="sm" className="text-white" />
+          <SafePilotIcon size="md" />
           {alertCount > 0 && (
             <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium ring-2 ring-white">
               {alertCount > 9 ? '9+' : alertCount}
@@ -872,11 +872,11 @@ export function SafePilotButton() {
           side="right"
         >
           <SheetHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b shrink-0">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-[#2F80ED]/10 to-[#56CCF2]/10 flex items-center justify-center shrink-0">
-                <SafePilotIcon size="sm" />
+            <div className="flex items-center min-w-0 pl-4">
+              <div className="shrink-0" style={{ width: 48, height: 48 }}>
+                <SafePilotIcon size="lg" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 ml-3">
                 <SheetTitle className="text-base sm:text-lg bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent font-semibold">SafePilot</SheetTitle>
                 <SheetDescription className="text-xs truncate">
                   AI Intelligence Engine
@@ -889,15 +889,15 @@ export function SafePilotButton() {
             <div className="px-4 sm:px-6 mt-3 sm:mt-4 shrink-0">
               <TabsList className="grid grid-cols-3 w-full">
                 <TabsTrigger value="intelligence" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-intelligence">
-                  <SafePilotIcon size="xs" className="mr-0.5 sm:mr-1.5 shrink-0" />
+                  <SafePilotIcon size="sm" className="mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">Intel</span>
                 </TabsTrigger>
                 <TabsTrigger value="context" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-context">
-                  <BarChart3 className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                  <SafePilotIcon size="sm" className="mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">Context</span>
                 </TabsTrigger>
                 <TabsTrigger value="response" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-response">
-                  <MessageSquare className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
+                  <SafePilotIcon size="sm" className="mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">Chat</span>
                 </TabsTrigger>
               </TabsList>

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
+import safepilotLogoPath from "@assets/safepilot/logo.jpeg";
 
 interface SafePilotLogoProps {
   variant?: 'icon' | 'full' | 'app-icon';
@@ -14,12 +15,12 @@ interface LucideCompatibleProps {
 }
 
 const sizeMap = {
-  xs: { icon: 16, full: 80 },
-  sm: { icon: 24, full: 120 },
-  md: { icon: 32, full: 160 },
-  lg: { icon: 48, full: 200 },
-  xl: { icon: 64, full: 256 },
-  '2xl': { icon: 128, full: 400 },
+  xs: 16,
+  sm: 24,
+  md: 32,
+  lg: 48,
+  xl: 64,
+  '2xl': 128,
 };
 
 export function SafePilotIcon({ 
@@ -27,43 +28,24 @@ export function SafePilotIcon({
   className,
   animated = false 
 }: Omit<SafePilotLogoProps, 'variant'>) {
-  const dimensions = sizeMap[size].icon;
+  const dimensions = sizeMap[size];
   
   return (
-    <svg 
-      width={dimensions} 
-      height={dimensions} 
-      viewBox="0 0 48 48" 
-      fill="none" 
-      xmlns="http://www.w3.org/2000/svg"
+    <img 
+      src={safepilotLogoPath}
+      alt="SafePilot"
+      width={dimensions}
+      height={dimensions}
       className={cn(
-        "flex-shrink-0",
+        "flex-shrink-0 object-contain",
         animated && "animate-pulse",
         className
       )}
-    >
-      <defs>
-        <linearGradient id="safepilot-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#2F80ED"/>
-          <stop offset="100%" stopColor="#56CCF2"/>
-        </linearGradient>
-      </defs>
-      
-      <path 
-        d="M24 4L6 10V22C6 33.05 13.68 43.22 24 46C34.32 43.22 42 33.05 42 22V10L24 4Z" 
-        fill="url(#safepilot-gradient)"
-      />
-      
-      <path 
-        d="M12 24H16L18 20L21 28L24 18L27 30L30 22L32 24H36" 
-        fill="none" 
-        stroke="#FFFFFF" 
-        strokeWidth="2" 
-        strokeLinecap="round" 
-        strokeLinejoin="round"
-        className={animated ? "animate-[pulse_2s_ease-in-out_infinite]" : ""}
-      />
-    </svg>
+      style={{ 
+        width: dimensions, 
+        height: dimensions,
+      }}
+    />
   );
 }
 
@@ -71,51 +53,23 @@ export function SafePilotLogoFull({
   size = 'md', 
   className 
 }: Omit<SafePilotLogoProps, 'variant'>) {
-  const width = sizeMap[size].full;
-  const height = width * 0.32;
+  const iconSize = sizeMap[size];
   
   return (
-    <svg 
-      width={width} 
-      height={height} 
-      viewBox="0 0 200 64" 
-      fill="none" 
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn("flex-shrink-0", className)}
-    >
-      <defs>
-        <linearGradient id="safepilot-full-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#2F80ED"/>
-          <stop offset="100%" stopColor="#56CCF2"/>
-        </linearGradient>
-      </defs>
-      
-      <g transform="translate(4, 8)">
-        <path 
-          d="M24 2L4 8V18C4 27.71 10.72 36.57 24 40C37.28 36.57 44 27.71 44 18V8L24 2Z" 
-          fill="url(#safepilot-full-gradient)"
-        />
-        <path 
-          d="M10 20H14L16 16L19 24L22 14L25 26L28 18L30 20H38" 
-          fill="none" 
-          stroke="#FFFFFF" 
-          strokeWidth="1.5" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        />
-      </g>
-      
-      <text 
-        x="56" 
-        y="38" 
-        fontFamily="Inter, system-ui, -apple-system, sans-serif" 
-        fontSize="22" 
-        fontWeight="600"
-      >
-        <tspan fill="url(#safepilot-full-gradient)">Safe</tspan>
-        <tspan className="fill-foreground dark:fill-white">Pilot</tspan>
-      </text>
-    </svg>
+    <div className={cn("flex items-center gap-3", className)}>
+      <img 
+        src={safepilotLogoPath}
+        alt="SafePilot"
+        width={iconSize}
+        height={iconSize}
+        className="flex-shrink-0 object-contain"
+        style={{ width: iconSize, height: iconSize }}
+      />
+      <span className="font-semibold text-lg">
+        <span className="bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent">Safe</span>
+        <span className="text-foreground">Pilot</span>
+      </span>
+    </div>
   );
 }
 
@@ -123,39 +77,22 @@ export function SafePilotAppIcon({
   size = 'lg', 
   className 
 }: Omit<SafePilotLogoProps, 'variant'>) {
-  const dimensions = sizeMap[size].icon;
+  const dimensions = sizeMap[size];
   
   return (
     <div 
       className={cn(
-        "rounded-2xl bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] p-2 flex items-center justify-center shadow-lg",
+        "rounded-2xl bg-gradient-to-br from-[#0a1929] to-[#0d2137] p-2 flex items-center justify-center shadow-lg",
         className
       )}
       style={{ width: dimensions, height: dimensions }}
     >
-      <svg 
-        width={dimensions * 0.7} 
-        height={dimensions * 0.7} 
-        viewBox="0 0 48 48" 
-        fill="none" 
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path 
-          d="M24 4L6 10V22C6 33.05 13.68 43.22 24 46C34.32 43.22 42 33.05 42 22V10L24 4Z" 
-          fill="rgba(255,255,255,0.2)"
-          stroke="rgba(255,255,255,0.5)"
-          strokeWidth="1"
-        />
-        
-        <path 
-          d="M12 24H16L18 20L21 28L24 18L27 30L30 22L32 24H36" 
-          fill="none" 
-          stroke="#FFFFFF" 
-          strokeWidth="2.5" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        />
-      </svg>
+      <img 
+        src={safepilotLogoPath}
+        alt="SafePilot"
+        className="object-contain"
+        style={{ width: dimensions * 0.8, height: dimensions * 0.8 }}
+      />
     </div>
   );
 }
@@ -176,39 +113,19 @@ export function SafePilotLogo({
   }
 }
 
-export const SafePilotSidebarIcon = forwardRef<SVGSVGElement, LucideCompatibleProps>(
-  ({ className, size = 16, ...props }, ref) => (
-    <svg 
+export const SafePilotSidebarIcon = forwardRef<HTMLImageElement, LucideCompatibleProps>(
+  ({ className, size = 20, ...props }, ref) => (
+    <img 
       ref={ref}
-      width={size} 
-      height={size} 
-      viewBox="0 0 48 48" 
-      fill="none" 
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn("flex-shrink-0", className)}
+      src={safepilotLogoPath}
+      alt="SafePilot"
+      className={cn("flex-shrink-0 object-contain", className)}
+      style={{ 
+        width: typeof size === 'number' ? size : parseInt(size), 
+        height: typeof size === 'number' ? size : parseInt(size) 
+      }}
       {...props}
-    >
-      <defs>
-        <linearGradient id="safepilot-sidebar-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#2F80ED"/>
-          <stop offset="100%" stopColor="#56CCF2"/>
-        </linearGradient>
-      </defs>
-      
-      <path 
-        d="M24 4L6 10V22C6 33.05 13.68 43.22 24 46C34.32 43.22 42 33.05 42 22V10L24 4Z" 
-        fill="url(#safepilot-sidebar-gradient)"
-      />
-      
-      <path 
-        d="M12 24H16L18 20L21 28L24 18L27 30L30 22L32 24H36" 
-        fill="none" 
-        stroke="#FFFFFF" 
-        strokeWidth="2" 
-        strokeLinecap="round" 
-        strokeLinejoin="round"
-      />
-    </svg>
+    />
   )
 );
 SafePilotSidebarIcon.displayName = 'SafePilotSidebarIcon';
