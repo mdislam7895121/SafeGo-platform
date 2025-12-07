@@ -1,0 +1,161 @@
+SAFEGO GLOBAL MASTER RULES (MUST OBEY – NO BREAKING CHANGES)
+
+A) ROLES (4 separate roles)
+1. customer
+2. driver
+3. restaurant (merchant)
+4. admin
+
+Each role keeps its own:
+- signup/onboarding flow
+- KYC/verification rules
+- dashboard
+- permissions
+- status flows
+
+Public signup is CUSTOMER ONLY. Drivers/restaurants/admins onboard after login. Never mix role access.
+
+B) SERVICES
+SafeGo always supports 3 services:
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+No change may break existing ride/food/parcel flows.
+
+C) COUNTRY-SPECIFIC KYC (do NOT rename/delete these fields)
+
+C.1 Bangladesh (BD) drivers:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified
+
+C.2 United States (US) base:
+- date_of_birth
+- home_address (street, city, state, zip)
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+C.3 US DRIVERS extra (especially NYC):
+- driver_license_number
+- driver_license_state
+- driver_license_expiry
+- driver_license_front_image_url
+- driver_license_back_image_url
+- ssn_last4 (optional)
+- TLC-specific fields for NYC (5 boroughs):
+  - tlc_license_number
+  - tlc_license_expiry
+  - tlc_license_front_image_url
+  - tlc_license_back_image_url
+  - fhv_number / fhv_barcode
+  - fhv_document_image (sticker)
+  - dmv_inspection_date
+  - dmv_inspection_expiry
+  - insurance docs, etc.
+
+You must NOT remove or rename these fields in the DB or models. Only adjust validation rules.
+
+D) ADMIN PANEL
+Admin must still:
+- verify customers/drivers/restaurants
+- approve/reject KYC with rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view driver and restaurant negative balances
+
+E) CORE COLLECTIONS
+Collections rides, food_orders, deliveries must keep identity fields, addresses+geo, fee+commission breakdown, payment details, timestamps, rating+feedback.
+
+F) COMMISSION
+- Ride CASH → driver keeps cash; commission → negative driver_wallet_balance (weekly settlement).
+- Food CASH → restaurant keeps cash; commission → negative restaurant_wallet.
+- ONLINE → SafeGo keeps commission automatically.
+- Admin can settle and mark as paid.
+
+G) SECURITY
+- No one can see other roles’ sensitive KYC (customer vs driver vs restaurant).
+- Only admin can change pricing, commission, verification_status, blocking.
+- Users can only edit their own profile.
+
+H) STATUS FLOWS
+Do NOT change the ride/food/parcel status flow machines.
+
+I) ONBOARDING
+Customer signup simple; partners onboard after login with multi-step flow and verification_status="pending" until admin approves.
+
+J) NOTIFICATIONS
+Keep all existing ride/order/parcel/KYC/admin notifications.
+
+All changes must be ADDITIVE and NON-BREAKING.
+
+=====================================================
+CONTEXT: NYC DRIVER – BACKEND STILL REQUIRES FHV NUMBER
+=====================================================
+
+Current frontend behavior is correct for our new rule:
+
+- On `/partner/driver/register?type=ride`, NYC Compliance step (TLC/FHV tab):
+  - Driver uploads TLC docs, DMV inspection, FHV Document/Sticker image.
+  - FHV Number/Barcode is OPTIONAL in the UI.
+
+However, when submitting the application, the backend returns:
+
+- HTTP 400
+- error: "nyc validation failed"
+- code: "KYC_INCOMPLETE"
+- details: "FHV license number is required for NYC drivers"
+
+We want this new business rule:
+
+1) For driver self-registration / submission:
+   - FHV Number/Barcode is OPTIONAL.
+   - FHV Document/Sticker image IS REQUIRED.
+   - Admin can fill FHV number later from the document.
+
+2) For admin KYC approval:
+   - Before admin sets `verification_status = "approved"` for a NYC driver,
+   - FHV number MUST be present and non-empty (so compliance is complete).
+
+We must implement this by adjusting backend validation ONLY, without changing database schema or removing fields.
+
+=====================================================
+1. LOCATE NYC DRIVER KYC VALIDATION LOGIC
+=====================================================
+
+1.1 Find the backend module(s) that validate US/NYC driver KYC, especially for TLC/FHV. Examples (names approximate):
+
+- `server/src/kyc/nycDriverValidator.ts`
+- `server/src/services/kyc/validateNycCompliance.ts`
+- any function that returns code `"KYC_INCOMPLETE"` with detail `"FHV license number is required for NYC drivers"`.
+
+1.2 Identify:
+
+- The function that runs when a driver submits the onboarding form (e.g. on POST /partner/driver/register or similar).
+- Any separate function that runs when ADMIN approves KYC.
+
+=====================================================
+2. CHANGE DRIVER-SIDE VALIDATION: FHV NUMBER OPTIONAL
+=====================================================
+
+2.1 In the driver submission validation (the code path triggered by driver onboarding submit):
+
+- Find the rule that currently enforces FHV number, something like:
+
+```ts
+if (!nyc.fhv_number) {
+  errors.push("FHV license number is required for NYC drivers");
+}

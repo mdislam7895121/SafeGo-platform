@@ -145,9 +145,8 @@ function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSc
       if (!nycCompliance?.tlcLicenseBackUrl) {
         errors.push('TLC license back image is required for NYC drivers');
       }
-      if (!nycCompliance?.fhvLicenseNumber) {
-        errors.push('FHV license number is required for NYC drivers');
-      }
+      // FHV Number is OPTIONAL during driver submission - admin can fill it from document later
+      // However, FHV Document image IS REQUIRED for NYC drivers
       if (!nycCompliance?.fhvDocumentUrl) {
         errors.push('FHV document image is required for NYC drivers');
       }

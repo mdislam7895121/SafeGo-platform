@@ -101,16 +101,26 @@ function validateDriverKYC(
       missing.push("DMV license expiry date");
     }
 
-    // TLC License required ONLY for NY state drivers (front & back images + expiry)
-    if (driver.usaState === "NY") {
+    // TLC/FHV License required ONLY for NYC drivers (NY state or hasNycCompliance flag)
+    // Note: This is the ADMIN APPROVAL validation - FHV number is REQUIRED here
+    // (During driver submission, FHV number is optional, but admin must fill it before approval)
+    const isNycDriver = driver.usaState === "NY" || driver.hasNycCompliance;
+    if (isNycDriver) {
       if (!driver.tlcLicenseFrontUrl) {
-        missing.push("TLC license front image (required for NY drivers)");
+        missing.push("TLC license front image (required for NYC drivers)");
       }
       if (!driver.tlcLicenseBackUrl) {
-        missing.push("TLC license back image (required for NY drivers)");
+        missing.push("TLC license back image (required for NYC drivers)");
       }
       if (!driver.tlcLicenseExpiry) {
-        missing.push("TLC license expiry date (required for NY drivers)");
+        missing.push("TLC license expiry date (required for NYC drivers)");
+      }
+      // FHV Number is REQUIRED for admin approval (admin can fill from driver's uploaded document)
+      if (!driver.fhvLicenseNumber) {
+        missing.push("FHV license number (required before approving NYC drivers - extract from uploaded document)");
+      }
+      if (!driver.fhvDocumentUrl) {
+        missing.push("FHV document image (required for NYC drivers)");
       }
     }
 
@@ -692,11 +702,24 @@ router.post("/kyc/approve", checkPermission(Permission.MANAGE_KYC), async (req: 
     // Get the userId from the profile
     let userId: string | null = null;
     if (role === "driver") {
-      const profile = await prisma.driverProfile.findUnique({ where: { id: profileId } });
+      const profile = await prisma.driverProfile.findUnique({ 
+        where: { id: profileId },
+        include: { user: true }
+      });
       if (!profile) {
         return res.status(404).json({ error: "Driver profile not found" });
       }
       userId = profile.userId;
+
+      // NYC Compliance Check: FHV number MUST be present before admin can approve NYC drivers
+      // This ensures regulatory compliance - admin must fill FHV number from document if driver left it blank
+      if (profile.hasNycCompliance && !profile.fhvLicenseNumber) {
+        return res.status(400).json({ 
+          error: "FHV license number is required before approving NYC drivers. Please update the driver's FHV number from their uploaded document first.",
+          code: "NYC_COMPLIANCE_INCOMPLETE",
+          field: "fhvLicenseNumber"
+        });
+      }
 
       // Update profile
       await prisma.driverProfile.update({
