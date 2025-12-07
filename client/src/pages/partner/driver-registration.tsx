@@ -130,7 +130,8 @@ function isNycBorough(city: string | undefined): boolean {
 }
 
 export default function DriverRegistration() {
-  const { isEnabled: isV2Enabled, isLoading: flagLoading } = useFeatureFlags(FEATURE_FLAGS.DRIVER_ONBOARDING_V2);
+  const { isEnabled, isLoading: flagLoading } = useFeatureFlags();
+  const isV2Enabled = isEnabled(FEATURE_FLAGS.DRIVER_ONBOARDING_V2);
   
   if (flagLoading) {
     return (
@@ -431,7 +432,7 @@ function DriverRegistrationV2() {
           setFormData(prev => ({ ...prev, nycCompliance: nycForm.getValues() }));
         }
       } else if ((currentStep === 5 && isNycDriver) || (currentStep === 4 && !isNycDriver)) {
-        if (!backgroundCheckConsent) {
+        if (backgroundCheckConsent !== true) {
           toast({
             title: "Consent Required",
             description: "You must consent to a background check to continue.",
