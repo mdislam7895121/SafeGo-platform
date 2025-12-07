@@ -1,0 +1,95 @@
+STOP. The Driver License step is still broken.
+
+The values from the Personal Information step are automatically populating the Driver License fields. This is a critical form state linking bug.
+
+Current incorrect behavior:
+- full_legal_name is being injected into driver_license_number
+- date_of_birth is being injected into driver_license_expiry
+- home_address.state is being injected into driver_license_state
+- The user cannot see or provide the correct license details
+
+You must FIX the state mapping immediately.
+
+========================================
+A. SafeGo master rules – KEEP ALL
+========================================
+(Do not break roles, KYC, admin, collections, commission logic, security rules, or status flows.)
+
+========================================
+B. FIX FORM STATE LINKS
+========================================
+
+1. Open the US Driver Onboarding V2 form container:
+   - The parent component controlling the onboarding steps
+   - The code that carries formState from Personal Info → Driver License step
+
+2. REMOVE any auto-mapping such as:
+   - driver_license_number = fullLegalName
+   - driver_license_expiry = dateOfBirth
+   - driver_license_state = homeAddress.state
+
+3. ENSURE these fields are initialized EMPTY:
+
+   driver_license_number: ""
+   driver_license_state: ""
+   driver_license_expiry: ""
+   driver_license_front_image: null
+   driver_license_back_image: null
+
+4. ENSURE these fields are NOT derived from personal info step:
+   - DO NOT map values from:
+     - full_legal_name
+     - date_of_birth
+     - home_address.state
+     - any previous step field
+
+5. FIX the Controller bindings:
+
+The Driver License inputs must be wired ONLY to their own fields:
+
+   name="driver_license_number"
+   name="driver_license_state"
+   name="driver_license_expiry"
+
+NO OTHER FIELD from step 1 should update these values.
+
+6. FIX validation schema:
+The schema keys must match EXACTLY:
+
+   driver_license_number: z.string().min(1)
+   driver_license_state: z.string().min(1)
+   driver_license_expiry: z.string().min(1)
+
+7. Ensure Next button logic checks these EXACT fields, not personal info fields.
+
+========================================
+C. TEST AFTER FIX
+========================================
+
+1) Fill Personal Info step → Next
+   - Driver License Number MUST be empty
+   - License Issuing State MUST be empty
+   - License Expiration Date MUST be empty
+
+2) Allow manual entry:
+   - Type license number
+   - Select state
+   - Pick expiration date
+
+3) Confirm error messages disappear when values are provided.
+
+4) Confirm Next button becomes active.
+
+========================================
+D. REPORT BACK
+========================================
+
+Explain:
+- What code was auto-populating the driver license fields?
+- Which file controlled the step state transfer?
+- How the mapping was removed?
+- Confirmation that:
+   - Driver License fields start empty
+   - Personal info no longer overwrites them
+   - Binding works
+   - Validation works

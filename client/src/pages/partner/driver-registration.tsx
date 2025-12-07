@@ -768,7 +768,7 @@ function DriverRegistrationV2() {
 
   const renderLicenseInfo = () => (
     <Form {...licenseForm}>
-      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()} autoComplete="off">
         <FormField
           control={licenseForm.control}
           name="driverLicenseNumber"
@@ -778,7 +778,7 @@ function DriverRegistrationV2() {
               <Input
                 type="text"
                 placeholder="Enter your license number"
-                autoComplete="off"
+                autoComplete="new-password"
                 data-testid="input-license-number"
                 value={field.value || ""}
                 onChange={field.onChange}
@@ -820,6 +820,7 @@ function DriverRegistrationV2() {
                 <FormLabel>License Expiration Date *</FormLabel>
                 <Input
                   type="date"
+                  autoComplete="new-password"
                   data-testid="input-license-expiry"
                   value={field.value || ""}
                   onChange={field.onChange}
