@@ -150,7 +150,10 @@ export default function DriverRegistration() {
   const [nidFrontFile, setNidFrontFile] = useState<File | null>(null);
   const [nidBackFile, setNidBackFile] = useState<File | null>(null);
   
+  const [selectedPersonalState, setSelectedPersonalState] = useState<string>("");
+  const [selectedRelationship, setSelectedRelationship] = useState<string>("");
   const [selectedLicenseState, setSelectedLicenseState] = useState<string>("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState<string>("");
 
   const urlParams = new URLSearchParams(window.location.search);
   const typeParam = urlParams.get('type');
@@ -607,12 +610,20 @@ export default function DriverRegistration() {
                 <FormItem>
                   <FormLabel>State *</FormLabel>
                   <Select 
-                    onValueChange={field.onChange}
-                    value={field.value}
+                    onValueChange={(value) => {
+                      setSelectedPersonalState(value);
+                      field.onChange(value);
+                    }}
+                    value={selectedPersonalState || field.value}
                   >
                     <FormControl>
                       <SelectTrigger data-testid="select-state">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Select">
+                          {selectedPersonalState || field.value ? 
+                            US_STATES.find(s => s.code === (selectedPersonalState || field.value))?.name || "Select"
+                            : "Select"
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -681,12 +692,20 @@ export default function DriverRegistration() {
               <FormItem className="mt-4">
                 <FormLabel>Relationship *</FormLabel>
                 <Select 
-                  onValueChange={field.onChange}
-                  value={field.value}
+                  onValueChange={(value) => {
+                    setSelectedRelationship(value);
+                    field.onChange(value);
+                  }}
+                  value={selectedRelationship || field.value}
                 >
                   <FormControl>
                     <SelectTrigger data-testid="select-relationship">
-                      <SelectValue placeholder="Select relationship" />
+                      <SelectValue placeholder="Select relationship">
+                        {selectedRelationship || field.value ? 
+                          EMERGENCY_RELATIONSHIPS.find(r => r.value === (selectedRelationship || field.value))?.label || "Select relationship"
+                          : "Select relationship"
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -850,16 +869,29 @@ export default function DriverRegistration() {
         <FormField
           control={vehicleForm.control}
           name="vehicleType"
-          render={({ field }) => (
+          render={({ field }) => {
+            const vehicleTypeLabels: Record<string, string> = {
+              sedan: 'Sedan', suv: 'SUV', minivan: 'Minivan', luxury: 'Luxury', cng: 'CNG Auto',
+              car: 'Car', motorcycle: 'Motorcycle', bicycle: 'Bicycle', scooter: 'Scooter'
+            };
+            return (
             <FormItem>
               <FormLabel>Vehicle Type *</FormLabel>
               <Select 
-                onValueChange={field.onChange}
-                value={field.value}
+                onValueChange={(value) => {
+                  setSelectedVehicleType(value);
+                  field.onChange(value);
+                }}
+                value={selectedVehicleType || field.value}
               >
                 <FormControl>
                   <SelectTrigger data-testid="select-vehicle-type">
-                    <SelectValue placeholder="Select vehicle type" />
+                    <SelectValue placeholder="Select vehicle type">
+                      {selectedVehicleType || field.value ? 
+                        vehicleTypeLabels[selectedVehicleType || field.value] || "Select vehicle type"
+                        : "Select vehicle type"
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
@@ -883,7 +915,7 @@ export default function DriverRegistration() {
               </Select>
               <FormMessage />
             </FormItem>
-          )}
+          )}}
         />
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -226,12 +226,14 @@ function validateRestaurantKYC(data: z.infer<typeof restaurantRegistrationSchema
   return { valid: errors.length === 0, errors };
 }
 
-router.get('/driver/registration/status', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/driver/registration/status/:driverType?', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    
+    const requestedDriverType = req.params.driverType || 'ride';
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
