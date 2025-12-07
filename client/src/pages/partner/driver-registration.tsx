@@ -775,15 +775,18 @@ function DriverRegistrationV2() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Driver License Number *</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Enter your license number"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  {...field}
-                  data-testid="input-license-number"
-                />
-              </FormControl>
+              <input
+                type="text"
+                placeholder="Enter your license number"
+                autoComplete="off"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                value={field.value || ""}
+                onChange={(e) => field.onChange(e.target.value)}
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+                data-testid="input-license-number"
+              />
               <FormMessage />
             </FormItem>
           )}
@@ -796,18 +799,20 @@ function DriverRegistrationV2() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>License Issuing State *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
-                  <FormControl>
-                    <SelectTrigger data-testid="select-license-state">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {US_STATES.map(state => (
-                      <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                  value={field.value || ""}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                  data-testid="select-license-state"
+                >
+                  <option value="">Select state</option>
+                  {US_STATES.map(state => (
+                    <option key={state.code} value={state.code}>{state.name}</option>
+                  ))}
+                </select>
                 <FormMessage />
               </FormItem>
             )}
@@ -818,13 +823,16 @@ function DriverRegistrationV2() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>License Expiration Date *</FormLabel>
-                <FormControl>
-                  <Input
-                    type="date"
-                    {...field}
-                    data-testid="input-license-expiry"
-                  />
-                </FormControl>
+                <input
+                  type="date"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                  value={field.value || ""}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                  data-testid="input-license-expiry"
+                />
                 <FormMessage />
               </FormItem>
             )}
