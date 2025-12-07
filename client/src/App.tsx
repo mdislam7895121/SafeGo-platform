@@ -414,6 +414,7 @@ import RideDriverStart from "@/pages/partner/ride-start";
 import DeliveryDriverStart from "@/pages/partner/delivery-start";
 import RestaurantStart from "@/pages/partner/restaurant-start";
 import DriverRegistration from "@/pages/partner/driver-registration";
+import DriverStatus from "@/pages/partner/driver-status";
 import RestaurantRegistration from "@/pages/partner/restaurant-registration";
 import ShopPartnerStart from "@/pages/partner/shop-start";
 import TicketOperatorStart from "@/pages/partner/ticket-start";
@@ -2963,6 +2964,13 @@ function Router() {
       <Route path="/partner/restaurant-registration">
         <ProtectedRoute allowedRoles={["customer"]}>
           <RestaurantRegistration />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Driver Status Page - For pending_driver role */}
+      <Route path="/partner/driver/status">
+        <ProtectedRoute allowedRoles={["pending_driver", "driver"]}>
+          <DriverStatus />
         </ProtectedRoute>
       </Route>
 

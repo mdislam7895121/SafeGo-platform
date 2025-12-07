@@ -65,6 +65,11 @@ export function getPostLoginPath(user: UserForRedirect | null | undefined): stri
     case "driver":
       return "/driver/map";
 
+    case "pending_driver":
+      // Driver has submitted application, waiting for admin approval
+      // Show the driver onboarding status page while they wait
+      return "/partner/driver/status";
+
     case "restaurant":
       return "/restaurant";
 
