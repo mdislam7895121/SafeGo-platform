@@ -550,15 +550,21 @@ function DriverRegistrationV2() {
 
   const renderUSPersonalInfo = () => (
     <Form {...personalFormUS}>
-      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()} autoComplete="off">
         <FormField
           control={personalFormUS.control}
           name="usaFullLegalName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Full Legal Name *</FormLabel>
+              <FormLabel htmlFor="personal-full-legal-name">Full Legal Name *</FormLabel>
               <FormControl>
-                <Input placeholder="As shown on your driver license" {...field} data-testid="input-legal-name" />
+                <Input 
+                  id="personal-full-legal-name"
+                  placeholder="As shown on your driver license" 
+                  autoComplete="off"
+                  {...field} 
+                  data-testid="input-legal-name" 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -571,9 +577,15 @@ function DriverRegistrationV2() {
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone Number *</FormLabel>
+                <FormLabel htmlFor="personal-phone">Phone Number *</FormLabel>
                 <FormControl>
-                  <Input placeholder="(555) 123-4567" {...field} data-testid="input-phone" />
+                  <Input 
+                    id="personal-phone"
+                    placeholder="(555) 123-4567" 
+                    autoComplete="off"
+                    {...field} 
+                    data-testid="input-phone" 
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -584,9 +596,15 @@ function DriverRegistrationV2() {
             name="dateOfBirth"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Date of Birth *</FormLabel>
+                <FormLabel htmlFor="personal-date-of-birth">Date of Birth *</FormLabel>
                 <FormControl>
-                  <Input type="date" {...field} data-testid="input-dob" />
+                  <Input 
+                    id="personal-date-of-birth"
+                    type="date" 
+                    autoComplete="off"
+                    {...field} 
+                    data-testid="input-dob" 
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -605,9 +623,9 @@ function DriverRegistrationV2() {
             name="usaStreet"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Street Address 1 *</FormLabel>
+                <FormLabel htmlFor="personal-street-address">Street Address 1 *</FormLabel>
                 <FormControl>
-                  <Input placeholder="123 Main Street" {...field} data-testid="input-street" />
+                  <Input id="personal-street-address" placeholder="123 Main Street" autoComplete="off" {...field} data-testid="input-street" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -619,9 +637,9 @@ function DriverRegistrationV2() {
             name="usaAptUnit"
             render={({ field }) => (
               <FormItem className="mt-4">
-                <FormLabel>Street Address 2 (Apt/Unit/Suite)</FormLabel>
+                <FormLabel htmlFor="personal-apt-unit">Street Address 2 (Apt/Unit/Suite)</FormLabel>
                 <FormControl>
-                  <Input placeholder="Apt 4B, Suite 100, Unit 5" {...field} data-testid="input-apt" />
+                  <Input id="personal-apt-unit" placeholder="Apt 4B, Suite 100, Unit 5" autoComplete="off" {...field} data-testid="input-apt" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -634,9 +652,9 @@ function DriverRegistrationV2() {
               name="usaCity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>City *</FormLabel>
+                  <FormLabel htmlFor="personal-city">City *</FormLabel>
                   <FormControl>
-                    <Input placeholder="City" {...field} data-testid="input-city" />
+                    <Input id="personal-city" placeholder="City" autoComplete="off" {...field} data-testid="input-city" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -647,10 +665,10 @@ function DriverRegistrationV2() {
               name="usaState"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>State *</FormLabel>
+                  <FormLabel htmlFor="personal-state">State *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
-                      <SelectTrigger data-testid="select-state">
+                      <SelectTrigger id="personal-state" data-testid="select-state">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                     </FormControl>
@@ -669,9 +687,9 @@ function DriverRegistrationV2() {
               name="usaZipCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>ZIP Code *</FormLabel>
+                  <FormLabel htmlFor="personal-zip">ZIP Code *</FormLabel>
                   <FormControl>
-                    <Input placeholder="12345" maxLength={10} {...field} data-testid="input-zip" />
+                    <Input id="personal-zip" placeholder="12345" maxLength={10} autoComplete="off" {...field} data-testid="input-zip" />
                   </FormControl>
                   <FormDescription className="text-xs">5-digit or ZIP+4</FormDescription>
                   <FormMessage />
@@ -690,9 +708,9 @@ function DriverRegistrationV2() {
               name="emergencyContactName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Name *</FormLabel>
+                  <FormLabel htmlFor="personal-emergency-name">Contact Name *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Full name" {...field} data-testid="input-emergency-name" />
+                    <Input id="personal-emergency-name" placeholder="Full name" autoComplete="off" {...field} data-testid="input-emergency-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -703,9 +721,9 @@ function DriverRegistrationV2() {
               name="emergencyContactPhone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Phone *</FormLabel>
+                  <FormLabel htmlFor="personal-emergency-phone">Contact Phone *</FormLabel>
                   <FormControl>
-                    <Input placeholder="(555) 123-4567" {...field} data-testid="input-emergency-phone" />
+                    <Input id="personal-emergency-phone" placeholder="(555) 123-4567" autoComplete="off" {...field} data-testid="input-emergency-phone" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -718,10 +736,10 @@ function DriverRegistrationV2() {
             name="emergencyContactRelationship"
             render={({ field }) => (
               <FormItem className="mt-4">
-                <FormLabel>Relationship *</FormLabel>
+                <FormLabel htmlFor="personal-emergency-relationship">Relationship *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || ""}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-relationship">
+                    <SelectTrigger id="personal-emergency-relationship" data-testid="select-relationship">
                       <SelectValue placeholder="Select relationship" />
                     </SelectTrigger>
                   </FormControl>
@@ -743,9 +761,10 @@ function DriverRegistrationV2() {
             name="ssnLast4"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>SSN Last 4 Digits (Optional)</FormLabel>
+                <FormLabel htmlFor="personal-ssn-last4">SSN Last 4 Digits (Optional)</FormLabel>
                 <FormControl>
                   <Input 
+                    id="personal-ssn-last4"
                     placeholder="••••" 
                     maxLength={4} 
                     type="password"
@@ -774,8 +793,9 @@ function DriverRegistrationV2() {
           name="driverLicenseNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Driver License Number *</FormLabel>
+              <FormLabel htmlFor="license-number-field">Driver License Number *</FormLabel>
               <Input
+                id="license-number-field"
                 type="text"
                 placeholder="Enter your license number"
                 autoComplete="new-password"
@@ -797,9 +817,9 @@ function DriverRegistrationV2() {
             name="driverLicenseState"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>License Issuing State *</FormLabel>
+                <FormLabel htmlFor="license-state-field">License Issuing State *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || ""}>
-                  <SelectTrigger data-testid="select-license-state">
+                  <SelectTrigger id="license-state-field" data-testid="select-license-state">
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                   <SelectContent>
@@ -817,8 +837,9 @@ function DriverRegistrationV2() {
             name="driverLicenseExpiry"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>License Expiration Date *</FormLabel>
+                <FormLabel htmlFor="license-expiry-field">License Expiration Date *</FormLabel>
                 <Input
+                  id="license-expiry-field"
                   type="date"
                   autoComplete="new-password"
                   data-testid="input-license-expiry"

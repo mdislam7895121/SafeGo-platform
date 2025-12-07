@@ -511,15 +511,15 @@ export default function DriverRegistration() {
 
   const renderUSPersonalInfo = () => (
     <Form {...personalFormUS}>
-      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()} autoComplete="off">
         <FormField
           control={personalFormUS.control}
           name="usaFullLegalName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Full Legal Name *</FormLabel>
+              <FormLabel htmlFor="v1-personal-full-legal-name">Full Legal Name *</FormLabel>
               <FormControl>
-                <Input placeholder="As shown on your driver license" {...field} data-testid="input-legal-name" />
+                <Input id="v1-personal-full-legal-name" placeholder="As shown on your driver license" autoComplete="off" {...field} data-testid="input-legal-name" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -532,9 +532,9 @@ export default function DriverRegistration() {
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone Number *</FormLabel>
+                <FormLabel htmlFor="v1-personal-phone">Phone Number *</FormLabel>
                 <FormControl>
-                  <Input placeholder="(555) 123-4567" {...field} data-testid="input-phone" />
+                  <Input id="v1-personal-phone" placeholder="(555) 123-4567" autoComplete="off" {...field} data-testid="input-phone" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -545,9 +545,9 @@ export default function DriverRegistration() {
             name="dateOfBirth"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Date of Birth *</FormLabel>
+                <FormLabel htmlFor="v1-personal-date-of-birth">Date of Birth *</FormLabel>
                 <FormControl>
-                  <Input type="date" {...field} data-testid="input-dob" />
+                  <Input id="v1-personal-date-of-birth" type="date" autoComplete="off" {...field} data-testid="input-dob" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -743,9 +743,10 @@ export default function DriverRegistration() {
           name="driverLicenseNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Driver License Number *</FormLabel>
+              <FormLabel htmlFor="v1-license-number-field">Driver License Number *</FormLabel>
               <FormControl>
                 <input
+                  id="v1-license-number-field"
                   type="text"
                   inputMode="text"
                   autoComplete="new-password"
@@ -773,9 +774,10 @@ export default function DriverRegistration() {
             name="driverLicenseState"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>License Issuing State *</FormLabel>
+                <FormLabel htmlFor="v1-license-state-field">License Issuing State *</FormLabel>
                 <FormControl>
                   <select
+                    id="v1-license-state-field"
                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
                     data-testid="select-license-state"
                     value={field.value || ""}
@@ -799,9 +801,10 @@ export default function DriverRegistration() {
             name="driverLicenseExpiry"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>License Expiration Date *</FormLabel>
+                <FormLabel htmlFor="v1-license-expiry-field">License Expiration Date *</FormLabel>
                 <FormControl>
                   <input
+                    id="v1-license-expiry-field"
                     type="date"
                     autoComplete="new-password"
                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
