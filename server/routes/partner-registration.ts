@@ -226,7 +226,7 @@ function validateRestaurantKYC(data: z.infer<typeof restaurantRegistrationSchema
   return { valid: errors.length === 0, errors };
 }
 
-router.get('/driver/registration/status/:driverType?', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/partner-driver/registration/status/:driverType?', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -333,7 +333,7 @@ router.get('/driver/registration/status/:driverType?', authenticateToken, async 
   }
 });
 
-router.post('/driver/registration/submit', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.post('/partner-driver/registration/submit', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -521,7 +521,7 @@ router.post('/driver/registration/submit', authenticateToken, async (req: AuthRe
   }
 });
 
-router.post('/driver/registration/save-step', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.post('/partner-driver/registration/save-step', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {

@@ -184,20 +184,20 @@ export default function DriverRegistration() {
   const STEPS = isBD ? STEPS_BD : STEPS_US;
 
   const { data: existingProfile, isLoading: profileLoading } = useQuery<{ profile: any } | null>({
-    queryKey: ["/api/driver/registration/status", driverType],
+    queryKey: ["/api/partner-driver/registration/status", driverType],
     enabled: !!user,
   });
 
   const submitMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/driver/registration/submit", {
+      return await apiRequest("/api/partner-driver/registration/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/registration/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/partner-driver/registration/status"] });
       toast({
         title: "Application Submitted",
         description: "Your driver application has been submitted for review.",
