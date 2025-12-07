@@ -604,7 +604,11 @@ export default function DriverRegistration() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>State *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value)} 
+                    value={field.value || undefined}
+                    defaultValue={field.value || undefined}
+                  >
                     <FormControl>
                       <SelectTrigger data-testid="select-state">
                         <SelectValue placeholder="Select" />
@@ -675,7 +679,11 @@ export default function DriverRegistration() {
             render={({ field }) => (
               <FormItem className="mt-4">
                 <FormLabel>Relationship *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select 
+                  onValueChange={(value) => field.onChange(value)} 
+                  value={field.value || undefined}
+                  defaultValue={field.value || undefined}
+                >
                   <FormControl>
                     <SelectTrigger data-testid="select-relationship">
                       <SelectValue placeholder="Select relationship" />
@@ -746,7 +754,13 @@ export default function DriverRegistration() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>License Issuing State *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select 
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                  }} 
+                  value={field.value || undefined}
+                  defaultValue={field.value || undefined}
+                >
                   <FormControl>
                     <SelectTrigger data-testid="select-license-state">
                       <SelectValue placeholder="Select state" />
@@ -834,7 +848,11 @@ export default function DriverRegistration() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Vehicle Type *</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select 
+                onValueChange={(value) => field.onChange(value)} 
+                value={field.value || undefined}
+                defaultValue={field.value || undefined}
+              >
                 <FormControl>
                   <SelectTrigger data-testid="select-vehicle-type">
                     <SelectValue placeholder="Select vehicle type" />
