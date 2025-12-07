@@ -775,17 +775,16 @@ function DriverRegistrationV2() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Driver License Number *</FormLabel>
-              <input
+              <Input
                 type="text"
                 placeholder="Enter your license number"
                 autoComplete="off"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                data-testid="input-license-number"
                 value={field.value || ""}
-                onChange={(e) => field.onChange(e.target.value)}
+                onChange={field.onChange}
                 onBlur={field.onBlur}
                 name={field.name}
                 ref={field.ref}
-                data-testid="input-license-number"
               />
               <FormMessage />
             </FormItem>
@@ -799,20 +798,16 @@ function DriverRegistrationV2() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>License Issuing State *</FormLabel>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-                  value={field.value || ""}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  ref={field.ref}
-                  data-testid="select-license-state"
-                >
-                  <option value="">Select state</option>
-                  {US_STATES.map(state => (
-                    <option key={state.code} value={state.code}>{state.name}</option>
-                  ))}
-                </select>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <SelectTrigger data-testid="select-license-state">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {US_STATES.map(state => (
+                      <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -823,15 +818,14 @@ function DriverRegistrationV2() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>License Expiration Date *</FormLabel>
-                <input
+                <Input
                   type="date"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                  data-testid="input-license-expiry"
                   value={field.value || ""}
-                  onChange={(e) => field.onChange(e.target.value)}
+                  onChange={field.onChange}
                   onBlur={field.onBlur}
                   name={field.name}
                   ref={field.ref}
-                  data-testid="input-license-expiry"
                 />
                 <FormMessage />
               </FormItem>
