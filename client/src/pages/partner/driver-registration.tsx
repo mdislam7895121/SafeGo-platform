@@ -22,8 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isPartnerAvailable, getPartnerConfig, type PartnerType } from "@shared/partnerAvailability";
-import { useFeatureFlags, FEATURE_FLAGS } from "@/hooks/useFeatureFlags";
-// V1 is kept in ./legacy/driver-registration-v1.tsx for backup/reference only - not used in routing
+// V1 is kept in ./legacy/driver-registration-v1.tsx for backup/reference only
+// V2 is now the only version used for driver onboarding (feature flag bypass)
 
 const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
 
@@ -99,7 +99,7 @@ const vehicleInfoSchema = z.object({
 const nycComplianceSchema = z.object({
   tlcLicenseNumber: z.string().min(5, "TLC license number is required"),
   tlcLicenseExpiry: z.string().min(1, "TLC license expiry is required"),
-  fhvLicenseNumber: z.string().min(1, "FHV number/barcode is required"),
+  fhvLicenseNumber: z.string().optional().or(z.literal("")),
   dmvInspectionDate: z.string().min(1, "DMV inspection date is required"),
   dmvInspectionExpiry: z.string().min(1, "DMV inspection expiry is required"),
 });
@@ -1127,17 +1127,20 @@ function DriverRegistrationV2() {
         </div>
 
         <div className="border-t pt-6 space-y-4">
-          <h4 className="font-semibold">FHV (For-Hire Vehicle) Permit *</h4>
+          <h4 className="font-semibold">FHV (For-Hire Vehicle) Permit</h4>
           
           <FormField
             control={nycForm.control}
             name="fhvLicenseNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>FHV Number/Barcode *</FormLabel>
+                <FormLabel>FHV Number/Barcode (Optional)</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter FHV number or scan barcode" {...field} data-testid="input-fhv-number" />
+                  <Input placeholder="Enter FHV number or scan barcode (optional)" {...field} data-testid="input-fhv-number" />
                 </FormControl>
+                <FormDescription>
+                  You can leave this blank - admin will fill it from your uploaded document if needed.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -1507,7 +1510,11 @@ function DriverRegistrationV2() {
               <span className="text-muted-foreground">TLC Expiry:</span>
               <span>{formData.nycCompliance.tlcLicenseExpiry}</span>
               <span className="text-muted-foreground">FHV #:</span>
-              <span className="font-mono">{formData.nycCompliance.fhvLicenseNumber}</span>
+              {formData.nycCompliance.fhvLicenseNumber ? (
+                <span className="font-mono">{formData.nycCompliance.fhvLicenseNumber}</span>
+              ) : (
+                <span className="text-muted-foreground italic text-xs">Not provided (admin will extract from document)</span>
+              )}
               <span className="text-muted-foreground">DMV Inspection:</span>
               <span>{formData.nycCompliance.dmvInspectionDate} - {formData.nycCompliance.dmvInspectionExpiry}</span>
             </div>

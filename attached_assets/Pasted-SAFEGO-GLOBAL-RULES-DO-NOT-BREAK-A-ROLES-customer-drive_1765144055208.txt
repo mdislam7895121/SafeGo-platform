@@ -1,0 +1,76 @@
+SAFEGO GLOBAL RULES – DO NOT BREAK
+
+A) ROLES (customer, driver, restaurant, admin) stay separated with their own onboarding, KYC, dashboards, permissions, and status flows. Public signup is CUSTOMER ONLY; partners onboard after login.
+
+B) SERVICES: ride-hailing, food delivery, parcel delivery must keep working everywhere.
+
+C) COUNTRY KYC:
+- BD drivers: father_name, date_of_birth, present_address, permanent_address, NID (number + images), emergency contact, verification_status, is_verified.
+- US base: date_of_birth, home_address, emergency contacts, government_id_type, government_id_last4, verification_status, is_verified.
+- US drivers extra: driver_license_number/state/expiry, license images, optional ssn_last4, NYC TLC fields (TLC license number/expiry + images, FHV, DMV inspection, insurance, etc.).
+Do NOT rename or delete existing fields.
+
+D) ADMIN PANEL: must still verify KYC, see rejection_reason, manage pricing/fees/commission, block/unblock, manage payouts, view driver/restaurant negative balances.
+
+E) COLLECTIONS: rides, food_orders, deliveries keep identity fields, addresses+geo, fee+commission, payment details, timestamps, rating+feedback.
+
+F) COMMISSION: cash rides → negative driver_wallet_balance; cash food → negative restaurant_wallet; online → SafeGo keeps commission; admin settles.
+
+G) SECURITY: no cross-role KYC visibility, only admin edits pricing/commission/verification/blocking, users edit only self.
+
+H) STATUS FLOWS for rides/food/parcel remain unchanged.
+
+I) ONBOARDING: customer-only signup; partners have multi-step onboarding with verification_status="pending" until admin approval.
+
+J) NOTIFICATIONS: keep all ride/order/parcel/KYC/admin notifications.
+
+All changes must be additive and NON-BREAKING.
+
+====================================================
+TASK: MAKE FHV NUMBER/BARCODE OPTIONAL IN NYC COMPLIANCE (US DRIVERS)
+====================================================
+
+Context (current behavior):
+
+On the **NYC Compliance** step for US drivers (route `/partner/driver/register?type=ride`), we have:
+
+- TLC License Number + Expiry + images (work fine)
+- FHV Number/Barcode (text input, currently REQUIRED)
+- FHV Document/Sticker Image (file upload, required)
+- DMV Vehicle Inspection fields, etc.
+
+The user requirement:
+
+- For NYC drivers, **FHV Number/Barcode must NOT be required on the driver form**.
+- It is enough for the driver to upload the **FHV Document/Sticker Image**.
+- Admin can fill or edit the FHV number later if needed in the admin panel.
+
+Important: Do NOT delete the FHV number field from the schema or DB. Just make it optional for drivers and, if needed, hide it from the driver UI while keeping it available for admin.
+
+====================================================
+1. FIND THE NYC COMPLIANCE STEP (V2 DRIVER ONBOARDING)
+====================================================
+
+1.1 Open the V2 driver onboarding file used for `/partner/driver/register?type=ride` (the one we already use after removing V1 from routing).
+
+1.2 In that file, locate the **NYC Compliance** step component which includes:
+- TLC License inputs
+- FHV Number/Barcode + FHV Document/Sticker Image
+- DMV inspection fields, etc.
+
+Identify the form field names, especially:
+- `fhv_number` or `fhv_barcode` (whatever key is used)
+- `fhv_document_image` (or similar)
+
+====================================================
+2. MAKE FHV NUMBER OPTIONAL IN VALIDATION
+====================================================
+
+2.1 In the validation schema (Zod/Yup/whatever you use) for the NYC Compliance step:
+
+- Locate the schema entry for the FHV number/barcode field.
+
+Currently it’s something like:
+
+```ts
+fhv_number: z.string().min(1, "FHV number/barcode is required")
