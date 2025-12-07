@@ -2940,6 +2940,11 @@ function Router() {
       </Route>
 
       {/* Partner Registration Flows */}
+      <Route path="/partner/register">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <DriverRegistration />
+        </ProtectedRoute>
+      </Route>
       <Route path="/partner/driver/register">
         <ProtectedRoute allowedRoles={["customer"]}>
           <DriverRegistration />
