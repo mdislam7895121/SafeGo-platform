@@ -511,7 +511,7 @@ export default function DriverRegistration() {
 
   const renderUSPersonalInfo = () => (
     <Form {...personalFormUS}>
-      <form className="space-y-6">
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
         <FormField
           control={personalFormUS.control}
           name="usaFullLegalName"
@@ -609,21 +609,22 @@ export default function DriverRegistration() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>State *</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange}
-                    value={field.value ?? ""}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-state">
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  <FormControl>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="select-state"
+                      value={field.value}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref as any}
+                    >
+                      <option value="">Select</option>
                       {US_STATES.map(state => (
-                        <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
+                        <option key={state.code} value={state.code}>{state.name}</option>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -683,21 +684,22 @@ export default function DriverRegistration() {
             render={({ field }) => (
               <FormItem className="mt-4">
                 <FormLabel>Relationship *</FormLabel>
-                <Select 
-                  onValueChange={field.onChange}
-                  value={field.value ?? ""}
-                >
-                  <FormControl>
-                    <SelectTrigger data-testid="select-relationship">
-                      <SelectValue placeholder="Select relationship" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
+                <FormControl>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="select-relationship"
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref as any}
+                  >
+                    <option value="">Select relationship</option>
                     {EMERGENCY_RELATIONSHIPS.map(rel => (
-                      <SelectItem key={rel.value} value={rel.value}>{rel.label}</SelectItem>
+                      <option key={rel.value} value={rel.value}>{rel.label}</option>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </select>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -735,7 +737,7 @@ export default function DriverRegistration() {
 
   const renderLicenseInfo = () => (
     <Form {...licenseForm}>
-      <form className="space-y-6">
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
         <FormField
           control={licenseForm.control}
           name="driverLicenseNumber"
@@ -743,7 +745,22 @@ export default function DriverRegistration() {
             <FormItem>
               <FormLabel>Driver License Number *</FormLabel>
               <FormControl>
-                <Input placeholder="Enter your license number" {...field} data-testid="input-license-number" />
+                <input
+                  type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  placeholder="Enter your license number"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="input-license-number"
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -757,21 +774,22 @@ export default function DriverRegistration() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>License Issuing State *</FormLabel>
-                <Select 
-                  onValueChange={field.onChange}
-                  value={field.value ?? ""}
-                >
-                  <FormControl>
-                    <SelectTrigger data-testid="select-license-state">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
+                <FormControl>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                    data-testid="select-license-state"
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref as any}
+                  >
+                    <option value="">Select state</option>
                     {US_STATES.map(state => (
-                      <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
+                      <option key={state.code} value={state.code}>{state.name}</option>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </select>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -783,7 +801,16 @@ export default function DriverRegistration() {
               <FormItem>
                 <FormLabel>License Expiration Date *</FormLabel>
                 <FormControl>
-                  <Input type="date" {...field} data-testid="input-license-expiry" />
+                  <input
+                    type="date"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="input-license-expiry"
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -841,41 +868,42 @@ export default function DriverRegistration() {
 
   const renderVehicleInfo = () => (
     <Form {...vehicleForm}>
-      <form className="space-y-6">
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
         <FormField
           control={vehicleForm.control}
           name="vehicleType"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Vehicle Type *</FormLabel>
-              <Select 
-                onValueChange={field.onChange}
-                value={field.value ?? ""}
-              >
-                <FormControl>
-                  <SelectTrigger data-testid="select-vehicle-type">
-                    <SelectValue placeholder="Select vehicle type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
+              <FormControl>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="select-vehicle-type"
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref as any}
+                >
+                  <option value="">Select vehicle type</option>
                   {driverType === 'ride' ? (
                     <>
-                      <SelectItem value="sedan">Sedan</SelectItem>
-                      <SelectItem value="suv">SUV</SelectItem>
-                      <SelectItem value="minivan">Minivan</SelectItem>
-                      <SelectItem value="luxury">Luxury</SelectItem>
-                      {isBD && <SelectItem value="cng">CNG Auto</SelectItem>}
+                      <option value="sedan">Sedan</option>
+                      <option value="suv">SUV</option>
+                      <option value="minivan">Minivan</option>
+                      <option value="luxury">Luxury</option>
+                      {isBD && <option value="cng">CNG Auto</option>}
                     </>
                   ) : (
                     <>
-                      <SelectItem value="car">Car</SelectItem>
-                      <SelectItem value="motorcycle">Motorcycle</SelectItem>
-                      <SelectItem value="bicycle">Bicycle</SelectItem>
-                      <SelectItem value="scooter">Scooter</SelectItem>
+                      <option value="car">Car</option>
+                      <option value="motorcycle">Motorcycle</option>
+                      <option value="bicycle">Bicycle</option>
+                      <option value="scooter">Scooter</option>
                     </>
                   )}
-                </SelectContent>
-              </Select>
+                </select>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
