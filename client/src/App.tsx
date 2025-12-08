@@ -1344,7 +1344,7 @@ function Router() {
       {/* Restaurant routes - All wrapped with RestaurantLayout */}
       {/* Dashboard - Home */}
       <Route path="/restaurant/dashboard">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantHome />
           </RestaurantLayout>
@@ -1354,7 +1354,7 @@ function Router() {
         <Redirect to="/restaurant/dashboard" />
       </Route>
       <Route path="/restaurant">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantHome />
           </RestaurantLayout>
@@ -1363,49 +1363,49 @@ function Router() {
 
       {/* Orders */}
       <Route path="/restaurant/orders/overview">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <OrdersOverview />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/orders/live">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <LiveOrders />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/orders/cancellations">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <OrdersCancellations />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/orders/scheduled">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <ScheduledOrders />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/orders/history">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantOrders />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/orders/:orderId">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantOrderDetails />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/orders">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantOrders />
           </RestaurantLayout>
@@ -1414,7 +1414,7 @@ function Router() {
 
       {/* Kitchen Display */}
       <Route path="/restaurant/kitchen">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantKitchen />
           </RestaurantLayout>
@@ -1423,49 +1423,49 @@ function Router() {
 
       {/* Menu Management */}
       <Route path="/restaurant/menu/items">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantMenu />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/menu/categories">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <MenuCategories />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/menu/new">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <AddMenuItem />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/menu-edit/:id">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <EditMenuItem />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/menu-item-options/:itemId">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <MenuItemOptions />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/menu/bulk">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <MenuBulkActions />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/menu">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantMenu />
           </RestaurantLayout>
@@ -1474,21 +1474,21 @@ function Router() {
 
       {/* Promotions - OWNER ONLY */}
       <Route path="/restaurant/promotions/campaigns">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <PromotionsCampaigns />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/promotions/coupons">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <PromotionsCoupons />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/promotions/featured">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <PromotionsFeatured />
           </RestaurantLayout>
@@ -1497,28 +1497,28 @@ function Router() {
 
       {/* Analytics - Phase 4 */}
       <Route path="/restaurant/analytics/overview">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <AnalyticsOverview />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/analytics/items">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <AnalyticsItems />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/analytics/customers">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <AnalyticsCustomers />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/analytics/drivers">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <AnalyticsDrivers />
           </RestaurantLayout>
@@ -1527,14 +1527,14 @@ function Router() {
 
       {/* Payouts - Phase 5 */}
       <Route path="/restaurant/payouts/overview">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <RestaurantPayouts />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/payouts">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <RestaurantPayouts />
           </RestaurantLayout>
@@ -1543,14 +1543,14 @@ function Router() {
       
       {/* Payout Methods - Payment & Payout Configuration (OWNER only) */}
       <Route path="/restaurant/payout-methods">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <RestaurantPayoutMethods />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/payouts-history">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <RestaurantPayoutsHistory />
           </RestaurantLayout>
@@ -1559,7 +1559,7 @@ function Router() {
       
       {/* Customer Payment Options - Payment & Payout Configuration */}
       <Route path="/restaurant/payment-options">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantPaymentOptions />
           </RestaurantLayout>
@@ -1568,14 +1568,14 @@ function Router() {
 
       {/* Staff Management - Phase 6 (OWNER only) */}
       <Route path="/restaurant/staff/activity">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <StaffActivity />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/staff">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <StaffManagement />
           </RestaurantLayout>
@@ -1584,14 +1584,14 @@ function Router() {
 
       {/* Reviews */}
       <Route path="/restaurant/reviews/complaints">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <ReviewsComplaints />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/reviews">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <Reviews />
           </RestaurantLayout>
@@ -1600,7 +1600,7 @@ function Router() {
 
       {/* Branding - Phase 9 (OWNER only) */}
       <Route path="/restaurant/branding">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <RestaurantBranding />
           </RestaurantLayout>
@@ -1609,7 +1609,7 @@ function Router() {
 
       {/* Gallery - Phase 9 */}
       <Route path="/restaurant/gallery">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantGallery />
           </RestaurantLayout>
@@ -1618,49 +1618,49 @@ function Router() {
 
       {/* Settings */}
       <Route path="/restaurant/settings/profile">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SettingsProfile />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/settings/hours">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SettingsHours />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/settings/delivery">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SettingsDelivery />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/settings/zones">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SettingsZones />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/settings/surge">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SettingsSurge />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/settings/staff">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <SettingsStaff />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/settings/devices">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SettingsDevices />
           </RestaurantLayout>
@@ -1669,21 +1669,21 @@ function Router() {
 
       {/* Documents & Compliance (Owner only) */}
       <Route path="/restaurant/documents/business">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <DocumentsBusiness />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/documents/health">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <DocumentsHealth />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/documents/kyc">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <DocumentsKYC />
           </RestaurantLayout>
@@ -1693,14 +1693,14 @@ function Router() {
       {/* Support */}
       {/* Phase 12: Support Tickets */}
       <Route path="/restaurant/support-tickets/:id">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantSupportTicketDetail />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/support-tickets">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantSupportTickets />
           </RestaurantLayout>
@@ -1708,49 +1708,49 @@ function Router() {
       </Route>
       {/* Phase 12.5: Support Center - Multi-channel support hub */}
       <Route path="/restaurant/support/live-chat">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SupportLiveChat />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/support/phone">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SupportPhone />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/support/articles/:id">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SupportArticle />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/support/help">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SupportHelp />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/support/contact">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SupportContact />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/support/status">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SupportStatus />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/support">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <SupportHub />
           </RestaurantLayout>
@@ -1759,19 +1759,19 @@ function Router() {
 
       {/* Legacy routes - keep for backward compatibility */}
       <Route path="/restaurant/profile">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantProfile />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/privacy-policy">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantPrivacyPolicy />
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/wallet">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantWallet />
           </RestaurantLayout>

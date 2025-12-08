@@ -11,6 +11,7 @@ interface KYCStatus {
   countryCode: string | null;
   verificationStatus: string;
   isVerified: boolean;
+  rejectionReason?: string | null;
 }
 
 function getFieldLabel(field: string): string {
@@ -34,7 +35,7 @@ export function KYCBanner() {
     return null;
   }
 
-  const { isComplete, missingFields, countryCode, verificationStatus, isVerified } = kycData.kycStatus;
+  const { isComplete, missingFields, countryCode, verificationStatus, isVerified, rejectionReason } = kycData.kycStatus;
 
   // Don't show banner if KYC is complete and verified
   if (isComplete && isVerified) {
@@ -92,12 +93,17 @@ export function KYCBanner() {
       <Alert variant="destructive" className="mb-4" data-testid="alert-kyc-rejected">
         <XCircle className="h-5 w-5" />
         <AlertTitle className="flex items-center gap-2">
-          KYC Verification Rejected
+          Verification Rejected
           <Badge variant="destructive">Action Required</Badge>
         </AlertTitle>
         <AlertDescription className="mt-2">
+          {rejectionReason && (
+            <p className="mb-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded text-sm">
+              <strong>Reason:</strong> {rejectionReason}
+            </p>
+          )}
           <p className="mb-3">
-            Your KYC verification was rejected. Please review and update your information.
+            Your verification was rejected. Please review and update your information to continue.
           </p>
           <Button asChild size="sm" variant="outline" data-testid="button-resubmit-kyc">
             <Link href="/restaurant/profile">

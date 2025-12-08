@@ -1954,11 +1954,14 @@ router.get("/kyc-status", async (req: AuthRequest, res) => {
     const kycValidation = validateRestaurantKYC(restaurantProfile);
 
     res.json({
-      isComplete: kycValidation.isComplete,
-      missingFields: kycValidation.missingFields,
-      countryCode: kycValidation.countryCode,
-      verificationStatus: restaurantProfile.verificationStatus,
-      isVerified: restaurantProfile.isVerified,
+      kycStatus: {
+        isComplete: kycValidation.isComplete,
+        missingFields: kycValidation.missingFields,
+        countryCode: kycValidation.countryCode,
+        verificationStatus: restaurantProfile.verificationStatus,
+        isVerified: restaurantProfile.isVerified,
+        rejectionReason: restaurantProfile.rejectionReason,
+      }
     });
   } catch (error) {
     console.error("Get KYC status error:", error);

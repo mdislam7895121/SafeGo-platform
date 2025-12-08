@@ -65,6 +65,15 @@ interface WalletData {
   } | null;
 }
 
+interface KYCStatus {
+  isComplete: boolean;
+  missingFields: string[];
+  countryCode: string | null;
+  verificationStatus: string;
+  isVerified: boolean;
+  rejectionReason?: string;
+}
+
 export default function RestaurantHome() {
   const { user, logout } = useAuth();
   const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
@@ -75,6 +84,16 @@ export default function RestaurantHome() {
     queryKey: ["/api/restaurant/home"],
     refetchInterval: 30000, // Reduced for memory efficiency
   });
+
+  // Query for KYC/verification status
+  const { data: kycData } = useQuery<{ kycStatus?: KYCStatus }>({
+    queryKey: ["/api/restaurant/kyc-status"],
+  });
+  
+  // Check if restaurant can accept orders (must be verified)
+  const isVerified = kycData?.kycStatus?.isVerified ?? false;
+  const verificationStatus = kycData?.kycStatus?.verificationStatus ?? "pending";
+  const canAcceptOrders = isVerified && verificationStatus === "approved";
 
   const { data: ordersData, isLoading: ordersLoading, isError: ordersError } = useQuery({
     queryKey: ordersKeys.list({ limit: 10 }),
@@ -377,26 +396,38 @@ export default function RestaurantHome() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Verification blocking message */}
+            {!canAcceptOrders && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg" data-testid="alert-verification-required">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                  {verificationStatus === "rejected" 
+                    ? "Your verification was rejected. Please update your information to go live."
+                    : "Your restaurant is pending verification. You cannot accept orders until approved by SafeGo."}
+                </p>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
               <div className="flex items-center justify-between sm:justify-start gap-3">
                 <div className="flex items-center gap-2">
                   <Switch
                     id="open-toggle"
-                    checked={isOpen}
+                    checked={canAcceptOrders ? isOpen : false}
                     onCheckedChange={handleOpenToggle}
-                    disabled={updateStatusMutation2.isPending}
+                    disabled={updateStatusMutation2.isPending || !canAcceptOrders}
                     data-testid="switch-open-close"
                   />
-                  <Label htmlFor="open-toggle" className="font-medium cursor-pointer">
-                    {isOpen ? "Open" : "Closed"}
+                  <Label htmlFor="open-toggle" className={`font-medium cursor-pointer ${!canAcceptOrders ? 'text-muted-foreground' : ''}`}>
+                    {canAcceptOrders && isOpen ? "Open" : "Closed"}
                   </Label>
                 </div>
                 <Badge 
-                  variant={isOpen ? "default" : "secondary"} 
-                  className={isOpen ? "bg-green-500" : ""}
+                  variant={canAcceptOrders && isOpen ? "default" : "secondary"} 
+                  className={canAcceptOrders && isOpen ? "bg-green-500" : ""}
                   data-testid="badge-open-status"
                 >
-                  {isOpen ? "Accepting Orders" : "Not Accepting"}
+                  {!canAcceptOrders 
+                    ? "Verification Required" 
+                    : isOpen ? "Accepting Orders" : "Not Accepting"}
                 </Badge>
               </div>
               <div className="flex items-center justify-between sm:justify-start gap-3">
@@ -405,14 +436,14 @@ export default function RestaurantHome() {
                     id="busy-toggle"
                     checked={isBusy}
                     onCheckedChange={handleBusyToggle}
-                    disabled={updateStatusMutation2.isPending || !isOpen}
+                    disabled={updateStatusMutation2.isPending || !isOpen || !canAcceptOrders}
                     data-testid="switch-busy-mode"
                   />
-                  <Label htmlFor="busy-toggle" className={`font-medium cursor-pointer ${!isOpen ? 'text-muted-foreground' : ''}`}>
+                  <Label htmlFor="busy-toggle" className={`font-medium cursor-pointer ${!isOpen || !canAcceptOrders ? 'text-muted-foreground' : ''}`}>
                     Busy Mode
                   </Label>
                 </div>
-                {isBusy && isOpen && (
+                {isBusy && isOpen && canAcceptOrders && (
                   <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-busy-status">
                     <PauseCircle className="h-3 w-3" />
                     Paused
@@ -420,7 +451,7 @@ export default function RestaurantHome() {
                 )}
               </div>
             </div>
-            {isBusy && isOpen && (
+            {isBusy && isOpen && canAcceptOrders && (
               <p className="text-xs text-muted-foreground mt-3">
                 New orders are temporarily paused. Existing orders can still be managed.
               </p>
