@@ -1,3 +1,28 @@
+/**
+ * CANONICAL SafeGo Delivery Driver 7-Step KYC Registration Wizard
+ * 
+ * This is the ONLY driver registration/onboarding wizard for the SafeGo platform.
+ * 
+ * Route: /partner/delivery-driver/wizard
+ * 
+ * 7-Step Flow (SafeGo Master Rules Compliant):
+ * 1. Select Country (BD or US)
+ * 2. Personal Info (country-specific fields)
+ * 3. Address Info (country-specific validation)
+ * 4. Government ID (NID for BD, state ID/passport for US)
+ * 5. Delivery Method (US only: car/bike/walking)
+ * 6. Vehicle Documents (if applicable - BD always, US only for car)
+ * 7. Review & Submit
+ * 
+ * Field Mapping:
+ * - Frontend uses clean names: street_address, apt_unit, city, state, zip_code
+ * - Backend uses legacy names: usaStreet, usaAptUnit, usaCity, usaState, usaZipCode
+ * - Mapping occurs in handleStep3SubmitUS function
+ * 
+ * For POST-APPROVAL driver training tutorials, see:
+ * - /driver/onboarding (route)
+ * - client/src/pages/driver/onboarding.tsx (component)
+ */
 import { useState, useEffect, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -38,16 +63,11 @@ interface OnboardingDraft {
   presentAddress?: string;
   permanentAddress?: string;
   homeAddress?: string;
-  street_address?: string;
-  apt_unit?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
-  usaZipCode?: string;
   usaStreet?: string;
+  usaAptUnit?: string;
   usaCity?: string;
   usaState?: string;
-  usaAptUnit?: string;
+  usaZipCode?: string;
   nidNumber?: string;
   nidFrontImageUrl?: string;
   nidBackImageUrl?: string;
@@ -258,11 +278,11 @@ export default function DeliveryDriverWizard() {
   const addressInfoFormUS = useForm({
     resolver: zodResolver(addressInfoSchemaUS),
     defaultValues: {
-      street_address: draft?.street_address || draft?.usaStreet || "",
-      apt_unit: draft?.apt_unit || draft?.usaAptUnit || "",
-      city: draft?.city || draft?.usaCity || "",
-      state: draft?.state || draft?.usaState || "",
-      zip_code: draft?.zip_code || draft?.usaZipCode || "",
+      street_address: draft?.usaStreet || "",
+      apt_unit: draft?.usaAptUnit || "",
+      city: draft?.usaCity || "",
+      state: draft?.usaState || "",
+      zip_code: draft?.usaZipCode || "",
     },
   });
 
@@ -334,16 +354,25 @@ export default function DeliveryDriverWizard() {
   });
 
   useEffect(() => {
-    if (draft) {
+    if (currentStep === 3 && isUS) {
       addressInfoFormUS.reset({
-        street_address: draft.street_address || draft.usaStreet || "",
-        apt_unit: draft.apt_unit || draft.usaAptUnit || "",
-        city: draft.city || draft.usaCity || "",
-        state: draft.state || draft.usaState || "",
-        zip_code: draft.zip_code || draft.usaZipCode || "",
+        street_address: draft?.usaStreet || "",
+        apt_unit: draft?.usaAptUnit || "",
+        city: draft?.usaCity || "",
+        state: draft?.usaState || "",
+        zip_code: draft?.usaZipCode || "",
       });
     }
-  }, [draft]);
+  }, [currentStep, draft, isUS]);
+
+  useEffect(() => {
+    if (currentStep === 3 && isBD) {
+      addressInfoFormBD.reset({
+        presentAddress: draft?.presentAddress || "",
+        permanentAddress: draft?.permanentAddress || "",
+      });
+    }
+  }, [currentStep, draft, isBD]);
 
   const saveStepMutation = useMutation({
     mutationFn: async ({ step, data }: { step: number; data: any }) => {
@@ -1521,15 +1550,15 @@ export default function DeliveryDriverWizard() {
                     ) : (
                       <>
                         <span className="text-muted-foreground">Street:</span>
-                        <span data-testid="review-street">{draft?.street_address || draft?.usaStreet || "Not provided"}</span>
-                        {(draft?.apt_unit || draft?.usaAptUnit) && (
+                        <span data-testid="review-street">{draft?.usaStreet || "Not provided"}</span>
+                        {draft?.usaAptUnit && (
                           <>
                             <span className="text-muted-foreground">Apt/Unit:</span>
-                            <span>{draft?.apt_unit || draft?.usaAptUnit}</span>
+                            <span>{draft.usaAptUnit}</span>
                           </>
                         )}
                         <span className="text-muted-foreground">City, State ZIP:</span>
-                        <span data-testid="review-city-state">{`${draft?.city || draft?.usaCity || ""}, ${draft?.state || draft?.usaState || ""} ${draft?.zip_code || draft?.usaZipCode || ""}`}</span>
+                        <span data-testid="review-city-state">{`${draft?.usaCity || ""}, ${draft?.usaState || ""} ${draft?.usaZipCode || ""}`}</span>
                       </>
                     )}
                   </div>

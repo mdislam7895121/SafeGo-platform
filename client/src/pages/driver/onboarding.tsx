@@ -1,3 +1,23 @@
+/**
+ * Driver Training/Tutorial Onboarding
+ * 
+ * IMPORTANT: This is NOT the delivery driver registration wizard.
+ * 
+ * This component provides POST-APPROVAL training tutorials for drivers who have
+ * already completed the 7-step KYC registration process and been verified.
+ * 
+ * It covers:
+ * - Welcome to SafeGo
+ * - How Earnings Work
+ * - Getting Paid (payouts)
+ * - Safety Guidelines
+ * - Help Center
+ * - Completion celebration
+ * 
+ * For the CANONICAL 7-step KYC driver registration wizard, see:
+ * - /partner/delivery-driver/wizard (route)
+ * - client/src/pages/partner/delivery-driver-wizard.tsx (component)
+ */
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
