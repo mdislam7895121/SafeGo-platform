@@ -1,0 +1,59 @@
+SAFEGO ARCHITECT – FIX 403 “INVALID OR EXPIRED TOKEN” DURING RESTAURANT REGISTRATION
+
+You must fix the authentication/token validation flow for the restaurant onboarding submit action.  
+The user received this error:
+
+403: {"error":"invalid or expired token"}
+
+This means the frontend submission request is NOT sending a valid Authorization header, OR the backend is rejecting a valid user session due to a missing/incorrect token flow.
+
+=====================================================
+A) SAFEGO MASTER RULES (DO NOT BREAK)
+
+Keep all SafeGo rules intact:
+- Roles: customer, driver, restaurant, admin (strict separation)
+- All onboarding flows
+- All country-specific KYC
+- All collections (rides, food_orders, deliveries)
+- All commission & wallet logic
+- All status flows
+- All security rules
+- DO NOT rename or delete DB fields
+- DO NOT change API signatures or break existing users
+
+=====================================================
+B) ROOT CAUSE TO FIX  
+One or more of the following is happening:
+
+1) The restaurant registration form is being submitted WITHOUT an Authorization header.
+2) The Authorization header is using a null/undefined token.
+3) The login session cookie is not being applied during onboarding.
+4) The backend handler for restaurant registration requires a role token but the frontend isn't providing one.
+5) The backend is validating the wrong role (driver/customer) instead of restaurant partner onboarding.
+6) The client-side fetch/axios call is missing:
+   Authorization: Bearer <valid_token>
+7) Token refresh logic (if implemented) is not being triggered.
+
+=====================================================
+C) REQUIRED ACTIONS
+
+You must systematically fix the issue in **three layers**:
+
+--------------------------------------------------
+1) FRONTEND FIX  
+Locate the restaurant registration submit handler in the canonical registration component at:  
+`/partner/restaurant/register`
+
+Ensure the submission request includes:
+
+- If token is stored in localStorage:
+  ```js
+  const token = localStorage.getItem("token");
+  fetch("/api/restaurant/register", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": token ? `Bearer ${token}` : "",
+    },
+    body: JSON.stringify(payload),
+  });
