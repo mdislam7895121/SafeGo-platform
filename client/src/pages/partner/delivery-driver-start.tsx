@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { 
   Bike, ArrowLeft, CheckCircle2, Clock, FileText, 
   ShieldCheck, Loader2, ArrowRight, Package, CircleCheck,
-  AlertCircle
+  AlertCircle, Car
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type VehicleType = "bicycle" | "motorbike";
+type VehicleType = "bicycle" | "motorbike" | "car";
 
 interface PartnerProfile {
   id: string;
@@ -82,6 +82,15 @@ export default function DeliveryDriverBikeStart() {
         { id: 1, title: "Basic Information", description: "Personal details and contact", icon: FileText },
         { id: 2, title: "Government ID", description: "ID verification (no license needed)", icon: ShieldCheck },
         { id: 3, title: "Emergency Contact", description: "Safety contact information", icon: FileText },
+      ];
+    }
+    if (vehicle === "car") {
+      return [
+        { id: 1, title: "Basic Information", description: "Personal details and contact", icon: FileText },
+        { id: 2, title: "Driver's License", description: "License verification required", icon: ShieldCheck },
+        { id: 3, title: "Vehicle Documents", description: "Registration, insurance & inspection", icon: Car },
+        { id: 4, title: "Government ID", description: "ID verification", icon: FileText },
+        { id: 5, title: "Emergency Contact", description: "Safety contact information", icon: FileText },
       ];
     }
     return [
@@ -158,14 +167,14 @@ export default function DeliveryDriverBikeStart() {
         </Link>
 
         <div className="text-center mb-8">
-          <div className="h-20 w-20 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-            <Bike className="h-10 w-10 text-green-600" />
+          <div className="h-20 w-20 rounded-full bg-gradient-to-br from-green-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-4">
+            <Package className="h-10 w-10 text-green-600" />
           </div>
           <h1 className="text-3xl font-bold mb-2" data-testid="text-page-title">
-            Delivery Driver (Bike & Bicycle)
+            Become a Delivery Driver
           </h1>
           <p className="text-muted-foreground">
-            Start earning with SafeGo using a bike or bicycle. Fast approval. Simple requirements.
+            Start earning with SafeGo. Choose your vehicle and complete the simple signup process.
           </p>
         </div>
 
@@ -271,6 +280,38 @@ export default function DeliveryDriverBikeStart() {
                   </div>
                 </div>
               </div>
+
+              <div 
+                className={`flex items-center space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  selectedVehicle === "car" 
+                    ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30" 
+                    : "border-muted hover:border-muted-foreground/30"
+                }`}
+                onClick={() => setSelectedVehicle("car")}
+                data-testid="vehicle-option-car"
+              >
+                <RadioGroupItem value="car" id="car" />
+                <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                  <Car className="h-6 w-6 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="car" className="text-base font-semibold cursor-pointer">
+                    Car
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Use your car for deliveries. Car documents required.
+                  </p>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <Badge variant="secondary" className="text-xs">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      License Required
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      More Capacity
+                    </Badge>
+                  </div>
+                </div>
+              </div>
             </RadioGroup>
           </CardContent>
         </Card>
@@ -350,7 +391,9 @@ export default function DeliveryDriverBikeStart() {
           <p className="text-sm text-muted-foreground mt-4">
             {selectedVehicle === "bicycle" 
               ? "Typical approval time: Same day after document submission"
-              : "Typical approval time: 24-48 hours after document submission"}
+              : selectedVehicle === "car"
+                ? "Typical approval time: 2-3 business days (more documents to verify)"
+                : "Typical approval time: 24-48 hours after document submission"}
           </p>
         </div>
       </div>

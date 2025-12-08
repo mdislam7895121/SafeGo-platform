@@ -1,0 +1,324 @@
+You are working on the SafeGo global platform.  
+This task: EXTEND the existing *delivery-driver* onboarding to support a **Car** vehicle option, with proper document rules, without breaking any existing SafeGo behavior.
+
+You MUST follow all SafeGo Master Rules and only make non-breaking, additive changes.
+
+=====================================================
+A) SAFEGO MASTER RULES (MUST FOLLOW)
+=====================================================
+
+1) Roles (keep separated)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   Each role has its own:
+   - signup / onboarding flow
+   - dashboard
+   - permissions
+   - status flows
+   Never mix sensitive data or permissions between roles.
+
+2) Global services (must remain supported)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+3) Country-specific KYC — branching is mandatory
+
+   BANGLADESH (BD) driver KYC (do NOT remove):
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID_number
+   - NID_front_image
+   - NID_back_image
+   - emergency_contact_name / phone / relation
+   - verification_status
+   - is_verified
+
+   UNITED STATES (US) driver KYC (do NOT remove):
+   - date_of_birth
+   - home_address (US)
+   - emergency_contact_name / phone / relation
+   - government_id_type
+   - government_id_last4
+   - driver_license_number (for vehicles that require a license)
+   - driver_license_image_front
+   - driver_license_image_back
+   - driver_license_expiry
+   - ssn_last4 (optional)
+   - city-specific docs (e.g. TLC license images) when applicable
+   - verification_status
+   - is_verified
+
+   NYC rule: FHV Number must NOT be required in any UI form.
+
+4) Admin panel (must keep all current capabilities)
+   - Approve / reject / block customers, drivers, restaurants
+   - Set verification_status, is_verified, rejection_reason
+   - Configure pricing, fees, commissions
+   - Manage payouts and negative balances
+
+5) Required collections (must remain)
+   - rides
+   - food_orders
+   - deliveries
+   Each with:
+   - identity fields (customer_id, driver_id, restaurant_id)
+   - addresses + geolocation
+   - fares, service fees, commission, earnings
+   - payment details (method, status, transaction_id)
+   - complete status flows
+   - ratings + feedback
+
+6) Commission rules (unchanged)
+   - Cash ride → driver keeps cash; commission → negative driver wallet.
+   - Cash food → restaurant keeps cash; commission → negative restaurant wallet.
+   - Online → SafeGo keeps its commission.
+   - Admin can settle balances.
+
+7) Security rules (unchanged)
+   - Customers cannot see driver documents.
+   - Drivers cannot see customer documents.
+   - Restaurants cannot see other restaurants.
+   - Only Admin can change pricing, commission, verification, blocking.
+   - Users can update only their own profile.
+
+8) Onboarding & status flows (unchanged)
+   - Multi-step onboarding (basic info, address, ID/KYC, emergency contact).
+   - verification_status + is_verified used to gate access to live operations.
+   - Ride/Food/Parcel status flows must stay intact.
+
+9) Notifications (must still work)
+   - Ride / food / parcel updates.
+   - Verification approval / rejection.
+   - Admin announcements.
+
+10) NON-BREAKING RULE
+   - Do NOT delete or rename any existing DB fields, APIs, or routes.
+   - Only ADD new fields, flags, components, and conditional logic.
+
+=====================================================
+B) CURRENT STATE (DELIVERY DRIVER START PAGE)
+=====================================================
+
+Route: `/partner/delivery-driver/start`
+
+Currently shows vehicle-type cards:
+   - Bicycle
+   - Motorbike / Scooter
+
+Each card already has text such as:
+   - Bicycle → “No driver’s license required. Fastest approval.”
+   - Motorbike → “License required.”
+
+Below that, the onboarding steps (Basic Info, Government ID, etc.) are displayed.
+
+=====================================================
+C) NEW REQUIREMENT: ADD CAR OPTION FOR DELIVERY DRIVER
+=====================================================
+
+You must add a **third vehicle card** for delivery drivers:
+
+1) THIRD CARD: CAR
+
+   Card title:
+   - “Car”
+
+   Subtitle / supporting text:
+   - “Use your car for deliveries. Car documents required.”
+
+   Badges:
+   - “License Required”
+   - “More Capacity”
+
+   Behavior:
+   - When the user selects this card, we are still in the **delivery-driver** flow, NOT in the ride-share driver flow.
+
+2) SERVICE FLAGS (NON-BREAKING)
+
+   For drivers who start from `/partner/delivery-driver/start`:
+
+   - They are **delivery-first drivers**. By default:
+     - can_food_delivery = true
+     - can_parcel_delivery = true
+     - can_ride = false   // IMPORTANT: they are not ride-share drivers by default
+
+   - This must remain true whether they choose:
+     - Bicycle
+     - Motorbike / Scooter
+     - Car
+
+   - Admin can later enable ride services manually if business rules allow, but this flow should not auto-enable ride-hailing.
+
+=====================================================
+D) VEHICLE DOCUMENT RULES BY VEHICLE TYPE (DELIVERY FLOW)
+=====================================================
+
+You must update the delivery-driver onboarding documents step to branch on **vehicle_type**.
+
+Assume we already have a `vehicle_type` field for delivery drivers; if not, ADD it.
+
+Allowed values:
+   - bicycle
+   - motorbike
+   - car
+
+1) BICYCLE (USA + BD)
+   - No driver license required.
+   - No car registration required.
+   - No car insurance required.
+   - Optional: single photo of bicycle.
+   - Keep existing Government ID KYC unchanged.
+
+2) MOTORBIKE / SCOOTER (USA + BD)
+   - Requires:
+     - driver_license_number + front/back images + expiry (US)
+     - appropriate motorbike license docs for BD if already implemented
+   - If current implementation already requires bike registration/insurance, keep that.
+   - No TLC requirement.
+
+3) CAR (NEW RULES)
+
+   For **BANGLADESH (BD) delivery driver, vehicle_type = car**:
+   - Keep identity KYC same as other BD drivers.
+   - Vehicle docs (REQUIRED for delivery by car):
+     - car_registration_document
+     - car_insurance_document
+     - fitness / inspection document (if currently used for car ride drivers)
+   - NO TLC fields shown for BD (not applicable).
+
+   For **UNITED STATES (US) delivery driver, vehicle_type = car**:
+   - Identity KYC stays same as any US driver:
+     - government_id_type, government_id_last4
+     - date_of_birth, home_address
+     - emergency_contact details
+   - Vehicle docs (REQUIRED for car delivery):
+     - driver_license_number + front/back images + expiry
+     - car_registration_document
+     - car_insurance_document
+     - car_inspection_document (state inspection or similar if applicable)
+
+   - TLC-related fields for NYC:
+     - tlc_license_number (optional)
+     - tlc_license_front_image (optional)
+     - tlc_license_back_image (optional)
+     - tlc_vehicle_license_or_decals (optional)
+
+   These TLC items must be VISIBLE IF the driver city/zone is NYC/TLC-enabled, but they must be:
+     - clearly **optional**
+     - with labels like “Optional for NYC professional drivers”
+     - and skippable with a “Skip for now” control.
+
+   There MUST NOT be any blocking validation that forces TLC fields to be filled for car delivery drivers.
+
+   IMPORTANT:
+   - FHV Number must NOT appear or be required.
+   - TLC fields are optional extras; if filled, they can be stored for future ride-hailing upgrade but not required for basic car delivery.
+
+=====================================================
+E) UI/UX REQUIREMENTS
+=====================================================
+
+1) Update `/partner/delivery-driver/start`:
+
+   - Add the new Car card visually in the same style as Bicycle and Motorbike.
+   - Cards should look something like:
+     - Bicycle (selected by default or the first simple option).
+     - Motorbike / Scooter.
+     - Car.
+
+   - When user taps a card:
+     - Highlight that card.
+     - Set `vehicle_type` in state.
+     - Continue to steps below using this value.
+
+2) On the “Vehicle / Documents” onboarding step:
+
+   - Show different fields based on vehicle_type:
+     - bicycle → no license/registration/insurance fields.
+     - motorbike → show license + (optional) bike registration/insurance if already used.
+     - car → show full car docs (license, registration, insurance, inspection) AND optional TLC.
+
+   - For TLC fields (US, NYC only):
+     - Show a small label like “Optional – for NYC TLC drivers”.
+     - Add a “Skip TLC details” button/checkbox that lets the user proceed without filling them.
+
+3) Validation:
+
+   - For vehicle_type = car:
+     - Enforce required validation on:
+       - driver_license_number
+       - driver_license_front_image
+       - driver_license_back_image
+       - driver_license_expiry
+       - car_registration_document
+       - car_insurance_document
+       - car_inspection_document (if business requires)
+     - DO NOT enforce TLC fields as required.
+
+   - For bicycle:
+     - Ensure none of the car/motorbike fields are falsely required.
+
+   - For motorbike:
+     - Enforce only the motorbike-relevant fields.
+
+=====================================================
+F) MATCHING & DASHBOARD BEHAVIOR (DELIVERY ONLY)
+=====================================================
+
+1) Matching behavior:
+   - Delivery drivers with any vehicle_type (bicycle / motorbike / car) should:
+     - Receive jobs from `food_orders` and `deliveries`.
+     - NOT receive `rides` jobs unless Admin explicitly enables ride services later.
+
+2) Dashboard (delivery driver):
+
+   - Keep the existing rule:
+     - Delivery-only drivers should see:
+       - Food Deliveries
+       - Active Delivery
+       - Delivery History
+       - Wallet
+       - Incentives
+       - Trust Score
+       - Log Out
+     - They should NOT see “Active Trip” or ride-specific items.
+
+   - This new car option does NOT change the menu—only the docs and potential capacity.
+
+=====================================================
+G) FILES / MODULES LIKELY TO CHANGE (NON-BREAKING)
+=====================================================
+
+Without renaming or deleting anything, you will likely touch:
+
+1) Delivery driver start page:
+   - e.g. `apps/web/app/partner/delivery-driver/start/page.tsx`
+   - Add “Car” card and wire up vehicle_type = 'car'.
+
+2) Delivery driver onboarding vehicle/documents step:
+   - e.g. `apps/web/app/partner/delivery-driver/onboarding/vehicle.tsx`
+   - Implement branching UI and validation for bicycle / motorbike / car.
+   - Add optional TLC fields for US/NYC.
+
+3) Driver schema / types:
+   - e.g. `apps/core/models/driver.ts` or shared `Driver` type
+   - Ensure `vehicle_type` supports 'car' in addition to existing values.
+   - Ensure TLC fields remain optional.
+
+4) Validation schemas:
+   - e.g. `apps/web/lib/validation/driverDeliveryVehicleSchema.ts`
+   - Add rules described above for each vehicle_type.
+   - TLC fields optional.
+
+5) Matching / service flags:
+   - e.g. `apps/backend/services/matching/deliveryMatching.ts`
+   - Confirm it uses service flags (can_food_delivery / can_parcel_delivery) and does not depend on vehicle_type for eligibility except where necessary.
+
+All changes MUST be additive and backward-compatible.  
+After this task, delivery drivers starting on `/partner/delivery-driver/start` can choose Bicycle, Motorbike, or Car.  
+Car delivery drivers will upload proper car documents, TLC fields will be optional (skippable), and the rest of SafeGo flows (rides, food_orders, deliveries, commissions, admin verification) will continue to work unchanged.
