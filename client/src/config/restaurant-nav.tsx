@@ -53,7 +53,7 @@ export const restaurantNavigation: NavItem[] = [
   {
     label: "Dashboard",
     icon: LayoutDashboard,
-    path: "/restaurant/dashboard",
+    path: "/partner/restaurant/dashboard",
     section: "main"
   },
   {

@@ -169,7 +169,7 @@ export default function RestaurantRegistration() {
         description: "Your restaurant partner application has been submitted for review. Redirecting to your dashboard...",
       });
       // Redirect to restaurant dashboard to see verification status
-      setLocation("/restaurant/dashboard");
+      setLocation("/partner/restaurant/dashboard");
     },
     onError: (error: any) => {
       toast({

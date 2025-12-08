@@ -75,7 +75,7 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
   useEffect(() => {
     if (!isLoading && profile && userRole === "OWNER" && actualOwnerRole === "STAFF") {
       // STAFF user trying to access OWNER-only route, redirect to dashboard
-      setLocation("/restaurant/dashboard");
+      setLocation("/partner/restaurant/dashboard");
     }
   }, [isLoading, profile, userRole, actualOwnerRole, setLocation]);
 

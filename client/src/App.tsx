@@ -1342,22 +1342,28 @@ function Router() {
       </Route>
 
       {/* Restaurant routes - All wrapped with RestaurantLayout */}
-      {/* Dashboard - Home */}
-      <Route path="/restaurant/dashboard">
+      {/* Dashboard - Canonical route */}
+      <Route path="/partner/restaurant/dashboard">
         <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
           <RestaurantLayout>
             <RestaurantHome />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
+      {/* Legacy redirects to canonical dashboard */}
+      <Route path="/restaurant/dashboard">
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
+          <Redirect to="/partner/restaurant/dashboard" />
+        </ProtectedRoute>
+      </Route>
       <Route path="/restaurant/home">
-        <Redirect to="/restaurant/dashboard" />
+        <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
+          <Redirect to="/partner/restaurant/dashboard" />
+        </ProtectedRoute>
       </Route>
       <Route path="/restaurant">
         <ProtectedRoute allowedRoles={["restaurant", "pending_restaurant"]}>
-          <RestaurantLayout>
-            <RestaurantHome />
-          </RestaurantLayout>
+          <Redirect to="/partner/restaurant/dashboard" />
         </ProtectedRoute>
       </Route>
 

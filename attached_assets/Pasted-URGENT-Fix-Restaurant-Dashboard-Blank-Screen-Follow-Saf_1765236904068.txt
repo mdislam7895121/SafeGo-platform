@@ -1,0 +1,93 @@
+URGENT: Fix Restaurant Dashboard Blank Screen — Follow SafeGo Master Rules
+
+You must debug and fix the restaurant dashboard.  
+Right now /restaurant/dashboard shows a blank white screen, which means:
+
+1. The dashboard component is not being rendered.
+2. The route definition is incorrect OR pointing to a missing component.
+3. The data fetch for the restaurant profile is failing (likely undefined restaurant_id or invalid token).
+4. You must check console logs, server logs, and client JS errors.
+
+Do the following steps exactly:
+
+-----------------------------------
+A) VERIFY ROUTE CONFIGURATION
+-----------------------------------
+Check all existing routes. Ensure:
+
+- The ONLY valid route for restaurant dashboard is:
+  /partner/restaurant/dashboard
+
+If any of these exist, remove or redirect them to the correct one (add only, do not delete backend routes):
+  /restaurant/dashboard
+  /restaurant
+  /partner/restaurant
+  /restaurant/home
+
+The dashboard must live under:
+  /partner/restaurant/dashboard
+
+-----------------------------------
+B) VERIFY COMPONENT FILE
+-----------------------------------
+Confirm that the dashboard component file actually exists.  
+Examples:
+- components/restaurant/RestaurantDashboard.tsx
+- pages/partner/restaurant/dashboard.tsx
+
+If missing, create the required file exactly once.  
+Do NOT create duplicates.
+
+-----------------------------------
+C) FIX DATA FETCH
+-----------------------------------
+The dashboard must load the restaurant data by:
+- reading logged-in user token
+- finding linked restaurant_id
+- fetching restaurant profile
+
+If the fetch returns 500 or undefined:
+- Fix the query
+- Fix the restaurant lookup
+- Ensure token decoding works
+- Ensure restaurant is linked to the user after registration
+
+-----------------------------------
+D) ADD FALLBACK UI (SO NO BLANK SCREEN)
+-----------------------------------
+If data fails to load, the dashboard must:
+- Show an error message
+NOT render a blank white page.
+
+-----------------------------------
+E) ENFORCE SAFEGO RULES
+-----------------------------------
+Do NOT modify or remove:
+- onboarding data models  
+- admin verification fields  
+- commission rules  
+- negative balance rules  
+- rides, deliveries, food_orders schemas  
+
+Changes must be additive and non-breaking.
+
+-----------------------------------
+F) TEST CASES YOU MUST PERFORM
+-----------------------------------
+Test 1:
+- Complete a new restaurant registration
+- Redirect to /partner/restaurant/dashboard
+- Page must load with basic info and “verification pending” banner
+
+Test 2:
+- Reload page after clearing cache
+- Dashboard must still load (no blank page)
+
+Test 3:
+- Fetch should return restaurant data correctly
+
+-----------------------------------
+When finished:
+- Confirm the exact route that is being used
+- Confirm the dashboard now loads data
+- Confirm there is no blank screen

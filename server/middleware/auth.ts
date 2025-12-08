@@ -44,7 +44,18 @@ export function requireRole(allowedRoles: string[]) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const userRole = req.user.role;
+    
+    // Check if user's role matches any allowed role
+    // Also handle pending_restaurant roles that should have read-only dashboard access
+    const hasAccess = allowedRoles.some(role => {
+      if (userRole === role) return true;
+      // pending_restaurant should have access to restaurant routes (dashboard with disabled controls)
+      if (role === 'restaurant' && userRole === 'pending_restaurant') return true;
+      return false;
+    });
+
+    if (!hasAccess) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
 

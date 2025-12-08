@@ -125,14 +125,12 @@ export function requireRole(...allowedRoles: Array<'customer' | 'driver' | 'rest
     }
 
     // Check if user's role matches any allowed role
-    // Also handle pending roles that should have access to their main dashboard
+    // Also handle pending_restaurant roles that should have read-only dashboard access
     const userRole = req.user.role as string;
     const hasAccess = allowedRoles.some(role => {
       if (userRole === role) return true;
-      // pending_restaurant should have access to restaurant routes
+      // pending_restaurant should have access to restaurant routes (dashboard with disabled controls)
       if (role === 'restaurant' && userRole === 'pending_restaurant') return true;
-      // pending_driver should have access to driver routes
-      if (role === 'driver' && userRole === 'pending_driver') return true;
       return false;
     });
 

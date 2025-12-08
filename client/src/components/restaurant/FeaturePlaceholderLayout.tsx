@@ -96,7 +96,7 @@ export function FeaturePlaceholderLayout({
 
         {/* Back to Dashboard Button */}
         <div className="flex justify-center pt-2">
-          <Link href="/restaurant/dashboard">
+          <Link href="/partner/restaurant/dashboard">
             <Button 
               variant="outline" 
               className="gap-2"
