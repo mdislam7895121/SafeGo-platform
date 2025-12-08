@@ -774,7 +774,7 @@ router.post('/restaurant/registration/submit', authenticateToken, async (req: Au
 });
 
 const deliveryDriverInitSchema = z.object({
-  vehicleType: z.enum(['bicycle', 'motorbike']),
+  vehicleType: z.enum(['bicycle', 'motorbike', 'car', 'walking']),
   services: z.array(z.string()).optional(),
   canRide: z.boolean().optional(),
   canFoodDelivery: z.boolean().optional(),
@@ -852,9 +852,7 @@ router.post('/partner/delivery-driver/init', authenticateToken, async (req: Auth
       },
     });
 
-    const nextUrl = validatedData.vehicleType === 'bicycle'
-      ? '/partner/driver/register?type=delivery&vehicle=bicycle'
-      : '/partner/driver/register?type=delivery&vehicle=motorbike';
+    const nextUrl = `/partner/driver/register?type=delivery&vehicle=${validatedData.vehicleType}`;
 
     return res.json({
       success: true,

@@ -166,8 +166,9 @@ function DriverRegistrationV2() {
   const typeParam = urlParams.get('type');
   const vehicleParam = urlParams.get('vehicle');
   const driverType: 'ride' | 'delivery' = typeParam === 'delivery' ? 'delivery' : 'ride';
-  const vehicleType: 'bicycle' | 'motorbike' | 'car' | null = vehicleParam === 'bicycle' ? 'bicycle' : vehicleParam === 'motorbike' ? 'motorbike' : vehicleParam === 'car' ? 'car' : null;
+  const vehicleType: 'bicycle' | 'motorbike' | 'car' | 'walking' | null = vehicleParam === 'bicycle' ? 'bicycle' : vehicleParam === 'motorbike' ? 'motorbike' : vehicleParam === 'car' ? 'car' : vehicleParam === 'walking' ? 'walking' : null;
   const isBicycleDelivery = driverType === 'delivery' && vehicleType === 'bicycle';
+  const isWalkingDelivery = driverType === 'delivery' && vehicleType === 'walking';
   const isCarDelivery = driverType === 'delivery' && vehicleType === 'car';
   
   const countryCode = user?.countryCode || "US";
@@ -192,7 +193,7 @@ function DriverRegistrationV2() {
     { id: 5, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
   ];
 
-  const STEPS_US = isBicycleDelivery ? STEPS_US_BICYCLE_DELIVERY : isCarDelivery ? STEPS_US_CAR_DELIVERY : isNycDriver ? [
+  const STEPS_US = (isBicycleDelivery || isWalkingDelivery) ? STEPS_US_BICYCLE_DELIVERY : isCarDelivery ? STEPS_US_CAR_DELIVERY : isNycDriver ? [
     { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
     { id: 2, title: "Driver License", icon: FileText, desc: "License details & images" },
     { id: 3, title: "Vehicle Details", icon: Car, desc: "Vehicle info & documents" },
@@ -495,11 +496,11 @@ function DriverRegistrationV2() {
     let submitData;
     
     if (isUS) {
-      if (isBicycleDelivery) {
+      if (isBicycleDelivery || isWalkingDelivery) {
         submitData = {
           driverType,
           countryCode,
-          vehicleType: 'bicycle',
+          vehicleType: isWalkingDelivery ? 'walking' : 'bicycle',
           personalInfo: {
             phone: formData.personalInfo.phone,
             dateOfBirth: formData.personalInfo.dateOfBirth,
@@ -515,7 +516,7 @@ function DriverRegistrationV2() {
             ssnLast4: formData.personalInfo.ssnLast4,
           },
           vehicleInfo: {
-            vehicleType: 'bicycle',
+            vehicleType: isWalkingDelivery ? 'walking' : 'bicycle',
           },
           documents: {
             governmentIdType: formData.licenseInfo?.governmentIdType,
@@ -2204,7 +2205,7 @@ function DriverRegistrationV2() {
 
   const renderStepContent = () => {
     if (isUS) {
-      if (isBicycleDelivery) {
+      if (isBicycleDelivery || isWalkingDelivery) {
         if (currentStep === 1) return renderUSPersonalInfo();
         if (currentStep === 2) return renderGovernmentIdOnly();
         if (currentStep === 3) return renderBackgroundCheck();

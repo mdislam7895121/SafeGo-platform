@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { 
   Bike, ArrowLeft, CheckCircle2, Clock, FileText, 
   ShieldCheck, Loader2, ArrowRight, Package, CircleCheck,
-  AlertCircle, Car
+  AlertCircle, Car, Footprints
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type VehicleType = "bicycle" | "motorbike" | "car";
+type VehicleType = "bicycle" | "motorbike" | "car" | "walking";
 
 interface PartnerProfile {
   id: string;
@@ -77,7 +77,7 @@ export default function DeliveryDriverBikeStart() {
   const currentStep = profile?.onboardingStep || 0;
   
   const getStepsForVehicle = (vehicle: VehicleType | null) => {
-    if (vehicle === "bicycle") {
+    if (vehicle === "bicycle" || vehicle === "walking") {
       return [
         { id: 1, title: "Basic Information", description: "Personal details and contact", icon: FileText },
         { id: 2, title: "Government ID", description: "ID verification (no license needed)", icon: ShieldCheck },
@@ -312,6 +312,38 @@ export default function DeliveryDriverBikeStart() {
                   </div>
                 </div>
               </div>
+
+              <div 
+                className={`flex items-center space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  selectedVehicle === "walking" 
+                    ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30" 
+                    : "border-muted hover:border-muted-foreground/30"
+                }`}
+                onClick={() => setSelectedVehicle("walking")}
+                data-testid="vehicle-option-walking"
+              >
+                <RadioGroupItem value="walking" id="walking" />
+                <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                  <Footprints className="h-6 w-6 text-orange-600" />
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="walking" className="text-base font-semibold cursor-pointer">
+                    Walking
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Deliver on foot. Perfect for dense urban areas.
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      <CircleCheck className="h-3 w-3 mr-1" />
+                      No License Needed
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                      Fastest Approval
+                    </Badge>
+                  </div>
+                </div>
+              </div>
             </RadioGroup>
           </CardContent>
         </Card>
@@ -389,7 +421,7 @@ export default function DeliveryDriverBikeStart() {
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
           <p className="text-sm text-muted-foreground mt-4">
-            {selectedVehicle === "bicycle" 
+            {selectedVehicle === "bicycle" || selectedVehicle === "walking"
               ? "Typical approval time: Same day after document submission"
               : selectedVehicle === "car"
                 ? "Typical approval time: 2-3 business days (more documents to verify)"
