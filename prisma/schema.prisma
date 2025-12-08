@@ -1306,6 +1306,7 @@ model RestaurantProfile {
   governmentIdType         String? // US: ID type (SSN, Driver License, etc.)
   governmentIdLast4        String? // US: Last 4 digits of government ID
   // Common KYC fields
+  ownerName                String? // Owner's full legal name
   dateOfBirth              DateTime? // Owner's date of birth
   emergencyContactName     String? // Emergency contact full name
   emergencyContactPhone    String? // Emergency contact phone
