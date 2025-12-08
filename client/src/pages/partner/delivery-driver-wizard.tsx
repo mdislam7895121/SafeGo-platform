@@ -190,7 +190,7 @@ const vehicleDocsSchemaUSCar = z.object({
 const finalReviewSchema = z.object({
   profilePhotoUrl: z.string().min(1, "Profile photo is required"),
   emergencyContactName: z.string().min(2, "Emergency contact name required"),
-  emergencyContactPhone: z.string().min(10, "Emergency contact phone required"),
+  emergencyContactPhone: z.string().min(7, "Emergency contact phone required"),
   emergencyContactRelationship: z.string().optional(),
 });
 
@@ -199,6 +199,12 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (value && value.length > 0) {
+      setPreview(value);
+    }
+  }, [value]);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -206,9 +212,8 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
     setError(null);
     setIsUploading(true);
 
-    const reader = new FileReader();
-    reader.onloadend = () => setPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    const localPreview = URL.createObjectURL(file);
+    setPreview(localPreview);
 
     try {
       const formData = new FormData();
@@ -221,17 +226,24 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
         credentials: "include",
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || "Upload failed");
       }
 
-      const data = await response.json();
-      onChange(data.url);
+      if (data.url) {
+        setPreview(data.url);
+        onChange(data.url);
+        setIsUploading(false);
+        return;
+      } else {
+        throw new Error("No URL returned from server");
+      }
     } catch (err: any) {
-      setError(err.message);
+      console.error("[ProfilePhotoUpload] Error:", err);
+      setError(err.message || "Upload failed");
       setPreview(null);
-    } finally {
       setIsUploading(false);
     }
   };
@@ -242,9 +254,10 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
   };
 
   const hasValue = value && value.length > 0;
+  const displayUrl = preview || value;
 
   return (
-    <div className="border-2 border-dashed rounded-lg p-6 text-center transition-colors hover:border-primary">
+    <div className="border-2 border-dashed rounded-lg p-6 text-center transition-colors hover:border-primary" data-testid="profile-photo-upload">
       <input
         type="file"
         accept="image/jpeg,image/png,image/webp"
@@ -252,6 +265,7 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
         className="hidden"
         id="profile-photo-input"
         disabled={isUploading}
+        data-testid="input-profile-photo-file"
       />
       
       {isUploading ? (
@@ -259,12 +273,13 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Uploading...</p>
         </div>
-      ) : hasValue || preview ? (
+      ) : (hasValue || preview) && displayUrl ? (
         <div className="flex flex-col items-center gap-2">
           <img 
-            src={preview || value} 
+            src={displayUrl} 
             alt="Profile preview" 
             className="h-24 w-24 rounded-full object-cover border-2 border-primary"
+            data-testid="profile-photo-preview"
           />
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -276,7 +291,7 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
                 <span>Change</span>
               </Button>
             </label>
-            <Button type="button" variant="ghost" size="sm" onClick={handleRemove}>
+            <Button type="button" variant="ghost" size="sm" onClick={handleRemove} data-testid="button-remove-photo">
               Remove
             </Button>
           </div>
@@ -289,7 +304,7 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
         </label>
       )}
 
-      {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+      {error && <p className="text-sm text-destructive mt-2" data-testid="upload-error">{error}</p>}
     </div>
   );
 }
