@@ -873,4 +873,485 @@ router.post('/partner/delivery-driver/init', authenticateToken, async (req: Auth
   }
 });
 
+// ============================================================
+// 7-STEP DELIVERY DRIVER ONBOARDING WIZARD API ROUTES
+// ============================================================
+
+// Step 1: Initialize delivery driver onboarding with country selection
+const deliveryOnboardingInitSchema = z.object({
+  countryCode: z.enum(['BD', 'US']),
+});
+
+router.post('/partner/delivery-driver/onboarding/init', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = deliveryOnboardingInitSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let draft = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+    });
+
+    if (draft) {
+      draft = await prisma.deliveryDriverOnboardingDraft.update({
+        where: { userId },
+        data: {
+          countryCode: validatedData.countryCode,
+          currentStep: 2,
+        },
+      });
+    } else {
+      draft = await prisma.deliveryDriverOnboardingDraft.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId,
+          countryCode: validatedData.countryCode,
+          currentStep: 2,
+        },
+      });
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: userId,
+        actorEmail: user.email || 'unknown',
+        actorRole: 'customer',
+        actionType: 'DELIVERY_ONBOARDING_INIT',
+        entityType: 'delivery_driver_onboarding_draft',
+        entityId: draft.id,
+        description: `Delivery driver 7-step onboarding initiated for country: ${validatedData.countryCode}`,
+        metadata: { countryCode: validatedData.countryCode },
+      },
+    });
+
+    return res.json({
+      success: true,
+      draftId: draft.id,
+      currentStep: draft.currentStep,
+      countryCode: draft.countryCode,
+      message: 'Onboarding initialized successfully',
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('[Delivery Onboarding] Error initializing:', error);
+    return res.status(500).json({ error: 'Failed to initialize onboarding' });
+  }
+});
+
+// Get current draft state
+router.get('/partner/delivery-driver/onboarding/draft', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const draft = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+    });
+
+    if (!draft) {
+      return res.json({ exists: false, draft: null });
+    }
+
+    return res.json({ exists: true, draft });
+  } catch (error) {
+    console.error('[Delivery Onboarding] Error fetching draft:', error);
+    return res.status(500).json({ error: 'Failed to fetch draft' });
+  }
+});
+
+// Step 2: Personal Info (country-specific)
+const personalInfoSchema = z.object({
+  fullName: z.string().min(2, 'Full name is required'),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  middleName: z.string().optional(),
+  fatherName: z.string().optional(),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  phoneNumber: z.string().min(10, 'Valid phone number required'),
+});
+
+router.put('/partner/delivery-driver/onboarding/step/2', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = personalInfoSchema.parse(req.body);
+
+    const draft = await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        fullName: validatedData.fullName,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        middleName: validatedData.middleName,
+        fatherName: validatedData.fatherName,
+        dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : undefined,
+        phoneNumber: validatedData.phoneNumber,
+        currentStep: 3,
+      },
+    });
+
+    return res.json({ success: true, currentStep: draft.currentStep });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('[Delivery Onboarding] Error saving personal info:', error);
+    return res.status(500).json({ error: 'Failed to save personal info' });
+  }
+});
+
+// Step 3: Address Info (country-specific)
+const addressInfoSchema = z.object({
+  presentAddress: z.string().optional(),
+  permanentAddress: z.string().optional(),
+  homeAddress: z.string().optional(),
+  usaStreet: z.string().optional(),
+  usaCity: z.string().optional(),
+  usaState: z.string().optional(),
+  usaZipCode: z.string().optional(),
+  usaAptUnit: z.string().optional(),
+});
+
+router.put('/partner/delivery-driver/onboarding/step/3', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = addressInfoSchema.parse(req.body);
+
+    const draft = await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        presentAddress: validatedData.presentAddress,
+        permanentAddress: validatedData.permanentAddress,
+        homeAddress: validatedData.homeAddress,
+        usaStreet: validatedData.usaStreet,
+        usaCity: validatedData.usaCity,
+        usaState: validatedData.usaState,
+        usaZipCode: validatedData.usaZipCode,
+        usaAptUnit: validatedData.usaAptUnit,
+        currentStep: 4,
+      },
+    });
+
+    return res.json({ success: true, currentStep: draft.currentStep });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('[Delivery Onboarding] Error saving address info:', error);
+    return res.status(500).json({ error: 'Failed to save address info' });
+  }
+});
+
+// Step 4: Government ID Upload
+const governmentIdSchema = z.object({
+  nidNumber: z.string().optional(),
+  nidFrontImageUrl: z.string().optional(),
+  nidBackImageUrl: z.string().optional(),
+  governmentIdType: z.string().optional(),
+  governmentIdLast4: z.string().max(4).optional(),
+  governmentIdFrontUrl: z.string().optional(),
+  governmentIdBackUrl: z.string().optional(),
+  ssnLast4: z.string().max(4).optional(),
+  backgroundCheckConsent: z.boolean().optional(),
+});
+
+router.put('/partner/delivery-driver/onboarding/step/4', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = governmentIdSchema.parse(req.body);
+
+    const currentDraft = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+      select: { countryCode: true },
+    });
+
+    const nextStep = currentDraft?.countryCode === 'US' ? 5 : 6;
+
+    const draft = await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        nidNumber: validatedData.nidNumber,
+        nidFrontImageUrl: validatedData.nidFrontImageUrl,
+        nidBackImageUrl: validatedData.nidBackImageUrl,
+        governmentIdType: validatedData.governmentIdType,
+        governmentIdLast4: validatedData.governmentIdLast4,
+        governmentIdFrontUrl: validatedData.governmentIdFrontUrl,
+        governmentIdBackUrl: validatedData.governmentIdBackUrl,
+        ssnLast4: validatedData.ssnLast4,
+        backgroundCheckConsent: validatedData.backgroundCheckConsent ?? false,
+        currentStep: nextStep,
+      },
+    });
+
+    return res.json({ success: true, currentStep: draft.currentStep });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('[Delivery Onboarding] Error saving government ID:', error);
+    return res.status(500).json({ error: 'Failed to save government ID' });
+  }
+});
+
+// Step 5: Delivery Method (US only)
+const deliveryMethodSchema = z.object({
+  deliveryMethod: z.enum(['car', 'bike', 'walking']),
+});
+
+router.put('/partner/delivery-driver/onboarding/step/5', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = deliveryMethodSchema.parse(req.body);
+    const nextStep = validatedData.deliveryMethod === 'car' ? 6 : 7;
+
+    const draft = await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        deliveryMethod: validatedData.deliveryMethod,
+        currentStep: nextStep,
+      },
+    });
+
+    return res.json({ success: true, currentStep: draft.currentStep, skipVehicleDocs: validatedData.deliveryMethod !== 'car' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('[Delivery Onboarding] Error saving delivery method:', error);
+    return res.status(500).json({ error: 'Failed to save delivery method' });
+  }
+});
+
+// Step 6: Vehicle Documents (car only, or BD drivers)
+const vehicleDocsSchema = z.object({
+  drivingLicenseNumber: z.string().optional(),
+  drivingLicenseFrontUrl: z.string().optional(),
+  drivingLicenseBackUrl: z.string().optional(),
+  drivingLicenseExpiry: z.string().optional(),
+  vehicleRegistrationUrl: z.string().optional(),
+  insuranceCardUrl: z.string().optional(),
+  vehicleMake: z.string().optional(),
+  vehicleModel: z.string().optional(),
+  vehicleYear: z.number().optional(),
+  vehiclePlate: z.string().optional(),
+  vehicleColor: z.string().optional(),
+});
+
+router.put('/partner/delivery-driver/onboarding/step/6', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = vehicleDocsSchema.parse(req.body);
+
+    const draft = await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        drivingLicenseNumber: validatedData.drivingLicenseNumber,
+        drivingLicenseFrontUrl: validatedData.drivingLicenseFrontUrl,
+        drivingLicenseBackUrl: validatedData.drivingLicenseBackUrl,
+        drivingLicenseExpiry: validatedData.drivingLicenseExpiry ? new Date(validatedData.drivingLicenseExpiry) : undefined,
+        vehicleRegistrationUrl: validatedData.vehicleRegistrationUrl,
+        insuranceCardUrl: validatedData.insuranceCardUrl,
+        vehicleMake: validatedData.vehicleMake,
+        vehicleModel: validatedData.vehicleModel,
+        vehicleYear: validatedData.vehicleYear,
+        vehiclePlate: validatedData.vehiclePlate,
+        vehicleColor: validatedData.vehicleColor,
+        currentStep: 7,
+      },
+    });
+
+    return res.json({ success: true, currentStep: draft.currentStep });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('[Delivery Onboarding] Error saving vehicle docs:', error);
+    return res.status(500).json({ error: 'Failed to save vehicle documents' });
+  }
+});
+
+// Step 7: Final Review and Submit
+const finalReviewSchema = z.object({
+  profilePhotoUrl: z.string().min(1, 'Profile photo is required'),
+  emergencyContactName: z.string().min(2, 'Emergency contact name required'),
+  emergencyContactPhone: z.string().min(10, 'Emergency contact phone required'),
+  emergencyContactRelationship: z.string().optional(),
+});
+
+router.post('/partner/delivery-driver/onboarding/submit', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const validatedData = finalReviewSchema.parse(req.body);
+
+    const draft = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+    });
+
+    if (!draft) {
+      return res.status(404).json({ error: 'Onboarding draft not found' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
+    let driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    const profileData = {
+      driverType: 'delivery',
+      country: draft.countryCode,
+      fullName: draft.fullName,
+      firstName: draft.firstName,
+      lastName: draft.lastName,
+      middleName: draft.middleName,
+      fatherName: draft.fatherName,
+      dateOfBirth: draft.dateOfBirth,
+      phoneNumber: draft.phoneNumber,
+      presentAddress: draft.presentAddress,
+      permanentAddress: draft.permanentAddress,
+      homeAddress: draft.homeAddress,
+      usaStreet: draft.usaStreet,
+      usaCity: draft.usaCity,
+      usaState: draft.usaState,
+      usaZipCode: draft.usaZipCode,
+      usaAptUnit: draft.usaAptUnit,
+      nidNumber: draft.nidNumber,
+      nidFrontImageUrl: draft.nidFrontImageUrl,
+      nidBackImageUrl: draft.nidBackImageUrl,
+      governmentIdType: draft.governmentIdType,
+      governmentIdLast4: draft.governmentIdLast4,
+      governmentIdFrontImageUrl: draft.governmentIdFrontUrl,
+      governmentIdBackImageUrl: draft.governmentIdBackUrl,
+      ssnLast4: draft.ssnLast4,
+      backgroundCheckConsent: draft.backgroundCheckConsent,
+      deliveryDriverMethod: draft.deliveryMethod,
+      driverLicenseNumber: draft.drivingLicenseNumber,
+      driverLicenseFrontUrl: draft.drivingLicenseFrontUrl,
+      driverLicenseBackUrl: draft.drivingLicenseBackUrl,
+      driverLicenseExpiry: draft.drivingLicenseExpiry,
+      vehicleRegistrationUrl: draft.vehicleRegistrationUrl,
+      insuranceCardUrl: draft.insuranceCardUrl,
+      vehicleMake: draft.vehicleMake,
+      vehicleModel: draft.vehicleModel,
+      vehiclePlate: draft.vehiclePlate,
+      vehicleType: draft.deliveryMethod || 'bicycle',
+      profilePhotoUrl: validatedData.profilePhotoUrl,
+      emergencyContactName: validatedData.emergencyContactName,
+      emergencyContactPhone: validatedData.emergencyContactPhone,
+      emergencyContactRelationship: validatedData.emergencyContactRelationship,
+      verificationStatus: 'pending',
+      isVerified: false,
+      partnerStatus: 'pending_verification',
+      canRide: false,
+      canFoodDelivery: true,
+      canParcelDelivery: true,
+      services: ['food_delivery', 'parcel_delivery'],
+      onboardingStep: 7,
+      onboardingCompleted: true,
+      onboardingCompletedAt: new Date(),
+    };
+
+    if (driverProfile) {
+      driverProfile = await prisma.driverProfile.update({
+        where: { userId },
+        data: profileData,
+      });
+    } else {
+      driverProfile = await prisma.driverProfile.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId,
+          ...profileData,
+        },
+      });
+    }
+
+    await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        isSubmitted: true,
+        submittedAt: new Date(),
+        profilePhotoUrl: validatedData.profilePhotoUrl,
+        emergencyContactName: validatedData.emergencyContactName,
+        emergencyContactPhone: validatedData.emergencyContactPhone,
+        emergencyContactRelationship: validatedData.emergencyContactRelationship,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: userId,
+        actorEmail: user?.email || 'unknown',
+        actorRole: 'customer',
+        actionType: 'DELIVERY_DRIVER_SUBMIT',
+        entityType: 'driver_profile',
+        entityId: driverProfile.id,
+        description: `Delivery driver 7-step onboarding completed - pending verification`,
+        metadata: {
+          countryCode: draft.countryCode,
+          deliveryMethod: draft.deliveryMethod,
+          verificationStatus: 'pending',
+        },
+      },
+    });
+
+    return res.json({
+      success: true,
+      profileId: driverProfile.id,
+      verificationStatus: 'pending',
+      message: 'Application submitted successfully. Pending admin verification.',
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('[Delivery Onboarding] Error submitting application:', error);
+    return res.status(500).json({ error: 'Failed to submit application' });
+  }
+});
+
 export default router;

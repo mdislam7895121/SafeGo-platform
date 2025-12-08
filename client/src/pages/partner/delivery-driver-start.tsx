@@ -3,9 +3,8 @@ import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
-  Bike, ArrowLeft, CheckCircle2, Clock, FileText, 
-  ShieldCheck, Loader2, ArrowRight, Package, CircleCheck,
-  AlertCircle, Car, Footprints
+  ArrowLeft, CheckCircle2, Loader2, ArrowRight, Package, Globe,
+  MapPin, FileText, IdCard, Truck, ClipboardCheck, User
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,17 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type VehicleType = "bicycle" | "motorbike" | "car" | "walking";
+type CountryCode = "BD" | "US";
+
+interface OnboardingDraft {
+  id: string;
+  userId: string;
+  countryCode: string;
+  currentStep: number;
+  isSubmitted: boolean;
+  fullName?: string;
+  deliveryMethod?: string;
+}
 
 interface PartnerProfile {
   id: string;
@@ -25,85 +34,66 @@ interface PartnerProfile {
   partnerStatus: string;
   trustLevel: string;
   onboardingStep?: number;
-  vehicleType?: string;
+  onboardingCompleted?: boolean;
+  verificationStatus?: string;
 }
 
-export default function DeliveryDriverBikeStart() {
+const WIZARD_STEPS = [
+  { id: 1, title: "Select Country", description: "Choose your operating country", icon: Globe },
+  { id: 2, title: "Personal Info", description: "Your personal details", icon: User },
+  { id: 3, title: "Address Info", description: "Your address information", icon: MapPin },
+  { id: 4, title: "Government ID", description: "Identity verification", icon: IdCard },
+  { id: 5, title: "Delivery Method", description: "How you'll deliver (US only)", icon: Truck },
+  { id: 6, title: "Vehicle Documents", description: "License & vehicle docs (if applicable)", icon: FileText },
+  { id: 7, title: "Review & Submit", description: "Final review and submission", icon: ClipboardCheck },
+];
+
+export default function DeliveryDriverStart() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null);
   
-  const { data: partnerData, isLoading } = useQuery<{ profile: PartnerProfile | null }>({
+  const { data: partnerData, isLoading: isLoadingProfile } = useQuery<{ profile: PartnerProfile | null }>({
     queryKey: ["/api/partner/profile", "delivery_driver"],
     enabled: !!user,
   });
 
-  const initDeliveryMutation = useMutation({
-    mutationFn: async (vehicleType: VehicleType) => {
-      const response = await apiRequest("/api/partner/delivery-driver/init", {
+  const { data: draftData, isLoading: isLoadingDraft } = useQuery<{ exists: boolean; draft: OnboardingDraft | null }>({
+    queryKey: ["/api/partner/delivery-driver/onboarding/draft"],
+    enabled: !!user,
+  });
+
+  const initOnboardingMutation = useMutation({
+    mutationFn: async (countryCode: CountryCode) => {
+      const response = await apiRequest("/api/partner/delivery-driver/onboarding/init", {
         method: "POST",
-        body: JSON.stringify({ 
-          vehicleType,
-          services: ["food_delivery", "parcel_delivery"],
-          canRide: false,
-          canFoodDelivery: true,
-          canParcelDelivery: true,
-        }),
+        body: JSON.stringify({ countryCode }),
         headers: { "Content-Type": "application/json" },
       });
       return response;
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/partner/profile"] });
-      if (data.nextUrl) {
-        setLocation(data.nextUrl);
-      } else {
-        setLocation(`/partner/delivery-driver/register?vehicle=${selectedVehicle}`);
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/partner/delivery-driver/onboarding/draft"] });
+      setLocation(`/partner/delivery-driver/wizard?step=${data.currentStep}`);
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error?.message || "Failed to initialize. Please try again.",
+        description: error?.message || "Failed to initialize onboarding. Please try again.",
         variant: "destructive",
       });
     },
   });
 
+  const isLoading = isLoadingProfile || isLoadingDraft;
   const profile = partnerData?.profile;
-  const hasExistingProfile = profile && profile.role === "delivery_driver";
-  const isApproved = profile?.partnerStatus === "approved";
-  const currentStep = profile?.onboardingStep || 0;
-  
-  const getStepsForVehicle = (vehicle: VehicleType | null) => {
-    if (vehicle === "bicycle" || vehicle === "walking") {
-      return [
-        { id: 1, title: "Basic Information", description: "Personal details and contact", icon: FileText },
-        { id: 2, title: "Government ID", description: "ID verification (no license needed)", icon: ShieldCheck },
-        { id: 3, title: "Emergency Contact", description: "Safety contact information", icon: FileText },
-      ];
-    }
-    if (vehicle === "car") {
-      return [
-        { id: 1, title: "Basic Information", description: "Personal details and contact", icon: FileText },
-        { id: 2, title: "Driver's License", description: "License verification required", icon: ShieldCheck },
-        { id: 3, title: "Vehicle Documents", description: "Registration, insurance & inspection", icon: Car },
-        { id: 4, title: "Government ID", description: "ID verification", icon: FileText },
-        { id: 5, title: "Emergency Contact", description: "Safety contact information", icon: FileText },
-      ];
-    }
-    return [
-      { id: 1, title: "Basic Information", description: "Personal details and contact", icon: FileText },
-      { id: 2, title: "Driver's License", description: "License verification required", icon: ShieldCheck },
-      { id: 3, title: "Government ID", description: "ID verification", icon: FileText },
-      { id: 4, title: "Emergency Contact", description: "Safety contact information", icon: FileText },
-    ];
-  };
-
-  const steps = getStepsForVehicle(selectedVehicle);
-  const totalSteps = steps.length;
-  const progressPercent = (currentStep / totalSteps) * 100;
+  const draft = draftData?.draft;
+  const hasExistingDraft = draftData?.exists && draft && !draft.isSubmitted;
+  const isApproved = profile?.partnerStatus === "approved" || profile?.verificationStatus === "approved";
+  const isPendingVerification = profile?.verificationStatus === "pending" || profile?.partnerStatus === "pending_verification";
+  const currentStep = draft?.currentStep || 1;
+  const progressPercent = ((currentStep - 1) / (WIZARD_STEPS.length - 1)) * 100;
 
   if (isLoading) {
     return (
@@ -144,21 +134,57 @@ export default function DeliveryDriverBikeStart() {
     );
   }
 
+  if (isPendingVerification) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-2xl mx-auto">
+          <Link href="/customer">
+            <Button variant="ghost" className="mb-6" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </Link>
+
+          <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-900">
+            <CardContent className="p-8 text-center">
+              <div className="h-16 w-16 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center mx-auto mb-4">
+                <Loader2 className="h-8 w-8 text-yellow-600 dark:text-yellow-400 animate-spin" />
+              </div>
+              <h1 className="text-2xl font-bold mb-2" data-testid="text-pending-title">Application Pending Verification</h1>
+              <p className="text-muted-foreground mb-6">
+                Your delivery driver application is being reviewed by our team. This usually takes 1-2 business days.
+              </p>
+              <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                Pending Verification
+              </Badge>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const handleContinueApplication = () => {
+    if (hasExistingDraft && draft) {
+      setLocation(`/partner/delivery-driver/wizard?step=${draft.currentStep}`);
+    }
+  };
+
   const handleStartApplication = () => {
-    if (!selectedVehicle) {
+    if (!selectedCountry) {
       toast({
-        title: "Select Vehicle Type",
-        description: "Please select your preferred vehicle type to continue.",
+        title: "Select Country",
+        description: "Please select your operating country to continue.",
         variant: "destructive",
       });
       return;
     }
-    initDeliveryMutation.mutate(selectedVehicle);
+    initOnboardingMutation.mutate(selectedCountry);
   };
 
   return (
     <div className="min-h-screen bg-background p-6">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <Link href="/customer">
           <Button variant="ghost" className="mb-6" data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -174,19 +200,19 @@ export default function DeliveryDriverBikeStart() {
             Become a Delivery Driver
           </h1>
           <p className="text-muted-foreground">
-            Start earning with SafeGo. Choose your vehicle and complete the simple signup process.
+            Complete the 7-step onboarding process to start earning with SafeGo
           </p>
         </div>
 
-        {hasExistingProfile && currentStep > 0 && (
-          <Card className="mb-6">
+        {hasExistingDraft && (
+          <Card className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
                 Resume Your Application
               </CardTitle>
               <CardDescription>
-                You've already started your delivery driver application.
+                You have an in-progress application. Continue where you left off.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -197,236 +223,150 @@ export default function DeliveryDriverBikeStart() {
                 </div>
                 <Progress value={progressPercent} className="h-2" />
               </div>
-              <Badge variant="secondary">
-                Step {currentStep} of {totalSteps}
-              </Badge>
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary">
+                  Step {currentStep} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep - 1]?.title}
+                </Badge>
+                <Button onClick={handleContinueApplication} data-testid="button-continue">
+                  Continue Application
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Select Your Vehicle Type</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Step 1: Select Your Country
+            </CardTitle>
             <CardDescription>
-              Choose the vehicle you'll use for deliveries
+              Choose the country where you'll be operating as a delivery driver
             </CardDescription>
           </CardHeader>
           <CardContent>
             <RadioGroup
-              value={selectedVehicle || ""}
-              onValueChange={(value) => setSelectedVehicle(value as VehicleType)}
+              value={selectedCountry || ""}
+              onValueChange={(value) => setSelectedCountry(value as CountryCode)}
               className="space-y-4"
             >
               <div 
                 className={`flex items-center space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  selectedVehicle === "bicycle" 
+                  selectedCountry === "BD" 
                     ? "border-green-500 bg-green-50 dark:bg-green-950/30" 
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
-                onClick={() => setSelectedVehicle("bicycle")}
-                data-testid="vehicle-option-bicycle"
+                onClick={() => setSelectedCountry("BD")}
+                data-testid="country-option-bd"
               >
-                <RadioGroupItem value="bicycle" id="bicycle" />
-                <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                  <Bike className="h-6 w-6 text-green-600" />
+                <RadioGroupItem value="BD" id="country-bd" />
+                <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-2xl">
+                  🇧🇩
                 </div>
                 <div className="flex-1">
-                  <Label htmlFor="bicycle" className="text-base font-semibold cursor-pointer">
-                    Bicycle
+                  <Label htmlFor="country-bd" className="text-base font-semibold cursor-pointer">
+                    Bangladesh
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    No driver's license required. Fastest approval.
+                    National ID (NID) verification required. Driving license for motorized vehicles.
                   </p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      <CircleCheck className="h-3 w-3 mr-1" />
-                      No License Needed
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Fast Approval
-                    </Badge>
-                  </div>
                 </div>
               </div>
 
               <div 
                 className={`flex items-center space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  selectedVehicle === "motorbike" 
+                  selectedCountry === "US" 
                     ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" 
                     : "border-muted hover:border-muted-foreground/30"
                 }`}
-                onClick={() => setSelectedVehicle("motorbike")}
-                data-testid="vehicle-option-motorbike"
+                onClick={() => setSelectedCountry("US")}
+                data-testid="country-option-us"
               >
-                <RadioGroupItem value="motorbike" id="motorbike" />
-                <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                  <Bike className="h-6 w-6 text-blue-600" />
+                <RadioGroupItem value="US" id="country-us" />
+                <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-2xl">
+                  🇺🇸
                 </div>
                 <div className="flex-1">
-                  <Label htmlFor="motorbike" className="text-base font-semibold cursor-pointer">
-                    Motorbike / Scooter
+                  <Label htmlFor="country-us" className="text-base font-semibold cursor-pointer">
+                    United States
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    Driver's license required. Higher earning potential.
+                    Government ID and background check consent required. Choose from car, bike, or walking.
                   </p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      License Required
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                      More Deliveries
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div 
-                className={`flex items-center space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  selectedVehicle === "car" 
-                    ? "border-purple-500 bg-purple-50 dark:bg-purple-950/30" 
-                    : "border-muted hover:border-muted-foreground/30"
-                }`}
-                onClick={() => setSelectedVehicle("car")}
-                data-testid="vehicle-option-car"
-              >
-                <RadioGroupItem value="car" id="car" />
-                <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-                  <Car className="h-6 w-6 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <Label htmlFor="car" className="text-base font-semibold cursor-pointer">
-                    Car
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Use your car for deliveries. Car documents required.
-                  </p>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      License Required
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                      More Capacity
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div 
-                className={`flex items-center space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  selectedVehicle === "walking" 
-                    ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30" 
-                    : "border-muted hover:border-muted-foreground/30"
-                }`}
-                onClick={() => setSelectedVehicle("walking")}
-                data-testid="vehicle-option-walking"
-              >
-                <RadioGroupItem value="walking" id="walking" />
-                <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
-                  <Footprints className="h-6 w-6 text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <Label htmlFor="walking" className="text-base font-semibold cursor-pointer">
-                    Walking
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Deliver on foot. Perfect for dense urban areas.
-                  </p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      <CircleCheck className="h-3 w-3 mr-1" />
-                      No License Needed
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                      Fastest Approval
-                    </Badge>
-                  </div>
                 </div>
               </div>
             </RadioGroup>
           </CardContent>
         </Card>
 
-        {selectedVehicle && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Onboarding Steps</CardTitle>
-              <CardDescription>
-                {selectedVehicle === "bicycle" 
-                  ? "Simplified process - complete in minutes!" 
-                  : "Complete these steps to become a verified delivery driver"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {steps.map((step, index) => {
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>7-Step Onboarding Process</CardTitle>
+            <CardDescription>
+              Complete all steps to become a verified SafeGo delivery driver
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {WIZARD_STEPS.map((step, index) => {
                 const StepIcon = step.icon;
-                const isCompleted = currentStep > index;
-                const isCurrent = currentStep === index;
+                const isActive = index === 0;
+                const isConditional = step.id === 5 || step.id === 6;
                 
                 return (
                   <div 
                     key={step.id}
-                    className={`flex items-center gap-4 p-4 rounded-lg border ${
-                      isCompleted 
-                        ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900' 
-                        : isCurrent
-                          ? 'bg-primary/5 border-primary/30'
-                          : 'bg-muted/30'
+                    className={`flex items-center gap-4 p-3 rounded-lg ${
+                      isActive ? "bg-primary/10" : "bg-muted/30"
                     }`}
-                    data-testid={`step-${step.id}`}
                   >
                     <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      isCompleted 
-                        ? 'bg-green-100 dark:bg-green-900' 
-                        : isCurrent
-                          ? 'bg-primary/20'
-                          : 'bg-muted'
+                      isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                     }`}>
-                      {isCompleted ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      ) : (
-                        <StepIcon className={`h-5 w-5 ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`} />
-                      )}
+                      <StepIcon className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{step.title}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{step.title}</span>
+                        {isConditional && (
+                          <Badge variant="outline" className="text-xs">
+                            Conditional
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">{step.description}</p>
                     </div>
-                    {isCompleted && (
-                      <Badge variant="default" className="bg-green-600">Complete</Badge>
-                    )}
-                    {isCurrent && (
-                      <Badge variant="secondary">Current</Badge>
-                    )}
+                    <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                      Step {step.id}
+                    </Badge>
                   </div>
                 );
               })}
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="mt-8 text-center">
+        <div className="flex justify-end">
           <Button 
             size="lg" 
-            className="w-full sm:w-auto px-12"
             onClick={handleStartApplication}
-            disabled={!selectedVehicle || initDeliveryMutation.isPending}
-            data-testid="button-start-onboarding"
+            disabled={!selectedCountry || initOnboardingMutation.isPending}
+            data-testid="button-start-application"
           >
-            {initDeliveryMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : null}
-            {hasExistingProfile && currentStep > 0 ? "Continue Application" : "Start Application"}
-            <ArrowRight className="h-4 w-4 ml-2" />
+            {initOnboardingMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                Start Application
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </>
+            )}
           </Button>
-          <p className="text-sm text-muted-foreground mt-4">
-            {selectedVehicle === "bicycle" || selectedVehicle === "walking"
-              ? "Typical approval time: Same day after document submission"
-              : selectedVehicle === "car"
-                ? "Typical approval time: 2-3 business days (more documents to verify)"
-                : "Typical approval time: 24-48 hours after document submission"}
-          </p>
         </div>
       </div>
     </div>

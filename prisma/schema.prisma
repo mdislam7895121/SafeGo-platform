@@ -789,6 +789,24 @@ model DriverProfile {
   complaints                Complaint[]
   enterpriseSafetyIncidents SafetyIncident[] @relation("SafetyIncidentDriver")
 
+  // Delivery Driver Onboarding Fields (7-Step Wizard)
+  deliveryDriverMethod         String?  // car | bike | walking (for delivery drivers only)
+  governmentIdFrontImageUrl    String?  // Government ID front image URL
+  governmentIdBackImageUrl     String?  // Government ID back image URL
+  governmentIdStatus           DocumentStatus @default(PENDING) // Government ID verification status
+  governmentIdRejectionReason  String?  // Reason for rejection
+  vehicleRegistrationUrl       String?  // Vehicle registration document URL (car only)
+  vehicleRegistrationStatus    DocumentStatus @default(PENDING) // Vehicle registration status
+  vehicleRegistrationRejectionReason String? // Reason for rejection
+  insuranceCardUrl             String?  // Insurance card/document URL (car only)
+  insuranceCardStatus          DocumentStatus @default(PENDING) // Insurance card status
+  insuranceCardRejectionReason String?  // Reason for rejection
+  onboardingStep               Int      @default(1) // Current onboarding step (1-7)
+  onboardingCompleted          Boolean  @default(false) // Whether 7-step onboarding is complete
+  onboardingCompletedAt        DateTime? // When onboarding was completed
+  drivingLicenseFrontImageUrl  String?  // Driving license front image (for BD or car delivery)
+  drivingLicenseBackImageUrl   String?  // Driving license back image (for BD or car delivery)
+
   // Privacy & Consent Fields (additive only)
   privacyPolicyVersion String?   // The policy version the user last accepted (e.g., "v1.0.3")
   termsAccepted        Boolean   @default(false) // Has the user accepted the Terms & Conditions?
@@ -837,6 +855,78 @@ model DriverOnboarding {
 
   @@index([driverId])
   @@map("driver_onboarding")
+}
+
+// Delivery Driver 7-Step Onboarding Draft Persistence
+model DeliveryDriverOnboardingDraft {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  countryCode       String   // BD or US
+  currentStep       Int      @default(1) // Steps 1-7
+  
+  // Step 1: Country Selection (captured)
+  // Step 2: Personal Info
+  fullName          String?
+  firstName         String?
+  lastName          String?
+  middleName        String?
+  fatherName        String?  // BD only
+  dateOfBirth       DateTime?
+  phoneNumber       String?
+  
+  // Step 3: Address Info
+  presentAddress    String?  // BD
+  permanentAddress  String?  // BD
+  homeAddress       String?  // US
+  usaStreet         String?
+  usaCity           String?
+  usaState          String?
+  usaZipCode        String?
+  usaAptUnit        String?
+  
+  // Step 4: Government ID
+  nidNumber         String?  // BD: National ID
+  nidFrontImageUrl  String?  // BD: NID front
+  nidBackImageUrl   String?  // BD: NID back
+  governmentIdType  String?  // US: ID type
+  governmentIdLast4 String?  // US: last 4 digits
+  governmentIdFrontUrl String? // US: ID front image
+  governmentIdBackUrl  String? // US: ID back image
+  ssnLast4          String?  // US: SSN last 4
+  backgroundCheckConsent Boolean @default(false) // US: consent
+  
+  // Step 5: Delivery Method (US only)
+  deliveryMethod    String?  // car | bike | walking
+  
+  // Step 6: Vehicle Documents (car only)
+  drivingLicenseNumber    String?
+  drivingLicenseFrontUrl  String?
+  drivingLicenseBackUrl   String?
+  drivingLicenseExpiry    DateTime?
+  vehicleRegistrationUrl  String?
+  insuranceCardUrl        String?
+  vehicleMake             String?
+  vehicleModel            String?
+  vehicleYear             Int?
+  vehiclePlate            String?
+  vehicleColor            String?
+  
+  // Step 7: Review & Submit
+  profilePhotoUrl   String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  emergencyContactRelationship String?
+  
+  // Metadata
+  isSubmitted       Boolean  @default(false)
+  submittedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([countryCode])
+  @@map("delivery_driver_onboarding_drafts")
 }
 
 // D20: Driver Safety Center & Incident Reporting System
@@ -1835,6 +1925,9 @@ model User {
   // SafePilot: AI Admin Assistant
   safePilotInteractions SafePilotInteraction[] @relation("SafePilotInteractions")
   safePilotConfigUpdates SafePilotConfig[] @relation("SafePilotConfigUpdates")
+
+  // Delivery Driver 7-Step Onboarding
+  deliveryDriverOnboardingDraft DeliveryDriverOnboardingDraft?
 
   @@index([isDemo])
   @@index([isAccountLocked])
