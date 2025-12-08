@@ -792,6 +792,15 @@ model DriverProfile {
 
   // Delivery Driver Onboarding Fields (7-Step Wizard)
   deliveryDriverMethod         String?  // car | bike | walking (for delivery drivers only)
+  vehicleMake                  String?  // Vehicle make (for car delivery)
+  vehicleModel                 String?  // Vehicle model (for car delivery)
+  vehiclePlate                 String?  // Vehicle plate number (for car delivery)
+  vehicleType                  String?  // bike | car | walking
+  services                     String[] // Array of enabled services
+  canFoodDelivery              Boolean  @default(true)  // Can deliver food orders
+  canParcelDelivery            Boolean  @default(true)  // Can deliver parcel orders
+  canRide                      Boolean  @default(false) // Always false for delivery drivers
+  partnerStatus                String   @default("pending_verification") // Partner verification status
   governmentIdFrontImageUrl    String?  // Government ID front image URL
   governmentIdBackImageUrl     String?  // Government ID back image URL
   governmentIdStatus           DocumentStatus @default(PENDING) // Government ID verification status
