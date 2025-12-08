@@ -22,13 +22,43 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isPartnerAvailable, getPartnerConfig } from "@shared/partnerAvailability";
 
+// US state codes
+const US_STATES = [
+  { code: "AL", name: "Alabama" }, { code: "AK", name: "Alaska" }, { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" }, { code: "CA", name: "California" }, { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" }, { code: "DE", name: "Delaware" }, { code: "DC", name: "Washington DC" },
+  { code: "FL", name: "Florida" }, { code: "GA", name: "Georgia" }, { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" }, { code: "IL", name: "Illinois" }, { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" }, { code: "KS", name: "Kansas" }, { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" }, { code: "ME", name: "Maine" }, { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" }, { code: "MI", name: "Michigan" }, { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" }, { code: "MO", name: "Missouri" }, { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" }, { code: "NV", name: "Nevada" }, { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" }, { code: "NM", name: "New Mexico" }, { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" }, { code: "ND", name: "North Dakota" }, { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" }, { code: "OR", name: "Oregon" }, { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" }, { code: "SC", name: "South Carolina" }, { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" }, { code: "TX", name: "Texas" }, { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" }, { code: "VA", name: "Virginia" }, { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" }, { code: "WI", name: "Wisconsin" }, { code: "WY", name: "Wyoming" },
+];
+
+// Bangladesh districts
+const BD_DISTRICTS = [
+  "Dhaka", "Chittagong", "Sylhet", "Rajshahi", "Khulna", "Barisal", "Rangpur", "Mymensingh",
+  "Comilla", "Gazipur", "Narayanganj", "Cox's Bazar", "Jessore", "Bogra", "Dinajpur", "Tangail",
+];
+
 const restaurantInfoSchema = z.object({
   restaurantName: z.string().min(2, "Restaurant name is required"),
   cuisineType: z.string().min(1, "Cuisine type is required"),
-  address: z.string().min(5, "Address is required"),
-  cityCode: z.string().min(1, "City is required"),
+  address: z.string().min(3, "Address is required"),
+  city: z.string().min(2, "City is required"),
+  state: z.string().optional(), // US only
+  district: z.string().optional(), // BD only
+  zipCode: z.string().optional(), // US: required, BD: optional
   description: z.string().optional(),
-  phone: z.string().min(10, "Phone number is required"),
+  phone: z.string().min(7, "Phone number is required"),
 });
 
 const menuSetupSchema = z.object({
@@ -154,7 +184,10 @@ export default function RestaurantRegistration() {
       restaurantName: "",
       cuisineType: "",
       address: "",
-      cityCode: "",
+      city: "",
+      state: "",
+      district: "",
+      zipCode: "",
       description: "",
       phone: "",
     },
@@ -468,38 +501,95 @@ export default function RestaurantRegistration() {
                       </FormItem>
                     )}
                   />
+                  {/* City field - text input for all countries */}
                   <FormField
                     control={restaurantInfoForm.control}
-                    name="cityCode"
+                    name="city"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>City</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-city">
-                              <SelectValue placeholder="Select city" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {isBD ? (
-                              <>
-                                <SelectItem value="dhaka">Dhaka</SelectItem>
-                                <SelectItem value="chittagong">Chittagong</SelectItem>
-                                <SelectItem value="sylhet">Sylhet</SelectItem>
-                                <SelectItem value="rajshahi">Rajshahi</SelectItem>
-                                <SelectItem value="khulna">Khulna</SelectItem>
-                              </>
-                            ) : (
-                              <>
-                                <SelectItem value="new_york">New York</SelectItem>
-                                <SelectItem value="los_angeles">Los Angeles</SelectItem>
-                                <SelectItem value="chicago">Chicago</SelectItem>
-                                <SelectItem value="houston">Houston</SelectItem>
-                                <SelectItem value="miami">Miami</SelectItem>
-                              </>
-                            )}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Input 
+                            placeholder={isBD ? "e.g., Dhaka, Chittagong" : "e.g., Brooklyn, Manhattan"} 
+                            {...field} 
+                            data-testid="input-city" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* US-specific: State dropdown */}
+                  {!isBD && (
+                    <FormField
+                      control={restaurantInfoForm.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-state">
+                                <SelectValue placeholder="Select state" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {US_STATES.map((state) => (
+                                <SelectItem key={state.code} value={state.code}>
+                                  {state.name} ({state.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {/* BD-specific: District dropdown */}
+                  {isBD && (
+                    <FormField
+                      control={restaurantInfoForm.control}
+                      name="district"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>District</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-district">
+                                <SelectValue placeholder="Select district" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {BD_DISTRICTS.map((district) => (
+                                <SelectItem key={district} value={district.toLowerCase()}>
+                                  {district}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {/* ZIP/Postal Code field */}
+                  <FormField
+                    control={restaurantInfoForm.control}
+                    name="zipCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{isBD ? "Postal Code (Optional)" : "ZIP Code"}</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder={isBD ? "e.g., 1205" : "e.g., 11212"} 
+                            {...field} 
+                            data-testid="input-zip-code" 
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
