@@ -354,6 +354,36 @@ export default function DeliveryDriverWizard() {
   });
 
   useEffect(() => {
+    if (currentStep === 2 && isUS) {
+      const freshValues = {
+        fullName: draft?.fullName || "",
+        firstName: draft?.firstName || "",
+        lastName: draft?.lastName || "",
+        middleName: draft?.middleName || "",
+        fatherName: draft?.fatherName || "",
+        dateOfBirth: draft?.dateOfBirth ? new Date(draft.dateOfBirth).toISOString().split("T")[0] : "",
+        phoneNumber: draft?.phoneNumber || "",
+      };
+      personalInfoFormUS.reset(freshValues);
+    }
+  }, [currentStep, isUS, draft?.fullName, draft?.firstName, draft?.lastName, draft?.middleName, draft?.fatherName, draft?.dateOfBirth, draft?.phoneNumber]);
+
+  useEffect(() => {
+    if (currentStep === 2 && isBD) {
+      const freshValues = {
+        fullName: draft?.fullName || "",
+        firstName: draft?.firstName || "",
+        lastName: draft?.lastName || "",
+        middleName: draft?.middleName || "",
+        fatherName: draft?.fatherName || "",
+        dateOfBirth: draft?.dateOfBirth ? new Date(draft.dateOfBirth).toISOString().split("T")[0] : "",
+        phoneNumber: draft?.phoneNumber || "",
+      };
+      personalInfoFormBD.reset(freshValues);
+    }
+  }, [currentStep, isBD, draft?.fullName, draft?.firstName, draft?.lastName, draft?.middleName, draft?.fatherName, draft?.dateOfBirth, draft?.phoneNumber]);
+
+  useEffect(() => {
     if (currentStep === 3 && isUS) {
       const freshValues = {
         street_address: draft?.usaStreet || "",
@@ -375,6 +405,85 @@ export default function DeliveryDriverWizard() {
       addressInfoFormBD.reset(freshValues);
     }
   }, [currentStep, isBD, draft?.presentAddress, draft?.permanentAddress]);
+
+  useEffect(() => {
+    if (currentStep === 4 && isUS) {
+      const freshValues = {
+        governmentIdType: draft?.governmentIdType || "",
+        governmentIdLast4: draft?.governmentIdLast4 || "",
+        governmentIdFrontUrl: draft?.governmentIdFrontUrl || "",
+        governmentIdBackUrl: draft?.governmentIdBackUrl || "",
+        ssnLast4: draft?.ssnLast4 || "",
+        backgroundCheckConsent: draft?.backgroundCheckConsent || false,
+      };
+      governmentIdFormUS.reset(freshValues);
+    }
+  }, [currentStep, isUS, draft?.governmentIdType, draft?.governmentIdLast4, draft?.governmentIdFrontUrl, draft?.governmentIdBackUrl, draft?.ssnLast4, draft?.backgroundCheckConsent]);
+
+  useEffect(() => {
+    if (currentStep === 4 && isBD) {
+      const freshValues = {
+        nidNumber: draft?.nidNumber || "",
+        nidFrontImageUrl: draft?.nidFrontImageUrl || "",
+        nidBackImageUrl: draft?.nidBackImageUrl || "",
+      };
+      governmentIdFormBD.reset(freshValues);
+    }
+  }, [currentStep, isBD, draft?.nidNumber, draft?.nidFrontImageUrl, draft?.nidBackImageUrl]);
+
+  useEffect(() => {
+    if (currentStep === 5 && isUS) {
+      const freshValues = {
+        deliveryMethod: (draft?.deliveryMethod as "car" | "bike" | "walking") || "bike",
+      };
+      deliveryMethodForm.reset(freshValues);
+    }
+  }, [currentStep, isUS, draft?.deliveryMethod]);
+
+  useEffect(() => {
+    if (currentStep === 6 && isBD) {
+      const freshValues = {
+        drivingLicenseNumber: draft?.drivingLicenseNumber || "",
+        drivingLicenseFrontUrl: draft?.drivingLicenseFrontUrl || "",
+        drivingLicenseBackUrl: draft?.drivingLicenseBackUrl || "",
+        drivingLicenseExpiry: draft?.drivingLicenseExpiry || "",
+        vehicleRegistrationUrl: draft?.vehicleRegistrationUrl || "",
+        insuranceCardUrl: draft?.insuranceCardUrl || "",
+      };
+      vehicleDocsFormBD.reset(freshValues);
+    }
+  }, [currentStep, isBD, draft?.drivingLicenseNumber, draft?.drivingLicenseFrontUrl, draft?.drivingLicenseBackUrl, draft?.drivingLicenseExpiry, draft?.vehicleRegistrationUrl, draft?.insuranceCardUrl]);
+
+  useEffect(() => {
+    if (currentStep === 6 && isUS && draft?.deliveryMethod === "car") {
+      const freshValues = {
+        drivingLicenseNumber: draft?.drivingLicenseNumber || "",
+        drivingLicenseFrontUrl: draft?.drivingLicenseFrontUrl || "",
+        drivingLicenseBackUrl: draft?.drivingLicenseBackUrl || "",
+        drivingLicenseExpiry: draft?.drivingLicenseExpiry || "",
+        vehicleRegistrationUrl: draft?.vehicleRegistrationUrl || "",
+        insuranceCardUrl: draft?.insuranceCardUrl || "",
+        vehicleMake: draft?.vehicleMake || "",
+        vehicleModel: draft?.vehicleModel || "",
+        vehicleYear: draft?.vehicleYear?.toString() || "",
+        vehiclePlate: draft?.vehiclePlate || "",
+        vehicleColor: draft?.vehicleColor || "",
+      };
+      vehicleDocsFormUSCar.reset(freshValues);
+    }
+  }, [currentStep, isUS, draft?.deliveryMethod, draft?.drivingLicenseNumber, draft?.drivingLicenseFrontUrl, draft?.drivingLicenseBackUrl, draft?.drivingLicenseExpiry, draft?.vehicleRegistrationUrl, draft?.insuranceCardUrl, draft?.vehicleMake, draft?.vehicleModel, draft?.vehicleYear, draft?.vehiclePlate, draft?.vehicleColor]);
+
+  useEffect(() => {
+    if (currentStep === 7) {
+      const freshValues = {
+        profilePhotoUrl: draft?.profilePhotoUrl || "",
+        emergencyContactName: draft?.emergencyContactName || "",
+        emergencyContactPhone: draft?.emergencyContactPhone || "",
+        emergencyContactRelationship: draft?.emergencyContactRelationship || "",
+      };
+      finalReviewForm.reset(freshValues);
+    }
+  }, [currentStep, draft?.profilePhotoUrl, draft?.emergencyContactName, draft?.emergencyContactPhone, draft?.emergencyContactRelationship]);
 
   const saveStepMutation = useMutation({
     mutationFn: async ({ step, data }: { step: number; data: any }) => {
@@ -942,8 +1051,8 @@ export default function DeliveryDriverWizard() {
               <CardDescription>Enter your government ID and SSN details</CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...governmentIdFormUS}>
-                <form onSubmit={governmentIdFormUS.handleSubmit(handleStep4SubmitUS)} className="space-y-4">
+              <Form {...governmentIdFormUS} key={`gov-id-form-us-${currentStep}`}>
+                <form onSubmit={governmentIdFormUS.handleSubmit(handleStep4SubmitUS)} className="space-y-4" autoComplete="off">
                   <FormField
                     control={governmentIdFormUS.control}
                     name="governmentIdType"
@@ -974,7 +1083,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>Last 4 Digits of ID *</FormLabel>
                         <FormControl>
-                          <Input placeholder="1234" maxLength={4} {...field} data-testid="input-id-last4" />
+                          <Input placeholder="Enter 4 digits" maxLength={4} autoComplete="new-id-digits" {...field} data-testid="input-id-last4" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -988,7 +1097,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>SSN Last 4 Digits *</FormLabel>
                         <FormControl>
-                          <Input placeholder="1234" maxLength={4} {...field} data-testid="input-ssn-last4" />
+                          <Input placeholder="Enter 4 digits" maxLength={4} autoComplete="new-ssn-digits" {...field} data-testid="input-ssn-last4" />
                         </FormControl>
                         <FormDescription>Required for background check and tax reporting</FormDescription>
                         <FormMessage />
