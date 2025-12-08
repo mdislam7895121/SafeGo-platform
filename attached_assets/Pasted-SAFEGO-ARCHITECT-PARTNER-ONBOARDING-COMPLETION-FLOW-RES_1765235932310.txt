@@ -1,0 +1,292 @@
+SAFEGO ARCHITECT – PARTNER ONBOARDING COMPLETION FLOW (RESTAURANT + ALL PARTNERS)
+
+Goal:
+When any partner (restaurant, ride driver, delivery driver, other partners) finishes onboarding:
+- Their application must be saved with verification_status = "pending", is_verified = false.
+- They must be redirected to their own Partner Dashboard/Profile.
+- They must be able to SEE their data, but CANNOT go live or accept work until approved by Admin.
+- This behavior must be consistent across all partner types.
+
+Right now, after restaurant registration submit, the user does not clearly see where their application went.  
+We need a clean, unified “post-onboarding” flow.
+
+=====================================================
+A) SAFEGO MASTER RULES (DO NOT BREAK, DO NOT SIMPLIFY)
+
+You must respect all existing SafeGo rules:
+
+1) ROLES (4, strictly separated)
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+
+   Each role has:
+   - its own onboarding & KYC
+   - its own dashboard
+   - its own permissions
+   - its own status flows
+
+2) GLOBAL SERVICES (3)
+   - ride-hailing
+   - food delivery
+   - parcel delivery
+
+3) COUNTRY-SPECIFIC KYC
+
+   BANGLADESH (BD) drivers:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - nid_number + nid_front_image + nid_back_image
+   - emergency_contact_name + emergency_contact_phone
+   - driving_license_number + driving_license_front + driving_license_back
+   - vehicle_registration
+   - insurance_document (optional)
+   - verification_status + is_verified
+
+   UNITED STATES (US) drivers:
+   - date_of_birth
+   - home_address
+   - emergency_contact_name + emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - government_id_front_image + government_id_back_image
+   - driver_license + image + expiry (for car)
+   - ssn_last4 (optional)
+   - verification_status + is_verified
+
+   Restaurants have their own KYC per country (business info, address, ID, tax info, emergency contact, etc.).  
+
+4) ADMIN PANEL (must stay as is)
+   Admin can:
+   - verify customers / drivers / restaurants
+   - approve or reject KYC (with rejection_reason)
+   - block/unblock any user
+   - update pricing, fees, commissions
+   - manage payouts
+   - view driver negative balances
+   - view restaurant negative balances
+
+5) CORE COLLECTIONS (MUST remain compatible)
+   - rides
+   - food_orders
+   - deliveries
+
+   Each includes:
+   - identity fields (customer_id, driver_id, restaurant_id)
+   - addresses + geolocation
+   - fees + commission
+   - payment details
+   - timestamps
+   - full status flow
+   - rating and feedback
+
+6) COMMISSION & PAYOUT LOGIC
+   - Cash ride: driver keeps all cash; SafeGo commission → negative driver_wallet_balance; weekly settlement.
+   - Cash food: restaurant keeps all cash; SafeGo commission → negative restaurant_wallet.
+   - Online payment: SafeGo keeps commission automatically.
+   - Admin can settle and mark balances as paid.
+
+7) SECURITY
+   - Customers cannot view driver documents.
+   - Drivers cannot view customer NID/government IDs.
+   - Restaurants cannot view other restaurants’ private data.
+   - Only admin can change pricing, commission, verification, blocking.
+   - Users can update only their own profile.
+
+8) STATUS FLOWS (do NOT break)
+
+   Ride:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+
+   Food:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+
+   Parcel:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+9) ONBOARDING
+   - Multi-step onboarding for each role.
+   - After submit: verification_status="pending", is_verified=false.
+   - Access to core actions is blocked until admin approval.
+
+10) NOTIFICATIONS
+   - New ride alert for driver
+   - Food/parcel order updates
+   - Verification approval / rejection
+   - Important admin messages
+
+All changes must be BACKWARD-COMPATIBLE:
+- DO NOT rename or remove DB fields.
+- DO NOT change or delete existing API routes.
+- Only ADD behavior / routes / components where needed.
+
+=====================================================
+B) CURRENT PROBLEM (RESTAURANT)
+
+On `/partner/restaurant/register`:
+- Restaurant completes the form and submits.
+- The application is accepted by the backend, but the user:
+  - is not clearly redirected to a Restaurant Dashboard
+  - cannot easily see their own profile or application status
+  - does not see a clear “Verification pending, cannot accept orders yet” state.
+
+Expected SafeGo behavior:
+- After submit → go straight to Restaurant Partner Dashboard/Profile.
+- They can review all details.
+- They see a big banner: “Verification pending – you cannot open for orders until approved.”
+- When they later try to “Open for orders / Go Online”, verification check blocks them if still pending.
+
+=====================================================
+C) REQUIRED BEHAVIOR – UNIFIED PARTNER COMPLETION FLOW
+
+You must implement the following for RESTAURANTS first, then generalize the pattern to ALL partners:
+
+---------------------------------------------
+1) RESTAURANT SUBMIT → DASHBOARD REDIRECT
+
+a) On successful submit of `/partner/restaurant/register`:
+   - Backend:
+     - Save restaurant record with:
+       - verification_status = "pending"
+       - is_verified = false
+       - link to owner account (owner_customer_id or partner_user_id)
+   - Frontend:
+     - Instead of staying on the form, redirect to the canonical Restaurant Dashboard route, e.g.:
+       - `/partner/restaurant/dashboard`  (or confirm the existing canonical route and use that)
+     - Pass enough context so the dashboard loads the newly created restaurant.
+
+b) The Restaurant Dashboard MUST show:
+   - Basic business info (name, cuisine, address, phone, etc.)
+   - A prominent verification banner:
+     - State: pending / approved / rejected
+     - For pending:
+       “Your restaurant application is under review. You cannot open for orders until verification is approved.”
+     - For rejected:
+       Show `rejection_reason` from admin.
+     - For approved:
+       Show “Verified – you can now open for orders.”
+
+c) “Open for orders / Go Online” control:
+   - Only visible when restaurant onboarding is complete.
+   - MUST be disabled when `verification_status !== "approved"` or `is_verified !== true`.
+   - Tooltip or message: “You must be verified by SafeGo before you can open for orders.”
+
+---------------------------------------------
+2) UNIFIED PATTERN FOR ALL PARTNERS (DRIVER + RESTAURANT + FUTURE PARTNERS)
+
+For each partner type you already have (or will have), you must follow this pattern:
+
+- Delivery driver onboarding → Driver Dashboard:
+  - Already implemented for drivers (Go Online disabled until verified).
+  - Reuse same logic pattern.
+
+- Ride driver onboarding → Ride Driver Dashboard:
+  - Same pattern: after submit, always redirect to driver dashboard with pending banner.
+
+- Restaurant onboarding → Restaurant Dashboard (as defined above).
+
+- Any other partner types (e.g. shop_partner, parcel hub, etc.):
+  - After onboarding submit → redirect to their Partner Dashboard.
+  - Show verification banner.
+  - Block all “live/online/accept work” actions until verified.
+
+Implementation requirement:
+- Introduce a simple consistent pattern in code, for example:
+
+  - Common fields:
+    - verification_status
+    - is_verified
+  - Common rule:
+    - If `verification_status !== "approved"`:
+      - dashboard loads in “read-only / setup only” mode
+      - any Go Online / Open For Orders / Start Accepting Trips buttons are disabled
+
+=====================================================
+D) ADMIN PANEL INTEGRATION (NO BREAKING CHANGES)
+
+Ensure the existing Admin Panel driver/restaurant verification features are hooked into this UX:
+
+1) When Admin approves a restaurant:
+   - Set verification_status = "approved"
+   - is_verified = true
+   - (Optionally) send a notification to the restaurant partner.
+
+2) When Admin rejects:
+   - Set verification_status = "rejected"
+   - is_verified = false
+   - Set rejection_reason.
+   - Dashboard must show the rejection reason and prevent going live.
+
+Do NOT change:
+- how admin approves drivers
+- how admin handles commission/wallet/etc.
+
+Just ensure restaurant dashboard reacts correctly to these fields.
+
+=====================================================
+E) ROUTES & COMPONENTS (ADD ONLY)
+
+1) Confirm canonical Restaurant Dashboard route:
+   - e.g. `/partner/restaurant/dashboard`
+   - If a different canonical route already exists, use that and make sure only ONE dashboard is active (no duplicate dashboards).
+
+2) Confirm that:
+   - `/partner/restaurant/register` is ONLY for onboarding.
+   - After submit success, redirect to dashboard, not keep them on the registration page.
+
+3) For drivers and other partners:
+   - Ensure similar pattern exists:
+     - /partner/delivery-driver/wizard → /driver/delivery-dashboard
+     - /partner/ride-driver/... → /driver/ride-dashboard
+   - Without changing any existing working flows, just ensure the “pending verification” state is consistent.
+
+=====================================================
+F) TEST CASES (YOU MUST RUN)
+
+Test 1 – New US Restaurant:
+- Log in as a new user.
+- Complete `/partner/restaurant/register`.
+- On success:
+  - You are redirected to the Restaurant Dashboard.
+  - You see all your submitted info.
+  - You see a “Verification pending” banner.
+  - Any “Open for orders / Go Online” control is disabled.
+
+Test 2 – Admin Approves:
+- As Admin, approve this restaurant in the Admin Panel.
+- As the restaurant user, refresh the dashboard:
+  - Banner shows “Verified”.
+  - Go Online / Open For Orders control becomes enabled.
+
+Test 3 – Admin Rejects:
+- As Admin, reject another restaurant and set a rejection_reason.
+- As that restaurant user, open dashboard:
+  - Banner shows “Rejected” with reason.
+  - Cannot go live.
+
+Test 4 – Other partner types:
+- For a new delivery driver, confirm:
+  - After onboarding, redirect → driver dashboard.
+  - Go Online disabled while verification pending.
+  - Enabled after admin approval.
+
+=====================================================
+G) NON-BREAKING GUARANTEE
+
+- Do NOT rename/remove database fields.
+- Do NOT modify existing API signatures (rides, food_orders, deliveries, wallet, commission).
+- Only:
+  - Add/adjust redirects after onboarding submit.
+  - Add/adjust dashboard UI components to show verification state and block/enable actions.
+  - Reuse existing verification_status / is_verified fields.
+
+At the end, provide:
+- Which routes now redirect where (restaurant + other partners).
+- Which dashboard components were updated.
+- Confirmation that:
+  - After submit, restaurants land on their dashboard.
+  - They can see all their info.
+  - They cannot “open business” until verified, exactly like drivers.

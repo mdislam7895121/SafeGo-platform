@@ -163,11 +163,13 @@ export default function RestaurantRegistration() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/registration/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/validate"] });
       toast({
         title: "Application Submitted",
-        description: "Your restaurant partner application has been submitted for review.",
+        description: "Your restaurant partner application has been submitted for review. Redirecting to your dashboard...",
       });
-      setLocation("/customer");
+      // Redirect to restaurant dashboard to see verification status
+      setLocation("/restaurant/dashboard");
     },
     onError: (error: any) => {
       toast({
