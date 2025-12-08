@@ -2166,9 +2166,15 @@ function DriverRegistrationV2() {
         </Link>
 
         <div className="text-center mb-8">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500/20 to-green-500/20 flex items-center justify-center mx-auto mb-4">
+          <div className={`h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+            isCarDelivery ? 'bg-gradient-to-br from-purple-500/20 to-blue-500/20' :
+            driverType === 'ride' ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20' :
+            'bg-gradient-to-br from-green-500/20 to-emerald-500/20'
+          }`}>
             {driverType === 'ride' ? (
               <Car className="h-8 w-8 text-blue-600" />
+            ) : isCarDelivery ? (
+              <Car className="h-8 w-8 text-purple-600" />
             ) : (
               <Bike className="h-8 w-8 text-green-600" />
             )}
@@ -2177,9 +2183,12 @@ function DriverRegistrationV2() {
             {driverType === 'ride' ? 'Ride Driver' : 'Delivery Driver'} Registration
           </h1>
           <p className="text-muted-foreground mt-2">
-            Complete all steps to submit your application
+            {isCarDelivery ? 'Car delivery with full vehicle documents' : 'Complete all steps to submit your application'}
           </p>
-          {isNycDriver && (
+          {isCarDelivery && (
+            <Badge className="mt-2 bg-purple-600">Car Delivery</Badge>
+          )}
+          {isNycDriver && !isCarDelivery && (
             <Badge className="mt-2 bg-blue-600">NYC TLC/FHV Required</Badge>
           )}
         </div>
