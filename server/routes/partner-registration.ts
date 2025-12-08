@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { uploadOnboardingDocument, getFileUrl } from '../middleware/upload';
 
 const router = Router();
 
@@ -1670,6 +1671,48 @@ router.post('/admin/delivery-drivers/:id/unblock', authenticateToken, async (req
     console.error('[Admin] Error unblocking driver:', error);
     return res.status(500).json({ error: 'Failed to unblock driver' });
   }
+});
+
+router.post('/delivery-driver/onboarding/upload', authenticateToken, (req: AuthRequest, res: Response) => {
+  uploadOnboardingDocument(req, res, async (err) => {
+    if (err) {
+      console.error('[Onboarding Upload] Error:', err.message);
+      if (err.message.includes('File too large')) {
+        return res.status(413).json({ error: 'File too large. Maximum size is 10MB.' });
+      }
+      if (err.message.includes('Invalid file type')) {
+        return res.status(400).json({ error: 'Invalid file type. Only JPEG, PNG, WebP, and PDF files are allowed.' });
+      }
+      return res.status(500).json({ error: 'Failed to upload file' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const fileUrl = getFileUrl(req.file.filename);
+      const documentType = req.body.documentType || 'general';
+
+      console.log(`[Onboarding Upload] User ${userId} uploaded ${documentType}: ${fileUrl}`);
+
+      return res.json({
+        success: true,
+        url: fileUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        documentType,
+      });
+    } catch (error) {
+      console.error('[Onboarding Upload] Processing error:', error);
+      return res.status(500).json({ error: 'Failed to process upload' });
+    }
+  });
 });
 
 export default router;

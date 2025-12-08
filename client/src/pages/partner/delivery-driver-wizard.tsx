@@ -194,6 +194,106 @@ const finalReviewSchema = z.object({
   emergencyContactRelationship: z.string().optional(),
 });
 
+function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    setIsUploading(true);
+
+    const reader = new FileReader();
+    reader.onloadend = () => setPreview(reader.result as string);
+    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("documentType", "profile_photo");
+
+      const response = await fetch("/api/partner/delivery-driver/onboarding/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Upload failed");
+      }
+
+      const data = await response.json();
+      onChange(data.url);
+    } catch (err: any) {
+      setError(err.message);
+      setPreview(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemove = () => {
+    onChange("");
+    setPreview(null);
+  };
+
+  const hasValue = value && value.length > 0;
+
+  return (
+    <div className="border-2 border-dashed rounded-lg p-6 text-center transition-colors hover:border-primary">
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={handleFileChange}
+        className="hidden"
+        id="profile-photo-input"
+        disabled={isUploading}
+      />
+      
+      {isUploading ? (
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Uploading...</p>
+        </div>
+      ) : hasValue || preview ? (
+        <div className="flex flex-col items-center gap-2">
+          <img 
+            src={preview || value} 
+            alt="Profile preview" 
+            className="h-24 w-24 rounded-full object-cover border-2 border-primary"
+          />
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <span className="text-sm text-green-600">Photo uploaded</span>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <label htmlFor="profile-photo-input" className="cursor-pointer">
+              <Button type="button" variant="outline" size="sm" asChild>
+                <span>Change</span>
+              </Button>
+            </label>
+            <Button type="button" variant="ghost" size="sm" onClick={handleRemove}>
+              Remove
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <label htmlFor="profile-photo-input" className="cursor-pointer block">
+          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Upload a clear photo of yourself</p>
+          <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, or WebP (max 10MB)</p>
+        </label>
+      )}
+
+      {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+    </div>
+  );
+}
+
 export default function DeliveryDriverWizard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -1748,16 +1848,10 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>Profile Photo *</FormLabel>
                         <FormControl>
-                          <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
-                            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Upload a clear photo of yourself</p>
-                            <Input 
-                              placeholder="Enter photo URL or upload" 
-                              {...field} 
-                              className="mt-2"
-                              data-testid="input-profile-photo" 
-                            />
-                          </div>
+                          <ProfilePhotoUpload 
+                            value={field.value} 
+                            onChange={field.onChange}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

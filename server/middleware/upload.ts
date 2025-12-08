@@ -162,3 +162,12 @@ export const uploadRestaurantImage = multer({
     fileSize: 8 * 1024 * 1024, // 8MB limit for restaurant images
   },
 }).single("file");
+
+// Upload configuration for driver onboarding documents (ID, license, etc.)
+export const uploadOnboardingDocument = multer({
+  storage,
+  fileFilter: documentFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit for onboarding documents
+  },
+}).single("file");
