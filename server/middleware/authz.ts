@@ -117,14 +117,26 @@ export function requireAdmin(permissionKey?: string) {
   };
 }
 
-export function requireRole(...allowedRoles: Array<'customer' | 'driver' | 'restaurant' | 'admin'>) {
+export function requireRole(...allowedRoles: Array<'customer' | 'driver' | 'restaurant' | 'admin' | 'pending_restaurant' | 'pending_driver'>) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    // Check if user's role matches any allowed role
+    // Also handle pending roles that should have access to their main dashboard
+    const userRole = req.user.role as string;
+    const hasAccess = allowedRoles.some(role => {
+      if (userRole === role) return true;
+      // pending_restaurant should have access to restaurant routes
+      if (role === 'restaurant' && userRole === 'pending_restaurant') return true;
+      // pending_driver should have access to driver routes
+      if (role === 'driver' && userRole === 'pending_driver') return true;
+      return false;
+    });
+
+    if (!hasAccess) {
       res.status(403).json({ 
         error: `Access denied. Required role: ${allowedRoles.join(' or ')}` 
       });
