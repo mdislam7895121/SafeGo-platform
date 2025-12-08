@@ -918,6 +918,35 @@ model DeliveryDriverOnboardingDraft {
   emergencyContactPhone String?
   emergencyContactRelationship String?
   
+  // Verification & Status (populated after admin review)
+  verificationStatus    String   @default("pending") // pending | approved | rejected
+  rejectionReason       String?
+  isVerified            Boolean  @default(false)
+  
+  // Go-Online Engine
+  driverStatus          String   @default("offline") // offline | available | busy
+  isOnline              Boolean  @default(false)
+  lastLocationLat       Float?
+  lastLocationLng       Float?
+  lastLocationUpdatedAt DateTime?
+  
+  // Service Flags (delivery-only for delivery drivers)
+  canFoodDelivery       Boolean  @default(true)
+  canParcelDelivery     Boolean  @default(true)
+  canRide               Boolean  @default(false) // Always false for delivery drivers
+  
+  // Earnings Tracking
+  todayEarnings         Decimal  @default(0) @db.Decimal(10, 2)
+  weeklyEarnings        Decimal  @default(0) @db.Decimal(10, 2)
+  negativeBalance       Decimal  @default(0) @db.Decimal(10, 2)
+  totalEarnings         Decimal  @default(0) @db.Decimal(10, 2)
+  
+  // Task Counters
+  pendingFoodTasks      Int      @default(0)
+  activeFoodTasks       Int      @default(0)
+  pendingParcelTasks    Int      @default(0)
+  activeParcelTasks     Int      @default(0)
+  
   // Metadata
   isSubmitted       Boolean  @default(false)
   submittedAt       DateTime?
@@ -926,6 +955,9 @@ model DeliveryDriverOnboardingDraft {
   
   @@index([userId])
   @@index([countryCode])
+  @@index([verificationStatus])
+  @@index([isOnline])
+  @@index([driverStatus])
   @@map("delivery_driver_onboarding_drafts")
 }
 

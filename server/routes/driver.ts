@@ -7381,4 +7381,216 @@ router.get(
 // to allow customers (without driver role) to apply for driver positions.
 // The partner-registration routes use authenticateToken without role restrictions.
 
+// ====================================================
+// DELIVERY DRIVER DASHBOARD & GO-ONLINE ENGINE
+// ====================================================
+
+// GET /api/driver/delivery/dashboard
+// Get delivery driver dashboard data (for delivery drivers only)
+router.get("/delivery/dashboard", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get delivery driver from the onboarding draft (submitted drivers)
+    const deliveryDriver = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+    });
+
+    if (!deliveryDriver) {
+      return res.status(404).json({ error: "Delivery driver profile not found" });
+    }
+
+    // Get user data
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        countryCode: true,
+      },
+    });
+
+    // Get recent notifications for this user
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        type: true,
+        createdAt: true,
+        isRead: true,
+      },
+    });
+
+    // Serialize decimal fields
+    const todayEarnings = deliveryDriver.todayEarnings ? parseFloat(deliveryDriver.todayEarnings.toString()) : 0;
+    const weeklyEarnings = deliveryDriver.weeklyEarnings ? parseFloat(deliveryDriver.weeklyEarnings.toString()) : 0;
+    const negativeBalance = deliveryDriver.negativeBalance ? parseFloat(deliveryDriver.negativeBalance.toString()) : 0;
+    const totalEarnings = deliveryDriver.totalEarnings ? parseFloat(deliveryDriver.totalEarnings.toString()) : 0;
+
+    res.json({
+      driver: {
+        id: deliveryDriver.id,
+        fullName: deliveryDriver.fullName || `${deliveryDriver.firstName || ''} ${deliveryDriver.lastName || ''}`.trim(),
+        countryCode: deliveryDriver.countryCode,
+        verificationStatus: deliveryDriver.verificationStatus,
+        rejectionReason: deliveryDriver.rejectionReason,
+        isVerified: deliveryDriver.isVerified,
+        driverStatus: deliveryDriver.driverStatus,
+        isOnline: deliveryDriver.isOnline,
+        deliveryMethod: deliveryDriver.deliveryMethod,
+        profilePhotoUrl: deliveryDriver.profilePhotoUrl,
+        canFoodDelivery: deliveryDriver.canFoodDelivery,
+        canParcelDelivery: deliveryDriver.canParcelDelivery,
+      },
+      earnings: {
+        todayEarnings,
+        weeklyEarnings,
+        negativeBalance,
+        totalEarnings,
+      },
+      tasks: {
+        pendingFoodTasks: deliveryDriver.pendingFoodTasks || 0,
+        activeFoodTasks: deliveryDriver.activeFoodTasks || 0,
+        pendingParcelTasks: deliveryDriver.pendingParcelTasks || 0,
+        activeParcelTasks: deliveryDriver.activeParcelTasks || 0,
+      },
+      notifications,
+    });
+  } catch (error) {
+    console.error("[DeliveryDriver] Dashboard error:", error);
+    res.status(500).json({ error: "Failed to fetch delivery driver dashboard" });
+  }
+});
+
+// POST /api/driver/delivery/go-online
+// Delivery driver goes online to accept delivery requests
+router.post("/delivery/go-online", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get delivery driver
+    const deliveryDriver = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+    });
+
+    if (!deliveryDriver) {
+      return res.status(404).json({ error: "Delivery driver profile not found" });
+    }
+
+    // Check verification status
+    if (deliveryDriver.verificationStatus !== "approved" || !deliveryDriver.isVerified) {
+      return res.status(403).json({ 
+        error: "Cannot go online", 
+        message: "Your account must be verified before you can go online" 
+      });
+    }
+
+    // Update driver status
+    await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        isOnline: true,
+        driverStatus: "available",
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        id: randomUUID(),
+        userId,
+        title: "You're Online",
+        message: "You can now receive delivery requests. Stay safe!",
+        type: "status_change",
+        isRead: false,
+      },
+    });
+
+    console.log(`[DeliveryDriver] Driver ${deliveryDriver.id} went online`);
+    res.json({ success: true, message: "You are now online", isOnline: true });
+  } catch (error) {
+    console.error("[DeliveryDriver] Go online error:", error);
+    res.status(500).json({ error: "Failed to go online" });
+  }
+});
+
+// POST /api/driver/delivery/go-offline
+// Delivery driver goes offline to stop receiving delivery requests
+router.post("/delivery/go-offline", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get delivery driver
+    const deliveryDriver = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+    });
+
+    if (!deliveryDriver) {
+      return res.status(404).json({ error: "Delivery driver profile not found" });
+    }
+
+    // Update driver status
+    await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        isOnline: false,
+        driverStatus: "offline",
+      },
+    });
+
+    console.log(`[DeliveryDriver] Driver ${deliveryDriver.id} went offline`);
+    res.json({ success: true, message: "You are now offline", isOnline: false });
+  } catch (error) {
+    console.error("[DeliveryDriver] Go offline error:", error);
+    res.status(500).json({ error: "Failed to go offline" });
+  }
+});
+
+// POST /api/driver/delivery/update-location
+// Update delivery driver's current location (while online)
+router.post("/delivery/update-location", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { lat, lng } = req.body;
+
+    // Validate location data
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      return res.status(400).json({ error: "Invalid location data" });
+    }
+
+    // Get delivery driver
+    const deliveryDriver = await prisma.deliveryDriverOnboardingDraft.findUnique({
+      where: { userId },
+      select: { id: true, isOnline: true },
+    });
+
+    if (!deliveryDriver) {
+      return res.status(404).json({ error: "Delivery driver profile not found" });
+    }
+
+    // Only update location if driver is online
+    if (!deliveryDriver.isOnline) {
+      return res.status(400).json({ error: "Cannot update location while offline" });
+    }
+
+    // Update location
+    await prisma.deliveryDriverOnboardingDraft.update({
+      where: { userId },
+      data: {
+        lastLocationLat: lat,
+        lastLocationLng: lng,
+        lastLocationUpdatedAt: new Date(),
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[DeliveryDriver] Location update error:", error);
+    res.status(500).json({ error: "Failed to update location" });
+  }
+});
+
 export default router;

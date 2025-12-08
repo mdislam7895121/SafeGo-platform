@@ -19,6 +19,14 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Service Offerings**: Supports Food Delivery, Ride-Hailing, and Parcel Delivery with features like restaurant management, multi-route fare engine, and dynamic pricing.
     *   **SafeGo Parcel System (BD)**: Comprehensive parcel delivery for Bangladesh with 4-zone domestic and 4-corridor international pricing, dynamic pricing (volumetric weight, speed tiers), and COD settlement.
     *   **Bangladesh Tax System**: Comprehensive VAT calculation (15% default) for all 6 SafeGo services in Bangladesh, configurable via Admin Panel.
+*   **Delivery Driver Dashboard + Go-Online Engine**: Complete delivery driver management system:
+    *   **Verification Status Badge**: pending (blocks go-online), approved (allows go-online), rejected (shows rejection reason)
+    *   **Earnings Summary**: Today's earnings, weekly earnings, negative balance (commission owed), total earnings
+    *   **Online/Offline Toggle**: Disabled until isVerified=true, triggers real-time location updates when enabled
+    *   **Task Navigation Cards**: Food delivery tasks, parcel delivery tasks with pending/active counters
+    *   **Notification Center**: Verification updates, new tasks, payout notifications
+    *   **Go-Online Engine**: Status management (offline/available/busy), location broadcasting, matching pool registration for food and parcel delivery services
+    *   **Backend API**: GET /driver/delivery/dashboard, POST /driver/delivery/go-online, POST /driver/delivery/go-offline, POST /driver/delivery/update-location
 *   **Privacy & Consent Management System**: GDPR-compliant privacy management with consent tracking, policy versioning, configurable data retention, and user data deletion/export requests.
     *   **Post-Verification Enforcement**: Policy acceptance required ONLY after KYC/onboarding is complete and user is verified - unverified users can complete sign-up, onboarding, and KYC without being blocked. Admins are never blocked from Admin Panel.
 *   **Loyalty & Incentives**: SafeGo Points System, Opportunity Bonus Management System, and Driver Incentive Engine.

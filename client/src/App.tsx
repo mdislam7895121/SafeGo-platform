@@ -112,6 +112,7 @@ import DriverPoints from "@/pages/driver/points";
 import DriverPromotions from "@/pages/driver/promotions";
 import DriverHelp from "@/pages/driver/help";
 import DriverHome from "@/pages/driver/home";
+import DeliveryDriverDashboard from "@/pages/driver/delivery-dashboard";
 import DriverAccount from "@/pages/driver/account";
 import DriverAccountVehicles from "@/pages/driver/account/vehicles";
 import DriverAccountWorkHub from "@/pages/driver/account/work-hub";
@@ -748,6 +749,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Dashboard">
             <DriverDashboard />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      {/* Delivery Driver Dashboard with Go-Online Engine */}
+      <Route path="/driver/delivery-dashboard">
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
+          <DriverLayout pageTitle="Delivery Dashboard">
+            <DeliveryDriverDashboard />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
