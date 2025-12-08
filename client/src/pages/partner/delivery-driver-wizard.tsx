@@ -747,7 +747,7 @@ export default function DeliveryDriverWizard() {
             </CardHeader>
             <CardContent>
               <Form {...addressInfoFormUS}>
-                <form onSubmit={addressInfoFormUS.handleSubmit(handleStep3SubmitUS)} className="space-y-4">
+                <form onSubmit={addressInfoFormUS.handleSubmit(handleStep3SubmitUS)} className="space-y-4" autoComplete="off">
                   <FormField
                     control={addressInfoFormUS.control}
                     name="street_address"
@@ -755,7 +755,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>Street Address *</FormLabel>
                         <FormControl>
-                          <Input placeholder="123 Main Street" {...field} data-testid="input-street" />
+                          <Input placeholder="e.g. 123 Main Street" autoComplete="off" {...field} data-testid="input-street" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -769,7 +769,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>Apt/Unit (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="Apt 4B" {...field} data-testid="input-apt" />
+                          <Input placeholder="e.g. Apt 4B" autoComplete="off" {...field} data-testid="input-apt" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -784,7 +784,7 @@ export default function DeliveryDriverWizard() {
                         <FormItem>
                           <FormLabel>City *</FormLabel>
                           <FormControl>
-                            <Input placeholder="New York" {...field} data-testid="input-city" />
+                            <Input placeholder="e.g. New York" autoComplete="off" {...field} data-testid="input-city" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -797,7 +797,7 @@ export default function DeliveryDriverWizard() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>State *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger data-testid="select-state">
                                 <SelectValue placeholder="Select state" />
@@ -822,7 +822,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>ZIP Code *</FormLabel>
                         <FormControl>
-                          <Input placeholder="10001" {...field} data-testid="input-zip" />
+                          <Input placeholder="e.g. 10001" autoComplete="off" {...field} data-testid="input-zip" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -948,7 +948,7 @@ export default function DeliveryDriverWizard() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Government ID Type *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-id-type">
                               <SelectValue placeholder="Select ID type" />
