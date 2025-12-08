@@ -220,7 +220,7 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
       formData.append("file", file);
       formData.append("documentType", "profile_photo");
 
-      const response = await fetch("/api/partner/delivery-driver/onboarding/upload", {
+      const response = await fetch("/api/delivery-driver/onboarding/upload", {
         method: "POST",
         body: formData,
         credentials: "include",
