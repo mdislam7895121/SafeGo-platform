@@ -220,10 +220,12 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
       formData.append("file", file);
       formData.append("documentType", "profile_photo");
 
+      const token = localStorage.getItem("safego_token");
       const response = await fetch("/api/delivery-driver/onboarding/upload", {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       const data = await response.json();
