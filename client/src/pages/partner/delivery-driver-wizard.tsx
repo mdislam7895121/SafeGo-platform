@@ -355,24 +355,26 @@ export default function DeliveryDriverWizard() {
 
   useEffect(() => {
     if (currentStep === 3 && isUS) {
-      addressInfoFormUS.reset({
+      const freshValues = {
         street_address: draft?.usaStreet || "",
         apt_unit: draft?.usaAptUnit || "",
         city: draft?.usaCity || "",
         state: draft?.usaState || "",
         zip_code: draft?.usaZipCode || "",
-      });
+      };
+      addressInfoFormUS.reset(freshValues);
     }
-  }, [currentStep, draft, isUS]);
+  }, [currentStep, isUS, draft?.usaStreet, draft?.usaAptUnit, draft?.usaCity, draft?.usaState, draft?.usaZipCode]);
 
   useEffect(() => {
     if (currentStep === 3 && isBD) {
-      addressInfoFormBD.reset({
+      const freshValues = {
         presentAddress: draft?.presentAddress || "",
         permanentAddress: draft?.permanentAddress || "",
-      });
+      };
+      addressInfoFormBD.reset(freshValues);
     }
-  }, [currentStep, draft, isBD]);
+  }, [currentStep, isBD, draft?.presentAddress, draft?.permanentAddress]);
 
   const saveStepMutation = useMutation({
     mutationFn: async ({ step, data }: { step: number; data: any }) => {
@@ -746,7 +748,7 @@ export default function DeliveryDriverWizard() {
               <CardDescription>Enter your home address</CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...addressInfoFormUS}>
+              <Form {...addressInfoFormUS} key={`address-form-us-${currentStep}`}>
                 <form onSubmit={addressInfoFormUS.handleSubmit(handleStep3SubmitUS)} className="space-y-4" autoComplete="off">
                   <FormField
                     control={addressInfoFormUS.control}
@@ -755,7 +757,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>Street Address *</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. 123 Main Street" autoComplete="off" {...field} data-testid="input-street" />
+                          <Input placeholder="Enter your street address" autoComplete="new-street" {...field} data-testid="input-street" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -769,7 +771,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>Apt/Unit (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Apt 4B" autoComplete="off" {...field} data-testid="input-apt" />
+                          <Input placeholder="Apartment or unit number" autoComplete="new-apt" {...field} data-testid="input-apt" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -784,7 +786,7 @@ export default function DeliveryDriverWizard() {
                         <FormItem>
                           <FormLabel>City *</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. New York" autoComplete="off" {...field} data-testid="input-city" />
+                            <Input placeholder="Enter your city" autoComplete="new-city" {...field} data-testid="input-city" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -822,7 +824,7 @@ export default function DeliveryDriverWizard() {
                       <FormItem>
                         <FormLabel>ZIP Code *</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. 10001" autoComplete="off" {...field} data-testid="input-zip" />
+                          <Input placeholder="Enter ZIP code" autoComplete="new-zip" {...field} data-testid="input-zip" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
