@@ -85,6 +85,8 @@ const licenseInfoSchema = z.object({
   driverLicenseNumber: z.string().min(5, "Driver license number is required"),
   driverLicenseState: z.string().min(2, "License issuing state is required"),
   driverLicenseExpiry: z.string().min(1, "License expiry date is required"),
+  governmentIdType: z.string().optional(),
+  governmentIdLast4: z.string().max(4).optional(),
 });
 
 const vehicleInfoSchema = z.object({
@@ -490,68 +492,151 @@ function DriverRegistrationV2() {
   };
 
   const handleSubmit = () => {
-    const submitData = isUS ? {
-      driverType,
-      countryCode,
-      personalInfo: {
-        phone: formData.personalInfo.phone,
-        dateOfBirth: formData.personalInfo.dateOfBirth,
-        emergencyContactName: formData.personalInfo.emergencyContactName,
-        emergencyContactPhone: formData.personalInfo.emergencyContactPhone,
-        emergencyContactRelationship: formData.personalInfo.emergencyContactRelationship,
-        usaFullLegalName: formData.personalInfo.usaFullLegalName,
-        usaStreet: formData.personalInfo.usaStreet,
-        usaAptUnit: formData.personalInfo.usaAptUnit,
-        usaCity: formData.personalInfo.usaCity,
-        usaState: formData.personalInfo.usaState,
-        usaZipCode: formData.personalInfo.usaZipCode,
-        ssnLast4: formData.personalInfo.ssnLast4,
-      },
-      vehicleInfo: {
-        vehicleType: formData.vehicleInfo.vehicleType,
-        vehicleMake: formData.vehicleInfo.vehicleMake,
-        vehicleModel: formData.vehicleInfo.vehicleModel,
-        vehicleYear: formData.vehicleInfo.vehicleYear,
-        vehicleColor: formData.vehicleInfo.vehicleColor,
-        vehiclePlate: formData.vehicleInfo.vehiclePlate,
-        registrationDocumentUrl: "pending_upload",
-        insuranceDocumentUrl: "pending_upload",
-      },
-      documents: {
-        driverLicenseNumber: formData.licenseInfo.driverLicenseNumber,
-        driverLicenseExpiry: formData.licenseInfo.driverLicenseExpiry,
-        driverLicenseState: formData.licenseInfo.driverLicenseState,
-        driverLicenseFrontUrl: "pending_upload",
-        driverLicenseBackUrl: "pending_upload",
-      },
-      nycCompliance: isNycDriver ? {
-        tlcLicenseNumber: formData.nycCompliance.tlcLicenseNumber,
-        tlcLicenseExpiry: formData.nycCompliance.tlcLicenseExpiry,
-        tlcLicenseFrontUrl: "pending_upload",
-        tlcLicenseBackUrl: "pending_upload",
-        fhvLicenseNumber: formData.nycCompliance.fhvLicenseNumber,
-        fhvDocumentUrl: "pending_upload",
-        dmvInspectionDate: formData.nycCompliance.dmvInspectionDate,
-        dmvInspectionExpiry: formData.nycCompliance.dmvInspectionExpiry,
-        dmvInspectionImageUrl: "pending_upload",
-      } : undefined,
-      backgroundCheckConsent: formData.backgroundCheckConsent,
-    } : {
-      driverType,
-      countryCode,
-      personalInfo: formData.personalInfo,
-      vehicleInfo: {
-        vehicleType: formData.vehicleInfo.vehicleType,
-        vehicleModel: formData.vehicleInfo.vehicleModel,
-        vehiclePlate: formData.vehicleInfo.vehiclePlate,
-        vehicleMake: formData.vehicleInfo.vehicleMake,
-        vehicleYear: formData.vehicleInfo.vehicleYear,
-        vehicleColor: formData.vehicleInfo.vehicleColor,
-      },
-      documents: {
-        nidNumber: formData.documents.nidNumber,
-      },
-    };
+    let submitData;
+    
+    if (isUS) {
+      if (isBicycleDelivery) {
+        submitData = {
+          driverType,
+          countryCode,
+          vehicleType: 'bicycle',
+          personalInfo: {
+            phone: formData.personalInfo.phone,
+            dateOfBirth: formData.personalInfo.dateOfBirth,
+            emergencyContactName: formData.personalInfo.emergencyContactName,
+            emergencyContactPhone: formData.personalInfo.emergencyContactPhone,
+            emergencyContactRelationship: formData.personalInfo.emergencyContactRelationship,
+            usaFullLegalName: formData.personalInfo.usaFullLegalName,
+            usaStreet: formData.personalInfo.usaStreet,
+            usaAptUnit: formData.personalInfo.usaAptUnit,
+            usaCity: formData.personalInfo.usaCity,
+            usaState: formData.personalInfo.usaState,
+            usaZipCode: formData.personalInfo.usaZipCode,
+            ssnLast4: formData.personalInfo.ssnLast4,
+          },
+          vehicleInfo: {
+            vehicleType: 'bicycle',
+          },
+          documents: {
+            governmentIdType: formData.licenseInfo?.governmentIdType,
+            governmentIdLast4: formData.licenseInfo?.governmentIdLast4,
+            governmentIdFrontUrl: "pending_upload",
+            governmentIdBackUrl: "pending_upload",
+          },
+          backgroundCheckConsent: formData.backgroundCheckConsent,
+          canRide: false,
+          canFoodDelivery: true,
+          canParcelDelivery: true,
+        };
+      } else if (isCarDelivery) {
+        submitData = {
+          driverType,
+          countryCode,
+          vehicleType: 'car',
+          personalInfo: {
+            phone: formData.personalInfo.phone,
+            dateOfBirth: formData.personalInfo.dateOfBirth,
+            emergencyContactName: formData.personalInfo.emergencyContactName,
+            emergencyContactPhone: formData.personalInfo.emergencyContactPhone,
+            emergencyContactRelationship: formData.personalInfo.emergencyContactRelationship,
+            usaFullLegalName: formData.personalInfo.usaFullLegalName,
+            usaStreet: formData.personalInfo.usaStreet,
+            usaAptUnit: formData.personalInfo.usaAptUnit,
+            usaCity: formData.personalInfo.usaCity,
+            usaState: formData.personalInfo.usaState,
+            usaZipCode: formData.personalInfo.usaZipCode,
+            ssnLast4: formData.personalInfo.ssnLast4,
+          },
+          vehicleInfo: {
+            vehicleType: 'car',
+          },
+          documents: {
+            driverLicenseNumber: formData.licenseInfo?.driverLicenseNumber,
+            driverLicenseExpiry: formData.licenseInfo?.driverLicenseExpiry,
+            driverLicenseState: formData.licenseInfo?.driverLicenseState,
+            driverLicenseFrontUrl: "pending_upload",
+            driverLicenseBackUrl: "pending_upload",
+            vehicleRegistrationUrl: "pending_upload",
+            vehicleInsuranceUrl: "pending_upload",
+            vehicleInspectionUrl: "pending_upload",
+          },
+          nycCompliance: !skipTlcDetails ? {
+            tlcLicenseNumber: formData.nycCompliance?.tlcLicenseNumber,
+            tlcLicenseFrontUrl: "pending_upload",
+            tlcLicenseBackUrl: "pending_upload",
+          } : undefined,
+          backgroundCheckConsent: formData.backgroundCheckConsent,
+          canRide: false,
+          canFoodDelivery: true,
+          canParcelDelivery: true,
+        };
+      } else {
+        submitData = {
+          driverType,
+          countryCode,
+          personalInfo: {
+            phone: formData.personalInfo.phone,
+            dateOfBirth: formData.personalInfo.dateOfBirth,
+            emergencyContactName: formData.personalInfo.emergencyContactName,
+            emergencyContactPhone: formData.personalInfo.emergencyContactPhone,
+            emergencyContactRelationship: formData.personalInfo.emergencyContactRelationship,
+            usaFullLegalName: formData.personalInfo.usaFullLegalName,
+            usaStreet: formData.personalInfo.usaStreet,
+            usaAptUnit: formData.personalInfo.usaAptUnit,
+            usaCity: formData.personalInfo.usaCity,
+            usaState: formData.personalInfo.usaState,
+            usaZipCode: formData.personalInfo.usaZipCode,
+            ssnLast4: formData.personalInfo.ssnLast4,
+          },
+          vehicleInfo: {
+            vehicleType: formData.vehicleInfo.vehicleType,
+            vehicleMake: formData.vehicleInfo.vehicleMake,
+            vehicleModel: formData.vehicleInfo.vehicleModel,
+            vehicleYear: formData.vehicleInfo.vehicleYear,
+            vehicleColor: formData.vehicleInfo.vehicleColor,
+            vehiclePlate: formData.vehicleInfo.vehiclePlate,
+            registrationDocumentUrl: "pending_upload",
+            insuranceDocumentUrl: "pending_upload",
+          },
+          documents: {
+            driverLicenseNumber: formData.licenseInfo.driverLicenseNumber,
+            driverLicenseExpiry: formData.licenseInfo.driverLicenseExpiry,
+            driverLicenseState: formData.licenseInfo.driverLicenseState,
+            driverLicenseFrontUrl: "pending_upload",
+            driverLicenseBackUrl: "pending_upload",
+          },
+          nycCompliance: isNycDriver ? {
+            tlcLicenseNumber: formData.nycCompliance.tlcLicenseNumber,
+            tlcLicenseExpiry: formData.nycCompliance.tlcLicenseExpiry,
+            tlcLicenseFrontUrl: "pending_upload",
+            tlcLicenseBackUrl: "pending_upload",
+            fhvLicenseNumber: formData.nycCompliance.fhvLicenseNumber,
+            fhvDocumentUrl: "pending_upload",
+            dmvInspectionDate: formData.nycCompliance.dmvInspectionDate,
+            dmvInspectionExpiry: formData.nycCompliance.dmvInspectionExpiry,
+            dmvInspectionImageUrl: "pending_upload",
+          } : undefined,
+          backgroundCheckConsent: formData.backgroundCheckConsent,
+        };
+      }
+    } else {
+      submitData = {
+        driverType,
+        countryCode,
+        personalInfo: formData.personalInfo,
+        vehicleInfo: {
+          vehicleType: formData.vehicleInfo.vehicleType,
+          vehicleModel: formData.vehicleInfo.vehicleModel,
+          vehiclePlate: formData.vehicleInfo.vehiclePlate,
+          vehicleMake: formData.vehicleInfo.vehicleMake,
+          vehicleYear: formData.vehicleInfo.vehicleYear,
+          vehicleColor: formData.vehicleInfo.vehicleColor,
+        },
+        documents: {
+          nidNumber: formData.documents.nidNumber,
+        },
+      };
+    }
     
     submitMutation.mutate(submitData);
   };
