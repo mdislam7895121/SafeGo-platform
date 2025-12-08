@@ -38,10 +38,14 @@ interface OnboardingDraft {
   presentAddress?: string;
   permanentAddress?: string;
   homeAddress?: string;
+  street_address?: string;
+  city?: string;
+  state?: string;
+  usaZipCode?: string;
+  apt_unit?: string;
   usaStreet?: string;
   usaCity?: string;
   usaState?: string;
-  usaZipCode?: string;
   usaAptUnit?: string;
   nidNumber?: string;
   nidFrontImageUrl?: string;
@@ -113,11 +117,11 @@ const addressInfoSchemaBD = z.object({
 });
 
 const addressInfoSchemaUS = z.object({
-  usaStreet: z.string().min(5, "Street address is required"),
-  usaCity: z.string().min(2, "City is required"),
-  usaState: z.string().min(2, "State is required"),
+  street_address: z.string().min(5, "Street address is required"),
+  city: z.string().min(2, "City is required"),
+  state: z.string().min(2, "State is required"),
   usaZipCode: z.string().min(5, "ZIP code is required"),
-  usaAptUnit: z.string().optional(),
+  apt_unit: z.string().optional(),
 });
 
 const governmentIdSchemaBD = z.object({
@@ -253,11 +257,11 @@ export default function DeliveryDriverWizard() {
   const addressInfoFormUS = useForm({
     resolver: zodResolver(addressInfoSchemaUS),
     defaultValues: {
-      usaStreet: draft?.usaStreet || "",
-      usaCity: draft?.usaCity || "",
-      usaState: draft?.usaState || "",
+      street_address: draft?.street_address || draft?.usaStreet || "",
+      city: draft?.city || draft?.usaCity || "",
+      state: draft?.state || draft?.usaState || "",
       usaZipCode: draft?.usaZipCode || "",
-      usaAptUnit: draft?.usaAptUnit || "",
+      apt_unit: draft?.apt_unit || draft?.usaAptUnit || "",
     },
   });
 
@@ -393,7 +397,14 @@ export default function DeliveryDriverWizard() {
   };
 
   const handleStep3SubmitUS = (data: z.infer<typeof addressInfoSchemaUS>) => {
-    saveStepMutation.mutate({ step: 3, data });
+    const mappedData = {
+      usaStreet: data.street_address,
+      usaCity: data.city,
+      usaState: data.state,
+      usaZipCode: data.usaZipCode,
+      usaAptUnit: data.apt_unit,
+    };
+    saveStepMutation.mutate({ step: 3, data: mappedData });
   };
 
   const handleStep4SubmitBD = (data: z.infer<typeof governmentIdSchemaBD>) => {
@@ -697,7 +708,7 @@ export default function DeliveryDriverWizard() {
                 <form onSubmit={addressInfoFormUS.handleSubmit(handleStep3SubmitUS)} className="space-y-4">
                   <FormField
                     control={addressInfoFormUS.control}
-                    name="usaStreet"
+                    name="street_address"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Street Address *</FormLabel>
@@ -711,7 +722,7 @@ export default function DeliveryDriverWizard() {
 
                   <FormField
                     control={addressInfoFormUS.control}
-                    name="usaAptUnit"
+                    name="apt_unit"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Apt/Unit (Optional)</FormLabel>
@@ -726,7 +737,7 @@ export default function DeliveryDriverWizard() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={addressInfoFormUS.control}
-                      name="usaCity"
+                      name="city"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>City *</FormLabel>
@@ -740,7 +751,7 @@ export default function DeliveryDriverWizard() {
 
                     <FormField
                       control={addressInfoFormUS.control}
-                      name="usaState"
+                      name="state"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>State *</FormLabel>
@@ -751,8 +762,8 @@ export default function DeliveryDriverWizard() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {US_STATES.map((state) => (
-                                <SelectItem key={state} value={state}>{state}</SelectItem>
+                              {US_STATES.map((stateCode) => (
+                                <SelectItem key={stateCode} value={stateCode}>{stateCode}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -1497,15 +1508,15 @@ export default function DeliveryDriverWizard() {
                     ) : (
                       <>
                         <span className="text-muted-foreground">Street:</span>
-                        <span data-testid="review-street">{draft?.usaStreet || "Not provided"}</span>
-                        {draft?.usaAptUnit && (
+                        <span data-testid="review-street">{draft?.street_address || draft?.usaStreet || "Not provided"}</span>
+                        {(draft?.apt_unit || draft?.usaAptUnit) && (
                           <>
                             <span className="text-muted-foreground">Apt/Unit:</span>
-                            <span>{draft.usaAptUnit}</span>
+                            <span>{draft?.apt_unit || draft?.usaAptUnit}</span>
                           </>
                         )}
                         <span className="text-muted-foreground">City, State ZIP:</span>
-                        <span data-testid="review-city-state">{`${draft?.usaCity || ""}, ${draft?.usaState || ""} ${draft?.usaZipCode || ""}`}</span>
+                        <span data-testid="review-city-state">{`${draft?.city || draft?.usaCity || ""}, ${draft?.state || draft?.usaState || ""} ${draft?.usaZipCode || ""}`}</span>
                       </>
                     )}
                   </div>
