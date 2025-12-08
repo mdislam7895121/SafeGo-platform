@@ -604,6 +604,7 @@ model DriverProfile {
   id                           String         @id @default(uuid())
   userId                       String         @unique
   driverType                   String?        // "ride" or "delivery"
+  country                      String?        // Country code: "BD" or "US"
   fatherName                   String?
   presentAddress               String?
   permanentAddress             String?

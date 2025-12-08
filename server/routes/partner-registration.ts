@@ -1211,7 +1211,7 @@ router.put('/partner/delivery-driver/onboarding/step/6', authenticateToken, asyn
 const finalReviewSchema = z.object({
   profilePhotoUrl: z.string().min(1, 'Profile photo is required'),
   emergencyContactName: z.string().min(2, 'Emergency contact name required'),
-  emergencyContactPhone: z.string().min(10, 'Emergency contact phone required'),
+  emergencyContactPhone: z.string().min(7, 'Emergency contact phone required'),
   emergencyContactRelationship: z.string().optional(),
 });
 
