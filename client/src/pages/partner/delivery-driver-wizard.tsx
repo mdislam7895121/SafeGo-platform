@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -139,17 +139,26 @@ const deliveryMethodSchema = z.object({
   deliveryMethod: z.enum(["car", "bike", "walking"]),
 });
 
-const vehicleDocsSchema = z.object({
-  drivingLicenseNumber: z.string().min(5, "License number required"),
+const vehicleDocsSchemaBD = z.object({
+  drivingLicenseNumber: z.string().min(5, "Driving license number required"),
   drivingLicenseFrontUrl: z.string().optional(),
   drivingLicenseBackUrl: z.string().optional(),
   drivingLicenseExpiry: z.string().optional(),
   vehicleRegistrationUrl: z.string().optional(),
   insuranceCardUrl: z.string().optional(),
-  vehicleMake: z.string().optional(),
-  vehicleModel: z.string().optional(),
-  vehicleYear: z.number().optional(),
-  vehiclePlate: z.string().optional(),
+});
+
+const vehicleDocsSchemaUSCar = z.object({
+  drivingLicenseNumber: z.string().min(5, "Driver license number required"),
+  drivingLicenseFrontUrl: z.string().optional(),
+  drivingLicenseBackUrl: z.string().optional(),
+  drivingLicenseExpiry: z.string().min(1, "License expiry date required"),
+  vehicleRegistrationUrl: z.string().optional(),
+  insuranceCardUrl: z.string().optional(),
+  vehicleMake: z.string().min(1, "Vehicle make required"),
+  vehicleModel: z.string().min(1, "Vehicle model required"),
+  vehicleYear: z.string().optional(),
+  vehiclePlate: z.string().min(1, "License plate required"),
   vehicleColor: z.string().optional(),
 });
 
@@ -192,6 +201,18 @@ export default function DeliveryDriverWizard() {
       }
     }
   }, []);
+
+  const needsVehicleDocs = useMemo(() => {
+    if (!draft) return true;
+    return isBD || (isUS && draft.deliveryMethod === "car");
+  }, [draft, isBD, isUS]);
+
+  useEffect(() => {
+    if (!isLoading && draft && currentStep === 6 && !needsVehicleDocs) {
+      setCurrentStep(7);
+      setLocation("/partner/delivery-driver/wizard?step=7");
+    }
+  }, [isLoading, draft, currentStep, needsVehicleDocs, setLocation]);
 
   const progressPercent = ((currentStep - 1) / (WIZARD_STEPS.length - 1)) * 100;
 
@@ -268,8 +289,20 @@ export default function DeliveryDriverWizard() {
     },
   });
 
-  const vehicleDocsForm = useForm({
-    resolver: zodResolver(vehicleDocsSchema),
+  const vehicleDocsFormBD = useForm({
+    resolver: zodResolver(vehicleDocsSchemaBD),
+    defaultValues: {
+      drivingLicenseNumber: draft?.drivingLicenseNumber || "",
+      drivingLicenseFrontUrl: draft?.drivingLicenseFrontUrl || "",
+      drivingLicenseBackUrl: draft?.drivingLicenseBackUrl || "",
+      drivingLicenseExpiry: draft?.drivingLicenseExpiry || "",
+      vehicleRegistrationUrl: draft?.vehicleRegistrationUrl || "",
+      insuranceCardUrl: draft?.insuranceCardUrl || "",
+    },
+  });
+
+  const vehicleDocsFormUSCar = useForm({
+    resolver: zodResolver(vehicleDocsSchemaUSCar),
     defaultValues: {
       drivingLicenseNumber: draft?.drivingLicenseNumber || "",
       drivingLicenseFrontUrl: draft?.drivingLicenseFrontUrl || "",
@@ -279,7 +312,7 @@ export default function DeliveryDriverWizard() {
       insuranceCardUrl: draft?.insuranceCardUrl || "",
       vehicleMake: draft?.vehicleMake || "",
       vehicleModel: draft?.vehicleModel || "",
-      vehicleYear: draft?.vehicleYear || undefined,
+      vehicleYear: draft?.vehicleYear?.toString() || "",
       vehiclePlate: draft?.vehiclePlate || "",
       vehicleColor: draft?.vehicleColor || "",
     },
@@ -375,7 +408,11 @@ export default function DeliveryDriverWizard() {
     saveStepMutation.mutate({ step: 5, data });
   };
 
-  const handleStep6Submit = (data: z.infer<typeof vehicleDocsSchema>) => {
+  const handleStep6SubmitBD = (data: z.infer<typeof vehicleDocsSchemaBD>) => {
+    saveStepMutation.mutate({ step: 6, data });
+  };
+
+  const handleStep6SubmitUSCar = (data: z.infer<typeof vehicleDocsSchemaUSCar>) => {
     saveStepMutation.mutate({ step: 6, data });
   };
 
@@ -1060,12 +1097,150 @@ export default function DeliveryDriverWizard() {
         );
 
       case 6:
-        const needsVehicleDocs = isBD || (isUS && draft?.deliveryMethod === "car");
-
         if (!needsVehicleDocs) {
-          setCurrentStep(7);
-          setLocation("/partner/delivery-driver/wizard?step=7");
-          return null;
+          return (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-muted-foreground">Redirecting to next step...</p>
+              </CardContent>
+            </Card>
+          );
+        }
+
+        if (isBD) {
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Step 6: Vehicle Documents (Bangladesh)
+                </CardTitle>
+                <CardDescription>
+                  Upload your driving license and vehicle documents
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...vehicleDocsFormBD}>
+                  <form onSubmit={vehicleDocsFormBD.handleSubmit(handleStep6SubmitBD)} className="space-y-4">
+                    <FormField
+                      control={vehicleDocsFormBD.control}
+                      name="drivingLicenseNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Driving License Number *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter license number" {...field} data-testid="input-license-number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={vehicleDocsFormBD.control}
+                      name="drivingLicenseExpiry"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>License Expiry Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid="input-license-expiry" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={vehicleDocsFormBD.control}
+                        name="drivingLicenseFrontUrl"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Driving License Front</FormLabel>
+                            <FormControl>
+                              <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground">Upload License Front</p>
+                                <Input type="hidden" {...field} />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={vehicleDocsFormBD.control}
+                        name="drivingLicenseBackUrl"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Driving License Back</FormLabel>
+                            <FormControl>
+                              <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground">Upload License Back</p>
+                                <Input type="hidden" {...field} />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={vehicleDocsFormBD.control}
+                      name="vehicleRegistrationUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vehicle Registration Document</FormLabel>
+                          <FormControl>
+                            <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Upload Vehicle Registration</p>
+                              <Input type="hidden" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={vehicleDocsFormBD.control}
+                      name="insuranceCardUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Insurance Document (Optional)</FormLabel>
+                          <FormControl>
+                            <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Upload Insurance (if available)</p>
+                              <Input type="hidden" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex justify-between pt-4">
+                      <Button type="button" variant="outline" onClick={goBack} data-testid="button-back">
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back
+                      </Button>
+                      <Button type="submit" disabled={saveStepMutation.isPending} data-testid="button-next">
+                        {saveStepMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                        Next
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          );
         }
 
         return (
@@ -1073,20 +1248,17 @@ export default function DeliveryDriverWizard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Step 6: Vehicle Documents
+                Step 6: Vehicle Documents (United States - Car)
               </CardTitle>
               <CardDescription>
-                {isBD 
-                  ? "Upload your driving license and vehicle documents" 
-                  : "Upload your driver's license, registration, and insurance"
-                }
+                Upload your driver's license, vehicle registration, and insurance
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...vehicleDocsForm}>
-                <form onSubmit={vehicleDocsForm.handleSubmit(handleStep6Submit)} className="space-y-4">
+              <Form {...vehicleDocsFormUSCar}>
+                <form onSubmit={vehicleDocsFormUSCar.handleSubmit(handleStep6SubmitUSCar)} className="space-y-4">
                   <FormField
-                    control={vehicleDocsForm.control}
+                    control={vehicleDocsFormUSCar.control}
                     name="drivingLicenseNumber"
                     render={({ field }) => (
                       <FormItem>
@@ -1099,13 +1271,65 @@ export default function DeliveryDriverWizard() {
                     )}
                   />
 
+                  <FormField
+                    control={vehicleDocsFormUSCar.control}
+                    name="drivingLicenseExpiry"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>License Expiry Date *</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-license-expiry" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
-                      control={vehicleDocsForm.control}
+                      control={vehicleDocsFormUSCar.control}
+                      name="drivingLicenseFrontUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Driver's License Front</FormLabel>
+                          <FormControl>
+                            <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Upload License Front</p>
+                              <Input type="hidden" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={vehicleDocsFormUSCar.control}
+                      name="drivingLicenseBackUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Driver's License Back</FormLabel>
+                          <FormControl>
+                            <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Upload License Back</p>
+                              <Input type="hidden" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={vehicleDocsFormUSCar.control}
                       name="vehicleMake"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Vehicle Make</FormLabel>
+                          <FormLabel>Vehicle Make *</FormLabel>
                           <FormControl>
                             <Input placeholder="Toyota" {...field} data-testid="input-vehicle-make" />
                           </FormControl>
@@ -1115,11 +1339,11 @@ export default function DeliveryDriverWizard() {
                     />
 
                     <FormField
-                      control={vehicleDocsForm.control}
+                      control={vehicleDocsFormUSCar.control}
                       name="vehicleModel"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Vehicle Model</FormLabel>
+                          <FormLabel>Vehicle Model *</FormLabel>
                           <FormControl>
                             <Input placeholder="Camry" {...field} data-testid="input-vehicle-model" />
                           </FormControl>
@@ -1129,19 +1353,87 @@ export default function DeliveryDriverWizard() {
                     />
                   </div>
 
-                  <FormField
-                    control={vehicleDocsForm.control}
-                    name="vehiclePlate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>License Plate Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="ABC-1234" {...field} data-testid="input-vehicle-plate" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={vehicleDocsFormUSCar.control}
+                      name="vehicleYear"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vehicle Year</FormLabel>
+                          <FormControl>
+                            <Input placeholder="2022" {...field} data-testid="input-vehicle-year" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={vehicleDocsFormUSCar.control}
+                      name="vehiclePlate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>License Plate *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="ABC-1234" {...field} data-testid="input-vehicle-plate" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={vehicleDocsFormUSCar.control}
+                      name="vehicleColor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vehicle Color</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Black" {...field} data-testid="input-vehicle-color" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={vehicleDocsFormUSCar.control}
+                      name="vehicleRegistrationUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vehicle Registration</FormLabel>
+                          <FormControl>
+                            <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Upload Registration</p>
+                              <Input type="hidden" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={vehicleDocsFormUSCar.control}
+                      name="insuranceCardUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Insurance Card</FormLabel>
+                          <FormControl>
+                            <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors">
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Upload Insurance</p>
+                              <Input type="hidden" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <div className="flex justify-between pt-4">
                     <Button type="button" variant="outline" onClick={goBack} data-testid="button-back">
@@ -1171,21 +1463,115 @@ export default function DeliveryDriverWizard() {
               <CardDescription>Review your information and submit your application</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6 mb-6">
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <h4 className="font-semibold mb-2">Application Summary</h4>
+              <div className="space-y-4 mb-6">
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 text-blue-900 dark:text-blue-100">Personal Information</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <span className="text-muted-foreground">Country:</span>
-                    <span>{countryCode === "BD" ? "Bangladesh" : "United States"}</span>
+                    <span data-testid="review-country">{countryCode === "BD" ? "Bangladesh" : "United States"}</span>
                     <span className="text-muted-foreground">Full Name:</span>
-                    <span>{draft?.fullName || "Not provided"}</span>
-                    {isUS && (
+                    <span data-testid="review-name">{draft?.fullName || "Not provided"}</span>
+                    {isBD && draft?.fatherName && (
                       <>
-                        <span className="text-muted-foreground">Delivery Method:</span>
-                        <span className="capitalize">{draft?.deliveryMethod || "Not selected"}</span>
+                        <span className="text-muted-foreground">Father's Name:</span>
+                        <span data-testid="review-father-name">{draft.fatherName}</span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground">Date of Birth:</span>
+                    <span data-testid="review-dob">{draft?.dateOfBirth ? new Date(draft.dateOfBirth).toLocaleDateString() : "Not provided"}</span>
+                    <span className="text-muted-foreground">Phone:</span>
+                    <span data-testid="review-phone">{draft?.phoneNumber || "Not provided"}</span>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 text-green-900 dark:text-green-100">Address Information</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {isBD ? (
+                      <>
+                        <span className="text-muted-foreground">Present Address:</span>
+                        <span data-testid="review-present-address">{draft?.presentAddress || "Not provided"}</span>
+                        <span className="text-muted-foreground">Permanent Address:</span>
+                        <span data-testid="review-permanent-address">{draft?.permanentAddress || "Not provided"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground">Street:</span>
+                        <span data-testid="review-street">{draft?.usaStreet || "Not provided"}</span>
+                        {draft?.usaAptUnit && (
+                          <>
+                            <span className="text-muted-foreground">Apt/Unit:</span>
+                            <span>{draft.usaAptUnit}</span>
+                          </>
+                        )}
+                        <span className="text-muted-foreground">City, State ZIP:</span>
+                        <span data-testid="review-city-state">{`${draft?.usaCity || ""}, ${draft?.usaState || ""} ${draft?.usaZipCode || ""}`}</span>
                       </>
                     )}
                   </div>
+                </div>
+
+                <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 text-purple-900 dark:text-purple-100">Government ID</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {isBD ? (
+                      <>
+                        <span className="text-muted-foreground">NID Number:</span>
+                        <span data-testid="review-nid">{draft?.nidNumber ? `****${draft.nidNumber.slice(-4)}` : "Not provided"}</span>
+                        <span className="text-muted-foreground">NID Documents:</span>
+                        <span>{draft?.nidFrontImageUrl ? "Uploaded" : "Pending"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground">ID Type:</span>
+                        <span data-testid="review-id-type" className="capitalize">{draft?.governmentIdType?.replace("_", " ") || "Not provided"}</span>
+                        <span className="text-muted-foreground">ID Last 4:</span>
+                        <span data-testid="review-id-last4">****{draft?.governmentIdLast4 || "----"}</span>
+                        <span className="text-muted-foreground">SSN Last 4:</span>
+                        <span data-testid="review-ssn">***-**-{draft?.ssnLast4 || "----"}</span>
+                        <span className="text-muted-foreground">Background Check:</span>
+                        <span>{draft?.backgroundCheckConsent ? "Consented" : "Not consented"}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {isUS && (
+                  <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                    <h4 className="font-semibold mb-3 text-orange-900 dark:text-orange-100">Delivery Method</h4>
+                    <div className="flex items-center gap-2">
+                      {draft?.deliveryMethod === "car" && <Car className="h-5 w-5" />}
+                      {draft?.deliveryMethod === "bike" && <Bike className="h-5 w-5" />}
+                      {draft?.deliveryMethod === "walking" && <Footprints className="h-5 w-5" />}
+                      <span className="capitalize font-medium" data-testid="review-delivery-method">{draft?.deliveryMethod || "Not selected"}</span>
+                    </div>
+                  </div>
+                )}
+
+                {(isBD || (isUS && draft?.deliveryMethod === "car")) && (
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <h4 className="font-semibold mb-3 text-red-900 dark:text-red-100">Vehicle Documents</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <span className="text-muted-foreground">License Number:</span>
+                      <span data-testid="review-license">{draft?.drivingLicenseNumber ? `****${draft.drivingLicenseNumber.slice(-4)}` : "Not provided"}</span>
+                      {isUS && draft?.deliveryMethod === "car" && (
+                        <>
+                          <span className="text-muted-foreground">Vehicle:</span>
+                          <span data-testid="review-vehicle">{`${draft?.vehicleMake || ""} ${draft?.vehicleModel || ""}`}</span>
+                          <span className="text-muted-foreground">License Plate:</span>
+                          <span data-testid="review-plate">{draft?.vehiclePlate || "Not provided"}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>Important:</strong> After submission, your application will be reviewed by our team. 
+                    You will not be able to accept deliveries until your verification is approved. 
+                    This typically takes 1-3 business days.
+                  </p>
                 </div>
               </div>
 

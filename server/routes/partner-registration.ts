@@ -1354,4 +1354,322 @@ router.post('/partner/delivery-driver/onboarding/submit', authenticateToken, asy
   }
 });
 
+// =====================================
+// ADMIN: Delivery Driver Management
+// =====================================
+
+router.get('/admin/delivery-drivers', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user?.userId },
+      select: { role: true },
+    });
+
+    if (!user || !['admin', 'super_admin'].includes(user.role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const status = req.query.status as string || 'pending';
+    const countryFilter = req.query.countryFilter as string;
+
+    let whereCondition: any = {
+      driverType: 'delivery',
+    };
+
+    switch (status) {
+      case 'pending':
+        whereCondition.verificationStatus = 'pending';
+        whereCondition.isBlocked = false;
+        break;
+      case 'verified':
+        whereCondition.isVerified = true;
+        whereCondition.isBlocked = false;
+        break;
+      case 'rejected':
+        whereCondition.verificationStatus = 'rejected';
+        whereCondition.isBlocked = false;
+        break;
+      case 'blocked':
+        whereCondition.isBlocked = true;
+        break;
+    }
+
+    if (countryFilter && countryFilter !== 'all') {
+      whereCondition.country = countryFilter;
+    }
+
+    const drivers = await prisma.driverProfile.findMany({
+      where: whereCondition,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formattedDrivers = drivers.map((d) => ({
+      id: d.id,
+      userId: d.userId,
+      email: d.user?.email || '',
+      countryCode: d.country || d.user?.countryCode || 'US',
+      verificationStatus: d.verificationStatus,
+      isVerified: d.isVerified,
+      isSuspended: d.isSuspended,
+      isBlocked: d.isBlocked || d.user?.isBlocked,
+      fullName: d.fullName,
+      fatherName: d.fatherName,
+      phoneNumber: d.phoneNumber,
+      dateOfBirth: d.dateOfBirth,
+      presentAddress: d.presentAddress,
+      permanentAddress: d.permanentAddress,
+      usaStreet: d.usaStreet,
+      usaCity: d.usaCity,
+      usaState: d.usaState,
+      usaZipCode: d.usaZipCode,
+      nidNumber: d.nidNumber,
+      nidFrontImageUrl: d.nidFrontImageUrl,
+      nidBackImageUrl: d.nidBackImageUrl,
+      governmentIdType: d.governmentIdType,
+      governmentIdLast4: d.governmentIdLast4,
+      governmentIdFrontImageUrl: d.governmentIdFrontImageUrl,
+      governmentIdBackImageUrl: d.governmentIdBackImageUrl,
+      ssnLast4: d.ssnLast4,
+      backgroundCheckConsent: d.backgroundCheckConsent,
+      deliveryDriverMethod: d.deliveryDriverMethod || d.vehicleType,
+      driverLicenseNumber: d.driverLicenseNumber,
+      driverLicenseFrontUrl: d.driverLicenseFrontUrl,
+      driverLicenseBackUrl: d.driverLicenseBackUrl,
+      driverLicenseExpiry: d.driverLicenseExpiry,
+      vehicleRegistrationUrl: d.vehicleRegistrationUrl,
+      insuranceCardUrl: d.insuranceCardUrl,
+      vehicleMake: d.vehicleMake,
+      vehicleModel: d.vehicleModel,
+      vehiclePlate: d.vehiclePlate,
+      profilePhotoUrl: d.profilePhotoUrl,
+      emergencyContactName: d.emergencyContactName,
+      emergencyContactPhone: d.emergencyContactPhone,
+      emergencyContactRelationship: d.emergencyContactRelationship,
+      rejectionReason: d.rejectionReason,
+      onboardingCompletedAt: d.onboardingCompletedAt,
+      walletBalance: '0.00',
+      negativeBalance: '0.00',
+    }));
+
+    return res.json({ drivers: formattedDrivers });
+  } catch (error) {
+    console.error('[Admin] Error fetching delivery drivers:', error);
+    return res.status(500).json({ error: 'Failed to fetch delivery drivers' });
+  }
+});
+
+router.post('/admin/delivery-drivers/:id/approve', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user?.userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!adminUser || !['admin', 'super_admin'].includes(adminUser.role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const driverId = req.params.id;
+
+    const driver = await prisma.driverProfile.update({
+      where: { id: driverId },
+      data: {
+        verificationStatus: 'approved',
+        isVerified: true,
+        partnerStatus: 'active',
+        verifiedAt: new Date(),
+        verifiedBy: adminUser.id,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: adminUser.id,
+        actorEmail: adminUser.email,
+        actorRole: adminUser.role,
+        actionType: 'DELIVERY_DRIVER_APPROVED',
+        entityType: 'driver_profile',
+        entityId: driverId,
+        description: `Delivery driver ${driver.fullName} approved by admin`,
+        metadata: {
+          driverName: driver.fullName,
+          countryCode: driver.country,
+          deliveryMethod: driver.deliveryDriverMethod,
+        },
+      },
+    });
+
+    return res.json({ success: true, message: 'Driver approved successfully' });
+  } catch (error) {
+    console.error('[Admin] Error approving driver:', error);
+    return res.status(500).json({ error: 'Failed to approve driver' });
+  }
+});
+
+router.post('/admin/delivery-drivers/:id/reject', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user?.userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!adminUser || !['admin', 'super_admin'].includes(adminUser.role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const driverId = req.params.id;
+    const { reason } = req.body;
+
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({ error: 'Rejection reason is required' });
+    }
+
+    const driver = await prisma.driverProfile.update({
+      where: { id: driverId },
+      data: {
+        verificationStatus: 'rejected',
+        isVerified: false,
+        partnerStatus: 'rejected',
+        rejectionReason: reason,
+        rejectedAt: new Date(),
+        rejectedBy: adminUser.id,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: adminUser.id,
+        actorEmail: adminUser.email,
+        actorRole: adminUser.role,
+        actionType: 'DELIVERY_DRIVER_REJECTED',
+        entityType: 'driver_profile',
+        entityId: driverId,
+        description: `Delivery driver ${driver.fullName} rejected: ${reason}`,
+        metadata: {
+          driverName: driver.fullName,
+          countryCode: driver.country,
+          rejectionReason: reason,
+        },
+      },
+    });
+
+    return res.json({ success: true, message: 'Driver rejected' });
+  } catch (error) {
+    console.error('[Admin] Error rejecting driver:', error);
+    return res.status(500).json({ error: 'Failed to reject driver' });
+  }
+});
+
+router.post('/admin/delivery-drivers/:id/block', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user?.userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!adminUser || !['admin', 'super_admin'].includes(adminUser.role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const driverId = req.params.id;
+    const { reason } = req.body;
+
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({ error: 'Block reason is required' });
+    }
+
+    const driver = await prisma.driverProfile.update({
+      where: { id: driverId },
+      data: {
+        isBlocked: true,
+        blockedReason: reason,
+        blockedAt: new Date(),
+        blockedBy: adminUser.id,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: adminUser.id,
+        actorEmail: adminUser.email,
+        actorRole: adminUser.role,
+        actionType: 'DELIVERY_DRIVER_BLOCKED',
+        entityType: 'driver_profile',
+        entityId: driverId,
+        description: `Delivery driver ${driver.fullName} blocked: ${reason}`,
+        metadata: {
+          driverName: driver.fullName,
+          countryCode: driver.country,
+          blockReason: reason,
+        },
+      },
+    });
+
+    return res.json({ success: true, message: 'Driver blocked' });
+  } catch (error) {
+    console.error('[Admin] Error blocking driver:', error);
+    return res.status(500).json({ error: 'Failed to block driver' });
+  }
+});
+
+router.post('/admin/delivery-drivers/:id/unblock', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user?.userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!adminUser || !['admin', 'super_admin'].includes(adminUser.role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const driverId = req.params.id;
+
+    const driver = await prisma.driverProfile.update({
+      where: { id: driverId },
+      data: {
+        isBlocked: false,
+        blockedReason: null,
+        blockedAt: null,
+        blockedBy: null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: adminUser.id,
+        actorEmail: adminUser.email,
+        actorRole: adminUser.role,
+        actionType: 'DELIVERY_DRIVER_UNBLOCKED',
+        entityType: 'driver_profile',
+        entityId: driverId,
+        description: `Delivery driver ${driver.fullName} unblocked`,
+        metadata: {
+          driverName: driver.fullName,
+          countryCode: driver.country,
+        },
+      },
+    });
+
+    return res.json({ success: true, message: 'Driver unblocked' });
+  } catch (error) {
+    console.error('[Admin] Error unblocking driver:', error);
+    return res.status(500).json({ error: 'Failed to unblock driver' });
+  }
+});
+
 export default router;

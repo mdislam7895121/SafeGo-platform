@@ -1,0 +1,87 @@
+Good. Step 2 is correct.  
+Now continue and implement the remaining onboarding steps of the full 7-step wizard.  
+YOU MUST NOT simplify.
+
+Complete the following immediately:
+
+=====================================================
+STEP 3 — ADDRESS INFO
+Country-specific:
+
+BD:
+- present_address (required)
+- permanent_address (required)
+
+US:
+- home_address (required)
+
+Add validations + error states.
+
+=====================================================
+STEP 4 — GOVERNMENT ID UPLOAD
+BD:
+- nid_number
+- nid_front_image
+- nid_back_image
+
+US:
+- government_id_type
+- government_id_last4
+- government_id_front_image
+- government_id_back_image
+
+=====================================================
+STEP 5 — DELIVERY METHOD (US ONLY)
+Show only for US drivers:
+- delivery_method = "car" | "bike" | "walking"
+
+BD path: this step must be hidden entirely.
+
+=====================================================
+STEP 6 — VEHICLE DOCUMENTS
+Apply conditional logic:
+
+If US + car:
+- driver_license_front
+- driver_license_back
+- vehicle_registration
+- insurance_card
+
+If US + bike OR US + walking:
+- no vehicle document fields
+- skip to next
+
+If BD:
+- driving_license_number
+- driving_license_front
+- driving_license_back
+- vehicle_registration
+- insurance_document (optional)
+
+=====================================================
+STEP 7 — FINAL REVIEW + SUBMIT
+On submit:
+- Lock all fields
+- verification_status = "pending"
+- is_verified = false
+- Driver cannot access any ride/food/parcel services
+- Only Admin can approve/reject
+
+=====================================================
+ADMIN PANEL — REQUIRED INTEGRATION
+You must also implement:
+
+Admin Driver Verification Module:
+- view all driver fields + documents
+- approve / reject
+- rejection_reason field
+- block / unblock driver
+- update driver status
+- integrate wallet negative balance logic (do NOT modify existing schema, only add where needed)
+
+=====================================================
+IMPORTANT:
+Do not skip any step.  
+Do not shorten the flow.  
+Follow SafeGo Master Rules exactly.  
+After completing, show the updated UI flow + schema + validations + API endpoints.

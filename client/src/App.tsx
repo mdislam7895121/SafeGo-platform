@@ -225,6 +225,7 @@ import AdminDocumentCenter from "@/pages/admin/documents";
 import AdminSettlement from "@/pages/admin/settlement";
 import AdminDrivers from "@/pages/admin/drivers";
 import AdminDriverDetails from "@/pages/admin/driver-details";
+import AdminDeliveryDriverVerification from "@/pages/admin/delivery-driver-verification";
 import AdminCustomers from "@/pages/admin/customers";
 import AdminCustomerDetails from "@/pages/admin/customer-details";
 import AdminRestaurants from "@/pages/admin/restaurants";
@@ -1799,6 +1800,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Drivers">
             <AdminDrivers />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/delivery-driver-verification">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Delivery Driver Verification">
+            <AdminDeliveryDriverVerification />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
