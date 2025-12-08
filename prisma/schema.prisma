@@ -1281,6 +1281,10 @@ model RestaurantProfile {
   cuisineType              String?
   description              String?
   cityCode                 String?
+  city                     String?  // Free text city name
+  state                    String?  // US: 2-letter state code (NY, CA, etc.)
+  district                 String?  // BD: District name
+  zipCode                  String?  // US: ZIP code, BD: postal code
   countryCode              String?
   averageRating            Float?                      @default(0)
   totalRatings             Int?                        @default(0)
