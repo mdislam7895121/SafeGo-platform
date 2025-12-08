@@ -39,10 +39,11 @@ interface OnboardingDraft {
   permanentAddress?: string;
   homeAddress?: string;
   street_address?: string;
+  apt_unit?: string;
   city?: string;
   state?: string;
+  zip_code?: string;
   usaZipCode?: string;
-  apt_unit?: string;
   usaStreet?: string;
   usaCity?: string;
   usaState?: string;
@@ -117,11 +118,11 @@ const addressInfoSchemaBD = z.object({
 });
 
 const addressInfoSchemaUS = z.object({
-  street_address: z.string().min(5, "Street address is required"),
+  street_address: z.string().min(2, "Street address is required"),
+  apt_unit: z.string().optional(),
   city: z.string().min(2, "City is required"),
   state: z.string().min(2, "State is required"),
-  usaZipCode: z.string().min(5, "ZIP code is required"),
-  apt_unit: z.string().optional(),
+  zip_code: z.string().min(3, "ZIP Code is required"),
 });
 
 const governmentIdSchemaBD = z.object({
@@ -258,10 +259,10 @@ export default function DeliveryDriverWizard() {
     resolver: zodResolver(addressInfoSchemaUS),
     defaultValues: {
       street_address: draft?.street_address || draft?.usaStreet || "",
+      apt_unit: draft?.apt_unit || draft?.usaAptUnit || "",
       city: draft?.city || draft?.usaCity || "",
       state: draft?.state || draft?.usaState || "",
-      usaZipCode: draft?.usaZipCode || "",
-      apt_unit: draft?.apt_unit || draft?.usaAptUnit || "",
+      zip_code: draft?.zip_code || draft?.usaZipCode || "",
     },
   });
 
@@ -332,6 +333,18 @@ export default function DeliveryDriverWizard() {
     },
   });
 
+  useEffect(() => {
+    if (draft) {
+      addressInfoFormUS.reset({
+        street_address: draft.street_address || draft.usaStreet || "",
+        apt_unit: draft.apt_unit || draft.usaAptUnit || "",
+        city: draft.city || draft.usaCity || "",
+        state: draft.state || draft.usaState || "",
+        zip_code: draft.zip_code || draft.usaZipCode || "",
+      });
+    }
+  }, [draft]);
+
   const saveStepMutation = useMutation({
     mutationFn: async ({ step, data }: { step: number; data: any }) => {
       const response = await apiRequest(`/api/partner/delivery-driver/onboarding/step/${step}`, {
@@ -399,10 +412,10 @@ export default function DeliveryDriverWizard() {
   const handleStep3SubmitUS = (data: z.infer<typeof addressInfoSchemaUS>) => {
     const mappedData = {
       usaStreet: data.street_address,
+      usaAptUnit: data.apt_unit,
       usaCity: data.city,
       usaState: data.state,
-      usaZipCode: data.usaZipCode,
-      usaAptUnit: data.apt_unit,
+      usaZipCode: data.zip_code,
     };
     saveStepMutation.mutate({ step: 3, data: mappedData });
   };
@@ -775,7 +788,7 @@ export default function DeliveryDriverWizard() {
 
                   <FormField
                     control={addressInfoFormUS.control}
-                    name="usaZipCode"
+                    name="zip_code"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>ZIP Code *</FormLabel>
@@ -1516,7 +1529,7 @@ export default function DeliveryDriverWizard() {
                           </>
                         )}
                         <span className="text-muted-foreground">City, State ZIP:</span>
-                        <span data-testid="review-city-state">{`${draft?.city || draft?.usaCity || ""}, ${draft?.state || draft?.usaState || ""} ${draft?.usaZipCode || ""}`}</span>
+                        <span data-testid="review-city-state">{`${draft?.city || draft?.usaCity || ""}, ${draft?.state || draft?.usaState || ""} ${draft?.zip_code || draft?.usaZipCode || ""}`}</span>
                       </>
                     )}
                   </div>

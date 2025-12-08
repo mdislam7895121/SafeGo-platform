@@ -1,0 +1,298 @@
+SAFEGO ARCHITECT INSTRUCTIONS  
+Task: Fix Delivery Driver Onboarding Step 3 (Address) field binding bug for United States, without breaking any existing SafeGo features.
+
+=====================================================
+A) ALWAYS RESPECT SAFEGO MASTER RULES (DO NOT BREAK)
+
+1) Roles (all four must stay separate):
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+
+   Each role has its own signup/onboarding, KYC rules, dashboard, permissions, status flows.  
+   Never mix role access.
+
+2) Global services (must remain working):
+   - ride-hailing
+   - food delivery
+   - parcel delivery
+
+3) Country-specific KYC rules (MUST be enforced):
+
+   BANGLADESH (BD) drivers:
+   - father_name (required)
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - nid_number + nid_front_image + nid_back_image
+   - emergency_contact_name + emergency_contact_phone
+   - driver license (number + images)
+   - vehicle_registration
+   - insurance_document (optional)
+   - verification_status + is_verified
+
+   UNITED STATES (US) drivers:
+   - date_of_birth
+   - home_address (via Step 3 address form)
+   - emergency_contact_name + emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - government_id_front_image + government_id_back_image
+   - driver_license + image + expiry (for car drivers)
+   - ssn_last4 (optional)
+   - verification_status + is_verified
+
+4) Admin panel capabilities (must stay):
+   - verify customers, drivers, restaurants
+   - approve/reject KYC + rejection_reason
+   - update pricing, fees, commissions
+   - block/unblock any user
+   - manage payouts
+   - view driver negative balance
+   - view restaurant negative balance
+
+5) Collections (MUST exist and remain compatible):
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must keep:
+   - identity fields (customer_id, driver_id, restaurant_id where relevant)
+   - addresses + geolocation
+   - fees + commission
+   - payment details
+   - timestamps
+   - full status flow
+   - rating and feedback
+
+6) Commission & payout rules:
+   - Cash ride: driver receives full cash, SafeGo commission → negative driver_wallet_balance, weekly settlement.
+   - Cash food: restaurant keeps cash, SafeGo commission → negative restaurant_wallet.
+   - Online payment: SafeGo keeps commission automatically.
+   - Admin can settle balances and mark as paid.
+
+7) Security:
+   - Customers cannot view driver documents.
+   - Drivers cannot view customer NID/government IDs.
+   - Restaurants cannot view other restaurants or driver docs.
+   - Only admin can change pricing, commission, verification, blocking.
+   - Users can update only their own profile.
+
+8) Status flows (MUST NOT be broken):
+
+   Ride:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+
+   Food:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+
+   Parcel:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+9) Onboarding:
+   - Multi-step flow for each user type.
+   - Basic info → Address → ID/KYC → Emergency contact → verification_status="pending".
+   - Block access until admin approves.
+
+10) Notifications:
+   - New ride alert for driver
+   - Food/parcel order updates
+   - Verification approval/rejection
+   - Important admin notifications
+
+All changes for this task must be BACKWARD-COMPATIBLE.  
+Do NOT rename or remove existing fields, APIs, or routes. Only ADD or FIX bindings.
+
+=====================================================
+B) BUG DESCRIPTION (MUST FIX)
+
+Observed behavior in the Delivery Driver Onboarding wizard (US):
+
+- Step 2: Personal Information (United States)
+  - full_name shows correctly (e.g. "Md Tazizul Islam")
+  - date_of_birth shows correctly (e.g. "Dec 8, 2003")
+  - phone_number shows correctly
+
+- Step 3: Address Information (United States)
+  - Street Address field is incorrectly prefilled with the FULL NAME value.
+    Example: "Md Tazizul Islam" appears inside Street Address.
+  - Apt/Unit field is incorrectly prefilled with the DATE OF BIRTH value.
+    Example: "2003-12-08" appears inside Apt/Unit.
+  - Because of this, the user cannot properly enter or keep the correct address.
+  - This clearly indicates that Step 3 inputs are bound to Step 2 fields instead of their own address fields.
+
+This is a CRITICAL FORM BINDING BUG.
+
+=====================================================
+C) EXPECTED DATA MODEL FOR WIZARD STEPS (DO NOT CHANGE NAMES)
+
+1) Step 2 — Personal Information (US)
+   Use these exact field keys:
+   - full_name        (string, required)
+   - date_of_birth    (date/string, required)
+   - phone_number     (string, required)
+
+2) Step 3 — Address Information (US)
+   Use these exact field keys:
+   - street_address   (string, required)
+   - apt_unit         (string, optional)
+   - city             (string, required)
+   - state            (string, required)
+   - zip_code         (string, required)
+
+For BD drivers, Step 3 uses:
+   - present_address  (required)
+   - permanent_address(required)
+   - city             (required)
+   - district         (required)
+   - postal_code      (required)
+
+Under NO circumstance should Step 3 inputs be bound to:
+   - full_name
+   - date_of_birth
+   - phone_number
+
+=====================================================
+D) REQUIRED FIXES – FRONTEND FORM BINDINGS
+
+1) Audit the form schemas and types:
+   - Locate the Zod/Yup schemas or TypeScript interfaces for:
+     - USPersonalInfoSchema (or similar)
+     - USAddressSchema (or similar)
+   - Verify that Step 2 and Step 3 use DIFFERENT field keys as listed above.
+
+2) Fix react-hook-form bindings for Step 3:
+   - The Street Address input MUST be bound to "street_address".
+   - The Apt/Unit input MUST be bound to "apt_unit".
+   - City MUST be bound to "city".
+   - State MUST be bound to "state".
+   - ZIP Code MUST be bound to "zip_code".
+
+   Example pattern (do not rename the field, just ensure binding is correct):
+
+   - If using register:
+     <input {...register("street_address")} />
+     <input {...register("apt_unit")} />
+     <input {...register("city")} />
+     <Select {...register("state")} />
+     <input {...register("zip_code")} />
+
+   - If using Controller:
+     <Controller
+       name="street_address"
+       control={control}
+       render={({ field }) => (
+         <Input {...field} />
+       )}
+     />
+
+   Make sure NO Step 3 input is bound to "full_name" or "date_of_birth" or any Step 2 key.
+
+3) Fix defaultValues and form state mapping:
+   - Check the wizard container/component that passes values between steps.
+   - Ensure that when moving from Step 2 → Step 3, the default values for Step 3 are:
+     - either empty
+     - or previously saved address fields (if the user came back), using ONLY the Step 3 keys.
+
+   There must be NO mapping like:
+   - street_address ← full_name
+   - apt_unit ← date_of_birth
+
+4) Ensure the form context is correctly scoped:
+   - The same FormProvider / useForm instance should manage all steps or you must properly merge state between steps.
+   - Do NOT create a second independent form for Step 3 that accidentally reuses personal info field names.
+
+=====================================================
+E) REQUIRED FIXES – VALIDATION LOGIC
+
+For US Address validation schema:
+
+   street_address: z.string().min(2, "Street address is required"),
+   apt_unit: z.string().optional(),
+   city: z.string().min(2, "City is required"),
+   state: z.string().min(2, "State is required"),
+   zip_code: z.string().min(3, "ZIP Code is required"),
+
+- Confirm that error messages are attached to the correct fields.
+- When the user types a valid street_address (e.g. "123 Main Street"), the error "Street address is required" must disappear.
+- Do NOT allow validation to run against full_name/date_of_birth for Step 3.
+
+=====================================================
+F) WIZARD BEHAVIOR REQUIREMENTS
+
+1) Step 2 → Step 3 transition:
+   - After completing Step 2 and pressing "Next":
+     - Save Step 2 data under its own keys.
+     - Show Step 3 with EMPTY address fields (or previously saved address fields for that step only).
+   - Do NOT auto-fill Step 3 from Step 2 fields.
+
+2) Back Navigation:
+   - Going Back from Step 3 to Step 2 must NOT overwrite address fields.
+   - Going forward again from Step 2 → Step 3 must show the last saved address-only values.
+
+3) Country toggle:
+   - If country = US:
+       show US address layout (street_address, apt_unit, city, state, zip_code).
+   - If country = BD:
+       show BD address layout (present_address, permanent_address, city, district, postal_code).
+   - Do not mix BD fields with US fields.
+
+=====================================================
+G) TEST CASES (MUST PASS)
+
+You must manually test the following cases in the browser:
+
+Test 1 — US New Driver:
+- Country: United States
+- Step 2:
+  - full_name = "Md Tazizul Islam"
+  - date_of_birth = "2003-12-08"
+  - phone_number = "9293359015"
+- Step 3:
+  - street_address = "123 Main Street"
+  - apt_unit = "Apt 4B"
+  - city = "Brooklyn"
+  - state = "NY"
+  - zip_code = "11212"
+
+Expected:
+- Street Address shows "123 Main Street" and stays after blur/next.
+- Apt/Unit shows "Apt 4B".
+- No auto-fill from full_name/date_of_birth.
+- No validation error for street_address when filled.
+
+Test 2 — Back and Forward:
+- From Step 3, click Back → Step 2.
+- Click Next → Step 3 again.
+
+Expected:
+- Step 2 values remain correct.
+- Step 3 address fields still show the address the user entered, NOT the personal info.
+
+Test 3 — BD Path:
+- Country: Bangladesh
+- Verify Step 3 uses BD fields only:
+  - present_address
+  - permanent_address
+  - city
+  - district
+  - postal_code
+- No US fields appear.
+
+=====================================================
+H) NON-BREAKING CHANGE REQUIREMENTS
+
+- Do NOT rename or remove any existing database fields.
+- Do NOT change any API route signatures.
+- Do NOT change collection names (rides, food_orders, deliveries).
+- Only adjust:
+  - frontend bindings
+  - field names inside the form (to correct keys)
+  - validation schema for address fields (if needed)
+- All other SafeGo modules (customer, restaurant, admin, ride/food/parcel flows) must continue to work exactly as before.
+
+At the end, provide:
+- A short summary of what you changed (files/components touched).
+- Confirmation that all three tests passed.
+- Confirmation that no existing SafeGo route or schema was broken.
