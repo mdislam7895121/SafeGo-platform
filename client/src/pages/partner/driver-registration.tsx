@@ -1612,11 +1612,11 @@ function DriverRegistrationV2() {
         <CardContent className="text-sm space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <span className="text-muted-foreground">License Number:</span>
-            <span className="font-mono">{formData.licenseInfo?.licenseNumber || 'Not provided'}</span>
+            <span className="font-mono">{formData.licenseInfo?.driverLicenseNumber || 'Not provided'}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <span className="text-muted-foreground">Expiry Date:</span>
-            <span>{formData.licenseInfo?.licenseExpiry || 'Not provided'}</span>
+            <span>{formData.licenseInfo?.driverLicenseExpiry || 'Not provided'}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <span className="text-muted-foreground">License Images:</span>

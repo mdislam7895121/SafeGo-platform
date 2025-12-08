@@ -1,0 +1,120 @@
+Before I approve your work, I need you to complete a strict SafeGo Master Rules compliance review.  
+You MUST run through each point below and confirm, fix, or adjust anything that is missing.
+
+==============================================
+A) VEHICLE TYPE LOGIC (MUST CONFIRM)
+==============================================
+
+Confirm:
+1. Delivery vehicle options = bicycle, motorbike, car.
+2. Selecting “car” sets:
+   - vehicle_type = "car"
+   - can_food_delivery = true
+   - can_parcel_delivery = true
+   - can_ride = false  (must stay false)
+3. No conflict with existing ride-driver onboarding.
+4. No forced enabling of car ride-hailing.
+
+==============================================
+B) CAR DELIVERY DOCUMENT RULES (MUST CONFIRM)
+==============================================
+
+For USA (delivery driver, vehicle_type = "car"):
+- REQUIRED:
+  - driver_license_number
+  - driver_license_front_image
+  - driver_license_back_image
+  - driver_license_expiry
+  - car_registration_document
+  - car_insurance_document
+  - car_inspection_document (if relevant)
+
+- OPTIONAL (NYC only):
+  - tlc_license_number
+  - tlc_license_front_image
+  - tlc_license_back_image
+  - tlc_vehicle_docs
+  - MUST have visible “Skip for now” or similar control.
+
+- FHV Number MUST NOT appear.
+
+For BD (vehicle_type = "car"):
+- Required: registration + insurance + fitness/inspection (if implemented)
+- TLC must not appear for BD.
+
+==============================================
+C) DELIVERY DRIVER DASHBOARD (MUST CONFIRM)
+==============================================
+
+For delivery-only drivers:
+- Sidebar MUST include:
+  - Active Delivery
+  - Food Deliveries
+  - Delivery History
+  - Wallet
+  - Incentives
+  - Trust Score
+  - Log Out
+
+- Sidebar MUST NOT include:
+  - Active Trip
+  - Trip History (ride)
+  - Ride map elements
+
+==============================================
+D) MATCHING ENGINE (MUST CONFIRM)
+==============================================
+
+Delivery-only drivers (any vehicle: bicycle, motorbike, car):
+- MUST receive only:
+  - food_orders
+  - deliveries
+
+- MUST NOT receive:
+  - rides
+
+Ride-only drivers must not receive food/delivery orders unless admin enables service flags.
+
+==============================================
+E) STATUS FLOW + ONLINE LOGIC (MUST CONFIRM)
+==============================================
+
+Delivery drivers:
+- Go Online must check:
+  - is_verified = true
+  - verification_status = "approved"
+
+If NOT approved:
+- Show “Your documents are under review”
+- Must NOT allow going online.
+
+==============================================
+F) COUNTRY BRANCHING (MUST CONFIRM)
+==============================================
+
+- USA delivery car drivers see USA docs only.
+- BD delivery car drivers see BD docs only.
+- TLC sections appear ONLY for USA + NYC zone.
+- All TLC fields optional.
+
+==============================================
+G) NON-BREAKING RULES (MUST CONFIRM)
+==============================================
+
+You must verify:
+- No existing ride-driver flows were modified or broken.
+- No DB field renamed or deleted.
+- All functionality was added as extensions, not replacements.
+- All routes continue working.
+
+==============================================
+H) FINAL CHECK
+==============================================
+
+After verifying A–G, give me a summary:
+- What is correct
+- What needed fixing
+- What was updated
+- What remains open (if anything)
+
+ONLY after this review will I approve the Car delivery flow.
