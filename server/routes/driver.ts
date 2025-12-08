@@ -7593,4 +7593,627 @@ router.post("/delivery/update-location", async (req: AuthRequest, res) => {
   }
 });
 
+// ============================================================
+// DRIVER LIVE ASSIGNMENT SYSTEM ROUTES
+// Task management, matching pool, and navigation
+// ============================================================
+
+// Zod schemas for task management
+const acceptTaskSchema = z.object({
+  assignmentId: z.string().uuid(),
+});
+
+const rejectTaskSchema = z.object({
+  assignmentId: z.string().uuid(),
+  reason: z.string().optional(),
+});
+
+const updateTaskStatusSchema = z.object({
+  assignmentId: z.string().uuid(),
+  status: z.enum([
+    // Ride statuses
+    "driver_arriving", "in_progress", "completed",
+    // Food/Parcel statuses
+    "accepted", "preparing", "ready_for_pickup", "picked_up", "on_the_way", "delivered"
+  ]),
+});
+
+const updateNavigationLocationSchema = z.object({
+  lat: z.number(),
+  lng: z.number(),
+  heading: z.number().optional(),
+  speed: z.number().optional(),
+  assignmentId: z.string().uuid().optional(),
+});
+
+// GET /api/driver/task/next
+// Get the next pending task assignment for the driver
+router.get("/task/next", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // First, expire any timed-out assignments
+    await prisma.taskAssignment.updateMany({
+      where: {
+        driverId: userId,
+        status: "pending",
+        expiresAt: { lt: new Date() },
+      },
+      data: {
+        status: "expired",
+        wasAutoRejected: true,
+        respondedAt: new Date(),
+      },
+    });
+
+    // Get the next pending assignment (oldest first)
+    const pendingAssignment = await prisma.taskAssignment.findFirst({
+      where: {
+        driverId: userId,
+        status: "pending",
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!pendingAssignment) {
+      return res.json({ assignment: null });
+    }
+
+    // Calculate remaining time
+    const remainingSeconds = Math.max(
+      0,
+      Math.floor((pendingAssignment.expiresAt.getTime() - Date.now()) / 1000)
+    );
+
+    res.json({
+      assignment: {
+        ...pendingAssignment,
+        estimatedEarnings: parseFloat(pendingAssignment.estimatedEarnings.toString()),
+        remainingSeconds,
+      },
+    });
+  } catch (error) {
+    console.error("[TaskAssignment] Get next task error:", error);
+    res.status(500).json({ error: "Failed to get next task" });
+  }
+});
+
+// POST /api/driver/task/accept
+// Accept a task assignment
+router.post("/task/accept", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const validation = acceptTaskSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: "Invalid request", details: validation.error.errors });
+    }
+
+    const { assignmentId } = validation.data;
+
+    // Get and validate the assignment
+    const assignment = await prisma.taskAssignment.findUnique({
+      where: { id: assignmentId },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ error: "Task assignment not found" });
+    }
+
+    if (assignment.driverId !== userId) {
+      return res.status(403).json({ error: "This task is not assigned to you" });
+    }
+
+    if (assignment.status !== "pending") {
+      return res.status(400).json({ error: `Task is already ${assignment.status}` });
+    }
+
+    if (assignment.expiresAt < new Date()) {
+      await prisma.taskAssignment.update({
+        where: { id: assignmentId },
+        data: { status: "expired", wasAutoRejected: true, respondedAt: new Date() },
+      });
+      return res.status(400).json({ error: "Task offer has expired" });
+    }
+
+    // Use transaction to update assignment and related records atomically
+    const result = await prisma.$transaction(async (tx) => {
+      // Update assignment status
+      const updatedAssignment = await tx.taskAssignment.update({
+        where: { id: assignmentId },
+        data: {
+          status: "accepted",
+          acceptedAt: new Date(),
+          respondedAt: new Date(),
+        },
+      });
+
+      // Update driver status to busy
+      await tx.deliveryDriverOnboardingDraft.updateMany({
+        where: { userId },
+        data: { driverStatus: "busy" },
+      });
+
+      // Also update DriverProfile if exists
+      await tx.driverProfile.updateMany({
+        where: { userId },
+        data: { isOnline: true },
+      });
+
+      // Update the actual task based on service type
+      if (assignment.serviceType === "ride" && assignment.rideId) {
+        await tx.ride.update({
+          where: { id: assignment.rideId },
+          data: {
+            driverId: userId,
+            status: "accepted",
+            acceptedAt: new Date(),
+          },
+        });
+      } else if (assignment.serviceType === "food" && assignment.foodOrderId) {
+        await tx.foodOrder.update({
+          where: { id: assignment.foodOrderId },
+          data: {
+            driverId: userId,
+            status: "accepted",
+            driverAssignmentStatus: "assigned",
+          },
+        });
+      } else if (assignment.serviceType === "parcel" && assignment.deliveryId) {
+        await tx.delivery.update({
+          where: { id: assignment.deliveryId },
+          data: {
+            driverId: userId,
+            status: "accepted",
+            acceptedAt: new Date(),
+          },
+        });
+      }
+
+      // Create navigation session
+      const navSession = await tx.driverNavigationSession.create({
+        data: {
+          driverId: userId,
+          taskAssignmentId: assignmentId,
+          rideId: assignment.rideId,
+          foodOrderId: assignment.foodOrderId,
+          deliveryId: assignment.deliveryId,
+          currentLeg: "to_pickup",
+          isActive: true,
+        },
+      });
+
+      return { assignment: updatedAssignment, navSession };
+    });
+
+    console.log(`[TaskAssignment] Driver ${userId} accepted ${assignment.serviceType} task ${assignmentId}`);
+
+    res.json({
+      success: true,
+      message: "Task accepted",
+      assignment: {
+        ...result.assignment,
+        estimatedEarnings: parseFloat(result.assignment.estimatedEarnings.toString()),
+      },
+      navigationSessionId: result.navSession.id,
+    });
+  } catch (error) {
+    console.error("[TaskAssignment] Accept task error:", error);
+    res.status(500).json({ error: "Failed to accept task" });
+  }
+});
+
+// POST /api/driver/task/reject
+// Reject a task assignment
+router.post("/task/reject", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const validation = rejectTaskSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: "Invalid request", details: validation.error.errors });
+    }
+
+    const { assignmentId, reason } = validation.data;
+
+    // Get and validate the assignment
+    const assignment = await prisma.taskAssignment.findUnique({
+      where: { id: assignmentId },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ error: "Task assignment not found" });
+    }
+
+    if (assignment.driverId !== userId) {
+      return res.status(403).json({ error: "This task is not assigned to you" });
+    }
+
+    if (assignment.status !== "pending") {
+      return res.status(400).json({ error: `Task is already ${assignment.status}` });
+    }
+
+    // Update assignment status to rejected
+    await prisma.taskAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        status: "rejected",
+        rejectedAt: new Date(),
+        respondedAt: new Date(),
+        rejectionReason: reason || "Driver declined",
+        wasAutoRejected: false,
+      },
+    });
+
+    console.log(`[TaskAssignment] Driver ${userId} rejected ${assignment.serviceType} task ${assignmentId}`);
+
+    res.json({
+      success: true,
+      message: "Task rejected - you will continue receiving new tasks",
+    });
+  } catch (error) {
+    console.error("[TaskAssignment] Reject task error:", error);
+    res.status(500).json({ error: "Failed to reject task" });
+  }
+});
+
+// POST /api/driver/task/update-status
+// Update task status during service flow
+router.post("/task/update-status", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const validation = updateTaskStatusSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: "Invalid request", details: validation.error.errors });
+    }
+
+    const { assignmentId, status } = validation.data;
+
+    // Get the assignment
+    const assignment = await prisma.taskAssignment.findUnique({
+      where: { id: assignmentId },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ error: "Task assignment not found" });
+    }
+
+    if (assignment.driverId !== userId) {
+      return res.status(403).json({ error: "This task is not assigned to you" });
+    }
+
+    if (assignment.status !== "accepted") {
+      return res.status(400).json({ error: "Can only update status for accepted tasks" });
+    }
+
+    const isCompleted = ["completed", "delivered"].includes(status);
+
+    // Update task based on service type
+    if (assignment.serviceType === "ride" && assignment.rideId) {
+      await prisma.ride.update({
+        where: { id: assignment.rideId },
+        data: {
+          status,
+          ...(status === "driver_arriving" && { arrivedAt: new Date() }),
+          ...(status === "in_progress" && { tripStartedAt: new Date() }),
+          ...(status === "completed" && { completedAt: new Date() }),
+        },
+      });
+    } else if (assignment.serviceType === "food" && assignment.foodOrderId) {
+      await prisma.foodOrder.update({
+        where: { id: assignment.foodOrderId },
+        data: {
+          status,
+          ...(status === "picked_up" && { pickedUpAt: new Date() }),
+          ...(status === "delivered" && { deliveredAt: new Date(), completedAt: new Date() }),
+        },
+      });
+    } else if (assignment.serviceType === "parcel" && assignment.deliveryId) {
+      await prisma.delivery.update({
+        where: { id: assignment.deliveryId },
+        data: {
+          status,
+          ...(status === "picked_up" && { pickedUpAt: new Date() }),
+          ...(status === "delivered" && { deliveredAt: new Date() }),
+        },
+      });
+    }
+
+    // Update navigation session leg
+    if (status === "picked_up" || status === "in_progress") {
+      await prisma.driverNavigationSession.updateMany({
+        where: { taskAssignmentId: assignmentId, isActive: true },
+        data: { currentLeg: "to_dropoff" },
+      });
+    }
+
+    // If completed, handle earnings and reset driver status
+    if (isCompleted) {
+      await prisma.$transaction(async (tx) => {
+        // Complete navigation session
+        await tx.driverNavigationSession.updateMany({
+          where: { taskAssignmentId: assignmentId },
+          data: { currentLeg: "completed", isActive: false, completedAt: new Date() },
+        });
+
+        // Mark assignment as completed
+        await tx.taskAssignment.update({
+          where: { id: assignmentId },
+          data: { status: "completed" },
+        });
+
+        // Reset driver status to available
+        await tx.deliveryDriverOnboardingDraft.updateMany({
+          where: { userId },
+          data: { driverStatus: "available" },
+        });
+
+        // Update driver earnings (add to total earned today/week)
+        await tx.deliveryDriverOnboardingDraft.updateMany({
+          where: { userId },
+          data: {
+            totalEarnedToday: { increment: Number(assignment.estimatedEarnings) },
+            totalEarnedThisWeek: { increment: Number(assignment.estimatedEarnings) },
+            totalEarnings: { increment: Number(assignment.estimatedEarnings) },
+          },
+        });
+      });
+
+      console.log(`[TaskAssignment] Driver ${userId} completed ${assignment.serviceType} task ${assignmentId}`);
+    }
+
+    res.json({
+      success: true,
+      message: `Status updated to ${status}`,
+      isCompleted,
+    });
+  } catch (error) {
+    console.error("[TaskAssignment] Update status error:", error);
+    res.status(500).json({ error: "Failed to update task status" });
+  }
+});
+
+// POST /api/driver/navigation/update-location
+// Update driver location during active navigation
+router.post("/navigation/update-location", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const validation = updateNavigationLocationSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: "Invalid request", details: validation.error.errors });
+    }
+
+    const { lat, lng, heading, speed, assignmentId } = validation.data;
+
+    // Update active navigation session
+    const updateData: any = {
+      currentLat: lat,
+      currentLng: lng,
+      heading,
+      speed,
+      etaLastUpdated: new Date(),
+    };
+
+    if (assignmentId) {
+      await prisma.driverNavigationSession.updateMany({
+        where: { taskAssignmentId: assignmentId, driverId: userId, isActive: true },
+        data: updateData,
+      });
+    } else {
+      // Update any active session for this driver
+      await prisma.driverNavigationSession.updateMany({
+        where: { driverId: userId, isActive: true },
+        data: updateData,
+      });
+    }
+
+    // Also update matching pool location
+    await prisma.driverMatchingPool.updateMany({
+      where: { driverId: userId, isActive: true },
+      data: {
+        currentLat: lat,
+        currentLng: lng,
+        lastLocationUpdate: new Date(),
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[Navigation] Location update error:", error);
+    res.status(500).json({ error: "Failed to update location" });
+  }
+});
+
+// GET /api/driver/task/active
+// Get the currently active task for navigation
+router.get("/task/active", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get active navigation session
+    const navSession = await prisma.driverNavigationSession.findFirst({
+      where: { driverId: userId, isActive: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!navSession) {
+      return res.json({ activeTask: null });
+    }
+
+    // Get the assignment details
+    const assignment = navSession.taskAssignmentId
+      ? await prisma.taskAssignment.findUnique({
+          where: { id: navSession.taskAssignmentId },
+        })
+      : null;
+
+    // Get task-specific details
+    let taskDetails: any = null;
+
+    if (navSession.rideId) {
+      taskDetails = await prisma.ride.findUnique({
+        where: { id: navSession.rideId },
+        select: {
+          id: true,
+          status: true,
+          pickupAddress: true,
+          pickupLat: true,
+          pickupLng: true,
+          dropoffAddress: true,
+          dropoffLat: true,
+          dropoffLng: true,
+          serviceFare: true,
+          driverPayout: true,
+          customer: { select: { firstName: true, phone: true } },
+        },
+      });
+    } else if (navSession.foodOrderId) {
+      taskDetails = await prisma.foodOrder.findUnique({
+        where: { id: navSession.foodOrderId },
+        select: {
+          id: true,
+          status: true,
+          pickupAddress: true,
+          pickupLat: true,
+          pickupLng: true,
+          deliveryAddress: true,
+          deliveryLat: true,
+          deliveryLng: true,
+          serviceFare: true,
+          driverPayout: true,
+          items: true,
+          restaurant: { select: { name: true, address: true, phone: true } },
+          customer: { select: { firstName: true, phone: true } },
+        },
+      });
+    } else if (navSession.deliveryId) {
+      taskDetails = await prisma.delivery.findUnique({
+        where: { id: navSession.deliveryId },
+        select: {
+          id: true,
+          status: true,
+          pickupAddress: true,
+          pickupLat: true,
+          pickupLng: true,
+          dropoffAddress: true,
+          dropoffLat: true,
+          dropoffLng: true,
+          serviceFare: true,
+          driverPayout: true,
+          customer: { select: { firstName: true, phone: true } },
+        },
+      });
+    }
+
+    res.json({
+      activeTask: {
+        navSession: {
+          id: navSession.id,
+          currentLeg: navSession.currentLeg,
+          currentLat: navSession.currentLat,
+          currentLng: navSession.currentLng,
+          etaSeconds: navSession.etaSeconds,
+        },
+        assignment: assignment
+          ? {
+              ...assignment,
+              estimatedEarnings: parseFloat(assignment.estimatedEarnings.toString()),
+            }
+          : null,
+        taskDetails,
+      },
+    });
+  } catch (error) {
+    console.error("[Task] Get active task error:", error);
+    res.status(500).json({ error: "Failed to get active task" });
+  }
+});
+
+// POST /api/driver/pool/join
+// Join matching pools when going online
+router.post("/pool/join", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { pools, lat, lng } = req.body;
+
+    // Validate pools
+    const validPools = ["ride_pool", "food_pool", "parcel_pool"];
+    const poolsToJoin = (pools || []).filter((p: string) => validPools.includes(p));
+
+    if (poolsToJoin.length === 0) {
+      return res.status(400).json({ error: "At least one valid pool must be specified" });
+    }
+
+    // Get driver's performance metrics
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      select: { rating: true },
+    });
+
+    // Join each pool
+    for (const poolType of poolsToJoin) {
+      await prisma.driverMatchingPool.upsert({
+        where: { driverId_poolType: { driverId: userId, poolType } },
+        create: {
+          driverId: userId,
+          poolType,
+          isActive: true,
+          currentLat: lat,
+          currentLng: lng,
+          lastLocationUpdate: new Date(),
+          avgRating: driverProfile?.rating ? parseFloat(driverProfile.rating.toString()) : null,
+        },
+        update: {
+          isActive: true,
+          currentLat: lat,
+          currentLng: lng,
+          lastLocationUpdate: new Date(),
+          leftAt: null,
+        },
+      });
+    }
+
+    console.log(`[MatchingPool] Driver ${userId} joined pools: ${poolsToJoin.join(", ")}`);
+
+    res.json({
+      success: true,
+      message: `Joined ${poolsToJoin.length} matching pool(s)`,
+      pools: poolsToJoin,
+    });
+  } catch (error) {
+    console.error("[MatchingPool] Join pool error:", error);
+    res.status(500).json({ error: "Failed to join matching pools" });
+  }
+});
+
+// POST /api/driver/pool/leave
+// Leave matching pools when going offline
+router.post("/pool/leave", authenticateToken, requireRole(["driver", "pending_driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Leave all pools
+    await prisma.driverMatchingPool.updateMany({
+      where: { driverId: userId, isActive: true },
+      data: {
+        isActive: false,
+        leftAt: new Date(),
+      },
+    });
+
+    console.log(`[MatchingPool] Driver ${userId} left all pools`);
+
+    res.json({
+      success: true,
+      message: "Left all matching pools",
+    });
+  } catch (error) {
+    console.error("[MatchingPool] Leave pool error:", error);
+    res.status(500).json({ error: "Failed to leave matching pools" });
+  }
+});
+
 export default router;

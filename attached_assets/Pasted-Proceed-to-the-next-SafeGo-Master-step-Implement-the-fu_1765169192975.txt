@@ -1,0 +1,96 @@
+Proceed to the next SafeGo Master step.
+
+Implement the full Driver Live Assignment System for ALL three services:
+1. Ride-hailing
+2. Food Delivery
+3. Parcel Delivery
+
+Follow SafeGo Master Rules and do NOT modify any existing schema. Add only where required.
+
+=====================================================
+A) WHEN DRIVER IS ONLINE
+The driver must enter the global matching pool for all three services:
+- ride_pool
+- food_pool
+- parcel_pool
+
+Start receiving assignment offers from the backend.
+
+=====================================================
+B) INCOMING TASK REQUEST SCREEN
+You must build a universal task popup for drivers with:
+
+- Service type badge: ride | food | parcel
+- Countdown timer (10 seconds)
+- Pickup address + map preview
+- Dropoff address (ride + parcel)
+- Restaurant name + pickup location (food)
+- Estimated earnings
+- Distance to pickup
+- Accept button
+- Reject button
+
+If the timer expires → auto-reject.
+
+=====================================================
+C) ACCEPT / REJECT LOGIC
+On ACCEPT:
+- Lock the request
+- Update driver_status = "busy"
+- Update task record:
+    rides / food_orders / deliveries
+- Move task to the correct service flow
+- Begin navigation screen
+
+On REJECT:
+- Driver stays online
+- Mark request rejected
+- Move to next task
+
+=====================================================
+D) STATUS FLOW INTEGRATION
+After accept, follow correct SafeGo status flows.
+
+Ride:
+requested → accepted → driver_arriving → in_progress → completed
+
+Food:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+
+Parcel:
+requested → accepted → picked_up → on_the_way → delivered
+
+=====================================================
+E) API ROUTES NEEDED (ADD ONLY)
+- POST /driver/task/accept
+- POST /driver/task/reject
+- GET /driver/task/next
+- POST /driver/task/update-status
+- POST /driver/navigation/update-location
+
+=====================================================
+F) UI REQUIREMENTS
+Create real-time driver screens:
+
+1. Incoming Task Popup  
+2. Navigation to pickup  
+3. Navigation to dropoff  
+4. Order details (dynamic for ride/food/parcel)
+
+=====================================================
+G) SECURITY RULES
+- Drivers cannot view customer documents  
+- Drivers cannot see other drivers  
+- Only admin can modify pricing/commission  
+- Must follow country-specific restrictions  
+
+=====================================================
+H) COMPLETION RULE
+When task is finished:
+- Update earning record
+- Update commission logic (cash vs online)
+- Update wallet negative balance if required
+- Driver returns to “available” state
+
+=====================================================
+Produce a publish-ready, full implementation.

@@ -14420,3 +14420,155 @@ model LaunchCertificate {
   @@index([issuedAt])
   @@map("launch_certificates")
 }
+
+// ============================================================
+// DRIVER LIVE ASSIGNMENT SYSTEM
+// Handles task matching, assignment offers, and driver pool management
+// ============================================================
+
+// Driver Matching Pool - tracks which pools a driver is registered in
+model DriverMatchingPool {
+  id        String   @id @default(uuid())
+  driverId  String
+  
+  // Pool types: ride_pool, food_pool, parcel_pool
+  poolType  String
+  
+  // Driver's current status in this pool
+  isActive  Boolean  @default(true)
+  
+  // Current location for matching
+  currentLat Float?
+  currentLng Float?
+  lastLocationUpdate DateTime?
+  
+  // Matching preferences
+  maxDistanceKm Float?  // Max distance willing to travel to pickup
+  
+  // Performance metrics for matching algorithm
+  acceptanceRate Float?  // 0-100 percentage
+  avgRating      Float?
+  
+  // Timestamps
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([driverId, poolType])
+  @@index([poolType, isActive])
+  @@index([currentLat, currentLng])
+  @@index([driverId])
+  @@map("driver_matching_pools")
+}
+
+// Task Assignment - incoming task offers to drivers
+model TaskAssignment {
+  id            String   @id @default(uuid())
+  
+  // Driver receiving the offer
+  driverId      String
+  
+  // Service type: ride, food, parcel
+  serviceType   String
+  
+  // Reference to the actual task (only one will be set based on serviceType)
+  rideId        String?
+  foodOrderId   String?
+  deliveryId    String?
+  
+  // Assignment status
+  status        String   @default("pending") // pending, accepted, rejected, expired, cancelled
+  
+  // Countdown timer (seconds)
+  expiresAt     DateTime
+  timeoutSeconds Int     @default(10)
+  
+  // Pickup details
+  pickupAddress String
+  pickupLat     Float?
+  pickupLng     Float?
+  
+  // Dropoff details (for ride and parcel)
+  dropoffAddress String?
+  dropoffLat    Float?
+  dropoffLng    Float?
+  
+  // Restaurant details (for food orders)
+  restaurantName String?
+  restaurantId   String?
+  
+  // Estimated earnings for this task
+  estimatedEarnings Decimal @db.Decimal(10, 2)
+  
+  // Distance to pickup from driver's current location
+  distanceToPickupKm Float?
+  
+  // ETA to pickup in minutes
+  etaToPickupMinutes Int?
+  
+  // Response timestamps
+  respondedAt   DateTime?
+  acceptedAt    DateTime?
+  rejectedAt    DateTime?
+  
+  // Rejection reason if rejected
+  rejectionReason String?
+  
+  // Auto-reject flag
+  wasAutoRejected Boolean @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([driverId, status])
+  @@index([serviceType])
+  @@index([expiresAt])
+  @@index([status])
+  @@map("task_assignments")
+}
+
+// Driver Navigation Session - tracks active navigation during task
+model DriverNavigationSession {
+  id            String   @id @default(uuid())
+  driverId      String
+  
+  // Current task reference
+  taskAssignmentId String?
+  rideId        String?
+  foodOrderId   String?
+  deliveryId    String?
+  
+  // Navigation leg: to_pickup, to_dropoff, completed
+  currentLeg    String   @default("to_pickup")
+  
+  // Route information
+  routePolyline String?  @db.Text
+  distanceMeters Int?
+  durationSeconds Int?
+  
+  // Current position
+  currentLat    Float?
+  currentLng    Float?
+  heading       Float?
+  speed         Float?
+  
+  // ETA tracking
+  etaSeconds    Int?
+  etaLastUpdated DateTime?
+  
+  // Navigation status
+  isActive      Boolean  @default(true)
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([driverId, isActive])
+  @@index([rideId])
+  @@index([foodOrderId])
+  @@index([deliveryId])
+  @@map("driver_navigation_sessions")
+}

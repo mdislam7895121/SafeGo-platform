@@ -113,6 +113,7 @@ import DriverPromotions from "@/pages/driver/promotions";
 import DriverHelp from "@/pages/driver/help";
 import DriverHome from "@/pages/driver/home";
 import DeliveryDriverDashboard from "@/pages/driver/delivery-dashboard";
+import DriverLiveAssignment from "@/pages/driver/live-assignment";
 import DriverAccount from "@/pages/driver/account";
 import DriverAccountVehicles from "@/pages/driver/account/vehicles";
 import DriverAccountWorkHub from "@/pages/driver/account/work-hub";
@@ -757,6 +758,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
           <DriverLayout pageTitle="Delivery Dashboard">
             <DeliveryDriverDashboard />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      {/* Driver Live Assignment System - Task Matching & Navigation */}
+      <Route path="/driver/live">
+        <ProtectedRoute allowedRoles={["driver", "pending_driver"]}>
+          <DriverLayout pageTitle="Live Assignment">
+            <DriverLiveAssignment />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
