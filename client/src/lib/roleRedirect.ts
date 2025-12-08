@@ -73,6 +73,11 @@ export function getPostLoginPath(user: UserForRedirect | null | undefined): stri
     case "restaurant":
       return "/restaurant";
 
+    case "pending_restaurant":
+      // Restaurant has submitted application, waiting for admin approval
+      // Redirect to restaurant dashboard - they can see dashboard but can't go online
+      return "/restaurant/dashboard";
+
     case "pending_ticket_operator":
       return "/ticket-operator/onboarding";
 
