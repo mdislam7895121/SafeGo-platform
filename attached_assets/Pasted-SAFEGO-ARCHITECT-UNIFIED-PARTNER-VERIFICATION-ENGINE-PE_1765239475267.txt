@@ -1,0 +1,364 @@
+SAFEGO ARCHITECT – UNIFIED PARTNER VERIFICATION ENGINE (PENDING / NEED MORE INFO / APPROVED)
+
+Goal:
+Implement a **single, unified verification status system** for ALL partners in SafeGo:
+
+- Ride-hailing drivers (car, bike, etc.)
+- Delivery drivers (bike, walking, motorbike, etc.)
+- Restaurants (SafeGo Eats merchants)
+- Any future partner types (shop_partner, etc.)
+
+The behavior must be:
+
+1) Pending:
+   - Status clearly shows “Pending review”
+   - Partner sees that application is under review
+   - Online / Go-live actions are blocked
+
+2) Need More Information:
+   - If Admin requests more documents or corrections
+   - Status: “Need more information” (or “Action required”)
+   - Partner sees exactly what is missing
+   - Online / Go-live actions remain blocked
+
+3) Approved:
+   - Status: “Verified / Approved”
+   - Partner receives a **Congratulations** email
+   - Dashboard banner confirms they can now start work
+   - Online / Go-live actions become enabled
+
+You must do this WITHOUT breaking any existing SafeGo features.
+
+=====================================================
+A) SAFEGO MASTER RULES (MUST REMAIN TRUE)
+
+1) ROLES (4, strictly separated)
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+
+   Each has its own:
+   - signup & onboarding
+   - KYC / verification rules
+   - dashboard
+   - permissions & status flows
+   - NO cross-access to sensitive data.
+
+2) GLOBAL SERVICES (3)
+   - ride-hailing
+   - food delivery
+   - parcel delivery
+
+3) COUNTRY-SPECIFIC KYC (MUST keep)
+
+   BANGLADESH (BD) drivers:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - nid_number + nid_front_image + nid_back_image
+   - emergency_contact_name + emergency_contact_phone
+   - driving_license_number + driving_license_front + driving_license_back
+   - vehicle_registration
+   - insurance_document (optional)
+   - verification_status + is_verified
+
+   UNITED STATES (US) drivers:
+   - date_of_birth
+   - home_address
+   - emergency_contact_name + emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - government_id_front_image + government_id_back_image
+   - driver_license + image + expiry (for car drivers)
+   - ssn_last4 (optional)
+   - verification_status + is_verified
+
+   Restaurants have their own required KYC fields per country (business info, address, ID/tax info, emergency contact, etc.). You must NOT weaken or remove any of these.
+
+4) ADMIN PANEL (must keep existing abilities)
+   Admin can:
+   - verify customers / drivers / restaurants
+   - approve / reject KYC
+   - set rejection_reason
+   - request additional documents
+   - block / unblock users
+   - update pricing, fees, commissions
+   - manage payouts
+   - view driver & restaurant negative balances
+
+5) CORE COLLECTIONS (must stay compatible)
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must keep:
+   - identity fields (customer_id, driver_id, restaurant_id)
+   - pickup/dropoff addresses + geolocation
+   - fees + commission
+   - payment details
+   - timestamps
+   - complete status flow
+   - rating and feedback
+
+6) COMMISSION & PAYOUT RULES
+   - Cash ride:
+       driver keeps all cash
+       SafeGo commission → negative driver_wallet_balance
+       driver must settle weekly
+   - Cash food:
+       restaurant keeps the cash
+       commission → negative restaurant_wallet
+   - Online payment:
+       SafeGo keeps commission automatically
+   - Admin can settle balances and mark paid
+
+7) SECURITY RULES
+   - Customers cannot view driver documents (NID, license, etc.)
+   - Drivers cannot view customer NID or government IDs
+   - Restaurants cannot view other restaurants’ data
+   - Only admin can change pricing, commission, verification, blocking
+   - Users can update only their own profile
+
+8) STATUS FLOWS (must remain)
+
+   Ride:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+
+   Food:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+
+   Parcel:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+9) ONBOARDING
+   - Multi-step onboarding flows
+   - After submit: verification_status = "pending"
+   - is_verified = false
+   - Access to go live / accept orders / accept rides is blocked until approved by Admin
+
+10) NOTIFICATIONS
+   - New ride alerts
+   - Order / parcel updates
+   - Verification approval / rejection
+   - Important admin notifications
+
+All changes for this task must be **BACKWARD-COMPATIBLE**:
+- Do NOT rename or remove DB fields.
+- Do NOT change API signatures for existing routes.
+- Only ADD or standardize logic.
+
+=====================================================
+B) DEFINE UNIFIED VERIFICATION STATE MACHINE
+
+You must introduce a unified verification state machine that works for ALL partners:
+
+Use these canonical states:
+
+1) "pending_review"
+   - Application submitted, waiting for admin.
+
+2) "need_more_info"
+   - Admin reviewed but needs more documents or corrections.
+
+3) "approved"
+   - Admin fully approved; partner can start work.
+
+4) "rejected"
+   - Admin rejected; partner cannot use services; should see rejection_reason.
+
+Mapping to existing fields:
+
+- `verification_status` becomes the canonical field:
+   - "pending_review"
+   - "need_more_info"
+   - "approved"
+   - "rejected"
+
+- `is_verified` is a boolean:
+   - true  → only when verification_status === "approved"
+   - false → in all other states
+
+You MUST NOT break existing values if the system already uses other strings.
+If existing values differ (e.g. "pending", "approved"), then:
+- Maintain a mapping layer so the UI uses the new canonical meanings
+- But DB/schema fields remain backward-compatible.
+
+=====================================================
+C) DASHBOARD UI RULES FOR ALL PARTNERS
+
+For EVERY partner dashboard (delivery driver, ride driver, restaurant, other partners), you must obey these rules:
+
+Let `status = verification_status` and `isVerified = is_verified`.
+
+1) When status = "pending_review":
+   - Badge: "Pending review"
+   - Banner: Informative yellow / neutral banner:
+     “Your application is under review. This usually takes 1–3 business days.”
+   - Go Online / Accept Orders / Start Working buttons:
+     - Disabled
+     - Tooltip: “You must be approved before you can start working.”
+
+2) When status = "need_more_info":
+   - Badge: "Action required"
+   - Red banner with clear list of missing items, e.g.:
+     “We need more information to complete your verification:
+        - Government ID Type
+        - Home Address
+      Please upload the missing information.”
+
+   - Show a “Complete KYC” or “Fix Application” button that takes the partner back to the KYC step/wizard.
+   - Go Online / Accept Orders / Start Working:
+     - Disabled
+     - Tooltip: “You must provide the requested information before you can start working.”
+
+3) When status = "approved":
+   - Badge: "Verified" (green)
+   - NO red KYC banner
+   - Optional small green info: “Verification complete. You can now start accepting work.”
+   - Go Online / Accept Orders / Start Working:
+     - Enabled
+     - Controlled by other business logic (busy/online/offline) but NOT blocked by verification anymore.
+   - is_verified MUST be true.
+
+4) When status = "rejected":
+   - Badge: "Rejected"
+   - Red banner with:
+     - rejection_reason
+     - clear instructions: “Please contact support or update your information and re-submit.”
+   - Go Online / Accept Orders / Start Working:
+     - Disabled
+   - is_verified MUST be false.
+
+These rules must be applied to:
+
+- `/driver/delivery-dashboard`
+- Any ride driver dashboard
+- `/partner/restaurant/dashboard`
+- Future partner dashboards (shop_partner, etc.)
+
+=====================================================
+D) EMAIL + NOTIFICATION RULES
+
+For ALL partners, implement these automated notifications:
+
+1) When status changes to "pending_review":
+   - Optional email/notification:
+     Subject: “We received your application”
+     Message: Thanks + summary of next steps.
+
+2) When status changes to "need_more_info":
+   - Email + in-app notification:
+     Subject: “We need more information to verify your account”
+     Body:
+       - Explain what is missing
+       - Include direct link/button to “Complete KYC” screen.
+
+3) When status changes to "approved":
+   - REQUIRED email + in-app notification:
+     Subject example: “Congratulations – your SafeGo account is verified”
+     Body template (do not hardcode text only; make it configurable):
+       - Congratulate the partner
+       - Mention role (Driver / Restaurant)
+       - Explain they can now:
+         - Go Online
+         - Accept rides/orders/deliveries
+       - Remind them of safety & commission rules.
+
+4) When status changes to "rejected":
+   - Email + in-app notification:
+     - Explain rejection_reason
+     - Offer next steps (contact support or resubmit with corrections).
+
+Make sure notifications respect role separation:
+- Driver emails go only to drivers
+- Restaurant emails go only to restaurants
+- No sensitive internal message leaked.
+
+=====================================================
+E) ADMIN PANEL CHANGES (ADD-ONLY)
+
+Update Admin verification UI for ALL partner types:
+
+1) For each application (driver/restaurant/partner), Admin must see:
+   - Current verification_status
+   - is_verified
+   - Key KYC fields
+   - rejection_reason (if any)
+   - list of missing fields (if you implement automatic checks)
+
+2) Admin actions:
+   - Set status to:
+     - pending_review
+     - need_more_info (with required fields description)
+     - approved
+     - rejected (with rejection_reason)
+   - When Admin changes status, the system must:
+     - Update verification_status
+     - Update is_verified accordingly
+     - Trigger the correct email/notification.
+
+3) Admin cannot bypass SafeGo rules:
+   - No way to set is_verified = true while verification_status is not "approved"
+   - No direct override that breaks the state machine.
+
+=====================================================
+F) NON-BREAKING IMPLEMENTATION PLAN
+
+You MUST:
+- Keep all existing DB fields and APIs as they are.
+- If verification_status currently uses different string values, implement a mapping layer in code so you can support both old and new values during transition.
+- Do not change schema for rides, food_orders, deliveries, wallets, or commissions.
+
+You MAY:
+- Add helper functions:
+   - isVerifiedForOperations(partner)
+   - isPendingReview(partner)
+   - needsMoreInfo(partner)
+- Add new UI components for banners/notifications.
+- Add new email templates / notification configs.
+
+=====================================================
+G) TEST CASES (ALL PARTNER TYPES)
+
+You MUST test at least:
+
+1) New delivery driver → submit:
+   - status: pending_review
+   - dashboard shows pending banner
+   - Go Online disabled.
+
+2) Admin sets need_more_info with missing fields:
+   - driver dashboard shows “Action required” + list
+   - driver can open KYC step to fix
+   - Go Online still disabled.
+
+3) Admin approves driver:
+   - status: approved
+   - is_verified: true
+   - driver receives Congratulations email
+   - dashboard shows “Verified”, Online toggle enabled.
+
+4) Restaurant same flow:
+   - Register restaurant → pending_review
+   - need_more_info → banner
+   - approved → Verified badge, no KYC banner, can Accept Orders.
+
+5) Any future partner (if implemented):
+   - Follows the same state machine.
+
+=====================================================
+H) FINAL CONFIRMATION
+
+After implementing, summarize:
+
+- Which partner dashboards now use the unified verification logic
+- Which helper functions / modules implement the state machine
+- That for ALL partners, the UI and emails behave as:
+
+   Pending → “Pending review”
+   Need more info → “Need more information / Action required”
+   Approved → “Congratulations, you can start working now”
+
+without changing any SafeGo core collections, commissions, or security rules.

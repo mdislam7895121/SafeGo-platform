@@ -7,6 +7,7 @@ export const NotificationType = {
   KYC_PENDING: "KYC_PENDING",
   KYC_APPROVED: "KYC_APPROVED",
   KYC_REJECTED: "KYC_REJECTED",
+  KYC_NEED_MORE_INFO: "KYC_NEED_MORE_INFO",
   
   // Document Expiry
   DOCUMENT_EXPIRING: "DOCUMENT_EXPIRING",
@@ -281,6 +282,33 @@ export async function notifyKYCRejected(params: {
     title: `${params.entityType} KYC rejected`,
     message: `KYC for ${params.email} (${params.countryCode}) has been rejected.`,
     metadata: { email: params.email, reason: params.reason },
+  });
+}
+
+/**
+ * Helper to create KYC need more info notification
+ */
+export async function notifyKYCNeedMoreInfo(params: {
+  entityType: "driver" | "customer" | "restaurant";
+  entityId: string;
+  countryCode: string;
+  email: string;
+  actorId: string;
+  actorEmail: string;
+  missingFields: string[];
+  message?: string;
+}) {
+  await logNotification({
+    type: NotificationType.KYC_NEED_MORE_INFO,
+    severity: NotificationSeverity.WARNING,
+    actorId: params.actorId,
+    actorEmail: params.actorEmail,
+    entityType: params.entityType,
+    entityId: params.entityId,
+    countryCode: params.countryCode,
+    title: `${params.entityType} KYC requires additional information`,
+    message: params.message || `Additional information required for ${params.email} (${params.countryCode}).`,
+    metadata: { email: params.email, missingFields: params.missingFields },
   });
 }
 

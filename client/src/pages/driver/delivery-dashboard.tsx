@@ -9,26 +9,24 @@ import {
   User,
   Wallet,
   Settings,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
   ChevronRight,
   MapPin,
   Radio,
   TrendingUp,
-  Ban
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { getDriverVerificationState } from "@/lib/driverVerification";
+import { VerificationBanner } from "@/components/partner/VerificationBanner";
+import { VerificationBadge } from "@/components/partner/VerificationBadge";
 
 interface DeliveryDriverDashboardData {
   driver: {
@@ -171,11 +169,20 @@ export default function DeliveryDriverDashboard() {
     };
   }, [driver?.isOnline, locationWatchId, sendLocationUpdate]);
 
+  const verification = useMemo(() => {
+    if (!driver) return getDriverVerificationState(null);
+    return getDriverVerificationState({
+      verificationStatus: driver.verificationStatus,
+      isVerified: driver.isVerified,
+      rejectionReason: driver.rejectionReason,
+    });
+  }, [driver?.verificationStatus, driver?.isVerified, driver?.rejectionReason]);
+
   const handleToggleStatus = () => {
-    if (!driver?.isVerified) {
+    if (!verification.canGoOnline) {
       toast({
         title: "Cannot go online",
-        description: "Your account must be verified before you can go online",
+        description: verification.disabledReason || "Your account must be verified before you can go online",
         variant: "destructive",
       });
       return;
@@ -189,33 +196,14 @@ export default function DeliveryDriverDashboard() {
     }
   };
 
-  const getVerificationStatusBadge = () => {
+  const verificationInput = useMemo(() => {
     if (!driver) return null;
-    
-    switch (driver.verificationStatus) {
-      case "approved":
-        return (
-          <Badge className="gap-1 bg-green-100 text-green-800 dark:bg-green-950/30 dark:text-green-400" data-testid="badge-verification-approved">
-            <CheckCircle2 className="h-3 w-3" />
-            Verified
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge variant="destructive" className="gap-1" data-testid="badge-verification-rejected">
-            <XCircle className="h-3 w-3" />
-            Rejected
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline" className="gap-1" data-testid="badge-verification-pending">
-            <Clock className="h-3 w-3" />
-            Pending Verification
-          </Badge>
-        );
-    }
-  };
+    return {
+      verificationStatus: driver.verificationStatus,
+      isVerified: driver.isVerified,
+      rejectionReason: driver.rejectionReason,
+    };
+  }, [driver?.verificationStatus, driver?.isVerified, driver?.rejectionReason]);
 
   if (isLoading) {
     return (
@@ -230,9 +218,7 @@ export default function DeliveryDriverDashboard() {
     );
   }
 
-  const isPending = driver?.verificationStatus === "pending";
-  const isRejected = driver?.verificationStatus === "rejected";
-  const isApproved = driver?.verificationStatus === "approved" && driver?.isVerified;
+  const canGoOnline = verification.canGoOnline;
 
   return (
     <div className="min-h-screen bg-background pb-6">
@@ -243,7 +229,7 @@ export default function DeliveryDriverDashboard() {
             <p className="text-sm opacity-90">{driver?.fullName || user?.email}</p>
           </div>
           <div className="flex items-center gap-2">
-            {getVerificationStatusBadge()}
+            <VerificationBadge verificationInput={verificationInput} size="sm" />
             <Button 
               variant="outline" 
               size="sm" 
@@ -258,52 +244,32 @@ export default function DeliveryDriverDashboard() {
       </div>
 
       <div className="p-6 space-y-6">
-        {isPending && (
-          <Card className="border-amber-500 bg-amber-50 dark:bg-amber-950/20" data-testid="card-pending-verification">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-amber-800 dark:text-amber-400">Account Pending Verification</p>
-                  <p className="text-sm text-amber-700 dark:text-amber-500">
-                    Your application is being reviewed. You will be notified once approved.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {!canGoOnline && (
+          <VerificationBanner 
+            verificationInput={verificationInput} 
+            kycRoute="/driver/delivery/kyc"
+            partnerType="driver"
+          />
         )}
 
-        {isRejected && (
-          <Card className="border-red-500 bg-red-50 dark:bg-red-950/20" data-testid="card-rejected-verification">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <Ban className="h-5 w-5 text-red-600 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-red-800 dark:text-red-400">Application Rejected</p>
-                  <p className="text-sm text-red-700 dark:text-red-500">
-                    {driver?.rejectionReason || "Your application was not approved. Please contact support for more details."}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {isApproved && (
-          <Card className={`border-2 ${driver.isOnline ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-gray-300 dark:border-gray-700"}`} data-testid="card-online-toggle">
+        <TooltipProvider>
+          <Card className={`border-2 ${driver?.isOnline && canGoOnline ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-gray-300 dark:border-gray-700"}`} data-testid="card-online-toggle">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`h-12 w-12 rounded-full flex items-center justify-center ${driver.isOnline ? "bg-green-500" : "bg-gray-400"}`}>
-                    <Power className={`h-6 w-6 text-white ${driver.isOnline ? "animate-pulse" : ""}`} />
+                  <div className={`h-12 w-12 rounded-full flex items-center justify-center ${driver?.isOnline && canGoOnline ? "bg-green-500" : "bg-gray-400"}`}>
+                    <Power className={`h-6 w-6 text-white ${driver?.isOnline && canGoOnline ? "animate-pulse" : ""}`} />
                   </div>
                   <div>
                     <p className="font-semibold text-lg" data-testid="text-online-status">
-                      {driver.isOnline ? "Online" : "Offline"}
+                      {canGoOnline ? (driver?.isOnline ? "Online" : "Offline") : "Offline"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {driver.isOnline ? (
+                      {!canGoOnline ? (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          Complete verification to go online
+                        </span>
+                      ) : driver?.isOnline ? (
                         <span className="flex items-center gap-1">
                           <Radio className="h-3 w-3 text-green-500 animate-pulse" />
                           Accepting delivery requests
@@ -312,17 +278,28 @@ export default function DeliveryDriverDashboard() {
                     </p>
                   </div>
                 </div>
-                <Switch
-                  checked={driver.isOnline}
-                  onCheckedChange={handleToggleStatus}
-                  disabled={isUpdatingStatus || !isApproved}
-                  className="scale-125"
-                  data-testid="switch-online-toggle"
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Switch
+                        checked={canGoOnline ? (driver?.isOnline ?? false) : false}
+                        onCheckedChange={handleToggleStatus}
+                        disabled={isUpdatingStatus || !canGoOnline}
+                        className="scale-125"
+                        data-testid="switch-online-toggle"
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  {!canGoOnline && verification.disabledReason && (
+                    <TooltipContent>
+                      <p className="max-w-xs">{verification.disabledReason}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </div>
             </CardContent>
           </Card>
-        )}
+        </TooltipProvider>
 
         <div>
           <h2 className="text-lg font-semibold mb-3">Earnings Summary</h2>

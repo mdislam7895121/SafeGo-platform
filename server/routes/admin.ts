@@ -6,7 +6,7 @@ import { Permission } from "../utils/permissions";
 import { z } from "zod";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone, isValidSSN, maskSSN } from "../utils/encryption";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
-import { notifyKYCPending, notifyKYCApproved, notifyKYCRejected, notifyDriverStatusChanged, notifyRestaurantStatusChanged, notifyRestaurantCommissionChanged } from "../utils/notifications";
+import { notifyKYCPending, notifyKYCApproved, notifyKYCRejected, notifyKYCNeedMoreInfo, notifyDriverStatusChanged, notifyRestaurantStatusChanged, notifyRestaurantCommissionChanged } from "../utils/notifications";
 import { walletService } from "../services/walletService";
 import { walletPayoutService } from "../services/payoutService";
 import { commissionService } from "../services/commissionService";
@@ -357,12 +357,17 @@ router.patch("/kyc/:userId", checkPermission(Permission.MANAGE_KYC), async (req:
     const { userId } = req.params;
     const { verificationStatus, rejectionReason } = req.body;
 
-    if (!["approved", "rejected", "pending"].includes(verificationStatus)) {
-      return res.status(400).json({ error: "Invalid verificationStatus. Must be: approved, rejected, or pending" });
+    if (!["approved", "rejected", "pending", "need_more_info"].includes(verificationStatus)) {
+      return res.status(400).json({ error: "Invalid verificationStatus. Must be: approved, rejected, pending, or need_more_info" });
     }
 
     if (verificationStatus === "rejected" && !rejectionReason) {
       return res.status(400).json({ error: "rejectionReason is required when rejecting KYC" });
+    }
+
+    const { missingFields } = req.body;
+    if (verificationStatus === "need_more_info" && (!missingFields || !Array.isArray(missingFields) || missingFields.length === 0)) {
+      return res.status(400).json({ error: "missingFields array is required when requesting more information" });
     }
 
     // Get user to determine role
@@ -450,15 +455,34 @@ router.patch("/kyc/:userId", checkPermission(Permission.MANAGE_KYC), async (req:
     }
 
     // Create notification for user
+    let notificationBody: string;
+    let notificationTitle: string;
+    
+    switch (verificationStatus) {
+      case "approved":
+        notificationTitle = "Congratulations! Verification Approved";
+        notificationBody = "Your verification has been approved. You can now use SafeGo services and start earning!";
+        break;
+      case "rejected":
+        notificationTitle = "Verification Rejected";
+        notificationBody = `Your verification has been rejected. Reason: ${rejectionReason}. Please contact support or update your information and resubmit.`;
+        break;
+      case "need_more_info":
+        notificationTitle = "Action Required: Additional Information Needed";
+        notificationBody = `We need more information to complete your verification. Please review and provide the missing information: ${(missingFields || []).join(", ")}.`;
+        break;
+      default:
+        notificationTitle = "Verification Status Updated";
+        notificationBody = "Your verification status has been updated. Please check your dashboard for more details.";
+    }
+    
     await prisma.notification.create({
       data: {
         id: crypto.randomUUID(),
         userId,
         type: "verification",
-        title: `KYC ${verificationStatus}`,
-        body: verificationStatus === "approved"
-          ? "Your KYC has been approved. You can now use SafeGo services."
-          : `Your KYC has been rejected. Reason: ${rejectionReason}`,
+        title: notificationTitle,
+        body: notificationBody,
       },
     });
 
@@ -511,6 +535,17 @@ router.patch("/kyc/:userId", checkPermission(Permission.MANAGE_KYC), async (req:
         actorId: req.user?.userId || "",
         actorEmail: req.user?.email || "unknown",
         reason: rejectionReason || "Not specified",
+      });
+    } else if (verificationStatus === "need_more_info") {
+      await notifyKYCNeedMoreInfo({
+        entityType: user.role as "driver" | "customer" | "restaurant",
+        entityId: updatedProfile.id,
+        countryCode: user.countryCode,
+        email: user.email,
+        actorId: req.user?.userId || "",
+        actorEmail: req.user?.email || "unknown",
+        missingFields: missingFields || [],
+        message: `Admin requested more information for verification: ${(missingFields || []).join(", ")}`,
       });
     }
 

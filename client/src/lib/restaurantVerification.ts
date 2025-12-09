@@ -1,4 +1,13 @@
-interface RestaurantKYCStatus {
+import { 
+  getUnifiedVerificationState, 
+  type PartnerVerificationInput,
+  type UnifiedVerificationState,
+  CanonicalVerificationStatus,
+  getFieldLabel as sharedGetFieldLabel,
+  isVerifiedForOperations as sharedIsVerifiedForOperations,
+} from '@shared/verification';
+
+export interface RestaurantKYCStatus {
   isComplete: boolean;
   missingFields: string[];
   countryCode: string | null;
@@ -9,83 +18,70 @@ interface RestaurantKYCStatus {
 
 export interface VerificationState {
   isVerifiedForOperations: boolean;
-  verificationStatus: 'approved' | 'pending' | 'rejected' | 'not_submitted';
+  verificationStatus: 'approved' | 'pending' | 'rejected' | 'not_submitted' | 'need_more_info';
   canAcceptOrders: boolean;
-  badgeVariant: 'verified' | 'pending' | 'rejected' | 'not_verified';
+  badgeVariant: 'verified' | 'pending' | 'rejected' | 'not_verified' | 'action_required';
   badgeLabel: string;
   needsKycAction: boolean;
   missingFields: string[];
   rejectionReason?: string | null;
+  bannerType: 'none' | 'info' | 'warning' | 'error';
+  bannerMessage: string;
+  canonicalStatus: string;
+}
+
+function mapToPartnerInput(kycStatus: RestaurantKYCStatus | null | undefined): PartnerVerificationInput | null {
+  if (!kycStatus) return null;
+  return {
+    verificationStatus: kycStatus.verificationStatus,
+    isVerified: kycStatus.isVerified,
+    isComplete: kycStatus.isComplete,
+    missingFields: kycStatus.missingFields,
+    rejectionReason: kycStatus.rejectionReason,
+  };
+}
+
+function mapCanonicalToLegacyStatus(unified: UnifiedVerificationState): VerificationState['verificationStatus'] {
+  switch (unified.canonicalStatus) {
+    case CanonicalVerificationStatus.APPROVED:
+      return 'approved';
+    case CanonicalVerificationStatus.PENDING_REVIEW:
+      return 'pending';
+    case CanonicalVerificationStatus.NEED_MORE_INFO:
+      return 'need_more_info';
+    case CanonicalVerificationStatus.REJECTED:
+      return 'rejected';
+    case CanonicalVerificationStatus.NOT_SUBMITTED:
+      return 'not_submitted';
+    default:
+      return 'not_submitted';
+  }
 }
 
 export function getVerificationState(kycStatus: RestaurantKYCStatus | null | undefined): VerificationState {
-  if (!kycStatus) {
-    return {
-      isVerifiedForOperations: false,
-      verificationStatus: 'not_submitted',
-      canAcceptOrders: false,
-      badgeVariant: 'not_verified',
-      badgeLabel: 'Not Verified',
-      needsKycAction: true,
-      missingFields: [],
-      rejectionReason: null,
-    };
-  }
-
-  const { isComplete, missingFields, verificationStatus, isVerified, rejectionReason } = kycStatus;
-
-  const isVerifiedForOperations = verificationStatus === 'approved' && isVerified === true;
-
-  const canAcceptOrders = isVerifiedForOperations;
-
-  let badgeVariant: VerificationState['badgeVariant'] = 'not_verified';
-  let badgeLabel = 'Not Verified';
-  let normalizedStatus: VerificationState['verificationStatus'] = 'not_submitted';
-
-  if (isVerifiedForOperations) {
-    badgeVariant = 'verified';
-    badgeLabel = 'Verified';
-    normalizedStatus = 'approved';
-  } else if (verificationStatus === 'pending') {
-    badgeVariant = 'pending';
-    badgeLabel = 'Pending Review';
-    normalizedStatus = 'pending';
-  } else if (verificationStatus === 'rejected') {
-    badgeVariant = 'rejected';
-    badgeLabel = 'Rejected';
-    normalizedStatus = 'rejected';
-  } else if (!isComplete) {
-    badgeVariant = 'not_verified';
-    badgeLabel = 'Not Verified';
-    normalizedStatus = 'not_submitted';
-  }
-
-  const needsKycAction = !isVerifiedForOperations;
+  const input = mapToPartnerInput(kycStatus);
+  const unified = getUnifiedVerificationState(input);
 
   return {
-    isVerifiedForOperations,
-    verificationStatus: normalizedStatus,
-    canAcceptOrders,
-    badgeVariant,
-    badgeLabel,
-    needsKycAction,
-    missingFields: missingFields || [],
-    rejectionReason,
+    isVerifiedForOperations: unified.isVerifiedForOperations,
+    verificationStatus: mapCanonicalToLegacyStatus(unified),
+    canAcceptOrders: unified.canGoOnline,
+    badgeVariant: unified.badgeVariant,
+    badgeLabel: unified.badgeLabel,
+    needsKycAction: unified.needsAction,
+    missingFields: unified.missingFields,
+    rejectionReason: unified.rejectionReason,
+    bannerType: unified.bannerType,
+    bannerMessage: unified.bannerMessage,
+    canonicalStatus: unified.canonicalStatus,
   };
 }
 
 export function getFieldLabel(field: string): string {
-  const labels: Record<string, string> = {
-    fatherName: "Father's Name",
-    nidNumber: "National ID Number",
-    presentAddress: "Present Address",
-    governmentIdType: "Government ID Type",
-    homeAddress: "Home Address",
-    countryCode: "Country Code",
-    businessLicense: "Business License",
-    ownerName: "Owner Name",
-    phoneNumber: "Phone Number",
-    email: "Email Address",
-  };
-  return labels[field] || field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+  return sharedGetFieldLabel(field);
+}
+
+export function isVerifiedForOperations(kycStatus: RestaurantKYCStatus | null | undefined): boolean {
+  const input = mapToPartnerInput(kycStatus);
+  return sharedIsVerifiedForOperations(input);
 }
