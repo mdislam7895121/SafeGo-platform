@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Globe, ChevronDown, Menu, ShieldCheck, MapPin } from "lucide-react";
+import { Globe, ChevronDown, Menu, ShieldCheck, Clock, XCircle, AlertTriangle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,10 +18,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 import { RestaurantSidebar } from "./RestaurantSidebar";
 import { RestaurantReceivingOrdersButton } from "./RestaurantReceivingOrdersButton";
 import { RestaurantSearchBar } from "./RestaurantSearchBar";
 import { RestaurantNotificationDropdown } from "./RestaurantNotificationDropdown";
+import { getVerificationState } from "@/lib/restaurantVerification";
 import type { UserRole } from "@/config/restaurant-nav";
 
 interface RestaurantTopNavProps {
@@ -33,6 +35,15 @@ interface RestaurantTopNavProps {
   isTabletOrLarger?: boolean;
   isDesktop?: boolean;
   userRole?: UserRole;
+}
+
+interface KYCStatus {
+  isComplete: boolean;
+  missingFields: string[];
+  countryCode: string | null;
+  verificationStatus: string;
+  isVerified: boolean;
+  rejectionReason?: string | null;
 }
 
 export function RestaurantTopNav({
@@ -49,6 +60,12 @@ export function RestaurantTopNav({
   const [language, setLanguage] = useState("en");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+
+  const { data: kycData } = useQuery<{ kycStatus?: KYCStatus }>({
+    queryKey: ["/api/restaurant/kyc-status"],
+  });
+
+  const verification = getVerificationState(kycData?.kycStatus);
 
   // Mock notification data - in production this would come from API
   const mockNotifications: Array<{
@@ -287,14 +304,46 @@ export function RestaurantTopNav({
             >
               {restaurantName}
             </h1>
-            <Badge
-              variant="outline"
-              className="text-xs gap-1 px-1.5 py-0.5 border-green-500/50 text-green-700 dark:text-green-400 shrink-0"
-              data-testid="badge-verified"
-            >
-              <ShieldCheck className="h-3 w-3" />
-              <span>Verified</span>
-            </Badge>
+            {verification.badgeVariant === 'verified' && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1 px-1.5 py-0.5 border-green-500/50 text-green-700 dark:text-green-400 shrink-0"
+                data-testid="badge-verified"
+              >
+                <ShieldCheck className="h-3 w-3" />
+                <span>Verified</span>
+              </Badge>
+            )}
+            {verification.badgeVariant === 'pending' && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1 px-1.5 py-0.5 border-yellow-500/50 text-yellow-700 dark:text-yellow-400 shrink-0"
+                data-testid="badge-pending"
+              >
+                <Clock className="h-3 w-3" />
+                <span>Pending Review</span>
+              </Badge>
+            )}
+            {verification.badgeVariant === 'rejected' && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1 px-1.5 py-0.5 border-red-500/50 text-red-700 dark:text-red-400 shrink-0"
+                data-testid="badge-rejected"
+              >
+                <XCircle className="h-3 w-3" />
+                <span>Rejected</span>
+              </Badge>
+            )}
+            {verification.badgeVariant === 'not_verified' && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1 px-1.5 py-0.5 border-gray-500/50 text-gray-600 dark:text-gray-400 shrink-0"
+                data-testid="badge-not-verified"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                <span>Not Verified</span>
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
             {restaurantId && (
@@ -313,8 +362,16 @@ export function RestaurantTopNav({
         {/* Right: Online/Offline Toggle (left-aligned on mobile, right-aligned on desktop) */}
         <div className="shrink-0">
           <RestaurantReceivingOrdersButton
-            isReceivingOrders={isOpen}
+            isReceivingOrders={verification.canAcceptOrders ? isOpen : false}
             onToggle={onToggleStatus || (() => {})}
+            disabled={!verification.canAcceptOrders}
+            disabledReason={
+              !verification.canAcceptOrders
+                ? verification.verificationStatus === 'rejected'
+                  ? "Your verification was rejected. Update your information to go online."
+                  : "Complete KYC verification and get approved before going online."
+                : undefined
+            }
           />
         </div>
       </div>

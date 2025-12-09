@@ -1,0 +1,143 @@
+SAFEGO ARCHITECT – FIX INCONSISTENT RESTAURANT VERIFICATION STATE
+
+Current bug (from live screenshot on /partner/restaurant/dashboard):
+
+- Top badge shows: "Verified" (green)
+- Big toggle shows: "Online"
+- But below that, a red banner shows: "KYC Verification Required – Action Required"
+  with missing items: Government ID Type, Home Address
+- Restaurant Status card shows: "Closed – Not Accepting"
+
+This is an inconsistent state: the restaurant cannot be simultaneously
+  - Verified,
+  - Online,
+  - AND still “KYC required / closed / not accepting”.
+
+We must unify the verification and KYC logic so there is ONE source of truth.
+
+=====================================================
+A) SAFEGO MASTER RULES (YOU MUST NOT BREAK)
+
+1) Roles:
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+   Each role has its own onboarding, KYC, dashboard, permissions, and status flows.
+
+2) Services:
+   - ride-hailing
+   - food delivery
+   - parcel delivery
+
+3) Country-specific KYC:
+   - BD drivers: father_name, NID + images, present/permanent address, emergency contact, etc.
+   - US drivers: DOB, home_address, government_id_type, government_id_last4, license image+expiry, ssn_last4(optional), emergency contact, verification_status, is_verified.
+   - Restaurants have their own KYC set (business info, government ID, address, emergency contact etc.) for BD and US.
+
+4) Collections:
+   - rides, food_orders, deliveries (identity fields, addresses+geo, commission, payment, timestamps, status flow, ratings).
+
+5) Commission & payout rules, security rules, status flows (ride/food/parcel), onboarding, notifications — all must remain unchanged.
+
+All changes MUST be backward-compatible:
+- No renaming or deleting DB fields.
+- No breaking of existing API signatures.
+- Only ADD or adjust logic.
+
+=====================================================
+B) GOAL – SINGLE VERIFIED STATE FOR RESTAURANT OPERATIONS
+
+You must implement a single logical predicate, for example:
+
+  `isVerifiedForOperations(restaurant)`
+
+This function must be the ONLY source of truth for:
+
+- Showing the "Verified" badge
+- Showing or hiding the red "KYC Verification Required" banner
+- Enabling or disabling the big "Online" button
+- Enabling or disabling "Restaurant Status" options (Accepting / Closed / Busy)
+- Any other “accept orders” / “go live” actions
+
+For now, define:
+
+  isVerifiedForOperations(restaurant) is TRUE if and only if:
+    - restaurant.verification_status === "approved"
+    - AND restaurant.is_verified === true
+
+(If you already have a dedicated KYC completion flag, you may include it,
+ but do not introduce a second independent source of truth again.)
+
+=====================================================
+C) FIX RESTAURANT DASHBOARD LOGIC
+
+1) VERIFIED BADGE
+   - Show "Verified" (green pill) ONLY when:
+       isVerifiedForOperations(restaurant) === true
+   - Otherwise:
+       - If verification_status === "pending" → show "Pending review"
+       - If verification_status === "rejected" → show "Rejected" + rejection_reason
+       - If no application → show "Not verified".
+
+2) KYC VERIFICATION REQUIRED BANNER
+   - This red banner must show ONLY when restaurant is NOT operationally verified.
+
+   Show banner when:
+     isVerifiedForOperations(restaurant) === false
+
+   Hide banner completely when:
+     isVerifiedForOperations(restaurant) === true
+
+   Do NOT keep a separate `needsKyc` flag that can contradict this.
+   If you want to show missing fields (Government ID, Home Address),
+   compute that inside the same branch where isVerifiedForOperations is false.
+
+3) ONLINE TOGGLE + RESTAURANT STATUS
+   - The big "Online" state and "Restaurant Status" (Closed / Not Accepting / Busy / etc.)
+     must never contradict each other.
+
+   Rules:
+   - If isVerifiedForOperations(restaurant) === false:
+       - Force restaurant_status = "closed"
+       - Online toggle must be OFF and DISABLED.
+       - Show a tooltip: "You must complete KYC and be approved before going online."
+   - If isVerifiedForOperations(restaurant) === true:
+       - Online toggle can be turned ON/OFF by the partner.
+       - Restaurant Status must reflect this (e.g. Online → Accepting, Offline → Closed).
+
+   Remove any code path that lets the Online toggle turn green while
+   KYC banner is still red.
+
+=====================================================
+D) BACKEND CONSISTENCY GUARANTEE
+
+1) Ensure that Admin approval logic sets:
+   - verification_status = "approved"
+   - is_verified = true
+   for restaurants only when the required KYC data is present.
+
+2) Ensure that when Admin sets verification_status to "rejected":
+   - is_verified = false
+   - rejection_reason is filled
+   - Dashboard uses these same fields.
+
+3) Do NOT create separate competing KYC states like:
+   - kyc_completed vs is_verified vs verification_status
+   without defining a clear mapping.
+
+   If you already have extra flags, treat them as internal but always funnel
+   the dashboard logic through isVerifiedForOperations(restaurant).
+
+=====================================================
+E) FRONTEND IMPLEMENTATION DETAILS
+
+1) Create a small helper in restaurant dashboard code, e.g.:
+
+   ```ts
+   function isVerifiedForOperations(restaurant: Restaurant): boolean {
+     return (
+       restaurant?.verification_status === "approved" &&
+       restaurant?.is_verified === true
+     );
+   }

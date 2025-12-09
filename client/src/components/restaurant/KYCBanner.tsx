@@ -1,9 +1,10 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, Clock, XCircle } from "lucide-react";
+import { AlertTriangle, Clock, XCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { getVerificationState, getFieldLabel } from "@/lib/restaurantVerification";
 
 interface KYCStatus {
   isComplete: boolean;
@@ -12,18 +13,6 @@ interface KYCStatus {
   verificationStatus: string;
   isVerified: boolean;
   rejectionReason?: string | null;
-}
-
-function getFieldLabel(field: string): string {
-  const labels: Record<string, string> = {
-    fatherName: "Father's Name",
-    nidNumber: "National ID Number",
-    presentAddress: "Present Address",
-    governmentIdType: "Government ID Type",
-    homeAddress: "Home Address",
-    countryCode: "Country Code",
-  };
-  return labels[field] || field;
 }
 
 export function KYCBanner() {
@@ -35,15 +24,14 @@ export function KYCBanner() {
     return null;
   }
 
-  const { isComplete, missingFields, countryCode, verificationStatus, isVerified, rejectionReason } = kycData.kycStatus;
+  const verification = getVerificationState(kycData.kycStatus);
+  const { countryCode } = kycData.kycStatus;
 
-  // Don't show banner if KYC is complete and verified
-  if (isComplete && isVerified) {
+  if (verification.isVerifiedForOperations) {
     return null;
   }
 
-  // If incomplete, show warning banner
-  if (!isComplete) {
+  if (verification.verificationStatus === 'not_submitted' || verification.missingFields.length > 0) {
     return (
       <Alert variant="destructive" className="mb-4" data-testid="alert-kyc-incomplete">
         <AlertTriangle className="h-5 w-5" />
@@ -56,11 +44,13 @@ export function KYCBanner() {
             Complete your KYC verification to accept orders and manage your restaurant. The
             following information is required for {countryCode || "your country"}:
           </p>
-          <ul className="list-disc list-inside mb-3 text-sm">
-            {missingFields.map((field) => (
-              <li key={field}>{getFieldLabel(field)}</li>
-            ))}
-          </ul>
+          {verification.missingFields.length > 0 && (
+            <ul className="list-disc list-inside mb-3 text-sm">
+              {verification.missingFields.map((field) => (
+                <li key={field}>{getFieldLabel(field)}</li>
+              ))}
+            </ul>
+          )}
           <Button asChild size="sm" variant="outline" data-testid="button-complete-kyc">
             <Link href="/restaurant/profile">
               Complete KYC Verification
@@ -71,24 +61,22 @@ export function KYCBanner() {
     );
   }
 
-  // If complete but pending approval
-  if (isComplete && verificationStatus === "pending") {
+  if (verification.verificationStatus === 'pending') {
     return (
       <Alert className="mb-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" data-testid="alert-kyc-pending">
         <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
         <AlertTitle className="flex items-center gap-2 text-yellow-900 dark:text-yellow-100">
-          KYC Verification Pending
+          Verification Pending
           <Badge variant="outline" className="border-yellow-600">Under Review</Badge>
         </AlertTitle>
         <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-          Your KYC documents are under review. You'll be notified once the verification is complete.
+          Your verification documents are under review. You'll be notified once approved. Until then, you cannot accept orders.
         </AlertDescription>
       </Alert>
     );
   }
 
-  // If rejected
-  if (verificationStatus === "rejected") {
+  if (verification.verificationStatus === 'rejected') {
     return (
       <Alert variant="destructive" className="mb-4" data-testid="alert-kyc-rejected">
         <XCircle className="h-5 w-5" />
@@ -97,9 +85,9 @@ export function KYCBanner() {
           <Badge variant="destructive">Action Required</Badge>
         </AlertTitle>
         <AlertDescription className="mt-2">
-          {rejectionReason && (
+          {verification.rejectionReason && (
             <p className="mb-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded text-sm">
-              <strong>Reason:</strong> {rejectionReason}
+              <strong>Reason:</strong> {verification.rejectionReason}
             </p>
           )}
           <p className="mb-3">

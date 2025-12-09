@@ -52,6 +52,7 @@ import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget
 import { PerformanceInsights } from "@/components/restaurant/PerformanceInsights";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, BarChart3 } from "lucide-react";
+import { getVerificationState } from "@/lib/restaurantVerification";
 
 type TimePeriod = 'today' | 'week' | 'month';
 
@@ -90,10 +91,9 @@ export default function RestaurantHome() {
     queryKey: ["/api/restaurant/kyc-status"],
   });
   
-  // Check if restaurant can accept orders (must be verified)
-  const isVerified = kycData?.kycStatus?.isVerified ?? false;
-  const verificationStatus = kycData?.kycStatus?.verificationStatus ?? "pending";
-  const canAcceptOrders = isVerified && verificationStatus === "approved";
+  // Use unified verification state
+  const verification = getVerificationState(kycData?.kycStatus);
+  const canAcceptOrders = verification.canAcceptOrders;
 
   const { data: ordersData, isLoading: ordersLoading, isError: ordersError } = useQuery({
     queryKey: ordersKeys.list({ limit: 10 }),
@@ -400,9 +400,11 @@ export default function RestaurantHome() {
             {!canAcceptOrders && (
               <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg" data-testid="alert-verification-required">
                 <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
-                  {verificationStatus === "rejected" 
+                  {verification.verificationStatus === "rejected" 
                     ? "Your verification was rejected. Please update your information to go live."
-                    : "Your restaurant is pending verification. You cannot accept orders until approved by SafeGo."}
+                    : verification.verificationStatus === "pending"
+                    ? "Your restaurant is pending verification. You cannot accept orders until approved by SafeGo."
+                    : "Complete your KYC verification to accept orders."}
                 </p>
               </div>
             )}
