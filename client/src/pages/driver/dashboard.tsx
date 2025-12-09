@@ -2,11 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Star, DollarSign, Car, MapPin } from "lucide-react";
+import { VerificationBanner } from "@/components/partner/VerificationBanner";
+import { getDriverVerificationState, type DriverVerificationData } from "@/lib/driverVerification";
 
 export default function DriverDashboard() {
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
   });
+  
+  const { data: kycData } = useQuery<{ kycStatus?: DriverVerificationData }>({
+    queryKey: ["/api/driver/kyc-status"],
+  });
+  
+  const driverVerification = getDriverVerificationState(kycData?.kycStatus);
 
   if (isLoading) {
     return (
@@ -33,6 +41,21 @@ export default function DriverDashboard() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Verification Banner */}
+      {!driverVerification.isVerifiedForOperations && (
+        <VerificationBanner
+          verification={{
+            canonicalStatus: driverVerification.canonicalStatus,
+            bannerType: driverVerification.bannerType,
+            bannerMessage: driverVerification.bannerMessage,
+            missingFields: driverVerification.missingFields,
+            rejectionReason: driverVerification.rejectionReason,
+          }}
+          kycRoute="/driver/profile"
+          partnerType="driver"
+        />
+      )}
+      
       {/* Welcome Section */}
       <div>
         <h1 className="text-3xl font-bold mb-2" data-testid="text-welcome">

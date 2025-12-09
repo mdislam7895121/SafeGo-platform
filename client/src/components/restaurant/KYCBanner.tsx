@@ -103,5 +103,34 @@ export function KYCBanner() {
     );
   }
 
+  if (verification.verificationStatus === 'need_more_info') {
+    return (
+      <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950/20" data-testid="alert-kyc-need-more-info">
+        <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-500" />
+        <AlertTitle className="flex items-center gap-2 text-orange-900 dark:text-orange-100">
+          Additional Information Required
+          <Badge variant="outline" className="border-orange-600">Action Required</Badge>
+        </AlertTitle>
+        <AlertDescription className="mt-2 text-orange-800 dark:text-orange-200">
+          <p className="mb-2">
+            We need additional information to complete your verification. Please review and update the following:
+          </p>
+          {verification.missingFields.length > 0 && (
+            <ul className="list-disc list-inside mb-3 text-sm">
+              {verification.missingFields.map((field) => (
+                <li key={field}>{getFieldLabel(field)}</li>
+              ))}
+            </ul>
+          )}
+          <Button asChild size="sm" variant="outline" data-testid="button-update-info">
+            <Link href="/restaurant/profile">
+              Update Information
+            </Link>
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return null;
 }

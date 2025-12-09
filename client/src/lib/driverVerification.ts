@@ -19,7 +19,7 @@ export interface DriverVerificationData {
 
 export interface DriverVerificationState {
   isVerifiedForOperations: boolean;
-  verificationStatus: 'approved' | 'pending' | 'rejected' | 'need_more_info';
+  verificationStatus: 'approved' | 'pending' | 'rejected' | 'need_more_info' | 'not_submitted';
   canGoOnline: boolean;
   badgeVariant: 'verified' | 'pending' | 'rejected' | 'not_verified' | 'action_required';
   badgeLabel: string;
@@ -29,6 +29,7 @@ export interface DriverVerificationState {
   bannerType: 'none' | 'info' | 'warning' | 'error';
   bannerMessage: string;
   disabledReason: string | null;
+  canonicalStatus: string;
 }
 
 function mapToPartnerInput(driver: DriverVerificationData | null | undefined): PartnerVerificationInput | null {
@@ -51,8 +52,10 @@ function mapCanonicalToLegacyStatus(unified: UnifiedVerificationState): DriverVe
       return 'need_more_info';
     case CanonicalVerificationStatus.REJECTED:
       return 'rejected';
+    case CanonicalVerificationStatus.NOT_SUBMITTED:
+      return 'not_submitted';
     default:
-      return 'pending';
+      return 'not_submitted';
   }
 }
 
@@ -89,6 +92,7 @@ export function getDriverVerificationState(driver: DriverVerificationData | null
     bannerType: unified.bannerType,
     bannerMessage: unified.bannerMessage,
     disabledReason,
+    canonicalStatus: unified.canonicalStatus,
   };
 }
 

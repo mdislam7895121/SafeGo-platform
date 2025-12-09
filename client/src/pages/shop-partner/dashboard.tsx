@@ -4,16 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { VerificationBanner } from "@/components/partner/VerificationBanner";
+import { getShopVerificationState, type ShopVerificationData } from "@/lib/shopVerification";
 import {
   Package,
   ShoppingCart,
   Wallet,
   TrendingUp,
   Plus,
-  AlertCircle,
   CheckCircle,
-  Clock,
   Store,
 } from "lucide-react";
 
@@ -33,8 +32,15 @@ export default function ShopPartnerDashboard() {
   const shopProfile = profileData?.profile;
   const products = productsData?.products || [];
   const orders = ordersData?.orders || [];
-  const isApproved = shopProfile?.verificationStatus === "approved";
-  const isPending = shopProfile?.verificationStatus === "pending";
+  
+  const shopVerificationData: ShopVerificationData | null = shopProfile ? {
+    verificationStatus: shopProfile.verificationStatus || 'not_submitted',
+    isVerified: shopProfile.isVerified,
+    rejectionReason: shopProfile.rejectionReason,
+    missingFields: shopProfile.missingFields,
+  } : null;
+  
+  const verification = getShopVerificationState(shopVerificationData);
 
   if (profileLoading) {
     return (
@@ -77,25 +83,21 @@ export default function ShopPartnerDashboard() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {!isApproved && (
-        <Alert variant={isPending ? "default" : "destructive"}>
-          {isPending ? (
-            <Clock className="h-5 w-5" />
-          ) : (
-            <AlertCircle className="h-5 w-5" />
-          )}
-          <AlertTitle className="text-lg">
-            {isPending ? "অনুমোদন অপেক্ষমান" : "দোকান অনুমোদিত হয়নি"}
-          </AlertTitle>
-          <AlertDescription className="text-base">
-            {isPending
-              ? "আপনার দোকান যাচাই করা হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন।"
-              : shopProfile?.rejectionReason || "আপনার আবেদন প্রত্যাখ্যাত হয়েছে।"}
-          </AlertDescription>
-        </Alert>
+      {!verification.isVerifiedForOperations && (
+        <VerificationBanner
+          verification={{
+            canonicalStatus: verification.canonicalStatus,
+            bannerType: verification.bannerType,
+            bannerMessage: verification.bannerMessage,
+            missingFields: verification.missingFields,
+            rejectionReason: verification.rejectionReason,
+          }}
+          kycRoute="/shop-partner/profile"
+          partnerType="shop"
+        />
       )}
 
-      {isApproved && (
+      {verification.isVerifiedForOperations && (
         <Card className="bg-gradient-to-r from-green-500/10 to-green-600/10 border-green-500/20">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
