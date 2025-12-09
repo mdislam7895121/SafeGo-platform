@@ -9,17 +9,26 @@ import {
 } from "@shared/verification";
 
 interface VerificationBannerProps {
-  verificationInput: PartnerVerificationInput | null | undefined;
+  verificationInput?: PartnerVerificationInput | null | undefined;
+  verification?: {
+    canonicalStatus: string;
+    bannerType: 'none' | 'info' | 'warning' | 'error';
+    bannerMessage: string;
+    missingFields: string[];
+    rejectionReason: string | null;
+    needsAction?: boolean;
+  };
   kycRoute?: string;
-  partnerType?: 'driver' | 'restaurant' | 'partner';
+  partnerType?: 'driver' | 'restaurant' | 'partner' | 'shop';
 }
 
 export function VerificationBanner({ 
   verificationInput, 
+  verification: directVerification,
   kycRoute,
   partnerType = 'partner' 
 }: VerificationBannerProps) {
-  const verification = getUnifiedVerificationState(verificationInput);
+  const verification = directVerification || getUnifiedVerificationState(verificationInput);
 
   if (verification.bannerType === 'none') {
     return null;
