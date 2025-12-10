@@ -171,9 +171,8 @@ export default function ParcelRequest() {
 
     setIsPricingLoading(true);
     try {
-      const response = await fetch("/api/parcel/bd/calculate-price", {
+      const data = await apiRequest("/api/parcel/bd/calculate-price", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           isInternational: parcelType === "international",
           actualWeightKg: weight,
@@ -189,8 +188,7 @@ export default function ParcelRequest() {
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (data?.pricing) {
         setPricing(data.pricing);
       }
     } catch (error) {
