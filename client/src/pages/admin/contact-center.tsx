@@ -85,6 +85,13 @@ export default function AdminContactCenter() {
 
   const { data, isLoading, refetch } = useQuery<ContactsResponse>({
     queryKey: ['/api/contact', statusFilter, priorityFilter, regionFilter, searchQuery, currentPage],
+    queryFn: async () => {
+      const response = await fetch(fullUrl, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error('Failed to fetch submissions');
+      }
+      return response.json();
+    },
     refetchInterval: 30000,
   });
 
