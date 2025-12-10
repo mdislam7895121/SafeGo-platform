@@ -585,8 +585,8 @@ router.patch('/drivers/:id', authenticateToken, requireRole(['admin']), async (r
       success: true
     });
 
-    // Trigger email notification (non-blocking)
-    triggerPartnerNotification({
+    // Trigger email notification (non-blocking, fire-and-forget)
+    void triggerPartnerNotification({
       partnerType: 'DRIVER',
       applicationId: existing.id,
       newStatus: status,
@@ -648,8 +648,8 @@ router.patch('/restaurants/:id', authenticateToken, requireRole(['admin']), asyn
       success: true
     });
 
-    // Trigger email notification (non-blocking)
-    triggerPartnerNotification({
+    // Trigger email notification (non-blocking, fire-and-forget)
+    void triggerPartnerNotification({
       partnerType: 'RESTAURANT',
       applicationId: existing.id,
       newStatus: status,
@@ -711,9 +711,9 @@ router.patch('/shops/:id', authenticateToken, requireRole(['admin']), async (req
       success: true
     });
 
-    // Trigger email notification (non-blocking) - only if email exists
+    // Trigger email notification (non-blocking, fire-and-forget) - only if email exists
     if (existing.email) {
-      triggerPartnerNotification({
+      void triggerPartnerNotification({
         partnerType: 'SHOP',
         applicationId: existing.id,
         newStatus: status,
@@ -776,9 +776,9 @@ router.patch('/tickets/:id', authenticateToken, requireRole(['admin']), async (r
       success: true
     });
 
-    // Trigger email notification (non-blocking) - only if email exists
+    // Trigger email notification (non-blocking, fire-and-forget) - only if email exists
     if (existing.email) {
-      triggerPartnerNotification({
+      void triggerPartnerNotification({
         partnerType: 'TICKET',
         applicationId: existing.id,
         newStatus: status,
