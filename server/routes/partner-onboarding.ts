@@ -294,7 +294,7 @@ router.post('/ticket', rateLimitSupport, async (req: Request, res: Response) => 
 
 router.get('/drivers', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
   try {
-    const { status, region, city, page = '1', limit = '20' } = req.query;
+    const { status, region, city, search, serviceType, page = '1', limit = '20' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
@@ -302,6 +302,14 @@ router.get('/drivers', authenticateToken, requireRole(['admin']), async (req: Au
     if (status && status !== 'all') where.status = status;
     if (region && region !== 'all') where.region = region;
     if (city) where.city = { contains: city as string, mode: 'insensitive' };
+    if (serviceType && serviceType !== 'all') where.serviceType = serviceType;
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search as string, mode: 'insensitive' } },
+        { phoneNumber: { contains: search as string, mode: 'insensitive' } },
+        { email: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
 
     const [applications, total] = await Promise.all([
       prisma.driverPartnerApplication.findMany({
@@ -336,7 +344,7 @@ router.get('/drivers', authenticateToken, requireRole(['admin']), async (req: Au
 
 router.get('/restaurants', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
   try {
-    const { status, city, cuisineType, page = '1', limit = '20' } = req.query;
+    const { status, city, cuisineType, search, page = '1', limit = '20' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
@@ -344,6 +352,13 @@ router.get('/restaurants', authenticateToken, requireRole(['admin']), async (req
     if (status && status !== 'all') where.status = status;
     if (city) where.city = { contains: city as string, mode: 'insensitive' };
     if (cuisineType) where.cuisineType = cuisineType;
+    if (search) {
+      where.OR = [
+        { restaurantName: { contains: search as string, mode: 'insensitive' } },
+        { ownerName: { contains: search as string, mode: 'insensitive' } },
+        { phoneNumber: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
 
     const [applications, total] = await Promise.all([
       prisma.restaurantPartnerApplication.findMany({
@@ -378,7 +393,7 @@ router.get('/restaurants', authenticateToken, requireRole(['admin']), async (req
 
 router.get('/shops', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
   try {
-    const { status, city, category, page = '1', limit = '20' } = req.query;
+    const { status, city, category, search, page = '1', limit = '20' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
@@ -386,6 +401,13 @@ router.get('/shops', authenticateToken, requireRole(['admin']), async (req: Auth
     if (status && status !== 'all') where.status = status;
     if (city) where.city = { contains: city as string, mode: 'insensitive' };
     if (category) where.category = category;
+    if (search) {
+      where.OR = [
+        { shopName: { contains: search as string, mode: 'insensitive' } },
+        { ownerName: { contains: search as string, mode: 'insensitive' } },
+        { phoneNumber: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
 
     const [applications, total] = await Promise.all([
       prisma.shopPartnerApplication.findMany({
@@ -420,7 +442,7 @@ router.get('/shops', authenticateToken, requireRole(['admin']), async (req: Auth
 
 router.get('/tickets', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
   try {
-    const { status, city, ticketType, page = '1', limit = '20' } = req.query;
+    const { status, city, ticketType, search, page = '1', limit = '20' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
@@ -428,6 +450,13 @@ router.get('/tickets', authenticateToken, requireRole(['admin']), async (req: Au
     if (status && status !== 'all') where.status = status;
     if (city) where.city = { contains: city as string, mode: 'insensitive' };
     if (ticketType) where.ticketType = ticketType;
+    if (search) {
+      where.OR = [
+        { businessName: { contains: search as string, mode: 'insensitive' } },
+        { contactPerson: { contains: search as string, mode: 'insensitive' } },
+        { phoneNumber: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
 
     const [applications, total] = await Promise.all([
       prisma.ticketPartnerApplication.findMany({
