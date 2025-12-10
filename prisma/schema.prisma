@@ -14719,6 +14719,7 @@ model ShopPartnerApplication {
   shopName      String
   ownerName     String
   phoneNumber   String
+  email         String?   // Optional email for notifications
   category      String    // Electronics, Groceries, Clothing, Essentials
   city          String
   country       String    @default("Bangladesh")
@@ -14752,6 +14753,7 @@ model TicketPartnerApplication {
   businessName  String
   contactPerson String
   phoneNumber   String
+  email         String?   // Optional email for notifications
   ticketType    String    // Bus, Train, Launch, Event
   city          String
   country       String    @default("Bangladesh")
@@ -14773,4 +14775,46 @@ model TicketPartnerApplication {
   @@index([ticketType])
   @@index([createdAt])
   @@map("ticket_partner_applications")
+}
+
+// Shop Partner Application - add email field
+// (Note: email field added to ShopPartnerApplication above for notifications)
+
+// ========================================
+// EMAIL NOTIFICATION LOGS
+// ========================================
+
+model EmailNotificationLog {
+  id                  String    @id @default(uuid())
+  createdAt           DateTime  @default(now())
+  
+  // Partner information
+  partnerType         String    // DRIVER, RESTAURANT, SHOP, TICKET
+  partnerApplicationId String
+  
+  // Email details
+  toEmail             String
+  subject             String
+  templateName        String    // e.g., "driver_approved", "restaurant_rejected"
+  
+  // Status trigger
+  statusTrigger       String    // APPROVED, REJECTED, NEED_MORE_INFO, IN_REVIEW
+  previousStatus      String?
+  
+  // Delivery status
+  success             Boolean
+  errorMessage        String?
+  
+  // Metadata
+  region              String    // BD, US
+  country             String
+  sentByAdminId       String?
+  metadata            Json?
+
+  @@index([partnerType])
+  @@index([partnerApplicationId])
+  @@index([success])
+  @@index([createdAt])
+  @@index([statusTrigger])
+  @@map("email_notification_logs")
 }
