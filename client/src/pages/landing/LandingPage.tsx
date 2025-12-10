@@ -28,6 +28,63 @@ interface ServiceItem {
   heroColor: string;
 }
 
+const PARTNER_CONFIG: Record<Region, {
+  driverCard: {
+    title: string;
+  };
+  businessCard: {
+    title: string;
+    description: string;
+    bullets: string[];
+  };
+}> = {
+  BD: {
+    driverCard: {
+      title: "For Drivers & Couriers",
+    },
+    businessCard: {
+      title: "For Restaurants & Shops",
+      description: "Reach more customers and grow your business with SafeGo.",
+      bullets: [
+        "Access thousands of hungry customers",
+        "Easy-to-use order management dashboard",
+        "Real-time analytics and business insights",
+        "Marketing support to boost visibility",
+      ],
+    },
+  },
+  US: {
+    driverCard: {
+      title: "For Drivers & Couriers",
+    },
+    businessCard: {
+      title: "For Restaurants",
+      description: "Reach more customers and grow your restaurant with SafeGo.",
+      bullets: [
+        "Access thousands of hungry customers",
+        "Easy-to-use order management dashboard",
+        "Real-time analytics and business insights",
+        "Marketing support to boost visibility",
+      ],
+    },
+  },
+  GLOBAL: {
+    driverCard: {
+      title: "For Drivers & Couriers",
+    },
+    businessCard: {
+      title: "For Restaurants & Shops",
+      description: "Reach more customers and grow your business with SafeGo.",
+      bullets: [
+        "Access thousands of hungry customers",
+        "Easy-to-use order management dashboard",
+        "Real-time analytics and business insights",
+        "Marketing support to boost visibility",
+      ],
+    },
+  },
+};
+
 const REGION_SERVICES: Record<Region, ServiceItem[]> = {
   BD: [
     {
@@ -456,7 +513,9 @@ function ServicesSection({ selectedRegion }: { selectedRegion: Region }) {
   );
 }
 
-function PartnerSection() {
+function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
+  const config = PARTNER_CONFIG[selectedRegion];
+  
   return (
     <section id="partners" className="py-20 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -476,7 +535,7 @@ function PartnerSection() {
               <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 w-fit mb-6">
                 <Car className="h-7 w-7 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">For Drivers & Couriers</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{config.driverCard.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Earn on your own schedule. Drive or deliver when it works for you.
               </p>
@@ -520,35 +579,19 @@ function PartnerSection() {
               <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-900/30 w-fit mb-6">
                 <Store className="h-7 w-7 text-orange-600 dark:text-orange-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">For Restaurants & Shops</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{config.businessCard.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Reach more customers and grow your business with SafeGo.
+                {config.businessCard.description}
               </p>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Access thousands of hungry customers</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Easy-to-use order management dashboard</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Real-time analytics and business insights</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Marketing support to boost visibility</span>
-                </li>
+                {config.businessCard.bullets.map((bullet, index) => (
+                  <li key={index} className="flex items-start gap-3">
+                    <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
+                      <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{bullet}</span>
+                  </li>
+                ))}
               </ul>
               <Link href="/restaurant/signup">
                 <Button className="w-full rounded-full bg-blue-600 hover:bg-blue-700" data-testid="button-restaurant-signup">
@@ -806,7 +849,7 @@ export default function LandingPage() {
           onRegionChange={handleRegionChange} 
         />
         <ServicesSection selectedRegion={selectedRegion} />
-        <PartnerSection />
+        <PartnerSection selectedRegion={selectedRegion} />
         <HowItWorksSection />
         <SafetySection />
         <FAQSection />
