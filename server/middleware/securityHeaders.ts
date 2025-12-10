@@ -85,15 +85,53 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
 
+  const trustedScriptDomains = [
+    'https://maps.googleapis.com',
+    'https://maps.gstatic.com',
+    'https://js.stripe.com',
+    'https://*.replit.app',
+    'https://*.replit.dev'
+  ];
+
+  const trustedStyleDomains = [
+    'https://fonts.googleapis.com',
+    'https://maps.googleapis.com'
+  ];
+
+  const trustedFontDomains = [
+    'https://fonts.gstatic.com'
+  ];
+
+  const trustedImageDomains = [
+    'https://maps.googleapis.com',
+    'https://maps.gstatic.com',
+    'https://*.stripe.com',
+    'https://*.replit.app',
+    'https://*.replit.dev'
+  ];
+
+  const trustedConnectDomains = [
+    'https://maps.googleapis.com',
+    'https://api.stripe.com',
+    'https://*.replit.app',
+    'https://*.replit.dev'
+  ];
+
+  const trustedFrameDomains = [
+    'https://js.stripe.com',
+    'https://hooks.stripe.com',
+    'https://www.google.com/maps'
+  ];
+
   const cspDirectives = isProduction
     ? [
         "default-src 'self'",
-        "script-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://js.stripe.com",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com data:",
-        "img-src 'self' data: blob: https: https://maps.googleapis.com https://maps.gstatic.com https://*.stripe.com",
-        "connect-src 'self' wss: https: https://maps.googleapis.com https://api.stripe.com",
-        "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.google.com",
+        `script-src 'self' ${trustedScriptDomains.join(' ')}`,
+        `style-src 'self' 'unsafe-inline' ${trustedStyleDomains.join(' ')}`,
+        `font-src 'self' ${trustedFontDomains.join(' ')}`,
+        `img-src 'self' data: ${trustedImageDomains.join(' ')}`,
+        `connect-src 'self' wss://*.replit.app wss://*.replit.dev ${trustedConnectDomains.join(' ')}`,
+        `frame-src 'self' ${trustedFrameDomains.join(' ')}`,
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
@@ -106,12 +144,12 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
       ]
     : [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://js.stripe.com",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com data:",
-        "img-src 'self' data: blob: https: https://maps.googleapis.com https://maps.gstatic.com https://*.stripe.com",
-        "connect-src 'self' ws: wss: https: https://maps.googleapis.com https://api.stripe.com",
-        "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.google.com",
+        `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${trustedScriptDomains.join(' ')}`,
+        `style-src 'self' 'unsafe-inline' ${trustedStyleDomains.join(' ')}`,
+        `font-src 'self' ${trustedFontDomains.join(' ')}`,
+        `img-src 'self' data: blob: ${trustedImageDomains.join(' ')}`,
+        `connect-src 'self' ws://localhost:* wss://localhost:* ws://*.replit.dev wss://*.replit.dev ${trustedConnectDomains.join(' ')}`,
+        `frame-src 'self' ${trustedFrameDomains.join(' ')}`,
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
