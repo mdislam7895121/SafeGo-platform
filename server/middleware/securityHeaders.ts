@@ -57,6 +57,18 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
+export function httpsRedirect(req: Request, res: Response, next: NextFunction): void {
+  if (isProduction) {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    if (proto !== 'https') {
+      const httpsUrl = `https://${req.headers.host}${req.url}`;
+      res.redirect(301, httpsUrl);
+      return;
+    }
+  }
+  next();
+}
+
 export function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
   const origin = req.headers.origin;
   
@@ -126,9 +138,7 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
 
-  if (isProduction) {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-  }
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
 
   const trustedScriptDomains = [
     'https://maps.googleapis.com',

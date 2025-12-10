@@ -8,9 +8,12 @@ import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { securityHeaders, corsMiddleware, csrfProtection, landingRateLimiter } from "./middleware/securityHeaders";
+import { securityHeaders, corsMiddleware, csrfProtection, landingRateLimiter, httpsRedirect } from "./middleware/securityHeaders";
 
 const app = express();
+
+// Force HTTPS redirect first (production only)
+app.use(httpsRedirect);
 
 // Apply CORS, security headers, CSRF protection, and landing page rate limiting globally
 app.use(corsMiddleware);
