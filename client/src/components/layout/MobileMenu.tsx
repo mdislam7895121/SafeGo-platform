@@ -23,6 +23,17 @@ const regions: { id: Region; label: string }[] = [
   { id: "GLOBAL", label: "Global" },
 ];
 
+function MobileLogo() {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
+        <span className="text-white font-bold text-sm">S</span>
+      </div>
+      <span className="font-semibold text-gray-900 text-base">SafeGo</span>
+    </div>
+  );
+}
+
 export function MobileMenu({ isOpen, onClose, selectedRegion, onRegionChange }: MobileMenuProps) {
   const handleRegionSelect = (regionId: Region) => {
     onRegionChange(regionId);
@@ -56,79 +67,33 @@ export function MobileMenu({ isOpen, onClose, selectedRegion, onRegionChange }: 
     >
       {/* Header with Logo and Close */}
       <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 20px",
-          background: "#ffffff",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
-        }}
+        className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-white"
+        style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)" }}
       >
-        <Link
-          href="/"
-          onClick={handleNavClick}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "5px 14px",
-            borderRadius: "999px",
-            background: "linear-gradient(135deg, #0a5cff, #3d8bff)",
-            color: "#ffffff",
-            fontWeight: 600,
-            fontSize: "16px",
-            letterSpacing: "0.02em",
-            textDecoration: "none",
-            boxShadow: "0 4px 12px rgba(10, 92, 255, 0.25)",
-          }}
-        >
-          SafeGo
+        <Link href="/" onClick={handleNavClick}>
+          <MobileLogo />
         </Link>
         <button
           onClick={onClose}
           aria-label="Close menu"
           data-testid="button-mobile-menu-close"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "48px",
-            height: "48px",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            padding: 0,
-            marginRight: "-8px",
-            borderRadius: "12px",
-          }}
+          className="flex items-center justify-center w-11 h-11 -mr-2 rounded-lg hover:bg-gray-100 transition-colors"
         >
-          <X size={24} color="#0f172a" />
+          <X size={24} className="text-gray-700" />
         </button>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px 0" }}>
+      <div className="flex-1 flex flex-col py-6">
         {/* Navigation Links */}
-        <nav aria-label="Mobile navigation" style={{ display: "flex", flexDirection: "column" }}>
+        <nav aria-label="Mobile navigation" className="flex flex-col">
           {navItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
               onClick={handleNavClick}
               data-testid={`link-mobile-${item.label.toLowerCase()}`}
-              style={{
-                display: "block",
-                padding: "20px 24px",
-                fontSize: "22px",
-                fontWeight: 500,
-                color: "#0f172a",
-                textDecoration: "none",
-                letterSpacing: "-0.01em",
-              }}
+              className="block px-6 py-5 text-xl font-medium text-gray-900 hover:bg-gray-50 transition-colors"
             >
               {item.label}
             </Link>
@@ -136,44 +101,24 @@ export function MobileMenu({ isOpen, onClose, selectedRegion, onRegionChange }: 
         </nav>
 
         {/* Divider */}
-        <div style={{ height: "1px", background: "rgba(0, 0, 0, 0.08)", margin: "16px 24px" }} />
+        <div className="h-px bg-gray-100 mx-6 my-4" />
 
         {/* Region Selector */}
-        <div style={{ padding: "16px 24px 24px" }}>
-          <div
-            style={{
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#64748b",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              marginBottom: "12px",
-            }}
-          >
+        <div className="px-6 py-4">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
             Select Region
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          <div className="flex flex-wrap gap-2.5">
             {regions.map((region) => (
               <button
                 key={region.id}
                 onClick={() => handleRegionSelect(region.id)}
                 data-testid={`button-region-${region.id.toLowerCase()}`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "10px 18px",
-                  borderRadius: "999px",
-                  fontSize: "15px",
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "all 180ms ease-out",
-                  background: selectedRegion === region.id ? "#0f172a" : "#f1f5f9",
-                  color: selectedRegion === region.id ? "#ffffff" : "#475569",
-                  boxShadow: selectedRegion === region.id ? "0 4px 12px rgba(15, 23, 42, 0.25)" : "none",
-                }}
+                className={`inline-flex items-center justify-center px-4 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                  selectedRegion === region.id
+                    ? "bg-gray-900 text-white shadow-md"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
               >
                 {region.label}
               </button>
@@ -182,33 +127,15 @@ export function MobileMenu({ isOpen, onClose, selectedRegion, onRegionChange }: 
         </div>
 
         {/* Divider */}
-        <div style={{ height: "1px", background: "rgba(0, 0, 0, 0.08)", margin: "0 24px 16px" }} />
+        <div className="h-px bg-gray-100 mx-6 my-4" />
 
-        {/* Auth Section */}
-        <div
-          style={{
-            padding: "24px",
-            marginTop: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: "14px",
-          }}
-        >
+        {/* Auth Section - pushed to bottom */}
+        <div className="mt-auto px-6 py-6 flex flex-col gap-3">
           <Link
             href="/login"
             onClick={handleNavClick}
             data-testid="button-mobile-login"
-            style={{
-              display: "block",
-              padding: "16px 0",
-              textAlign: "center",
-              fontSize: "17px",
-              fontWeight: 500,
-              color: "#0f172a",
-              textDecoration: "none",
-              borderRadius: "12px",
-              border: "1px solid rgba(0, 0, 0, 0.12)",
-            }}
+            className="block py-4 text-center text-base font-medium text-gray-900 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
           >
             Log in
           </Link>
@@ -216,18 +143,7 @@ export function MobileMenu({ isOpen, onClose, selectedRegion, onRegionChange }: 
             href="/signup"
             onClick={handleNavClick}
             data-testid="button-mobile-signup"
-            style={{
-              display: "block",
-              padding: "16px 0",
-              textAlign: "center",
-              fontSize: "17px",
-              fontWeight: 600,
-              color: "#ffffff",
-              background: "#0a5cff",
-              borderRadius: "12px",
-              textDecoration: "none",
-              boxShadow: "0 6px 16px rgba(10, 92, 255, 0.30)",
-            }}
+            className="block py-4 text-center text-base font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/25"
           >
             Sign up
           </Link>

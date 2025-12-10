@@ -10,6 +10,20 @@ interface SafeGoHeaderProps {
   onRegionChange?: (region: Region) => void;
 }
 
+function SafeGoLogo({ size = "default" }: { size?: "default" | "small" }) {
+  const iconSize = size === "small" ? "h-7 w-7" : "h-8 w-8";
+  const fontSize = size === "small" ? "text-base" : "text-lg";
+  
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className={`${iconSize} rounded-lg bg-blue-600 flex items-center justify-center shadow-sm`}>
+        <span className="text-white font-bold">S</span>
+      </div>
+      <span className={`font-semibold text-gray-900 dark:text-white ${fontSize}`}>SafeGo</span>
+    </div>
+  );
+}
+
 export const SafeGoHeader = ({ selectedRegion = "BD", onRegionChange }: SafeGoHeaderProps) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,60 +77,23 @@ export const SafeGoHeader = ({ selectedRegion = "BD", onRegionChange }: SafeGoHe
         }}
       >
         <div
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            padding: "10px 16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
+          className="max-w-[1200px] mx-auto px-4 md:px-6 py-2.5 md:py-3 flex items-center justify-between gap-6"
         >
-          {/* Logo */}
-          <Link
-            href="/"
-            aria-label="SafeGo home"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "5px 14px",
-              borderRadius: "999px",
-              background: "linear-gradient(135deg, #0a5cff, #3d8bff)",
-              color: "#ffffff",
-              fontWeight: 600,
-              fontSize: "16px",
-              letterSpacing: "0.02em",
-              textDecoration: "none",
-              boxShadow: "0 4px 12px rgba(10, 92, 255, 0.25)",
-              flexShrink: 0,
-            }}
-          >
-            SafeGo
+          {/* Logo - matches footer design */}
+          <Link href="/" aria-label="SafeGo home" className="flex-shrink-0">
+            <SafeGoLogo size="default" />
           </Link>
 
           {/* Desktop Navigation - Hidden on mobile */}
           <nav
             aria-label="Main navigation"
-            className="hidden md:flex"
-            style={{
-              alignItems: "center",
-              gap: "28px",
-              flex: 1,
-              justifyContent: "center",
-            }}
+            className="hidden md:flex items-center gap-7 flex-1 justify-center"
           >
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  color: "#0f172a",
-                  textDecoration: "none",
-                  opacity: 0.85,
-                }}
+                className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
               >
                 {item.label}
               </Link>
@@ -124,43 +101,18 @@ export const SafeGoHeader = ({ selectedRegion = "BD", onRegionChange }: SafeGoHe
           </nav>
 
           {/* Desktop Auth - Hidden on mobile */}
-          <div
-            className="hidden md:flex"
-            style={{
-              alignItems: "center",
-              gap: "14px",
-              flexShrink: 0,
-            }}
-          >
+          <div className="hidden md:flex items-center gap-4 flex-shrink-0">
             <Link
               href="/login"
               data-testid="button-login"
-              style={{
-                fontSize: "14px",
-                fontWeight: 500,
-                color: "#0f172a",
-                textDecoration: "none",
-                opacity: 0.85,
-              }}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
             >
               Log in
             </Link>
             <Link
               href="/signup"
               data-testid="button-signup"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "8px 18px",
-                borderRadius: "999px",
-                background: "#0a5cff",
-                color: "#ffffff",
-                fontSize: "14px",
-                fontWeight: 600,
-                textDecoration: "none",
-                boxShadow: "0 8px 20px rgba(10, 92, 255, 0.35)",
-              }}
+              className="inline-flex items-center justify-center px-5 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/25"
             >
               Sign up
             </Link>
@@ -168,26 +120,13 @@ export const SafeGoHeader = ({ selectedRegion = "BD", onRegionChange }: SafeGoHe
 
           {/* Hamburger Button - Mobile Only */}
           <button
-            className="flex md:hidden"
+            className="flex md:hidden items-center justify-center w-11 h-11 -mr-2 rounded-lg hover:bg-gray-100 transition-colors"
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Open menu"
             aria-expanded={mobileMenuOpen}
             data-testid="button-mobile-menu"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "48px",
-              height: "48px",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: 0,
-              marginRight: "-8px",
-              flexShrink: 0,
-            }}
           >
-            <Menu size={24} color="#0f172a" />
+            <Menu size={24} className="text-gray-700" />
           </button>
         </div>
       </header>
@@ -203,4 +142,5 @@ export const SafeGoHeader = ({ selectedRegion = "BD", onRegionChange }: SafeGoHe
   );
 };
 
+export { SafeGoLogo };
 export default SafeGoHeader;
