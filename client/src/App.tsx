@@ -426,6 +426,9 @@ import TicketOperatorStart from "@/pages/partner/ticket-start";
 
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing/LandingPage";
+import PrivacyPage from "@/pages/landing/PrivacyPage";
+import TermsPage from "@/pages/landing/TermsPage";
+import CookiesPage from "@/pages/landing/CookiesPage";
 
 function DashboardRedirect() {
   const { user, isLoading } = useAuth();
@@ -448,6 +451,9 @@ function Router() {
     <Switch>
       {/* Public routes */}
       <Route path="/" component={LandingPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/cookies" component={CookiesPage} />
       <Route path="/dashboard" component={DashboardRedirect} />
       <Route path="/login" component={Login} />
       <Route path="/auth/login" component={Login} />
