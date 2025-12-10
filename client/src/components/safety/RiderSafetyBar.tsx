@@ -59,33 +59,47 @@ export function RiderSafetyBar({
   const [sosDescription, setSOSDescription] = useState("");
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
+  // Only request location when user explicitly triggers a safety action
+  const requestLocation = async (): Promise<{ lat: number; lng: number } | null> => {
+    if (currentLocation) return currentLocation;
+    
+    if (!navigator.geolocation) return null;
+    
+    setIsGettingLocation(true);
+    return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setCurrentLocation({
+          const loc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setCurrentLocation(loc);
+          setIsGettingLocation(false);
+          resolve(loc);
         },
-        (error) => {
-          console.error("Failed to get location:", error);
-        }
+        () => {
+          setIsGettingLocation(false);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
       );
-    }
-  }, []);
+    });
+  };
 
   const triggerSOSMutation = useMutation({
     mutationFn: async () => {
+      // Request location only when user explicitly triggers SOS
+      const location = await requestLocation();
       return apiRequest("/api/phase5/safety/sos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tripType,
           tripId,
-          latitude: currentLocation?.lat,
-          longitude: currentLocation?.lng,
+          latitude: location?.lat,
+          longitude: location?.lng,
           description: sosDescription
         })
       });
@@ -109,6 +123,8 @@ export function RiderSafetyBar({
 
   const shareTripMutation = useMutation({
     mutationFn: async (contacts: string[]) => {
+      // Request location only when user explicitly shares trip
+      const location = await requestLocation();
       return apiRequest(`/api/phase5/safety/share-trip`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -116,8 +132,8 @@ export function RiderSafetyBar({
           tripType,
           tripId,
           recipientIds: contacts,
-          latitude: currentLocation?.lat,
-          longitude: currentLocation?.lng
+          latitude: location?.lat,
+          longitude: location?.lng
         })
       });
     },

@@ -63,8 +63,10 @@ import {
   Navigation2,
   CircleDot,
   AlertTriangle,
+  Share2,
 } from "lucide-react";
 import { TipCard } from "@/components/TipCard";
+import { RiderSafetyBar } from "@/components/safety/RiderSafetyBar";
 
 interface RideData {
   id: string;
@@ -287,6 +289,7 @@ export default function RideTrackingPage() {
 
   const [showFareBreakdown, setShowFareBreakdown] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showSafetyBar, setShowSafetyBar] = useState(false);
 
   const {
     data: ride,
@@ -413,6 +416,7 @@ export default function RideTrackingPage() {
           zoom={14}
           style={{ height: "100%", width: "100%" }}
           zoomControl={false}
+          aria-label="Live ride tracking map showing pickup, dropoff, and driver locations"
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -505,12 +509,27 @@ export default function RideTrackingPage() {
           )}
 
           {ride.etaMinutes && isActive && (
-            <div className="flex items-center justify-center gap-2 py-3 bg-primary/5 rounded-lg">
-              <Clock className="h-5 w-5 text-primary" />
+            <div 
+              className="flex items-center justify-center gap-2 py-3 bg-primary/5 rounded-lg"
+              role="status"
+              aria-live="polite"
+            >
+              <Clock className="h-5 w-5 text-primary" aria-hidden="true" />
               <span className="font-semibold text-lg" data-testid="text-eta">
                 {ride.status === "in_progress" ? "Arriving in" : "ETA"}: {ride.etaMinutes} min
               </span>
             </div>
+          )}
+
+          {isActive && (
+            <RiderSafetyBar
+              tripId={ride.id}
+              tripType="ride"
+              driverName={ride.driver?.firstName}
+              driverPhone={ride.driver?.phone}
+              isExpanded={showSafetyBar}
+              onToggle={() => setShowSafetyBar(!showSafetyBar)}
+            />
           )}
 
           <Card>

@@ -227,6 +227,7 @@ export default function RideRequestPage() {
   const [estimatedDistance, setEstimatedDistance] = useState<number | null>(null);
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
   const [routePolyline, setRoutePolyline] = useState<[number, number][] | null>(null);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
 
   const { data: cities, isLoading: citiesLoading } = useQuery<{ cities: CityOption[] }>({
     queryKey: ["/api/rides/bd/cities", countryCode],
@@ -319,13 +320,12 @@ export default function RideRequestPage() {
   const fetchRoute = useCallback(async () => {
     if (!pickupLocation || !dropoffLocation) return;
 
+    setIsRouteLoading(true);
     try {
-      const response = await fetch(
+      const data = await apiRequest(
         `/api/maps/directions?origin=${pickupLocation.lat},${pickupLocation.lng}&destination=${dropoffLocation.lat},${dropoffLocation.lng}`
       );
-      if (!response.ok) throw new Error("Failed to fetch route");
 
-      const data = await response.json();
       if (data.routes && data.routes.length > 0) {
         const route = data.routes[0].legs[0];
         setEstimatedDistance(route.distance.value / 1000);
@@ -336,8 +336,8 @@ export default function RideRequestPage() {
           setRoutePolyline(decoded);
         }
       }
-    } catch (error) {
-      console.error("Route fetch error:", error);
+    } catch {
+      // Fallback to direct distance calculation when route API fails
       const directDistance = calculateDirectDistance(
         pickupLocation.lat,
         pickupLocation.lng,
@@ -346,6 +346,8 @@ export default function RideRequestPage() {
       );
       setEstimatedDistance(directDistance);
       setEstimatedDuration(Math.ceil((directDistance / 30) * 60));
+    } finally {
+      setIsRouteLoading(false);
     }
   }, [pickupLocation, dropoffLocation]);
 
@@ -372,12 +374,9 @@ export default function RideRequestPage() {
       });
 
       const { latitude, longitude } = position.coords;
-      const response = await fetch(`/api/maps/geocode?latlng=${latitude},${longitude}`);
-      if (!response.ok) throw new Error("Failed to geocode location");
-
-      const data = await response.json();
+      const geocodeData = await apiRequest(`/api/maps/geocode?latlng=${latitude},${longitude}`);
       const address =
-        data.results?.[0]?.formatted_address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        geocodeData.results?.[0]?.formatted_address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 
       setPickupLocation({
         address,
@@ -389,10 +388,10 @@ export default function RideRequestPage() {
         title: "Location Found",
         description: "Using your current location as pickup",
       });
-    } catch (error) {
+    } catch {
       toast({
-        title: "Location Error",
-        description: "Could not get your current location",
+        title: "Location Access Denied",
+        description: "Please enable location permissions in your browser settings, or enter your pickup address manually.",
         variant: "destructive",
       });
     } finally {
@@ -494,6 +493,7 @@ export default function RideRequestPage() {
           zoom={13}
           style={{ height: "100%", width: "100%" }}
           zoomControl={false}
+          aria-label="Ride booking map showing pickup and dropoff locations"
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -579,14 +579,25 @@ export default function RideRequestPage() {
                 </div>
               </div>
 
-              {estimatedDistance && estimatedDuration && (
-                <div className="flex items-center gap-4 text-sm text-muted-foreground pt-1 flex-wrap">
+              {isRouteLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  <span>Calculating route...</span>
+                </div>
+              )}
+
+              {!isRouteLoading && estimatedDistance && estimatedDuration && (
+                <div 
+                  className="flex items-center gap-4 text-sm text-muted-foreground pt-1 flex-wrap"
+                  role="status"
+                  aria-live="polite"
+                >
                   <div className="flex items-center gap-1">
-                    <Navigation className="h-3.5 w-3.5" />
+                    <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>{estimatedDistance.toFixed(1)} km</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
+                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>~{estimatedDuration} min</span>
                   </div>
                 </div>

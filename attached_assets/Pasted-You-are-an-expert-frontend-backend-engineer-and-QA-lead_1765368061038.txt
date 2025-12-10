@@ -1,0 +1,232 @@
+You are an expert frontend + backend engineer and QA lead working on the SafeGo super app.
+
+CONTEXT (DO NOT CHANGE):
+- Brand: SafeGo – ride, food, parcel, and partner ecosystem.
+- There is ONE shared backend for pricing, GPS, ride status, and country rules.
+- The /ride (customer) experience is just a client of this backend. It MUST NOT introduce its own pricing, routing, or status engine.
+- The system already supports: showing routes, showing ride types, estimated fare & ETA, driver assignment, and in-trip map tracking.
+
+GOAL:
+Perform a full UBER-LEVEL AUDIT of the customer ride screen and ride engine, fix every issue you find, and prepare it for public launch. You must:
+- Keep the current design style (modern, clean, professional).
+- Never break existing backend contracts.
+- Keep security and privacy as the first priority.
+- Make the experience work perfectly on both desktop and mobile.
+
+SCOPE:
+Customer ride Web app (the screen where a customer:
+- sees the big map on the right,
+- selects pickup & dropoff,
+- chooses a route and ride type,
+- confirms the ride,
+- sees driver on the way, and
+- tracks trip until completion).
+
+Do NOT modify:
+- Landing page hero/marketing content.
+- Admin dashboard.
+- Driver onboarding or KYC flows.
+Only touch the code directly involved in the customer ride booking and tracking experience.
+
+------------------------------------------------
+1. Map + Location + Route behaviour
+------------------------------------------------
+1.1. Verify that:
+- Current location detection works or falls back gracefully with a clear message if permission is denied.
+- Pickup and dropoff inputs always stay in sync with the map pins.
+- Route suggestions (Fastest, Shortest, etc.) all work and update:
+  - distance,
+  - ETA,
+  - fare estimate,
+  - route polyline on the map.
+
+1.2. Fix any issues where:
+- The map does not recenter correctly after changing pickup/dropoff.
+- Route selection UI changes, but the actual backend route used for fare or ETA does not update.
+- Zoom level is too far or too near on desktop or mobile.
+
+1.3. Add/confirm:
+- Sensible default zoom based on trip distance.
+- Smooth map transitions instead of jarring jumps.
+- Clear loading or skeleton states when route data is being fetched.
+
+Security:
+- Never store or log raw GPS coordinates in console logs. Only use them where absolutely needed.
+- Make sure geolocation requests are only triggered after explicit user action (e.g., clicking “Use current location”), not automatically on page load.
+
+------------------------------------------------
+2. Ride options, pricing, and discounts
+------------------------------------------------
+2.1. Ensure that:
+- All ride types shown (e.g., Saver / X / Comfort / WAV, etc.) come directly from the backend response, not hardcoded business logic on the frontend.
+- Fare estimates, surcharges, discounts, and “You save $X” labels exactly match backend data.
+- Currency and formatting come from backend or global config; never hardcode symbols.
+
+2.2. Fix:
+- Any mismatch between UI fare and backend fare.
+- Any place where rounding is done differently between backend and frontend.
+- Any stale fare data when the user switches route or pickup/dropoff.
+
+2.3. States:
+- If pricing fails to load, show a user-friendly error and disable the Confirm button.
+- If pricing is loading, show skeleton/loader instead of broken or 0-value fares.
+
+Security & compliance:
+- Do not implement your own pricing formulas on the frontend.
+- Never expose internal calculation parameters in the UI (e.g., raw per-km rates, risk scores).
+
+------------------------------------------------
+3. Ride confirmation and error handling
+------------------------------------------------
+3.1. Confirm flow:
+- When the user taps “Confirm SafeGo X” (or equivalent):
+  - The button enters a loading state.
+  - Duplicate requests are prevented (debounce or disable while pending).
+  - A proper success state is shown (transition to “Driver searching / assigned”).
+  - Any errors show a clear message and allow retry.
+
+3.2. Audit:
+- All network calls in this step:
+  - Correct HTTP methods and endpoints.
+  - Proper handling of non-200 responses.
+  - Timeouts and retries where appropriate.
+
+3.3. Fix:
+- Any case where the UI appears “stuck” in loading with no feedback.
+- Any silent failure swallowed by `console.error` without user-visible guidance.
+
+Security:
+- Ensure no sensitive customer or driver information is logged.
+- Confirm that the ride create/confirm endpoint is only called once per click.
+
+------------------------------------------------
+4. Driver assignment and live trip tracking
+------------------------------------------------
+4.1. Driver assignment:
+- Verify the state machine:
+  - Searching for driver
+  - Driver assigned
+  - Driver en route to pickup
+  - Driver arrived
+  - Trip in progress
+  - Trip completed / cancelled
+- The customer UI must always reflect the current backend trip status.
+
+4.2. Live tracking:
+- Driver marker moves smoothly on the map as position updates arrive.
+- Arrival estimates (minutes away) update regularly.
+- If WebSocket or real-time channel fails, there is a safe fallback to polling.
+
+4.3. Fix:
+- Any state where the map does not update while status text changes.
+- Any desync between what backend reports and what UI shows.
+- Any broken or missing edge cases (driver cancels, long waiting time, etc.).
+
+Security & privacy:
+- Only show the driver’s:
+  - first name and initial,
+  - vehicle model and plate (masked if required by compliance),
+  - rating and photo (if provided).
+- Never expose driver’s phone, email, or home address.
+- Ensure there is no way to see another passenger’s personal details.
+
+------------------------------------------------
+5. Safety and compliance hooks (customer view)
+------------------------------------------------
+Even if some backend features are not fully active yet, the UI must be ready and safe.
+
+5.1. Verify or add:
+- “Share trip” UI hook (button that can be wired to backend later).
+- Safety / SOS button placement and disabled state if backend is not yet ready.
+- Clear disclaimer text where legal/compliance requires it (for test environment vs production).
+
+5.2. Implement:
+- Clear error messages for:
+  - connection loss,
+  - location denied,
+  - ride no longer available.
+
+5.3. Ensure:
+- No safety-related button is just a dead icon; if backend isn’t ready, show a clear tooltip or disabled state instead of silently failing.
+
+------------------------------------------------
+6. Responsive design and accessibility
+------------------------------------------------
+6.1. Responsive:
+- On large desktop screens:
+  - Left panel and right map must use space efficiently.
+  - No horizontal scrollbars.
+- On tablets and mobile:
+  - Panels stack or adapt cleanly.
+  - Map remains usable (panning, zooming, tapping markers).
+  - Buttons are at least 44x44px touch targets.
+
+6.2. Accessibility:
+- Proper semantic elements for headings, lists, buttons.
+- Keyboard navigation for major actions:
+  - switching routes,
+  - selecting ride type,
+  - confirming ride.
+- ARIA labels where necessary (e.g., map container, safety buttons).
+- Sufficient color contrast for all important text and controls.
+
+------------------------------------------------
+7. Code quality, structure, and tests
+------------------------------------------------
+7.1. Refactor the ride screen code to be:
+- Modular: separate components for
+  - RouteSelector,
+  - RideOptionsList,
+  - FareSummary / footer bar,
+  - DriverStatusPanel,
+  - MapView.
+- Strongly typed (TypeScript) with clear interfaces for backend responses.
+
+7.2. Clean-up:
+- Remove unused imports, dead code, and commented-out experiments.
+- Eliminate unnecessary `console.log` and `console.error` calls (replace with a simple, central logging helper if needed).
+- Keep all text strings in a single config or i18n-friendly structure (to support future translation).
+
+7.3. Tests:
+- Add unit tests for:
+  - mapping backend trip status to UI components,
+  - route selection logic and fare updates,
+  - confirm button disabled/enabled conditions.
+- If the project uses integration/UI tests (Cypress, Playwright, etc.), add at least one happy-path test:
+  - set pickup/dropoff,
+  - select route and ride type,
+  - confirm ride,
+  - see driver assigned and moving.
+
+------------------------------------------------
+8. Security and privacy checklist
+------------------------------------------------
+For every change you make, verify:
+
+- No customer or driver personal data is logged to console or localStorage.
+- localStorage/sessionStorage are used only if absolutely necessary and never for:
+  - full names,
+  - phone numbers,
+  - payment details,
+  - full coordinates history.
+- All API calls use HTTPS endpoints.
+- There is graceful handling of any unexpected backend response (never crash the UI, never expose raw JSON in the interface).
+
+------------------------------------------------
+DELIVERABLES
+------------------------------------------------
+When you are done, you MUST:
+
+1. Ensure the customer ride flow works smoothly from start to finish:
+   - enter pickup/dropoff,
+   - choose route,
+   - choose ride,
+   - confirm,
+   - see driver assigned and moving,
+   - complete trip.
+2. Provide a short, human-readable summary at the end of your run with:
+   - List of concrete issues you found and fixed.
+   - Any remaining limitations (if backend doesn’t support something yet).
+   - Suggestions for future improvements (but DO NOT break or block current flow).
+
+Do all of this in a single, coherent pass. Do not leave TODOs. The final ride screen must be stable, professional, and safe enough for a public beta launch.

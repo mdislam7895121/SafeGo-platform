@@ -31,27 +31,39 @@ export function EmergencySosButton({ rideId, variant = "floating", className = "
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState("");
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const { toast } = useToast();
 
   const { data: contacts } = useQuery<{ success: boolean; contacts: EmergencyContact[] }>({
     queryKey: ["/api/policy-safety/emergency-contacts/my"],
   });
 
-  useEffect(() => {
-    if (navigator.geolocation) {
+  // Only request location when user explicitly triggers SOS (not on mount)
+  const requestLocation = async (): Promise<{ lat: number; lng: number } | null> => {
+    if (location) return location;
+    
+    if (!navigator.geolocation) return null;
+    
+    setIsGettingLocation(true);
+    return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
+          const loc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          setLocation(loc);
+          setIsGettingLocation(false);
+          resolve(loc);
         },
-        (error) => {
-          console.warn("[SOS] Location access denied:", error);
-        }
+        () => {
+          setIsGettingLocation(false);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
       );
-    }
-  }, []);
+    });
+  };
 
   useEffect(() => {
     if (countdown !== null && countdown > 0) {
@@ -64,12 +76,14 @@ export function EmergencySosButton({ rideId, variant = "floating", className = "
 
   const triggerSosMutation = useMutation({
     mutationFn: async () => {
+      // Request location only when user explicitly triggers SOS
+      const currentLoc = await requestLocation();
       return apiRequest("/api/policy-safety/sos/trigger", {
         method: "POST",
         body: JSON.stringify({
           rideId,
-          latitude: location?.lat,
-          longitude: location?.lng,
+          latitude: currentLoc?.lat,
+          longitude: currentLoc?.lng,
           address,
         }),
       });
