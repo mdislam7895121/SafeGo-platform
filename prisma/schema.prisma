@@ -14632,3 +14632,145 @@ model ContactSubmission {
   @@index([assignedToAdminId])
   @@map("contact_submissions")
 }
+
+// ========================================
+// PARTNER ONBOARDING APPLICATIONS
+// ========================================
+
+// Driver/Courier Partner Application - from landing page (BD + US)
+model DriverPartnerApplication {
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Applicant information
+  fullName      String
+  phoneNumber   String
+  email         String
+  city          String
+  country       String    // "Bangladesh" or "United States"
+  region        String    // "BD" or "US"
+
+  // Service details
+  serviceType   String    // "ride_driver" or "delivery_courier"
+  vehicleType   String    // "car", "motorcycle", "bicycle", "walking"
+
+  // Application status
+  status        String    @default("new") // new, in_review, approved, rejected
+  reviewedAt    DateTime?
+  reviewedByAdminId String?
+  
+  // Admin notes
+  adminNotes    Json?     @default("[]")
+
+  // Metadata for audit
+  metadata      Json?
+
+  @@index([status])
+  @@index([country])
+  @@index([region])
+  @@index([city])
+  @@index([serviceType])
+  @@index([createdAt])
+  @@map("driver_partner_applications")
+}
+
+// Restaurant Partner Application - from landing page (BD only)
+model RestaurantPartnerApplication {
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Restaurant information
+  restaurantName String
+  ownerName     String
+  phoneNumber   String
+  businessEmail String
+  city          String
+  cuisineType   String    // Bengali, Indian, Chinese, Fast Food, etc.
+  country       String    @default("Bangladesh")
+  region        String    @default("BD")
+
+  // Application status
+  status        String    @default("new") // new, in_review, approved, rejected
+  reviewedAt    DateTime?
+  reviewedByAdminId String?
+  
+  // Admin notes
+  adminNotes    Json?     @default("[]")
+
+  // Metadata for audit
+  metadata      Json?
+
+  @@index([status])
+  @@index([city])
+  @@index([cuisineType])
+  @@index([createdAt])
+  @@map("restaurant_partner_applications")
+}
+
+// Shop Partner Application - from landing page (BD only)
+model ShopPartnerApplication {
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Shop information
+  shopName      String
+  ownerName     String
+  phoneNumber   String
+  category      String    // Electronics, Groceries, Clothing, Essentials
+  city          String
+  country       String    @default("Bangladesh")
+  region        String    @default("BD")
+
+  // Application status
+  status        String    @default("new") // new, in_review, approved, rejected
+  reviewedAt    DateTime?
+  reviewedByAdminId String?
+  
+  // Admin notes
+  adminNotes    Json?     @default("[]")
+
+  // Metadata for audit
+  metadata      Json?
+
+  @@index([status])
+  @@index([city])
+  @@index([category])
+  @@index([createdAt])
+  @@map("shop_partner_applications")
+}
+
+// Ticket Partner Application - from landing page (BD only)
+model TicketPartnerApplication {
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Business information
+  businessName  String
+  contactPerson String
+  phoneNumber   String
+  ticketType    String    // Bus, Train, Launch, Event
+  city          String
+  country       String    @default("Bangladesh")
+  region        String    @default("BD")
+
+  // Application status
+  status        String    @default("new") // new, in_review, approved, rejected
+  reviewedAt    DateTime?
+  reviewedByAdminId String?
+  
+  // Admin notes
+  adminNotes    Json?     @default("[]")
+
+  // Metadata for audit
+  metadata      Json?
+
+  @@index([status])
+  @@index([city])
+  @@index([ticketType])
+  @@index([createdAt])
+  @@map("ticket_partner_applications")
+}

@@ -1,0 +1,72 @@
+I need you to complete the full Partner Onboarding system for the landing page and connect all forms to the Admin Dashboard. Follow this exact specification and treat it as a production-ready requirement.
+
+PHASE: Serial 2 – Partner Onboarding (Bangladesh-focused)
+
+Implement the following onboarding flows with full database integration, admin views, status controls, and proper country filtering:
+
+1. DRIVER / COURIER ONBOARDING (BD + USA)
+Fields:
+– Full Name
+– Phone Number
+– Email
+– City
+– Service Type: Ride Driver / Delivery Courier
+– Vehicle Type
+– Country (autofill from landing page region)
+Save under: admin.driversOnboarding
+Status options: New → In Review → Approved → Rejected
+
+2. RESTAURANT PARTNER ONBOARDING (Bangladesh only)
+Fields:
+– Restaurant Name
+– Owner Name
+– Phone Number
+– Business Email
+– City
+– Cuisine Type
+– Country (Bangladesh only)
+Save under: admin.restaurantsOnboarding
+Status: New / In Review / Approved / Rejected
+
+3. SHOP PARTNER ONBOARDING (Bangladesh only)
+Fields:
+– Shop Name
+– Owner Name
+– Phone Number
+– Category (Electronics, Groceries, Clothing, Essentials)
+– City
+– Country (Bangladesh only)
+Save under: admin.shopsOnboarding
+Status: New / In Review / Approved / Rejected
+
+4. TICKET PARTNER ONBOARDING (Bangladesh only)
+Fields:
+– Business Name
+– Contact Person
+– Phone Number
+– Ticket Type (Bus, Train, Launch, Event)
+– City
+– Country (Bangladesh only)
+Save under: admin.ticketsOnboarding
+Status: New / In Review / Approved / Rejected
+
+ADMIN FEATURES REQUIRED:
+– Admin can see onboarding lists separately: Drivers, Restaurants, Shops, Tickets
+– Filters: Country, City, Status
+– Admin can change status and leave notes
+– Auto-email or on-screen confirmation
+– Region-aware routing: BD-only forms appear only when Bangladesh is selected
+
+SECURITY:
+– Validate all inputs
+– Rate limit all onboarding endpoints
+– Add backend logging for all submissions
+
+After building, test every flow for:
+– Correct saving
+– Admin visibility
+– Status updating
+– Region logic
+– Error handling
+
+Once done, show me screenshots confirming each onboarding list inside Admin Dashboard.
