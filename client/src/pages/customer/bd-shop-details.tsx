@@ -28,6 +28,7 @@ import {
   Image,
   Trash2,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const shopTypeLabels: Record<string, string> = {
   grocery: "মুদিখানা",
@@ -427,11 +428,11 @@ export default function BDShopDetails() {
                     <div className="flex flex-col gap-1 mt-2">
                       <div className="flex items-baseline gap-2">
                         <p className="text-lg font-bold text-primary">
-                          ৳{Number(productPrice).toLocaleString("bn-BD")}
+                          {formatCurrency(Number(productPrice), "BDT")}
                         </p>
                         {hasDiscount && (
                           <p className="text-xs text-muted-foreground line-through">
-                            ৳{Number(originalPrice).toLocaleString("bn-BD")}
+                            {formatCurrency(Number(originalPrice), "BDT")}
                           </p>
                         )}
                       </div>
@@ -499,7 +500,7 @@ export default function BDShopDetails() {
                   <span>কার্ট দেখুন ({cartItemCount})</span>
                 </div>
                 <span className="font-bold">
-                  ৳{cartTotal.toLocaleString("bn-BD")}
+                  {formatCurrency(cartTotal, "BDT")}
                 </span>
               </Button>
             </div>
@@ -530,7 +531,7 @@ export default function BDShopDetails() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{item.productName}</p>
                     <p className="text-primary font-bold">
-                      ৳{(item.price * item.quantity).toLocaleString("bn-BD")}
+                      {formatCurrency(item.price * item.quantity, "BDT")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -584,20 +585,20 @@ export default function BDShopDetails() {
               </div>
               <div className="flex justify-between py-2 border-t">
                 <span>সাবটোটাল</span>
-                <span>৳{cartTotal.toLocaleString("bn-BD")}</span>
+                <span>{formatCurrency(cartTotal, "BDT")}</span>
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>ডেলিভারি ফি</span>
-                <span>৳৫০</span>
+                <span>{formatCurrency(50, "BDT")}</span>
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>সার্ভিস ফি (৫%)</span>
-                <span>৳{Math.round(cartTotal * 0.05).toLocaleString("bn-BD")}</span>
+                <span>{formatCurrency(Math.round(cartTotal * 0.05), "BDT")}</span>
               </div>
               <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span>মোট</span>
                 <span className="text-primary">
-                  ৳{(cartTotal + 50 + Math.round(cartTotal * 0.05)).toLocaleString("bn-BD")}
+                  {formatCurrency(cartTotal + 50 + Math.round(cartTotal * 0.05), "BDT")}
                 </span>
               </div>
               <Button

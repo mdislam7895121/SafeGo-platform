@@ -82,9 +82,9 @@ const PARCEL_TYPES = [
 
 const SPEED_OPTIONS = [
   { value: "regular", label: "Regular", description: "Standard delivery", surcharge: 0 },
-  { value: "quick", label: "Quick", description: "+30৳ faster", surcharge: 30 },
-  { value: "express", label: "Express", description: "+60৳ priority", surcharge: 60 },
-  { value: "super_express", label: "Super Express", description: "+120৳ urgent", surcharge: 120 },
+  { value: "quick", label: "Quick", description: "+BDT 30 faster", surcharge: 30 },
+  { value: "express", label: "Express", description: "+BDT 60 priority", surcharge: 60 },
+  { value: "super_express", label: "Super Express", description: "+BDT 120 urgent", surcharge: 120 },
 ];
 
 const INTERNATIONAL_COUNTRIES = [
@@ -687,7 +687,7 @@ export default function ParcelRequest() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-orange-500" />
-                  <Label htmlFor="fragile">Fragile Item (+30৳)</Label>
+                  <Label htmlFor="fragile">Fragile Item (+BDT 30)</Label>
                 </div>
                 <Switch
                   id="fragile"
@@ -726,7 +726,7 @@ export default function ParcelRequest() {
                         data-testid="input-cod-amount"
                       />
                       <p className="text-xs text-muted-foreground">
-                        COD Fee: 0.8% (min ৳10)
+                        COD Fee: 0.8% (min BDT 10)
                       </p>
                     </div>
                   )}

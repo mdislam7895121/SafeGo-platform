@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DriverPreviewCard, DriverPublicProfile } from "@/components/DriverPreviewCard";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 export default function RideDetails() {
   const { id } = useParams();
@@ -176,7 +177,7 @@ export default function RideDetails() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Service Fare</span>
               <span className="font-medium" data-testid="text-fare">
-                ${parseFloat(ride.serviceFare).toFixed(2)}
+                {formatCurrency(parseFloat(ride.serviceFare), "USD")}
               </span>
             </div>
 
@@ -190,7 +191,7 @@ export default function RideDetails() {
             <div className="flex justify-between pt-2 border-t">
               <span className="font-medium">Total</span>
               <span className="font-bold text-lg" data-testid="text-total">
-                ${parseFloat(ride.serviceFare).toFixed(2)}
+                {formatCurrency(parseFloat(ride.serviceFare), "USD")}
               </span>
             </div>
           </CardContent>

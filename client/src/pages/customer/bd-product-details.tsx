@@ -21,6 +21,7 @@ import {
   LogIn,
   AlertTriangle,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const categoryLabels: Record<string, string> = {
   grocery: "মুদি সামগ্রী",
@@ -420,11 +421,11 @@ export default function BDProductDetails() {
               className="text-2xl font-bold text-primary"
               data-testid="text-product-price"
             >
-              ৳{displayPrice}
+              {formatCurrency(displayPrice, "BDT")}
             </span>
             {hasDiscount && (
               <span className="text-lg text-muted-foreground line-through">
-                ৳{product.price}
+                {formatCurrency(product.price, "BDT")}
               </span>
             )}
             <span className="text-sm text-muted-foreground">/{product.unit}</span>
@@ -501,7 +502,7 @@ export default function BDProductDetails() {
           <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 p-3 rounded-lg">
             <Info className="h-4 w-4 flex-shrink-0" />
             <p className="text-sm">
-              সর্বনিম্ন অর্ডার: ৳{product.minOrderAmount}
+              সর্বনিম্ন অর্ডার: {formatCurrency(product.minOrderAmount, "BDT")}
             </p>
           </div>
         )}
@@ -539,7 +540,7 @@ export default function BDProductDetails() {
           <div className="flex items-center justify-between">
             <span className="text-lg font-semibold">মোট:</span>
             <span className="text-xl font-bold text-primary" data-testid="text-total-price">
-              ৳{(displayPrice * quantity).toFixed(2)}
+              {formatCurrency(displayPrice * quantity, "BDT")}
             </span>
           </div>
 

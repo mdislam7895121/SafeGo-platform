@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -183,13 +184,6 @@ function getVehicleColor(vehicleType: string): string {
     default:
       return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
   }
-}
-
-function formatCurrency(amount: number, currency: string): string {
-  if (currency === "BDT") {
-    return `৳${amount.toFixed(0)}`;
-  }
-  return `$${amount.toFixed(2)}`;
 }
 
 function decodePolyline(encoded: string): [number, number][] {

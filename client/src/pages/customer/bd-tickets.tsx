@@ -20,6 +20,7 @@ import {
   Car,
   ArrowRight,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface TicketListing {
   id: string;
@@ -202,11 +203,11 @@ export default function BDTicketsPage() {
                     <div className="flex items-center justify-between pt-2 border-t">
                       <div>
                         <span className="text-2xl font-bold text-primary">
-                          ৳{ticket.basePrice.toLocaleString("bn-BD")}
+                          {formatCurrency(ticket.basePrice, "BDT")}
                         </span>
                         {ticket.discountPrice && (
                           <span className="text-sm text-muted-foreground line-through ml-2">
-                            ৳{ticket.discountPrice.toLocaleString("bn-BD")}
+                            {formatCurrency(ticket.discountPrice, "BDT")}
                           </span>
                         )}
                       </div>
@@ -269,12 +270,12 @@ export default function BDTicketsPage() {
                     <div className="flex items-center justify-between pt-2 border-t">
                       <div>
                         <span className="text-2xl font-bold text-primary">
-                          ৳{vehicle.pricePerDay.toLocaleString("bn-BD")}
+                          {formatCurrency(vehicle.pricePerDay, "BDT")}
                         </span>
                         <span className="text-sm text-muted-foreground">/দিন</span>
                         {vehicle.pricePerHour && (
                           <span className="text-sm text-muted-foreground ml-2">
-                            (৳{vehicle.pricePerHour.toLocaleString("bn-BD")}/ঘণ্টা)
+                            ({formatCurrency(vehicle.pricePerHour, "BDT")}/ঘণ্টা)
                           </span>
                         )}
                       </div>

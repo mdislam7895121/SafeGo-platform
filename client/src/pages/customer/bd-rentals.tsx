@@ -18,6 +18,7 @@ import {
   MapPin,
   Filter,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface RentalVehicle {
   id: string;
@@ -398,13 +399,13 @@ export default function BDRentalsPage() {
                         <div>
                           <div className="flex items-baseline gap-1">
                             <span className="text-2xl font-bold text-primary">
-                              ৳{vehicle.pricePerDay.toLocaleString("bn-BD")}
+                              {formatCurrency(vehicle.pricePerDay, "BDT")}
                             </span>
                             <span className="text-sm text-muted-foreground">/দিন</span>
                           </div>
                           {vehicle.pricePerHour && (
                             <span className="text-xs text-muted-foreground">
-                              ৳{vehicle.pricePerHour.toLocaleString("bn-BD")}/ঘণ্টা থেকে
+                              {formatCurrency(vehicle.pricePerHour, "BDT")}/ঘণ্টা থেকে
                             </span>
                           )}
                         </div>

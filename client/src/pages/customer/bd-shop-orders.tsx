@@ -30,6 +30,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface OrderItem {
   id: string;
@@ -260,7 +261,7 @@ export default function BDShopOrders() {
                       <div>
                         <p className="text-xs text-muted-foreground">মোট</p>
                         <p className="font-bold text-lg" data-testid={`text-total-${order.id}`}>
-                          ৳{order.totalAmount.toLocaleString()}
+                          {formatCurrency(order.totalAmount, "BDT")}
                         </p>
                       </div>
                       

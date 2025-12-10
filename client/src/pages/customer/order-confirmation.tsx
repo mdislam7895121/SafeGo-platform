@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DriverPreviewCard } from "@/components/DriverPreviewCard";
 import { ArrowLeft, MapPin, CheckCircle2, Clock, DollarSign, Package } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 type DriverPublicProfile = {
   name: string;
@@ -180,7 +181,7 @@ export default function OrderConfirmation() {
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Total</p>
                 <p className="text-lg font-bold" data-testid="text-total">
-                  ${Number(order.serviceFare).toFixed(2)}
+                  {formatCurrency(Number(order.serviceFare), "USD")}
                 </p>
               </div>
             </div>

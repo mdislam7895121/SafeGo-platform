@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface ParcelDetails {
   id: string;
@@ -322,14 +323,14 @@ export default function ParcelTracking() {
           <Card className="border-green-500/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <span className="text-green-600">৳</span>
+                <span className="text-green-600">BDT</span>
                 Cash on Delivery
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold">৳{parcel.codAmount?.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">{formatCurrency(parcel.codAmount || 0, "BDT")}</p>
                   <p className="text-sm text-muted-foreground">
                     {parcel.codCollected ? "Collected" : "To be collected"}
                   </p>
@@ -350,13 +351,13 @@ export default function ParcelTracking() {
             {parcel.pricingBreakdown?.map((item, idx) => (
               <div key={idx} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{item.label}</span>
-                <span>৳{item.amount.toFixed(2)}</span>
+                <span>{formatCurrency(item.amount, "BDT")}</span>
               </div>
             ))}
             <Separator />
             <div className="flex justify-between font-semibold">
               <span>Total</span>
-              <span>৳{parcel.totalCharge.toFixed(2)}</span>
+              <span>{formatCurrency(parcel.totalCharge, "BDT")}</span>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Payment Method</span>

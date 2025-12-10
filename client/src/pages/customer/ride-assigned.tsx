@@ -9,6 +9,7 @@ import { DriverPreviewCard, DriverPublicProfile } from "@/components/DriverPrevi
 import { RiderSafetyBar } from "@/components/safety/RiderSafetyBar";
 import { RefinedETADisplay } from "@/components/navigation/RefinedETADisplay";
 import { ArrowLeft, MapPin, Navigation, Clock, DollarSign, Phone, MessageCircle } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 export default function RideAssigned() {
   const [, setLocation] = useLocation();
@@ -161,7 +162,7 @@ export default function RideAssigned() {
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Estimated Fare</p>
                 <p className="text-lg font-bold" data-testid="text-fare">
-                  ${Number(ride.serviceFare).toFixed(2)}
+                  {formatCurrency(Number(ride.serviceFare), "USD")}
                 </p>
               </div>
             </div>

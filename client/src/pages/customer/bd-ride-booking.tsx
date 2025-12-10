@@ -49,6 +49,7 @@ import {
   Info,
   BanknoteIcon,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface LocationData {
   address: string;
@@ -628,7 +629,7 @@ export default function BDRideBooking() {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-lg">
-                        ৳{option.estimatedFare.toFixed(0)}
+                        {formatCurrency(option.estimatedFare, "BDT")}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {option.etaMinutes} min away
@@ -701,24 +702,24 @@ export default function BDRideBooking() {
                     <CardContent className="p-3 space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Base Fare</span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.baseFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.baseFare, "BDT")}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">
                           Distance ({estimatedDistance?.toFixed(1)} km)
                         </span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.distanceFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.distanceFare, "BDT")}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">
                           Time ({estimatedDuration} min)
                         </span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.timeFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.timeFare, "BDT")}</span>
                       </div>
                       {selectedVehicleOption.fareBreakdown.bookingFee > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Booking Fee</span>
-                          <span>৳{selectedVehicleOption.fareBreakdown.bookingFee.toFixed(0)}</span>
+                          <span>{formatCurrency(selectedVehicleOption.fareBreakdown.bookingFee, "BDT")}</span>
                         </div>
                       )}
                       {selectedVehicleOption.fareBreakdown.nightMultiplier > 1 && (
@@ -740,7 +741,7 @@ export default function BDRideBooking() {
                       {selectedVehicleOption.fareBreakdown.fareBeforeTax && (
                         <div className="flex justify-between text-muted-foreground">
                           <span>Subtotal</span>
-                          <span>৳{selectedVehicleOption.fareBreakdown.fareBeforeTax.toFixed(0)}</span>
+                          <span>{formatCurrency(selectedVehicleOption.fareBreakdown.fareBeforeTax, "BDT")}</span>
                         </div>
                       )}
                       {(selectedVehicleOption.fareBreakdown.bdTaxAmount ?? 0) > 0 && (
@@ -748,12 +749,12 @@ export default function BDRideBooking() {
                           <span className="flex items-center gap-1">
                             VAT ({selectedVehicleOption.fareBreakdown.bdTaxRate}%)
                           </span>
-                          <span>+৳{(selectedVehicleOption.fareBreakdown.bdTaxAmount ?? 0).toFixed(0)}</span>
+                          <span>+{formatCurrency(selectedVehicleOption.fareBreakdown.bdTaxAmount ?? 0, "BDT")}</span>
                         </div>
                       )}
                       <div className="border-t pt-2 flex justify-between font-semibold">
                         <span>Total</span>
-                        <span>৳{selectedVehicleOption.fareBreakdown.totalFare.toFixed(0)}</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.totalFare, "BDT")}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -778,7 +779,7 @@ export default function BDRideBooking() {
                   Requesting...
                 </>
               ) : selectedVehicleOption ? (
-                <>Request {selectedVehicleOption.displayName} · ৳{selectedVehicleOption.estimatedFare.toFixed(0)}</>
+                <>Request {selectedVehicleOption.displayName} · {formatCurrency(selectedVehicleOption.estimatedFare, "BDT")}</>
               ) : (
                 "Select a Vehicle"
               )}
