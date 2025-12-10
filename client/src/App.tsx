@@ -429,6 +429,8 @@ import LandingPage from "@/pages/landing/LandingPage";
 import PrivacyPage from "@/pages/landing/PrivacyPage";
 import TermsPage from "@/pages/landing/TermsPage";
 import CookiesPage from "@/pages/landing/CookiesPage";
+import ContactPage from "@/pages/landing/ContactPage";
+import HelpPage from "@/pages/landing/HelpPage";
 
 function DashboardRedirect() {
   const { user, isLoading } = useAuth();
@@ -454,6 +456,8 @@ function Router() {
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/cookies" component={CookiesPage} />
+      <Route path="/contact" component={ContactPage} />
+      <Route path="/help" component={HelpPage} />
       <Route path="/dashboard" component={DashboardRedirect} />
       <Route path="/login" component={Login} />
       <Route path="/auth/login" component={Login} />
