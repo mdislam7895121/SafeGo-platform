@@ -1272,7 +1272,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="landing-page">
-      <SafeGoHeader />
+      <SafeGoHeader selectedRegion={selectedRegion} onRegionChange={handleRegionChange} />
       <main className="flex-1">
         <HeroSection 
           selectedRegion={selectedRegion} 
