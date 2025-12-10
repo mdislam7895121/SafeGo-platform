@@ -1,3 +1,17 @@
+/**
+ * SafeGo Marketing Landing Page
+ * Last Updated: December 2024
+ * 
+ * This is a visual/UX refactor only - no backend changes.
+ * 
+ * Region-aware features:
+ * - REGION_SERVICES: Controls which services appear (BD: 5, US: 4, GLOBAL: 3)
+ * - PARTNER_CONFIG: Controls partner section text per region
+ * - HERO_CONFIG: Controls hero description per region
+ * 
+ * All CTAs use existing public routes only. No secrets exposed.
+ */
+
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { 
@@ -27,6 +41,20 @@ interface ServiceItem {
   link: string;
   heroColor: string;
 }
+
+const HERO_CONFIG: Record<Region, {
+  description: string;
+}> = {
+  BD: {
+    description: "One platform for rides, food delivery, parcel delivery, local shops, and tickets — launching first in Bangladesh.",
+  },
+  US: {
+    description: "Safe, reliable rides, food delivery, and parcel services with strong compliance and driver protection.",
+  },
+  GLOBAL: {
+    description: "A global, secure mobility and delivery platform — move, eat, and deliver anywhere with SafeGo.",
+  },
+};
 
 const PARTNER_CONFIG: Record<Region, {
   driverCard: {
@@ -403,6 +431,7 @@ function HeroSection({
   onRegionChange: (region: Region) => void;
 }) {
   const services = REGION_SERVICES[selectedRegion];
+  const heroConfig = HERO_CONFIG[selectedRegion];
   
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20 py-16 lg:py-24">
@@ -419,7 +448,7 @@ function HeroSection({
             </h1>
             
             <p className="mt-6 text-lg text-gray-600 dark:text-gray-400 max-w-xl mx-auto lg:mx-0">
-              One platform for rides, food delivery, and parcel delivery — launching first in Bangladesh.
+              {heroConfig.description}
             </p>
             
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
