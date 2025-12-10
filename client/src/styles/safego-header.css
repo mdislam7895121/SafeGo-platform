@@ -1,70 +1,93 @@
-/* client/src/styles/safego-header.css */
+/* SafeGo Premium Header - Uber/Apple Grade */
+
+/* ============================================
+   HEADER CONTAINER
+   ============================================ */
 
 .sg-header {
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 100;
+  width: 100%;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  background: rgba(255, 255, 255, 0.78);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   transition: all 180ms ease-out;
 }
 
 .sg-header--scrolled {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  background: rgba(255, 255, 255, 0.9);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
 }
 
 .sg-header-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 14px 24px;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
 }
 
-.sg-header-left {
-  display: flex;
-  align-items: center;
-  gap: 40px;
+@media (min-width: 768px) {
+  .sg-header-inner {
+    padding: 14px 24px;
+  }
 }
 
-/* Logo pill */
+/* ============================================
+   LOGO PILL
+   ============================================ */
+
 .sg-logo-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 16px;
+  padding: 5px 14px;
   border-radius: 999px;
   background: linear-gradient(135deg, #0a5cff, #3d8bff);
   color: #ffffff;
   font-weight: 600;
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: 0.02em;
   text-decoration: none;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28);
+  box-shadow: 0 6px 16px rgba(10, 92, 255, 0.25);
   transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+  flex-shrink: 0;
 }
 
 .sg-logo-pill:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 8px 20px rgba(10, 92, 255, 0.32);
 }
 
-/* Nav links */
+@media (min-width: 768px) {
+  .sg-logo-pill {
+    padding: 6px 16px;
+    font-size: 18px;
+  }
+}
+
+/* ============================================
+   DESKTOP NAVIGATION
+   ============================================ */
+
 .sg-nav {
-  display: flex;
+  display: none;
   align-items: center;
-  gap: 20px;
+  gap: 28px;
   flex: 1;
   justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .sg-nav {
+    display: flex;
+  }
 }
 
 .sg-nav-link {
@@ -73,8 +96,8 @@
   font-weight: 500;
   color: #0f172a;
   text-decoration: none;
-  padding: 4px 2px;
-  opacity: 0.86;
+  padding: 4px 0;
+  opacity: 0.85;
   transition: opacity 140ms ease-out;
 }
 
@@ -82,12 +105,12 @@
   content: "";
   position: absolute;
   left: 0;
-  bottom: -4px;
+  bottom: -2px;
   width: 0;
   height: 2px;
   border-radius: 999px;
   background: linear-gradient(90deg, #0a5cff, #3d8bff);
-  transition: width 160ms ease-out;
+  transition: width 180ms ease-out;
 }
 
 .sg-nav-link:hover {
@@ -98,11 +121,21 @@
   width: 100%;
 }
 
-/* Auth section */
+/* ============================================
+   DESKTOP AUTH BUTTONS
+   ============================================ */
+
 .sg-auth {
-  display: flex;
+  display: none;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .sg-auth {
+    display: flex;
+  }
 }
 
 .sg-login-link {
@@ -129,192 +162,192 @@
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.45);
-  transition: background 120ms ease-out, transform 120ms ease-out,
-    box-shadow 120ms ease-out;
+  box-shadow: 0 8px 20px rgba(10, 92, 255, 0.35);
+  transition: background 140ms ease-out, transform 140ms ease-out, box-shadow 140ms ease-out;
 }
 
 .sg-signup-btn:hover {
-  background: #1559e0;
+  background: #0952e0;
   transform: translateY(-1px);
-  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.55);
+  box-shadow: 0 12px 26px rgba(10, 92, 255, 0.45);
 }
 
-/* Mobile toggle */
-.sg-mobile-toggle {
-  display: none;
+/* ============================================
+   HAMBURGER MENU BUTTON
+   ============================================ */
+
+.sg-hamburger {
+  display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   background: transparent;
   border: none;
   cursor: pointer;
   padding: 0;
+  margin-right: -8px;
+  flex-shrink: 0;
 }
 
-.sg-hamburger-line {
+@media (min-width: 768px) {
+  .sg-hamburger {
+    display: none;
+  }
+}
+
+.sg-hamburger-bar {
   display: block;
-  width: 20px;
+  width: 22px;
   height: 2px;
   background: #0f172a;
-  border-radius: 1px;
-  transition: all 0.3s ease;
+  border-radius: 2px;
+  transition: all 250ms ease-out;
 }
 
-.sg-hamburger-line + .sg-hamburger-line {
+.sg-hamburger-bar + .sg-hamburger-bar {
   margin-top: 5px;
 }
 
-.sg-hamburger-line--open-1 {
-  transform: rotate(45deg) translateY(5px) translateX(3px);
+.sg-hamburger-bar--open-1 {
+  transform: rotate(45deg) translate(5px, 5px);
 }
 
-.sg-hamburger-line--open-2 {
+.sg-hamburger-bar--open-2 {
   opacity: 0;
+  transform: scaleX(0);
 }
 
-.sg-hamburger-line--open-3 {
-  transform: rotate(-45deg) translateY(-5px) translateX(3px);
+.sg-hamburger-bar--open-3 {
+  transform: rotate(-45deg) translate(5px, -5px);
 }
 
-/* Mobile menu */
-.sg-mobile-menu {
+/* ============================================
+   MOBILE DRAWER
+   ============================================ */
+
+.sg-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 40;
-  opacity: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0);
   pointer-events: none;
-  transition: opacity 0.3s ease;
-  top: 52px;
+  transition: background 250ms ease-out;
 }
 
-.sg-mobile-menu--open {
-  opacity: 1;
+.sg-drawer-backdrop--open {
+  background: rgba(0, 0, 0, 0.4);
   pointer-events: auto;
 }
 
-.sg-mobile-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.20);
-}
-
-.sg-mobile-panel {
-  position: absolute;
+.sg-drawer {
+  position: fixed;
   top: 0;
-  left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  transform: translateY(-100%);
-  transition: transform 0.3s ease;
+  bottom: 0;
+  z-index: 95;
+  width: 280px;
+  max-width: 85vw;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+  transform: translateX(100%);
+  transition: transform 250ms ease-out;
+  display: flex;
+  flex-direction: column;
+  padding-top: 72px;
 }
 
-.sg-mobile-menu--open .sg-mobile-panel {
-  transform: translateY(0);
+.sg-drawer--open {
+  transform: translateX(0);
 }
 
-.sg-mobile-nav {
+@media (min-width: 768px) {
+  .sg-drawer,
+  .sg-drawer-backdrop {
+    display: none;
+  }
+}
+
+.sg-drawer-nav {
   display: flex;
   flex-direction: column;
   padding: 16px 0;
+  flex: 1;
 }
 
-.sg-mobile-nav-link {
+.sg-drawer-link {
   display: block;
-  padding: 16px 24px;
-  font-size: 16px;
+  padding: 18px 24px;
+  font-size: 17px;
   font-weight: 500;
   color: #0f172a;
   text-decoration: none;
-  transition: background 0.2s ease;
+  transition: background 150ms ease-out;
 }
 
-.sg-mobile-nav-link:hover {
-  background: rgba(0, 0, 0, 0.05);
+.sg-drawer-link:hover,
+.sg-drawer-link:active {
+  background: rgba(0, 0, 0, 0.04);
 }
 
-.sg-mobile-auth {
+.sg-drawer-auth {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 20px 24px 32px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.sg-mobile-login {
+.sg-drawer-login {
   display: block;
-  padding: 12px 0;
+  padding: 14px 0;
   text-align: center;
   font-size: 16px;
   font-weight: 500;
   color: #0f172a;
   text-decoration: none;
-  transition: opacity 0.2s ease;
+  border-radius: 12px;
+  transition: background 150ms ease-out;
 }
 
-.sg-mobile-login:hover {
-  opacity: 0.7;
+.sg-drawer-login:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
-.sg-mobile-signup {
+.sg-drawer-signup {
   display: block;
-  padding: 12px 0;
+  padding: 14px 0;
   text-align: center;
   font-size: 16px;
   font-weight: 600;
   color: white;
   background: #0a5cff;
-  border-radius: 999px;
+  border-radius: 12px;
   text-decoration: none;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.40);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 6px 16px rgba(10, 92, 255, 0.30);
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
 }
 
-.sg-mobile-signup:hover {
+.sg-drawer-signup:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.50);
+  box-shadow: 0 8px 20px rgba(10, 92, 255, 0.40);
 }
 
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .sg-header-inner {
-    padding: 10px 16px;
-    gap: 12px;
-  }
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
 
-  .sg-nav {
-    display: none;
-  }
-
-  .sg-auth {
-    display: none;
-  }
-
-  .sg-mobile-toggle {
-    display: flex;
-  }
-
-  .sg-logo-pill {
-    font-size: 16px;
-    padding: 5px 14px;
-  }
-}
-
-/* Dark mode support */
 .dark .sg-header {
   background: rgba(15, 23, 42, 0.85);
   border-bottom-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .dark .sg-header--scrolled {
-  background: rgba(15, 23, 42, 0.92);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.3);
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
 }
 
 .dark .sg-nav-link {
@@ -329,26 +362,30 @@
   color: #e2e8f0;
 }
 
-.dark .sg-hamburger-line {
+.dark .sg-hamburger-bar {
   background: #e2e8f0;
 }
 
-.dark .sg-mobile-panel {
-  background: rgba(15, 23, 42, 0.95);
+.dark .sg-drawer {
+  background: rgba(15, 23, 42, 0.98);
 }
 
-.dark .sg-mobile-nav-link {
+.dark .sg-drawer-link {
   color: #e2e8f0;
 }
 
-.dark .sg-mobile-nav-link:hover {
-  background: rgba(255, 255, 255, 0.05);
+.dark .sg-drawer-link:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.dark .sg-mobile-auth {
+.dark .sg-drawer-auth {
   border-top-color: rgba(255, 255, 255, 0.08);
 }
 
-.dark .sg-mobile-login {
+.dark .sg-drawer-login {
   color: #e2e8f0;
+}
+
+.dark .sg-drawer-login:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
