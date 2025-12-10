@@ -558,45 +558,213 @@ const REGION_TO_FAQ_KEY: Record<"BD" | "US" | "GLOBAL", RegionKey> = {
 };
 
 const LandingHeader = memo(function LandingHeader() {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navItems = [
+    { label: 'Ride', href: '/ride' },
+    { label: 'Drive', href: '/drive' },
+    { label: 'Business', href: '/business' },
+    { label: 'Safety', href: '#safety', isAnchor: true },
+  ];
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
-      <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-xl">S</span>
+    <>
+      <header 
+        className="sticky top-0 z-50 w-full transition-all duration-300"
+        style={{
+          height: isScrolled ? '62px' : '72px',
+          background: 'rgba(255,255,255,0.80)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          boxShadow: '0 2px 20px rgba(0,0,0,0.06)',
+          borderBottom: '1px solid rgba(0,0,0,0.05)',
+        }}
+      >
+        <div 
+          className="mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 h-full"
+          style={{ maxWidth: '1280px' }}
+        >
+          {/* Logo */}
+          <div className="flex items-center gap-10">
+            <Link href="/" className="flex items-center gap-0">
+              <div 
+                className="flex items-center gap-2 px-3.5 py-2"
+                style={{
+                  background: 'linear-gradient(135deg, #0A5CFF, #3D8BFF)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
+                }}
+              >
+                <span className="text-white font-semibold text-lg tracking-tight">SafeGo</span>
+              </div>
+            </Link>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center" style={{ gap: '32px' }}>
+              {navItems.map((item) => (
+                item.isAnchor ? (
+                  <a 
+                    key={item.label}
+                    href={item.href}
+                    className="relative py-2 text-sm text-gray-700 transition-colors duration-200 hover:text-[#0A5CFF] group"
+                    style={{ fontWeight: 500, letterSpacing: '0.2px' }}
+                  >
+                    {item.label}
+                    <span 
+                      className="absolute bottom-0 left-0 w-full h-0.5 bg-[#0A5CFF] opacity-0 group-hover:opacity-70 transition-opacity duration-250"
+                    />
+                  </a>
+                ) : (
+                  <Link 
+                    key={item.label}
+                    href={item.href}
+                    className="relative py-2 text-sm text-gray-700 transition-colors duration-200 hover:text-[#0A5CFF] group"
+                    style={{ fontWeight: 500, letterSpacing: '0.2px' }}
+                  >
+                    {item.label}
+                    <span 
+                      className="absolute bottom-0 left-0 w-full h-0.5 bg-[#0A5CFF] opacity-0 group-hover:opacity-70 transition-opacity duration-250"
+                    />
+                  </Link>
+                )
+              ))}
+            </nav>
+          </div>
+
+          {/* Right side actions */}
+          <div className="hidden md:flex items-center gap-4">
+            <Link 
+              href="/login"
+              className="text-sm transition-colors duration-200 hover:text-[#0A5CFF]"
+              style={{ color: '#333', fontWeight: 500 }}
+              data-testid="button-login"
+            >
+              Log in
+            </Link>
+            <Link href="/signup">
+              <button
+                className="transition-all duration-250"
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '999px',
+                  background: '#0A5CFF',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 10px 24px rgba(0,0,0,0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.18)';
+                }}
+                data-testid="button-signup"
+              >
+                Sign up
+              </button>
+            </Link>
+          </div>
+
+          {/* Mobile Hamburger */}
+          <button
+            className="md:hidden flex flex-col justify-center items-center w-10 h-10 rounded-lg transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+            data-testid="button-mobile-menu"
+          >
+            <span 
+              className={`block w-5 h-0.5 bg-gray-700 transition-all duration-300 ${mobileMenuOpen ? 'rotate-45 translate-y-1.5' : ''}`}
+            />
+            <span 
+              className={`block w-5 h-0.5 bg-gray-700 my-1 transition-all duration-300 ${mobileMenuOpen ? 'opacity-0' : ''}`}
+            />
+            <span 
+              className={`block w-5 h-0.5 bg-gray-700 transition-all duration-300 ${mobileMenuOpen ? '-rotate-45 -translate-y-1.5' : ''}`}
+            />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Menu */}
+      <div 
+        className={`fixed inset-0 z-40 md:hidden transition-all duration-300 ${mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        style={{ top: isScrolled ? '62px' : '72px' }}
+      >
+        <div 
+          className="absolute inset-0 bg-black/20"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+        <div 
+          className={`absolute top-0 left-0 right-0 transition-transform duration-300 ${mobileMenuOpen ? 'translate-y-0' : '-translate-y-full'}`}
+          style={{
+            background: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          }}
+        >
+          <nav className="flex flex-col py-4">
+            {navItems.map((item) => (
+              item.isAnchor ? (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  className="px-6 py-4 text-base text-gray-800 hover:bg-gray-100 transition-colors"
+                  style={{ fontWeight: 500 }}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {item.label}
+                </a>
+              ) : (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="px-6 py-4 text-base text-gray-800 hover:bg-gray-100 transition-colors"
+                  style={{ fontWeight: 500 }}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              )
+            ))}
+            <div className="border-t border-gray-200 mt-2 pt-4 px-6 flex flex-col gap-3">
+              <Link 
+                href="/login"
+                className="py-3 text-center text-base text-gray-700 hover:text-[#0A5CFF] transition-colors"
+                style={{ fontWeight: 500 }}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Log in
+              </Link>
+              <Link 
+                href="/signup"
+                className="py-3 text-center text-base text-white rounded-full transition-all"
+                style={{
+                  background: '#0A5CFF',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                }}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Sign up
+              </Link>
             </div>
-            <span className="font-bold text-xl text-gray-900 dark:text-white">SafeGo</span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-1">
-            <Link href="/ride" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-              Ride
-            </Link>
-            <Link href="/drive" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-              Drive
-            </Link>
-            <Link href="/business" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-              Business
-            </Link>
-            <a href="#safety" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-              Safety
-            </a>
           </nav>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/login">
-            <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" data-testid="button-login">
-              Log in
-            </Button>
-          </Link>
-          <Link href="/signup">
-            <Button size="sm" className="rounded-full px-5 bg-blue-600 hover:bg-blue-700 shadow-sm" data-testid="button-signup">
-              Sign up
-            </Button>
-          </Link>
-        </div>
       </div>
-    </header>
+    </>
   );
 });
 
