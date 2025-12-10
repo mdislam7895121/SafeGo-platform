@@ -17,60 +17,145 @@ import {
 
 type Region = "BD" | "US" | "GLOBAL";
 
-const HERO_SERVICES = [
-  { icon: Car, label: "Rides", desc: "Safe & reliable transportation", color: "text-blue-500" },
-  { icon: UtensilsCrossed, label: "Food", desc: "Delicious meals delivered fast", color: "text-orange-500" },
-  { icon: Package, label: "Parcel", desc: "Send packages anywhere", color: "text-green-500" },
-  { icon: Store, label: "Shops", desc: "Shop from local stores", color: "text-purple-500" },
-];
+interface ServiceItem {
+  id: string;
+  title: string;
+  description: string;
+  icon: typeof Car;
+  bgColor: string;
+  iconColor: string;
+  link: string;
+  heroColor: string;
+}
 
-const SERVICES = [
-  {
-    id: "rides",
-    title: "Rides",
-    description: "Get where you need to go with reliable, verified drivers at your fingertips.",
-    icon: Car,
-    bgColor: "bg-blue-50 dark:bg-blue-950/30",
-    iconColor: "text-blue-600 dark:text-blue-400",
-    link: "/ride",
-  },
-  {
-    id: "food",
-    title: "Food Delivery",
-    description: "Order from your favorite restaurants and get meals delivered hot and fresh.",
-    icon: UtensilsCrossed,
-    bgColor: "bg-orange-50 dark:bg-orange-950/30",
-    iconColor: "text-orange-600 dark:text-orange-400",
-    link: "/food",
-  },
-  {
-    id: "parcel",
-    title: "Parcel Delivery",
-    description: "Send packages across the city or country with real-time tracking.",
-    icon: Package,
-    bgColor: "bg-green-50 dark:bg-green-950/30",
-    iconColor: "text-green-600 dark:text-green-400",
-    link: "/parcel",
-  },
-  {
-    id: "shops",
-    title: "Local Shops",
-    description: "Shop from local stores and get everything delivered to your doorstep.",
-    icon: Store,
-    bgColor: "bg-purple-50 dark:bg-purple-950/30",
-    iconColor: "text-purple-600 dark:text-purple-400",
-    link: "/shops",
-  },
-  {
-    id: "tickets",
-    title: "Tickets & Travel",
-    description: "Book bus tickets and travel services for your next journey.",
-    icon: Ticket,
-    bgColor: "bg-pink-50 dark:bg-pink-950/30",
-    iconColor: "text-pink-600 dark:text-pink-400",
-    link: "/tickets",
-  },
-];
+const REGION_SERVICES: Record<Region, ServiceItem[]> = {
+  BD: [
+    {
+      id: "rides",
+      title: "Rides",
+      description: "Safe & reliable transportation",
+      icon: Car,
+      bgColor: "bg-blue-50 dark:bg-blue-950/30",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      heroColor: "text-blue-500",
+      link: "/ride",
+    },
+    {
+      id: "food",
+      title: "Food Delivery",
+      description: "Delicious meals delivered hot and fresh",
+      icon: UtensilsCrossed,
+      bgColor: "bg-orange-50 dark:bg-orange-950/30",
+      iconColor: "text-orange-600 dark:text-orange-400",
+      heroColor: "text-orange-500",
+      link: "/food",
+    },
+    {
+      id: "parcel",
+      title: "Parcel Delivery",
+      description: "Send packages anywhere with real-time tracking",
+      icon: Package,
+      bgColor: "bg-green-50 dark:bg-green-950/30",
+      iconColor: "text-green-600 dark:text-green-400",
+      heroColor: "text-green-500",
+      link: "/parcel",
+    },
+    {
+      id: "shops",
+      title: "Local Shops",
+      description: "Shop from nearby groceries, pharmacies, and stores",
+      icon: Store,
+      bgColor: "bg-purple-50 dark:bg-purple-950/30",
+      iconColor: "text-purple-600 dark:text-purple-400",
+      heroColor: "text-purple-500",
+      link: "/shops",
+    },
+    {
+      id: "tickets",
+      title: "Tickets & Travel",
+      description: "Book bus, launch, train, and event tickets in one place",
+      icon: Ticket,
+      bgColor: "bg-pink-50 dark:bg-pink-950/30",
+      iconColor: "text-pink-600 dark:text-pink-400",
+      heroColor: "text-pink-500",
+      link: "/tickets",
+    },
+  ],
+  US: [
+    {
+      id: "rides",
+      title: "Rides",
+      description: "Safe & reliable transportation",
+      icon: Car,
+      bgColor: "bg-blue-50 dark:bg-blue-950/30",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      heroColor: "text-blue-500",
+      link: "/ride",
+    },
+    {
+      id: "food",
+      title: "Food Delivery",
+      description: "Delicious meals delivered hot and fresh",
+      icon: UtensilsCrossed,
+      bgColor: "bg-orange-50 dark:bg-orange-950/30",
+      iconColor: "text-orange-600 dark:text-orange-400",
+      heroColor: "text-orange-500",
+      link: "/food",
+    },
+    {
+      id: "parcel",
+      title: "Parcel Delivery",
+      description: "Send packages anywhere with real-time tracking",
+      icon: Package,
+      bgColor: "bg-green-50 dark:bg-green-950/30",
+      iconColor: "text-green-600 dark:text-green-400",
+      heroColor: "text-green-500",
+      link: "/parcel",
+    },
+    {
+      id: "shops",
+      title: "Local Shops",
+      description: "Shop from nearby groceries and stores",
+      icon: Store,
+      bgColor: "bg-purple-50 dark:bg-purple-950/30",
+      iconColor: "text-purple-600 dark:text-purple-400",
+      heroColor: "text-purple-500",
+      link: "/shops",
+    },
+  ],
+  GLOBAL: [
+    {
+      id: "rides",
+      title: "Rides",
+      description: "Safe & reliable transportation",
+      icon: Car,
+      bgColor: "bg-blue-50 dark:bg-blue-950/30",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      heroColor: "text-blue-500",
+      link: "/ride",
+    },
+    {
+      id: "food",
+      title: "Food Delivery",
+      description: "Delicious meals delivered hot and fresh",
+      icon: UtensilsCrossed,
+      bgColor: "bg-orange-50 dark:bg-orange-950/30",
+      iconColor: "text-orange-600 dark:text-orange-400",
+      heroColor: "text-orange-500",
+      link: "/food",
+    },
+    {
+      id: "parcel",
+      title: "Parcel Delivery",
+      description: "Send packages anywhere with real-time tracking",
+      icon: Package,
+      bgColor: "bg-green-50 dark:bg-green-950/30",
+      iconColor: "text-green-600 dark:text-green-400",
+      heroColor: "text-green-500",
+      link: "/parcel",
+    },
+  ],
+};
 
 const HOW_IT_WORKS = {
   rides: {
@@ -260,6 +345,8 @@ function HeroSection({
   selectedRegion: Region;
   onRegionChange: (region: Region) => void;
 }) {
+  const services = REGION_SERVICES[selectedRegion];
+  
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20 py-16 lg:py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -300,21 +387,23 @@ function HeroSection({
                 <p className="text-sm text-gray-500 dark:text-gray-400">All-in-one platform</p>
               </div>
               <CardContent className="p-0">
-                {HERO_SERVICES.map((service, index) => (
-                  <div 
-                    key={service.label}
-                    className={`flex items-center gap-4 p-4 ${
-                      index !== HERO_SERVICES.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''
+                {services.map((service, index) => (
+                  <Link 
+                    key={service.id}
+                    href={service.link}
+                    className={`flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                      index !== services.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''
                     }`}
+                    data-testid={`hero-service-${service.id}`}
                   >
-                    <div className={`p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 ${service.color}`}>
+                    <div className={`p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 ${service.heroColor}`}>
                       <service.icon className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{service.label}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{service.desc}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{service.title}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{service.description}</p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </CardContent>
             </Card>
@@ -325,7 +414,10 @@ function HeroSection({
   );
 }
 
-function ServicesSection() {
+function ServicesSection({ selectedRegion }: { selectedRegion: Region }) {
+  const services = REGION_SERVICES[selectedRegion];
+  const gridCols = services.length === 5 ? 'lg:grid-cols-5' : services.length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3';
+  
   return (
     <section id="services" className="py-20 bg-white dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -339,8 +431,8 @@ function ServicesSection() {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          {SERVICES.map((service) => (
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${gridCols} gap-6`}>
+          {services.map((service) => (
             <Link key={service.id} href={service.link}>
               <Card 
                 className="h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200 cursor-pointer group rounded-xl" 
@@ -713,7 +805,7 @@ export default function LandingPage() {
           selectedRegion={selectedRegion} 
           onRegionChange={handleRegionChange} 
         />
-        <ServicesSection />
+        <ServicesSection selectedRegion={selectedRegion} />
         <PartnerSection />
         <HowItWorksSection />
         <SafetySection />
