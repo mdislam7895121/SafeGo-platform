@@ -1,0 +1,502 @@
+You are working on the SafeGo global super-app project. Read and follow ALL SafeGo Master Rules below. Do NOT skip or simplify any of them. Your work MUST be backward-compatible and additive only.
+
+====================================================
+SAFEGO MASTER RULES (ALWAYS APPLY)
+====================================================
+
+1) ROLES (4 distinct roles, never mixed)
+----------------------------------------
+You must always preserve these four separate roles and NEVER mix their access:
+
+1. Customer
+2. Driver
+3. Restaurant (Merchant)
+4. Admin
+
+Each role must have its own:
+- signup/onboarding requirements
+- KYC / verification rules
+- dashboard and navigation
+- permissions and allowed actions
+- status flows and lifecycle
+
+Customers cannot access driver or restaurant panels.
+Drivers cannot access admin or other drivers’ panels.
+Restaurants cannot access each other’s data.
+Only admins have global control (see Admin rules).
+
+2) GLOBAL APP LOGIC – 3 core services
+-------------------------------------
+SafeGo always supports these three services, globally:
+
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+All prompts and implementations must keep these three services in mind, even if the current task focuses mainly on one (e.g., ride). The app operates WORLDWIDE, but rules (KYC, pricing, documents) must support per-country branching.
+
+3) COUNTRY-SPECIFIC KYC (BD vs US)
+-----------------------------------
+SafeGo currently supports at least two countries with specific KYC rules:
+
+A. BANGLADESH (BD) – required fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front + back images)
+- emergency contact details
+- verification_status + is_verified
+
+B. UNITED STATES (US) – required fields:
+(For all applicable roles, with extra for drivers)
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver license number + image + expiry date
+- (drivers) ssn_last4 (optional, if the system supports it)
+- verification_status + is_verified
+
+You must always keep the country branching explicit and intact. Do NOT break or remove any existing fields. Only ADD new fields if needed.
+
+4) ADMIN PANEL – mandatory capabilities
+---------------------------------------
+The Admin panel is a core part of SafeGo and MUST always support:
+
+- verify customers
+- verify drivers
+- verify restaurants
+- approve or reject KYC
+- store and display rejection_reason
+- update pricing, fees, and commissions
+- block / unblock any user (customer, driver, restaurant)
+- manage payouts
+- view driver negative balance
+- view restaurant negative balance
+
+Do NOT remove or weaken any of these admin capabilities. You may add more features, but cannot break existing ones.
+
+5) CORE COLLECTIONS – rides, food_orders, deliveries
+----------------------------------------------------
+All SafeGo logic must be built around these three collections:
+
+1. rides
+2. food_orders
+3. deliveries
+
+Each collection MUST have:
+- identity fields (customer_id, driver_id, restaurant_id, etc.)
+- addresses + geolocation (pickup, dropoff, restaurant location, etc.)
+- fees + commission structure
+- payment details (method, amounts, who paid what)
+- timestamps (created_at, updated_at, status_changed_at, etc.)
+- complete status flow (see Status Flow rules below)
+- rating and feedback from customer (and optional driver/restaurant feedback)
+
+Do NOT rename or remove these collections or their key semantics. Only extend them if necessary.
+
+6) COMMISSION & PAYOUT RULES (financial logic)
+----------------------------------------------
+You MUST always preserve this logic:
+
+1. If customer pays CASH for a ride:
+   - Driver receives full cash from the customer.
+   - SafeGo’s commission becomes a negative balance in driver_wallet_balance.
+   - Driver must settle this negative balance weekly (or at the configured interval).
+
+2. If food order is CASH:
+   - Restaurant gets all cash.
+   - SafeGo’s commission becomes a negative balance in restaurant_wallet.
+
+3. If payment is ONLINE (card, wallet, etc.):
+   - SafeGo automatically keeps its commission from the payment.
+   - Driver and restaurant only see their net payable amount.
+
+4. Admin can settle balances and mark them as “paid” / “settled”.
+
+Any change you make must not break these rules.
+
+7) SECURITY & PRIVACY RULES
+---------------------------
+- Customers cannot view driver sensitive documents (NID, license scans, SSN, etc.).
+- Drivers cannot view any customer NID or other sensitive KYC data.
+- Restaurants cannot view other restaurants’ documents or financial information.
+- Only Admin can:
+  - change pricing, commissions
+  - change verification status
+  - block/unblock users
+
+- Users can only update their own profile (according to their role).
+- NEVER expose sensitive KYC or financial data on the public frontend (landing page, etc.).
+
+8) STATUS FLOWS (complete flows required)
+-----------------------------------------
+You must maintain these status flows for each service:
+
+Ride statuses:
+- requested
+- searching_driver
+- accepted
+- driver_arriving
+- in_progress
+- completed
+- cancelled_x (e.g., cancelled_by_customer, cancelled_by_driver, cancelled_by_system)
+
+Food order statuses:
+- placed
+- accepted
+- preparing
+- ready_for_pickup
+- picked_up
+- on_the_way
+- delivered
+- cancelled_x
+
+Parcel statuses:
+- requested
+- searching_driver
+- accepted
+- picked_up
+- on_the_way
+- delivered
+- cancelled_x
+
+Frontend must never invent new statuses. Backend controls the status and the frontend only reflects it.
+
+9) ONBOARDING & ACCESS BLOCKING
+-------------------------------
+Each user type must have a multi-step onboarding:
+
+- Step 1: Basic info
+- Step 2: Address (country-specific)
+- Step 3: ID/KYC upload (BD vs US rules as above)
+- Step 4: Emergency contact
+- verification_status = "pending" at first
+- Access to real work/earning is BLOCKED until approved by admin.
+
+Signup rules (current company rule):
+- There is a single simple secure CUSTOMER signup (email + password, etc.).
+- All other roles (driver, restaurant, parcel courier, partners, admins) are created later through separate onboarding flows AFTER login.
+- Do NOT break this pattern when adjusting login/signup.
+
+10) NOTIFICATIONS
+-----------------
+The system must support notifications for:
+
+- New ride alert for driver
+- Order updates for customers
+- Parcel updates
+- Verification approval/rejection
+- Important admin notifications (e.g., account blocked, negative balance reminders, settlement reminders)
+
+Your work should not break these; you may add more notification hooks if needed.
+
+11) ARCHITECTURE CONSTRAINT: Single Backend, Landing Page as Client Only
+------------------------------------------------------------------------
+- There is ONE shared SafeGo backend for all logic:
+  - pricing
+  - GPS / location
+  - ride status
+  - country rules
+  - commission rules
+- The `/ride` landing page is ONLY a frontend client that calls this backend via APIs.
+- The landing page must NEVER implement its own pricing engine, status engine, or mock backend logic for production.
+- The landing page must always respect:
+  - currency, prices, and status from the backend response
+  - country and region handled ONLY by backend
+
+You must not create any second backend or separate pricing logic in the frontend.
+
+12) BACKWARD-COMPATIBILITY RULE
+-------------------------------
+- You must NOT rename or remove existing API endpoints, data fields, or UI routes.
+- You may NOT delete existing modules like `rideApi.ts` or `rideRepository.ts`, but you can refactor them internally to call the real backend instead of hardcoded mock data.
+- Any change must be additive and non-breaking.
+- If in doubt, prefer creating new helper modules/adapters while keeping existing interfaces intact.
+
+====================================================
+CURRENT TASK: CONNECT CUSTOMER LANDING PAGE + /RIDE TO BACKEND
+====================================================
+
+Goal:
+Fully connect the Customer landing page (including the /ride landing experience) to the shared SafeGo backend, removing all fake/mock data and making the frontend strictly follow backend data as the single source of truth. Preserve all existing SafeGo features and rules.
+
+You should assume a typical React + TypeScript frontend structure. Adjust file paths if they differ, but the concepts must stay the same.
+
+-------------------------------
+1) Create / ensure a shared API client
+-------------------------------
+- Create or update a shared API client at:
+
+  - `client/src/lib/apiClient.ts` (recommended name)
+
+- Implement it with axios or fetch. Example axios-style (adjust as needed, but preserve behavior):
+
+  - Base URL comes from an environment variable:
+    - `VITE_API_BASE_URL`
+  - `withCredentials: true` so that cookies/tokens are sent to the backend.
+  - Optional: global interceptors for auth errors (401), but do not break existing flow.
+
+- All landing page network calls MUST be routed through this shared client, not through separate hardcoded URLs.
+
+- Do NOT rename existing API clients used elsewhere; instead:
+  - If `rideApi.ts` or `rideRepository.ts` already exists, update them to internally use `apiClient` for real backend calls.
+
+-------------------------------
+2) Refactor rideApi.ts / rideRepository.ts to act as backend adapters
+-------------------------------
+- Identify these two modules (names approximate; adjust to actual code):
+
+  - `client/src/api/rideApi.ts`
+  - `client/src/lib/rideRepository.ts` (or similar)
+
+- Currently, they behave like “mock backends” (hardcoded data for ride and delivery flows). This is NOT allowed for production.
+
+- Your job:
+  - Keep the existing function names and signatures (to stay backward compatible).
+  - Internally replace the mock data with real backend calls via `apiClient`.
+
+- Example responsibilities:
+
+  `rideApi.ts` should expose functions like:
+  - `estimateRide(params)`
+  - `createRideRequest(params)`
+  - `getRideStatus(rideId)`
+  - `searchPlaces(query, countryCode, etc.)`
+
+  `rideRepository.ts` should:
+  - re-use the same backend logic where appropriate (for delivery/parcel, if currently used)
+  - but you must NOT keep separate “fake backend” logic here.
+
+- IMPORTANT:
+  - Remove any hardcoded “default driver”, “default distance”, or “default fare” inside these modules.
+  - All such values must be taken from backend responses only.
+
+-------------------------------
+3) Wire pickup/dropoff fields on the ride landing page to backend
+-------------------------------
+- Identify the ride landing page components, e.g.:
+
+  - `client/src/pages/RideBookingPage.tsx`
+  - `client/src/components/ride/RideSearchPanel.tsx`
+  - or any file where the pickup and dropoff input fields exist.
+
+- For both pickup and dropoff fields:
+
+  - When the user types text:
+    - Use a debounced call to backend location/places APIs, via the adapter in `rideApi.ts`.
+    - Show the list of suggestions from the backend.
+    - On selection, store:
+      - `lat`, `lng`
+      - `formatted_address`
+      - any backend place_id / reference that will be needed later for the ride.
+
+- For “Use current location”:
+  - Use browser geolocation to obtain `lat`/`lng`.
+  - Send them to backend via something like:
+    - `GET /ride/location/resolve?lat=...&lng=...`
+  - Update the pickup field with the exact address returned by backend.
+  - Do NOT implement your own reverse geocoding in the frontend.
+
+-------------------------------
+4) Implement fare + time estimate from backend only
+-------------------------------
+- On the ride landing page, there is a button or interaction for getting an estimate (e.g., “Get fare estimate”).
+
+- When triggered:
+  - Call the backend via `rideApi.estimateRide(...)` with:
+    - `pickup` (lat, lng, address)
+    - `dropoff` (lat, lng, address)
+    - `vehicle_type`
+    - optionally `country_code`
+
+  - Use the backend response to fill:
+    - `estimated_fare`
+    - `currency`
+    - `distance_km`
+    - `duration_min`
+    - any breakdown fields.
+
+- Remove all logic where the frontend:
+  - calculates distance or duration by itself
+  - assigns a fixed or fake price
+
+- The UI must display exactly what the backend provides, nothing else.
+
+-------------------------------
+5) Create ride request from landing page using backend
+-------------------------------
+- On “Request Ride” submit:
+
+  - Call `rideApi.createRideRequest(...)` that sends:
+
+    - `customer_id` (if user is logged in)
+    - `pickup` and `dropoff` details
+    - `vehicle_type`
+    - `payment_method`
+    - `country_code` (e.g., `BD` or `US`)
+    - any additional context required by backend (e.g., app version, device info)
+
+  - Backend returns:
+    - `ride_id`
+    - `initial_status` (should be `requested` or `searching_driver`)
+    - maybe pricing snapshot, etc.
+
+- On success:
+  - Immediately navigate to `/ride/track/:ride_id`.
+  - Make sure the routing is consistent with existing routes.
+  - Do NOT change existing paths; only add logic inside them.
+
+-------------------------------
+6) Connect RideTrackPage to backend status API
+-------------------------------
+- Identify `RideTrackPage` (you likely have something like `client/src/pages/RideTrackPage.tsx`).
+
+- Currently, it hardcodes values like:
+  - `distanceKm`
+  - `totalTrips`
+  - `driver.id`
+
+- This is forbidden. Replace them so that:
+
+  - The page calls `rideApi.getRideStatus(rideId)` using the backend.
+  - All the above fields come directly from the backend response.
+
+- The backend response should provide (at minimum):
+
+  - `status` (requested, searching_driver, accepted, driver_arriving, in_progress, completed, cancelled_x)
+  - `driver` object:
+    - name
+    - rating
+    - total_trips
+    - vehicle details (make, model, color, plate)
+  - `pickup` and `dropoff` location data
+  - `distance_km`, `duration_min` (optional if not yet available)
+  - `eta_min` (if driver assigned)
+
+- Implement either:
+  - Polling (e.g., every 5–10 seconds)
+  - Or subscribe to WebSocket events if already available in the project
+
+- The page must follow backend status and not try to “step” statuses itself.
+
+-------------------------------
+7) Map behavior for mobile and desktop (same data, responsive layout)
+-------------------------------
+- Ensure there is a single source of truth for map data:
+
+  - All markers (pickup, dropoff, driver location) come from backend or from the existing ride object.
+
+- Fix the issue where the map shows only on mobile but not on desktop:
+
+  - Inspect the layout CSS and container wrappers.
+  - Guarantee that the map container has a non-zero height on both mobile and desktop.
+  - If necessary, create a responsive layout component that:
+    - reuses the same Map component
+    - adjusts only CSS (e.g., height: 100%, minHeight, etc.)
+  - Do NOT maintain two separate map logic implementations for mobile vs desktop.
+
+-------------------------------
+8) Authentication on the landing page & navbar
+-------------------------------
+- Ensure the navbar’s “Login / Profile / Logout” buttons are wired to actual auth logic:
+
+  - Login:
+    - Opens the login flow (according to existing app logic).
+    - On success, backend issues token/cookie.
+
+  - On app load:
+    - Use `/auth/me` or equivalent to fetch the current user.
+    - Store user info in a global store (e.g., Redux, Zustand, or React context).
+
+  - Profile:
+    - Navigates to the user’s profile/dashboard, based on role (customer).
+    - Do NOT mix roles; drivers/restaurants have separate dashboards.
+
+  - Logout:
+    - Calls backend logout endpoint or clears auth token/cookie.
+    - Clears local user state.
+
+- For ride requests:
+  - If user must be logged in as a CUSTOMER, enforce that rule:
+    - Show a prompt or redirect to login if they are not authenticated.
+  - Do NOT hardcode a fake `customer_id` in the frontend.
+
+-------------------------------
+9) Preserve 3-service structure on the landing page (Ride / Food / Parcel)
+-------------------------------
+- On the main customer landing page, ensure there are three visible service panels/cards:
+
+  - Ride-hailing → Route to `/ride` landing experience
+  - Food delivery → Route to food landing (e.g., `/food` or `/eats`)
+  - Parcel delivery → Route to parcel landing (e.g., `/delivery`)
+
+- For this task:
+  - Fully implement backend integration for the ride landing experience.
+  - For food and parcel, keep the structure such that they can be wired later to:
+    - `food_orders` collection and APIs
+    - `deliveries` collection and APIs
+
+- Do NOT remove any existing “coming soon” labels unless they are clearly obsolete. If they exist, you may update them to point to real pages once those pages are implemented.
+
+-------------------------------
+10) Security measures applied in this task
+-------------------------------
+You must explicitly apply the following security principles while implementing:
+
+- Do NOT expose:
+  - driver license images
+  - NID images
+  - SSN_last4 or government_id_last4
+  - any internal KYC documents
+  directly on the landing page or ride tracking page.
+
+- Only show:
+  - driver first name (or short name)
+  - rating
+  - total trips
+  - vehicle make/model/color
+  - partial plate number (if required, e.g., masked)
+
+- Country-specific behavior:
+  - Let backend determine currency, city constraints, and other rules based on country (BD vs US).
+  - Frontend must NOT try to apply BD vs US rules by itself. It simply presents backend data.
+
+-------------------------------
+11) Non-breaking, additive changes – important constraints
+-------------------------------
+- DO NOT:
+  - rename existing API endpoints
+  - rename or remove existing types/interfaces
+  - break existing routes like `/ride`, `/food`, `/delivery`, `/admin`, etc.
+
+- You MAY:
+  - add new helper modules like `apiClient.ts`
+  - refactor `rideApi.ts` and `rideRepository.ts` internals to use the new `apiClient`
+  - add new components or hooks for data fetching
+  - extend existing types with optional fields (never remove fields)
+
+- After you finish:
+  - The UI should behave exactly as before in terms of navigation.
+  - The big difference: all data for the ride landing and tracking should now come from the real backend, not from mock data.
+
+-------------------------------
+12) Files and modules likely to be changed (examples)
+-------------------------------
+Do NOT hard-fail if the exact file names differ, but ensure equivalent locations are updated:
+
+- New / updated:
+  - `client/src/lib/apiClient.ts` (new shared API client)
+  - `client/src/api/rideApi.ts` (refactor to call backend)
+  - `client/src/lib/rideRepository.ts` (refactor to call backend instead of mocks)
+  - `client/src/pages/RideBookingPage.tsx` (wire form to backend estimation and request)
+  - `client/src/pages/RideTrackPage.tsx` (use backend ride status, remove hardcoded fields)
+  - `client/src/components/ride/RideSearchPanel.tsx` (if present, connect inputs to backend places/geo)
+  - `client/src/components/layout/Navbar.tsx` (or similar; connect login/profile/logout to auth state)
+  - `client/src/components/ride/RideMap.tsx` (or equivalent; unify map behavior for mobile and desktop)
+
+Ensure every change respects all SafeGo Master Rules above, keeps BD vs US support intact, preserves commission logic and collection semantics, and does NOT break any existing admin, driver, restaurant, or customer flows.
+
+Your final output should be a fully wired, backend-connected customer ride landing experience that is production-ready and consistent with the rest of the SafeGo platform.
