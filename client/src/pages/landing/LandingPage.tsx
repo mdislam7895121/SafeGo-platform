@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { useLandingSeo } from "@/components/landing/LandingSeo";
 import { Button } from "@/components/ui/button";
+import appStoreBadge from "@assets/generated_images/apple_app_store_badge.png";
+import playStoreBadge from "@assets/generated_images/google_play_store_badge.png";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Accordion,
@@ -1072,27 +1074,75 @@ const FAQSection = memo(function FAQSection({ selectedRegion }: { selectedRegion
   );
 });
 
-const CTASection = memo(function CTASection() {
+const CTA_CONFIG: Record<Region, { subtitle: string }> = {
+  BD: {
+    subtitle: "SafeGo is launching soon in Bangladesh. App download links will be available on release."
+  },
+  US: {
+    subtitle: "SafeGo is coming soon to the App Store and Google Play in the United States."
+  },
+  GLOBAL: {
+    subtitle: "SafeGo is expanding globally. Download links will be available in your region soon."
+  }
+};
+
+const CTASection = memo(function CTASection({ selectedRegion }: { selectedRegion: Region }) {
+  const config = CTA_CONFIG[selectedRegion];
+  
   return (
-    <section className="py-20 lg:py-24 bg-blue-600 relative overflow-hidden">
+    <section className="py-20 bg-blue-600 relative overflow-hidden" style={{ paddingTop: '80px', paddingBottom: '80px' }}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-50" />
         <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-700 rounded-full blur-3xl opacity-50" />
       </div>
       
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Ready to move with SafeGo?</h2>
-        <p className="mt-4 text-lg text-blue-100 max-w-xl mx-auto">
-          Join thousands of users who trust SafeGo for their daily rides and deliveries.
+        <h2 className="font-bold text-white" style={{ fontSize: '36px', lineHeight: '1.2' }}>
+          Ready to move with SafeGo?
+        </h2>
+        <p className="mt-4 max-w-2xl mx-auto text-blue-100" style={{ fontSize: '18px', opacity: 0.9 }}>
+          {config.subtitle}
         </p>
         
-        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" variant="secondary" className="rounded-full px-8 shadow-lg" data-testid="button-download-app">
-            <Smartphone className="mr-2 h-4 w-4" />
-            Download the app
-          </Button>
+        <div className="mt-10 flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <a 
+              href="https://www.apple.com/app-store/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="transition-transform hover:scale-105 active:scale-95"
+              data-testid="link-app-store"
+            >
+              <img 
+                src={appStoreBadge} 
+                alt="Download on the App Store" 
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
+            </a>
+            <a 
+              href="https://play.google.com/store" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="transition-transform hover:scale-105 active:scale-95"
+              data-testid="link-google-play"
+            >
+              <img 
+                src={playStoreBadge} 
+                alt="Get it on Google Play" 
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
+            </a>
+          </div>
+          
+          <div className="hidden lg:block w-px h-12 bg-white/20" />
+          
           <a href="#partners">
-            <Button size="lg" variant="outline" className="rounded-full px-8 border-white/30 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm" data-testid="button-cta-partner">
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="rounded-full px-8 border-white/30 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm" 
+              data-testid="button-cta-partner"
+            >
               Become a partner
             </Button>
           </a>
@@ -1143,7 +1193,7 @@ export default function LandingPage() {
         <HowItWorksSection selectedRegion={selectedRegion} />
         <SafetySection />
         <FAQSection selectedRegion={selectedRegion} />
-        <CTASection />
+        <CTASection selectedRegion={selectedRegion} />
       </main>
       <GlobalFooter 
         selectedRegion={selectedRegion === "GLOBAL" ? "BD" : selectedRegion}
