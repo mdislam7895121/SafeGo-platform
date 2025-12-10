@@ -822,7 +822,7 @@ export default function ParcelRequest() {
               <>
                 <Check className="h-5 w-5 mr-2" />
                 Confirm Parcel Request
-                {pricing && <span className="ml-2">(৳{pricing.totalDeliveryCharge.toFixed(2)})</span>}
+                {pricing && <span className="ml-2">({formatCurrency(pricing.totalDeliveryCharge, "BDT")})</span>}
               </>
             )}
           </Button>

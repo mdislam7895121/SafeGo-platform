@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { getAuthToken } from "@/lib/authToken";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
@@ -2325,7 +2326,7 @@ export default function UnifiedBookingPage() {
                               <span className="text-xs font-medium" style={{ color: "#166534" }}>
                                 {appliedPromo.discountType === "PERCENT" 
                                   ? `• ${appliedPromo.discountPercent}% off your ride`
-                                  : `• You save $${selectedFareData.discountAmount.toFixed(2)} on this trip`}
+                                  : `• You save ${formatCurrency(selectedFareData.discountAmount, "USD")} on this trip`}
                               </span>
                             </div>
                           </div>
@@ -2536,10 +2537,10 @@ export default function UnifiedBookingPage() {
                                 <>
                                   {hasDiscount && (
                                     <p className="text-xs line-through text-muted-foreground">
-                                      ${fareData.originalFare.toFixed(2)}
+                                      {formatCurrency(fareData.originalFare, "USD")}
                                     </p>
                                   )}
-                                  <p className="text-base font-bold">${fareData.finalFare.toFixed(2)}</p>
+                                  <p className="text-base font-bold">{formatCurrency(fareData.finalFare, "USD")}</p>
                                   {hasDiscount && (
                                     <Badge 
                                       className="text-[9px] px-1 py-0 border-0 mt-0.5"
@@ -2665,16 +2666,16 @@ export default function UnifiedBookingPage() {
                                 ) : (
                                   <div className="flex flex-col gap-1">
                                     <div className="flex items-baseline gap-2">
-                                      <p className="text-lg font-bold">${fareData.finalFare.toFixed(2)}</p>
+                                      <p className="text-lg font-bold">{formatCurrency(fareData.finalFare, "USD")}</p>
                                       {hasDiscount && (
                                         <p className="text-sm line-through" style={{ color: "#6B7280" }}>
-                                          ${fareData.originalFare.toFixed(2)}
+                                          {formatCurrency(fareData.originalFare, "USD")}
                                         </p>
                                       )}
                                     </div>
                                     {hasDiscount && (
                                       <p className="text-xs font-medium" style={{ color: "#16A34A" }}>
-                                        You save ${fareData.discountAmount.toFixed(2)}
+                                        You save {formatCurrency(fareData.discountAmount, "USD")}
                                       </p>
                                     )}
                                   </div>
@@ -2963,10 +2964,10 @@ export default function UnifiedBookingPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold">{VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}</p>
-                            <p className="text-base font-bold">${fareEstimate.finalFare.toFixed(2)}</p>
+                            <p className="text-base font-bold">{formatCurrency(fareEstimate.finalFare, "USD")}</p>
                           </div>
                           {fareEstimate.discountAmount > 0 && (
-                            <p className="text-xs" style={{ color: "#16A34A" }}>You save ${fareEstimate.discountAmount.toFixed(2)}</p>
+                            <p className="text-xs" style={{ color: "#16A34A" }}>You save {formatCurrency(fareEstimate.discountAmount, "USD")}</p>
                           )}
                         </div>
                         
@@ -3013,30 +3014,30 @@ export default function UnifiedBookingPage() {
                           <div className="pt-3 space-y-2 text-sm">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Base fare</span>
-                              <span className="font-medium">${fareEstimate.baseFare.toFixed(2)}</span>
+                              <span className="font-medium">{formatCurrency(fareEstimate.baseFare, "USD")}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Time ({fareEstimate.etaWithTrafficMinutes} min)</span>
-                              <span className="font-medium">${fareEstimate.timeFare.toFixed(2)}</span>
+                              <span className="font-medium">{formatCurrency(fareEstimate.timeFare, "USD")}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Distance ({fareEstimate.distanceMiles} mi)</span>
-                              <span className="font-medium">${fareEstimate.distanceFare.toFixed(2)}</span>
+                              <span className="font-medium">{formatCurrency(fareEstimate.distanceFare, "USD")}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Booking fee</span>
-                              <span className="font-medium">${fareEstimate.bookingFee.toFixed(2)}</span>
+                              <span className="font-medium">{formatCurrency(fareEstimate.bookingFee, "USD")}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Taxes & surcharges</span>
-                              <span className="font-medium">${fareEstimate.taxesAndSurcharges.toFixed(2)}</span>
+                              <span className="font-medium">{formatCurrency(fareEstimate.taxesAndSurcharges, "USD")}</span>
                             </div>
                             {fareEstimate.discountAmount > 0 && (
                               <>
                                 <div className="border-t pt-2 mt-2">
                                   <div className="flex justify-between">
                                     <span className="text-muted-foreground">Subtotal</span>
-                                    <span className="font-medium">${fareEstimate.originalFare.toFixed(2)}</span>
+                                    <span className="font-medium">{formatCurrency(fareEstimate.originalFare, "USD")}</span>
                                   </div>
                                 </div>
                                 <div className="flex justify-between" style={{ color: "#16A34A" }}>
@@ -3044,14 +3045,14 @@ export default function UnifiedBookingPage() {
                                     <Zap className="h-3 w-3" />
                                     {fareEstimate.promoCode || "Promo"}
                                   </span>
-                                  <span className="font-medium">-${fareEstimate.discountAmount.toFixed(2)}</span>
+                                  <span className="font-medium">-{formatCurrency(fareEstimate.discountAmount, "USD")}</span>
                                 </div>
                               </>
                             )}
                             <div className="border-t pt-2 mt-2">
                               <div className="flex justify-between text-base">
                                 <span className="font-bold">Total</span>
-                                <span className="font-bold">${fareEstimate.finalFare.toFixed(2)}</span>
+                                <span className="font-bold">{formatCurrency(fareEstimate.finalFare, "USD")}</span>
                               </div>
                             </div>
                           </div>
@@ -3084,7 +3085,7 @@ export default function UnifiedBookingPage() {
                                   </div>
                                   <div className="flex-1 text-left">
                                     <p className="font-semibold">{VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}</p>
-                                    <p className="text-xl font-bold">${fareEstimate.finalFare.toFixed(2)}</p>
+                                    <p className="text-xl font-bold">{formatCurrency(fareEstimate.finalFare, "USD")}</p>
                                     <p className="text-xs text-muted-foreground">
                                       {routes.findIndex(r => r.id === activeRouteId) === 0 ? "Fastest" : (activeRoute?.summary || "Route")} · {formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)} · {fareEstimate.distanceMiles} mi
                                     </p>
@@ -3278,12 +3279,12 @@ export default function UnifiedBookingPage() {
                                 {/* Final price */}
                                 <div className="flex items-baseline justify-between border-t pt-3">
                                   <span className="font-semibold">Final Price</span>
-                                  <span className="text-2xl font-bold">${fareEstimate.finalFare.toFixed(2)}</span>
+                                  <span className="text-2xl font-bold">{formatCurrency(fareEstimate.finalFare, "USD")}</span>
                                 </div>
                                 
                                 {fareEstimate.discountAmount > 0 && (
                                   <p className="text-sm text-green-600 mt-1">
-                                    Promo {fareEstimate.promoCode} applied · You saved ${fareEstimate.discountAmount.toFixed(2)}
+                                    Promo {fareEstimate.promoCode} applied · You saved {formatCurrency(fareEstimate.discountAmount, "USD")}
                                   </p>
                                 )}
                               </CardContent>
@@ -3408,11 +3409,11 @@ export default function UnifiedBookingPage() {
                             {/* Price row - aligned baseline */}
                             <div className="flex items-baseline gap-2 mt-1 flex-wrap">
                               <p className="text-2xl font-bold" data-testid="text-fare">
-                                ${fareEstimate.finalFare.toFixed(2)}
+                                {formatCurrency(fareEstimate.finalFare, "USD")}
                               </p>
                               {fareEstimate.discountAmount > 0 && (
                                 <p className="text-sm line-through text-muted-foreground">
-                                  ${fareEstimate.originalFare.toFixed(2)}
+                                  {formatCurrency(fareEstimate.originalFare, "USD")}
                                 </p>
                               )}
                             </div>
@@ -3420,7 +3421,7 @@ export default function UnifiedBookingPage() {
                             {fareEstimate.discountAmount > 0 && (
                               <div className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full w-fit" style={{ background: "#DCFCE7" }}>
                                 <Zap className="h-3 w-3" style={{ color: "#16A34A" }} />
-                                <span className="text-xs font-semibold" style={{ color: "#166534" }}>You save ${fareEstimate.discountAmount.toFixed(2)}</span>
+                                <span className="text-xs font-semibold" style={{ color: "#166534" }}>You save {formatCurrency(fareEstimate.discountAmount, "USD")}</span>
                               </div>
                             )}
                           </div>
@@ -3492,7 +3493,7 @@ export default function UnifiedBookingPage() {
                           ) : (
                             <>
                               Confirm {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                              <span className="ml-2 opacity-90">• ${fareEstimate.finalFare.toFixed(2)}</span>
+                              <span className="ml-2 opacity-90">• {formatCurrency(fareEstimate.finalFare, "USD")}</span>
                             </>
                           )}
                         </Button>
@@ -3632,7 +3633,7 @@ export default function UnifiedBookingPage() {
                 ) : (
                   <>
                     Request {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                    <span className="ml-2 opacity-90">• ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
+                    <span className="ml-2 opacity-90">• {fareEstimate ? formatCurrency(fareEstimate.finalFare, "USD") : "..."}</span>
                   </>
                 )}
               </Button>
@@ -3668,7 +3669,7 @@ export default function UnifiedBookingPage() {
                 ) : (
                   <>
                     Confirm {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                    <span className="ml-2 font-bold">· ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
+                    <span className="ml-2 font-bold">· {fareEstimate ? formatCurrency(fareEstimate.finalFare, "USD") : "..."}</span>
                   </>
                 )}
               </Button>

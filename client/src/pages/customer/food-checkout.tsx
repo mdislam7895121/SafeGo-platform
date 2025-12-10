@@ -5,6 +5,7 @@ import {
   AlertCircle, Store, Clock, CheckCircle, Shield, Home, Briefcase, ChevronRight,
   Loader2, X, DollarSign, Heart
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { CustomerHomeButton, BackToRestaurantsButton } from "@/components/customer/EatsNavigation";
 import { SiVisa, SiMastercard, SiAmericanexpress } from "react-icons/si";
 import { Button } from "@/components/ui/button";
@@ -374,7 +375,7 @@ export default function FoodCheckout() {
         setPromoInput("");
         toast({
           title: "Promo Applied",
-          description: response.messages?.[0] || `You saved $${response.discountAmount.toFixed(2)}!`,
+          description: response.messages?.[0] || `You saved ${formatCurrency(response.discountAmount, "USD")}!`,
         });
       }
     },
@@ -493,7 +494,7 @@ export default function FoodCheckout() {
       if (walletBalance < grandTotal) {
         return { 
           valid: false, 
-          error: `Insufficient wallet balance. You have $${walletBalance.toFixed(2)} but need $${grandTotal.toFixed(2)}.` 
+          error: `Insufficient wallet balance. You have ${formatCurrency(walletBalance, "USD")} but need ${formatCurrency(grandTotal, "USD")}.` 
         };
       }
       return { valid: true };
@@ -566,7 +567,7 @@ export default function FoodCheckout() {
     if (!hasMinimumOrder && state.restaurant?.minOrderAmount) {
       toast({
         title: "Minimum order not met",
-        description: `Add $${(state.restaurant.minOrderAmount - totals.subtotal).toFixed(2)} more to reach the minimum order.`,
+        description: `Add ${formatCurrency(state.restaurant.minOrderAmount - totals.subtotal, "USD")} more to reach the minimum order.`,
         variant: "destructive",
       });
       return false;
@@ -854,7 +855,7 @@ export default function FoodCheckout() {
                         >
                           <span>{mod.name}</span>
                           {mod.price > 0 && (
-                            <span className="text-xs">(+${mod.price.toFixed(2)})</span>
+                            <span className="text-xs">(+{formatCurrency(mod.price, "USD")})</span>
                           )}
                         </p>
                       ))}
@@ -862,7 +863,7 @@ export default function FoodCheckout() {
                   )}
                   <div className="flex items-center justify-between mt-2">
                     <span className="font-semibold" data-testid={`text-item-total-${item.id}`}>
-                      ${(item.price * item.quantity).toFixed(2)}
+                      {formatCurrency(item.price * item.quantity, "USD")}
                     </span>
                     <div className="flex items-center gap-2">
                       <Button
@@ -1006,7 +1007,7 @@ export default function FoodCheckout() {
                     data-testid={`button-tip-${percent}`}
                   >
                     <span className="font-semibold">{percent}%</span>
-                    <span className="text-sm opacity-80">${amount.toFixed(2)}</span>
+                    <span className="text-sm opacity-80">{formatCurrency(amount, "USD")}</span>
                   </Button>
                 );
               })}
@@ -1095,7 +1096,7 @@ export default function FoodCheckout() {
                   </Button>
                 </div>
                 <span className="text-sm text-green-600" data-testid="text-promo-savings">
-                  {state.promoFreeDelivery ? "Free Delivery!" : `-$${state.promoDiscount.toFixed(2)}`}
+                  {state.promoFreeDelivery ? "Free Delivery!" : `-${formatCurrency(state.promoDiscount, "USD")}`}
                 </span>
               </div>
             )}
@@ -1109,7 +1110,7 @@ export default function FoodCheckout() {
           <CardContent className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span data-testid="text-subtotal">${totals.subtotal.toFixed(2)}</span>
+              <span data-testid="text-subtotal">{formatCurrency(totals.subtotal, "USD")}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Delivery Fee</span>
@@ -1117,34 +1118,34 @@ export default function FoodCheckout() {
                 {totals.deliveryFee === 0 ? (
                   <span className="text-green-600">Free</span>
                 ) : (
-                  `$${totals.deliveryFee.toFixed(2)}`
+                  formatCurrency(totals.deliveryFee, "USD")
                 )}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Service Fee</span>
-              <span data-testid="text-service-fee">${totals.serviceFee.toFixed(2)}</span>
+              <span data-testid="text-service-fee">{formatCurrency(totals.serviceFee, "USD")}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Tax</span>
-              <span data-testid="text-tax">${totals.tax.toFixed(2)}</span>
+              <span data-testid="text-tax">{formatCurrency(totals.tax, "USD")}</span>
             </div>
             {tipAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Driver Tip</span>
-                <span data-testid="text-tip">${tipAmount.toFixed(2)}</span>
+                <span data-testid="text-tip">{formatCurrency(tipAmount, "USD")}</span>
               </div>
             )}
             {totals.discount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Discount</span>
-                <span data-testid="text-discount">-${totals.discount.toFixed(2)}</span>
+                <span data-testid="text-discount">-{formatCurrency(totals.discount, "USD")}</span>
               </div>
             )}
             <Separator />
             <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
-              <span data-testid="text-total">${grandTotal.toFixed(2)}</span>
+              <span data-testid="text-total">{formatCurrency(grandTotal, "USD")}</span>
             </div>
           </CardContent>
         </Card>
@@ -1158,7 +1159,7 @@ export default function FoodCheckout() {
                   Below Minimum Order
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                  Add ${(state.restaurant.minOrderAmount - totals.subtotal).toFixed(2)} more to meet the minimum order amount.
+                  Add {formatCurrency(state.restaurant.minOrderAmount - totals.subtotal, "USD")} more to meet the minimum order amount.
                 </p>
               </div>
             </CardContent>
@@ -1179,7 +1180,7 @@ export default function FoodCheckout() {
               Placing Order...
             </>
           ) : (
-            `Place Order • $${grandTotal.toFixed(2)}`
+            `Place Order • ${formatCurrency(grandTotal, "USD")}`
           )}
         </Button>
       </div>
@@ -1353,13 +1354,13 @@ export default function FoodCheckout() {
                     <div className="flex items-center gap-2">
                       <p className="font-medium">SafeGo Wallet</p>
                       <Badge variant="outline" className="font-mono text-sm">
-                        ${walletBalance.toFixed(2)}
+                        {formatCurrency(walletBalance, "USD")}
                       </Badge>
                     </div>
                     {walletBalance < grandTotal ? (
                       <p className="text-sm text-destructive flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
-                        Insufficient balance (need ${grandTotal.toFixed(2)})
+                        Insufficient balance (need {formatCurrency(grandTotal, "USD")})
                       </p>
                     ) : (
                       <p className="text-sm text-muted-foreground">Pay with your wallet balance</p>
@@ -1509,7 +1510,7 @@ export default function FoodCheckout() {
                 <Heart className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="font-medium">Driver Tip</p>
-                  <p className="text-sm text-muted-foreground">${tipAmount.toFixed(2)}</p>
+                  <p className="text-sm text-muted-foreground">{formatCurrency(tipAmount, "USD")}</p>
                 </div>
               </div>
             )}
@@ -1518,7 +1519,7 @@ export default function FoodCheckout() {
             
             <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
-              <span>${grandTotal.toFixed(2)}</span>
+              <span>{formatCurrency(grandTotal, "USD")}</span>
             </div>
           </div>
           
