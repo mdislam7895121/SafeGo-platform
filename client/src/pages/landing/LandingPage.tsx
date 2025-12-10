@@ -1102,75 +1102,7 @@ const CTASection = memo(function CTASection() {
   );
 });
 
-const LandingFooter = memo(function LandingFooter() {
-  return (
-    <footer className="bg-gray-900 text-gray-400 pt-16 pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12 mb-12">
-          <div>
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Company</h3>
-            <ul className="space-y-3 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">About us</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Press</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Services</h3>
-            <ul className="space-y-3 text-sm">
-              <li><Link href="/ride" className="hover:text-white transition-colors">Ride</Link></li>
-              <li><Link href="/food" className="hover:text-white transition-colors">Food</Link></li>
-              <li><Link href="/parcel" className="hover:text-white transition-colors">Parcel</Link></li>
-              <li><Link href="/shops" className="hover:text-white transition-colors">Shops</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Partners</h3>
-            <ul className="space-y-3 text-sm">
-              <li><Link href="/driver/signup" className="hover:text-white transition-colors">Drive with us</Link></li>
-              <li><Link href="/driver/signup" className="hover:text-white transition-colors">Deliver with us</Link></li>
-              <li><Link href="/restaurant/signup" className="hover:text-white transition-colors">Restaurant partners</Link></li>
-              <li><Link href="/business" className="hover:text-white transition-colors">Shop partners</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Support</h3>
-            <ul className="space-y-3 text-sm">
-              <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>
-              <li><a href="#safety" className="hover:text-white transition-colors">Safety</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-            </ul>
-          </div>
-        </div>
-        
-        <div className="border-t border-gray-800 pt-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold">S</span>
-              </div>
-              <span className="font-semibold text-white">SafeGo</span>
-            </div>
-            <p className="text-gray-500">&copy; {new Date().getFullYear()} SafeGo Global. All rights reserved.</p>
-            <div className="flex items-center gap-6">
-              <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
-              <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-              <Link href="/cookies" className="hover:text-white transition-colors">Cookie Policy</Link>
-            </div>
-          </div>
-          
-          <div className="mt-6 pt-6 border-t border-gray-800">
-            <p className="text-center text-xs text-gray-500">
-              SafeGo services are in testing mode. Some features are disabled or simulated. Public launch will include full KYC, payment, safety, and legal compliance systems.
-            </p>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-});
+import GlobalFooter from "@/components/landing/GlobalFooter";
 
 export default function LandingPage() {
   const [selectedRegion, setSelectedRegion] = useState<Region>("BD");
@@ -1213,7 +1145,10 @@ export default function LandingPage() {
         <FAQSection selectedRegion={selectedRegion} />
         <CTASection />
       </main>
-      <LandingFooter />
+      <GlobalFooter 
+        selectedRegion={selectedRegion === "GLOBAL" ? "BD" : selectedRegion}
+        onRegionChange={(region) => handleRegionChange(region)}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLandingSeo } from "@/components/landing/LandingSeo";
+import GlobalFooter from "@/components/landing/GlobalFooter";
 
 type Region = "BD" | "US" | "GLOBAL";
 
@@ -68,28 +69,6 @@ function HelpHeader() {
   );
 }
 
-function HelpFooter() {
-  return (
-    <footer className="bg-gray-900 text-gray-400 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold">S</span>
-            </div>
-            <span className="font-semibold text-white">SafeGo</span>
-          </div>
-          <p className="text-gray-500">&copy; {new Date().getFullYear()} SafeGo Global. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-            <Link href="/cookies" className="hover:text-white transition-colors">Cookie Policy</Link>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
 
 const FAQ_DATA: Record<string, { question: string; answer: string }[]> = {
   rides: [
@@ -359,7 +338,7 @@ export default function HelpPage() {
           </div>
         </section>
       </main>
-      <HelpFooter />
+      <GlobalFooter />
     </div>
   );
 }
