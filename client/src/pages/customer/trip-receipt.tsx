@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
 import { formatDurationMinutes } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface TripReceiptData {
   tripId: string;
@@ -121,17 +122,17 @@ Vehicle: ${vehicleCategory.displayName}
 
 FARE BREAKDOWN
 --------------
-Base Fare: $${fareBreakdown.baseFare.toFixed(2)}
-Distance (${receiptData.distanceMiles} mi × $${fareBreakdown.perMileRate.toFixed(2)}): $${fareBreakdown.distanceFare.toFixed(2)}
-Time (${receiptData.etaWithTrafficMinutes} min × $${fareBreakdown.perMinuteRate.toFixed(2)}): $${fareBreakdown.timeFare.toFixed(2)}
-Booking Fee: $${fareBreakdown.bookingFee.toFixed(2)}
-Taxes & Surcharges: $${fareBreakdown.taxesAndSurcharges.toFixed(2)}
-${fareBreakdown.minimumFareAdjustment > 0 ? `Minimum Fare Adjustment: $${fareBreakdown.minimumFareAdjustment.toFixed(2)}\n` : ''}
-Subtotal: $${fareBreakdown.subtotal.toFixed(2)}
-${fareBreakdown.discountAmount > 0 ? `Promo (${fareBreakdown.promoCode}): -$${fareBreakdown.discountAmount.toFixed(2)}\n` : ''}
+Base Fare: ${formatCurrency(fareBreakdown.baseFare, "USD")}
+Distance (${receiptData.distanceMiles} mi × ${formatCurrency(fareBreakdown.perMileRate, "USD")}): ${formatCurrency(fareBreakdown.distanceFare, "USD")}
+Time (${receiptData.etaWithTrafficMinutes} min × ${formatCurrency(fareBreakdown.perMinuteRate, "USD")}): ${formatCurrency(fareBreakdown.timeFare, "USD")}
+Booking Fee: ${formatCurrency(fareBreakdown.bookingFee, "USD")}
+Taxes & Surcharges: ${formatCurrency(fareBreakdown.taxesAndSurcharges, "USD")}
+${fareBreakdown.minimumFareAdjustment > 0 ? `Minimum Fare Adjustment: ${formatCurrency(fareBreakdown.minimumFareAdjustment, "USD")}\n` : ''}
+Subtotal: ${formatCurrency(fareBreakdown.subtotal, "USD")}
+${fareBreakdown.discountAmount > 0 ? `Promo (${fareBreakdown.promoCode}): -${formatCurrency(fareBreakdown.discountAmount, "USD")}\n` : ''}
 --------------
-TOTAL: $${fareBreakdown.finalFare.toFixed(2)}
-${receiptData.tipAmount ? `Tip: $${receiptData.tipAmount.toFixed(2)}` : ''}
+TOTAL: ${formatCurrency(fareBreakdown.finalFare, "USD")}
+${receiptData.tipAmount ? `Tip: ${formatCurrency(receiptData.tipAmount, "USD")}` : ''}
 
 Driver: ${driver.name}
 Vehicle: ${driver.carModel} (${driver.carColor}) - ${driver.plateNumber}
@@ -151,7 +152,7 @@ Thank you for riding with SafeGo!
   };
 
   const handleShare = async () => {
-    const shareText = `My SafeGo trip from ${receiptData.pickupAddress} to ${receiptData.dropoffAddress} - $${fareBreakdown.finalFare.toFixed(2)}`;
+    const shareText = `My SafeGo trip from ${receiptData.pickupAddress} to ${receiptData.dropoffAddress} - ${formatCurrency(fareBreakdown.finalFare, "USD")}`;
     
     if (navigator.share) {
       try {
@@ -272,29 +273,29 @@ Thank you for riding with SafeGo!
               {/* Base fare */}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Base fare</span>
-                <span data-testid="text-base-fare">${fareBreakdown.baseFare.toFixed(2)}</span>
+                <span data-testid="text-base-fare">{formatCurrency(fareBreakdown.baseFare, "USD")}</span>
               </div>
               
               {/* Distance fare */}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  Distance ({receiptData.distanceMiles} mi × ${fareBreakdown.perMileRate.toFixed(2)}/mi)
+                  Distance ({receiptData.distanceMiles} mi × {formatCurrency(fareBreakdown.perMileRate, "USD")}/mi)
                 </span>
-                <span data-testid="text-distance-fare">${fareBreakdown.distanceFare.toFixed(2)}</span>
+                <span data-testid="text-distance-fare">{formatCurrency(fareBreakdown.distanceFare, "USD")}</span>
               </div>
               
               {/* Time fare */}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  Time ({receiptData.etaWithTrafficMinutes} min × ${fareBreakdown.perMinuteRate.toFixed(2)}/min)
+                  Time ({receiptData.etaWithTrafficMinutes} min × {formatCurrency(fareBreakdown.perMinuteRate, "USD")}/min)
                 </span>
-                <span data-testid="text-time-fare">${fareBreakdown.timeFare.toFixed(2)}</span>
+                <span data-testid="text-time-fare">{formatCurrency(fareBreakdown.timeFare, "USD")}</span>
               </div>
               
               {/* Booking fee */}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Booking fee</span>
-                <span data-testid="text-booking-fee">${fareBreakdown.bookingFee.toFixed(2)}</span>
+                <span data-testid="text-booking-fee">{formatCurrency(fareBreakdown.bookingFee, "USD")}</span>
               </div>
               
               {/* Taxes */}
@@ -303,7 +304,7 @@ Thank you for riding with SafeGo!
                   <Building2 className="h-3 w-3" />
                   Taxes & surcharges
                 </span>
-                <span data-testid="text-taxes">${fareBreakdown.taxesAndSurcharges.toFixed(2)}</span>
+                <span data-testid="text-taxes">{formatCurrency(fareBreakdown.taxesAndSurcharges, "USD")}</span>
               </div>
               
               {/* Minimum fare adjustment */}
@@ -311,7 +312,7 @@ Thank you for riding with SafeGo!
                 <span className="text-muted-foreground">Minimum fare adjustment</span>
                 <span data-testid="text-min-fare" className={fareBreakdown.minimumFareAdjustment === 0 ? "text-muted-foreground" : ""}>
                   {fareBreakdown.minimumFareAdjustment > 0 
-                    ? `$${fareBreakdown.minimumFareAdjustment.toFixed(2)}`
+                    ? formatCurrency(fareBreakdown.minimumFareAdjustment, "USD")
                     : "Not applicable"
                   }
                 </span>
@@ -322,7 +323,7 @@ Thank you for riding with SafeGo!
               {/* Subtotal */}
               <div className="flex justify-between text-sm font-medium">
                 <span>Subtotal</span>
-                <span data-testid="text-subtotal">${fareBreakdown.subtotal.toFixed(2)}</span>
+                <span data-testid="text-subtotal">{formatCurrency(fareBreakdown.subtotal, "USD")}</span>
               </div>
               
               {/* Promo discount (if applicable) */}
@@ -332,7 +333,7 @@ Thank you for riding with SafeGo!
                     <Tag className="h-3 w-3" />
                     Promo ({fareBreakdown.promoCode})
                   </span>
-                  <span data-testid="text-discount">-${fareBreakdown.discountAmount.toFixed(2)}</span>
+                  <span data-testid="text-discount">-{formatCurrency(fareBreakdown.discountAmount, "USD")}</span>
                 </div>
               )}
 
@@ -341,14 +342,14 @@ Thank you for riding with SafeGo!
               {/* Final total */}
               <div className="flex justify-between items-center">
                 <span className="font-bold text-lg">Total</span>
-                <span className="font-bold text-2xl" data-testid="text-total">${fareBreakdown.finalFare.toFixed(2)}</span>
+                <span className="font-bold text-2xl" data-testid="text-total">{formatCurrency(fareBreakdown.finalFare, "USD")}</span>
               </div>
 
               {/* Tip (if any) */}
               {receiptData.tipAmount && receiptData.tipAmount > 0 && (
                 <div className="flex justify-between text-sm pt-2 border-t">
                   <span className="text-muted-foreground">Tip for driver</span>
-                  <span data-testid="text-tip">${receiptData.tipAmount.toFixed(2)}</span>
+                  <span data-testid="text-tip">{formatCurrency(receiptData.tipAmount, "USD")}</span>
                 </div>
               )}
 
@@ -358,7 +359,7 @@ Thank you for riding with SafeGo!
                   <p className="text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
                     <Percent className="h-4 w-4" />
                     <span>
-                      You saved <strong>${fareBreakdown.discountAmount.toFixed(2)}</strong> with {fareBreakdown.promoLabel || fareBreakdown.promoCode}
+                      You saved <strong>{formatCurrency(fareBreakdown.discountAmount, "USD")}</strong> with {fareBreakdown.promoLabel || fareBreakdown.promoCode}
                     </span>
                   </p>
                 </div>

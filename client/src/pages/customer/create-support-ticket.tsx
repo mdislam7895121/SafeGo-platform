@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 type Service = {
@@ -41,7 +42,7 @@ export default function CreateSupportTicket() {
       return data.orders.slice(0, 10).map((order: any) => ({
         id: order.id,
         type: "food_order",
-        label: `Food Order from ${order.restaurant?.restaurantName || "Unknown"} - $${order.totalAmount || "0.00"}`,
+        label: `Food Order from ${order.restaurant?.restaurantName || "Unknown"} - ${formatCurrency(Number(order.totalAmount) || 0, "USD")}`,
         date: order.createdAt
       }));
     }
@@ -55,7 +56,7 @@ export default function CreateSupportTicket() {
       return data.rides.slice(0, 10).map((ride: any) => ({
         id: ride.id,
         type: "ride",
-        label: `Ride on ${new Date(ride.createdAt).toLocaleDateString()} - $${ride.totalFare || "0.00"}`,
+        label: `Ride on ${new Date(ride.createdAt).toLocaleDateString()} - ${formatCurrency(Number(ride.totalFare) || 0, "USD")}`,
         date: ride.createdAt
       }));
     }
@@ -69,7 +70,7 @@ export default function CreateSupportTicket() {
       return data.deliveries.slice(0, 10).map((delivery: any) => ({
         id: delivery.id,
         type: "delivery",
-        label: `Parcel to ${delivery.dropoffAddress || "Unknown"} - $${delivery.totalFare || "0.00"}`,
+        label: `Parcel to ${delivery.dropoffAddress || "Unknown"} - ${formatCurrency(Number(delivery.totalFare) || 0, "USD")}`,
         date: delivery.createdAt
       }));
     }

@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEatsCart, type RestaurantInfo } from "@/contexts/EatsCartContext";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/formatCurrency";
 import CartDrawer from "@/components/customer/CartDrawer";
 import ItemDetailModal, { 
   type MenuItemDetail, 
@@ -799,7 +800,7 @@ export default function EatsRestaurant() {
                                   </p>
                                 )}
                                 <div className="flex items-center gap-1.5 mt-1">
-                                  <span className="font-semibold text-xs sm:text-sm">${item.price.toFixed(2)}</span>
+                                  <span className="font-semibold text-xs sm:text-sm">{formatCurrency(item.price, "USD")}</span>
                                   {item.calories && (
                                     <span className="text-[10px] text-muted-foreground">
                                       {item.calories} cal
@@ -868,7 +869,7 @@ export default function EatsRestaurant() {
           >
             <ShoppingCart className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">Cart ({cartItemCount})</span>
-            <span className="ml-auto font-bold flex-shrink-0">${cartTotals.total.toFixed(2)}</span>
+            <span className="ml-auto font-bold flex-shrink-0">{formatCurrency(cartTotals.total, "USD")}</span>
           </Button>
         </div>
       )}
@@ -940,7 +941,7 @@ export default function EatsRestaurant() {
                   onClick={confirmAddToCart}
                   data-testid="button-confirm-add-to-cart"
                 >
-                  Add to Cart - ${(selectedItem.price * itemQuantity).toFixed(2)}
+                  Add to Cart - {formatCurrency(selectedItem.price * itemQuantity, "USD")}
                 </Button>
               </DialogFooter>
             </>

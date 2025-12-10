@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ReviewSubmissionDialog } from "@/components/customer/ReviewSubmissionDialog";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { useToast } from "@/hooks/use-toast";
 import { useEatsCart } from "@/contexts/EatsCartContext";
 import { computeOrderTotals } from "@/lib/foodOrderUtils";
@@ -175,7 +176,7 @@ function OrderCard({
               
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <span className="text-lg font-bold" data-testid={`text-total-${order.id}`}>
-                  ${total.toFixed(2)}
+                  {formatCurrency(total, "USD")}
                 </span>
                 {isDelivered && (
                   <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" data-testid={`badge-status-${order.id}`}>

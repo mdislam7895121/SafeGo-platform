@@ -21,6 +21,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useEatsCart } from "@/contexts/EatsCartContext";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { computeOrderTotals } from "@/lib/foodOrderUtils";
 import {
   ArrowLeft,
@@ -496,10 +497,10 @@ export default function FoodOrderReceipt() {
     order.items.forEach((item) => {
       const qty = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
-      const itemTotal = (qty * price).toFixed(2);
+      const itemTotal = qty * price;
       doc.setFont("helvetica", "normal");
       doc.text(`${qty}x ${item.name || 'Item'}`, margin, y);
-      doc.text(`$${itemTotal}`, pageWidth - margin, y, { align: "right" });
+      doc.text(formatCurrency(itemTotal, "USD"), pageWidth - margin, y, { align: "right" });
       y += lineHeight;
     });
     y += 5;
@@ -517,37 +518,37 @@ export default function FoodOrderReceipt() {
 
     if (hasBreakdown) {
       doc.text("Subtotal", margin, y);
-      doc.text(`$${itemsSubtotal.toFixed(2)}`, pageWidth - margin, y, { align: "right" });
+      doc.text(formatCurrency(itemsSubtotal, "USD"), pageWidth - margin, y, { align: "right" });
       y += lineHeight;
 
       if (deliveryFee > 0) {
         doc.text("Delivery Fee", margin, y);
-        doc.text(`$${deliveryFee.toFixed(2)}`, pageWidth - margin, y, { align: "right" });
+        doc.text(formatCurrency(deliveryFee, "USD"), pageWidth - margin, y, { align: "right" });
         y += lineHeight;
       }
 
       if (taxAmount > 0) {
         doc.text("Tax", margin, y);
-        doc.text(`$${taxAmount.toFixed(2)}`, pageWidth - margin, y, { align: "right" });
+        doc.text(formatCurrency(taxAmount, "USD"), pageWidth - margin, y, { align: "right" });
         y += lineHeight;
       }
 
       if (tipAmount > 0) {
         doc.text("Tip", margin, y);
-        doc.text(`$${tipAmount.toFixed(2)}`, pageWidth - margin, y, { align: "right" });
+        doc.text(formatCurrency(tipAmount, "USD"), pageWidth - margin, y, { align: "right" });
         y += lineHeight;
       }
 
       if (discountAmount > 0) {
         doc.setTextColor(34, 139, 34);
         doc.text(`Discount${order.promoCode ? ` (${order.promoCode})` : ''}`, margin, y);
-        doc.text(`-$${discountAmount.toFixed(2)}`, pageWidth - margin, y, { align: "right" });
+        doc.text(`-${formatCurrency(discountAmount, "USD")}`, pageWidth - margin, y, { align: "right" });
         doc.setTextColor(0, 0, 0);
         y += lineHeight;
       }
     } else {
       doc.text("Order Total", margin, y);
-      doc.text(`$${total.toFixed(2)}`, pageWidth - margin, y, { align: "right" });
+      doc.text(formatCurrency(total, "USD"), pageWidth - margin, y, { align: "right" });
       y += lineHeight;
     }
 
@@ -558,7 +559,7 @@ export default function FoodOrderReceipt() {
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Total", margin, y);
-    doc.text(`$${total.toFixed(2)}`, pageWidth - margin, y, { align: "right" });
+    doc.text(formatCurrency(total, "USD"), pageWidth - margin, y, { align: "right" });
     y += 15;
 
     doc.setFontSize(10);
@@ -597,7 +598,7 @@ export default function FoodOrderReceipt() {
   };
 
   const handleShare = async () => {
-    const shareText = `SafeGo Eats order from ${order.restaurantName} - $${total.toFixed(2)} - Order #${order.orderCode || order.id.slice(0, 8).toUpperCase()}`;
+    const shareText = `SafeGo Eats order from ${order.restaurantName} - ${formatCurrency(total, "USD")} - Order #${order.orderCode || order.id.slice(0, 8).toUpperCase()}`;
     
     if (navigator.share) {
       try {
@@ -748,7 +749,7 @@ export default function FoodOrderReceipt() {
                     <span className="text-muted-foreground">
                       <span className="font-medium text-foreground">{qty}x</span> {item.name || 'Item'}
                     </span>
-                    <span className="font-medium">${(qty * price).toFixed(2)}</span>
+                    <span className="font-medium">{formatCurrency(qty * price, "USD")}</span>
                   </div>
                 );
               })}
@@ -766,41 +767,41 @@ export default function FoodOrderReceipt() {
                 <>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span data-testid="text-subtotal">${itemsSubtotal.toFixed(2)}</span>
+                    <span data-testid="text-subtotal">{formatCurrency(itemsSubtotal, "USD")}</span>
                   </div>
                   
                   {deliveryFee > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Delivery Fee</span>
-                      <span data-testid="text-delivery-fee">${deliveryFee.toFixed(2)}</span>
+                      <span data-testid="text-delivery-fee">{formatCurrency(deliveryFee, "USD")}</span>
                     </div>
                   )}
                   
                   {taxAmount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Tax</span>
-                      <span data-testid="text-tax">${taxAmount.toFixed(2)}</span>
+                      <span data-testid="text-tax">{formatCurrency(taxAmount, "USD")}</span>
                     </div>
                   )}
                   
                   {tipAmount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Tip</span>
-                      <span data-testid="text-tip">${tipAmount.toFixed(2)}</span>
+                      <span data-testid="text-tip">{formatCurrency(tipAmount, "USD")}</span>
                     </div>
                   )}
                   
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount{order.promoCode ? ` (${order.promoCode})` : ''}</span>
-                      <span data-testid="text-discount">-${discountAmount.toFixed(2)}</span>
+                      <span data-testid="text-discount">-{formatCurrency(discountAmount, "USD")}</span>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Order Total</span>
-                  <span data-testid="text-subtotal">${total.toFixed(2)}</span>
+                  <span data-testid="text-subtotal">{formatCurrency(total, "USD")}</span>
                 </div>
               )}
 
@@ -808,7 +809,7 @@ export default function FoodOrderReceipt() {
               
               <div className="flex justify-between items-center">
                 <span className="font-bold text-lg">Total</span>
-                <span className="font-bold text-2xl" data-testid="text-total">${total.toFixed(2)}</span>
+                <span className="font-bold text-2xl" data-testid="text-total">{formatCurrency(total, "USD")}</span>
               </div>
             </div>
           </CardContent>

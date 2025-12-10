@@ -45,6 +45,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { useLiveFoodTracking } from "@/hooks/useLiveFoodTracking";
 import { 
   FOOD_ORDER_STATUS_INFO, 
@@ -217,7 +218,7 @@ export default function FoodOrderTracking() {
       toast({
         title: "Order Cancelled",
         description: response.order?.refundAmount 
-          ? `Your order has been cancelled. A refund of $${response.order.refundAmount.toFixed(2)} will be processed.`
+          ? `Your order has been cancelled. A refund of ${formatCurrency(response.order.refundAmount, "USD")} will be processed.`
           : "Your order has been cancelled.",
       });
     },
@@ -627,7 +628,7 @@ export default function FoodOrderTracking() {
               {data.items.map((item, index) => (
                 <div key={index} className="flex justify-between text-sm" data-testid={`order-item-${index}`}>
                   <span>{item.quantity}x {item.name}</span>
-                  <span className="font-medium">${(item.quantity * item.price).toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(item.quantity * item.price, "USD")}</span>
                 </div>
               ))}
             </div>
@@ -639,18 +640,18 @@ export default function FoodOrderTracking() {
               {data.subtotal && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${parseFloat(data.subtotal).toFixed(2)}</span>
+                  <span>{formatCurrency(parseFloat(data.subtotal), "USD")}</span>
                 </div>
               )}
               {data.deliveryFee && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Delivery Fee</span>
-                  <span>${parseFloat(data.deliveryFee).toFixed(2)}</span>
+                  <span>{formatCurrency(parseFloat(data.deliveryFee), "USD")}</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold text-base pt-2 border-t">
                 <span>Total</span>
-                <span data-testid="text-order-total">${parseFloat(data.serviceFare).toFixed(2)}</span>
+                <span data-testid="text-order-total">{formatCurrency(parseFloat(data.serviceFare), "USD")}</span>
               </div>
             </div>
 

@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, User, Clock, Car, MapPin, Navigation, ChevronRight, UtensilsCrossed, Package, HelpCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -152,7 +153,7 @@ export default function CustomerActivity() {
                             <span className="text-sm text-muted-foreground">
                               {new Date(ride.createdAt).toLocaleDateString()}
                             </span>
-                            <span className="font-bold">${Number(ride.serviceFare).toFixed(2)}</span>
+                            <span className="font-bold">{formatCurrency(Number(ride.serviceFare), "USD")}</span>
                           </div>
                         </CardContent>
                       </Card>
@@ -206,7 +207,7 @@ export default function CustomerActivity() {
                             <span className="text-sm text-muted-foreground">
                               {new Date(ride.createdAt).toLocaleDateString()}
                             </span>
-                            <span className="font-bold">${Number(ride.serviceFare).toFixed(2)}</span>
+                            <span className="font-bold">{formatCurrency(Number(ride.serviceFare), "USD")}</span>
                           </div>
                         </CardContent>
                       </Card>

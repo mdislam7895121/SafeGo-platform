@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEatsCart } from "@/contexts/EatsCartContext";
@@ -283,7 +284,7 @@ export default function EatsHome() {
               <span>{restaurant.deliveryTime || '25-35'} min</span>
             </div>
             <span className="text-muted-foreground/40">·</span>
-            <span>{restaurant.deliveryFee ? `$${restaurant.deliveryFee.toFixed(2)} delivery` : 'Free delivery'}</span>
+            <span>{restaurant.deliveryFee ? `${formatCurrency(restaurant.deliveryFee, "USD")} delivery` : 'Free delivery'}</span>
           </div>
         </CardContent>
       </Card>
@@ -350,7 +351,7 @@ export default function EatsHome() {
               <span>{restaurant.deliveryTime || '25-35'} min</span>
             </div>
             <span className="text-muted-foreground/40">·</span>
-            <span>{restaurant.deliveryFee ? `$${restaurant.deliveryFee.toFixed(2)} delivery` : 'Free delivery'}</span>
+            <span>{restaurant.deliveryFee ? `${formatCurrency(restaurant.deliveryFee, "USD")} delivery` : 'Free delivery'}</span>
           </div>
         </CardContent>
       </Card>
@@ -429,7 +430,7 @@ export default function EatsHome() {
               <span>{restaurant.deliveryTime || '25-35'} min</span>
             </div>
             <span className="text-muted-foreground/40">·</span>
-            <span>{restaurant.deliveryFee ? `$${restaurant.deliveryFee.toFixed(2)} delivery` : 'Free delivery'}</span>
+            <span>{restaurant.deliveryFee ? `${formatCurrency(restaurant.deliveryFee, "USD")} delivery` : 'Free delivery'}</span>
           </div>
         </CardContent>
       </Card>
@@ -850,7 +851,7 @@ export default function EatsHome() {
           >
             <ShoppingCart className="h-5 w-5 flex-shrink-0" />
             <span className="truncate">View Cart ({cartItemCount} items)</span>
-            <span className="ml-auto font-bold flex-shrink-0">${cartTotals.total.toFixed(2)}</span>
+            <span className="ml-auto font-bold flex-shrink-0">{formatCurrency(cartTotals.total, "USD")}</span>
           </Button>
         </div>
       )}

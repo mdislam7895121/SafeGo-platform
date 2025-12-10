@@ -23,6 +23,7 @@ import GalleryModal from "@/components/customer/GalleryModal";
 import { PricingBreakdownModal } from "@/components/PricingBreakdownModal";
 import { useEatsCart, type RestaurantInfo } from "@/contexts/EatsCartContext";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface MenuItem {
   id: string;
@@ -748,7 +749,7 @@ export default function FoodRestaurantDetails() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Min Order:</span>
                     <span className="text-sm font-medium" data-testid="text-min-order">
-                      ${Number(operational.operational.minOrderAmount).toFixed(2)}
+                      {formatCurrency(Number(operational.operational.minOrderAmount), "USD")}
                     </span>
                   </div>
                 )}
@@ -793,7 +794,7 @@ export default function FoodRestaurantDetails() {
                         </div>
                         {operational.deliveryZone.deliveryFee !== null && (
                           <p className="text-xs text-green-800 dark:text-green-300" data-testid="text-delivery-fee">
-                            Delivery fee: ${Number(operational.deliveryZone.deliveryFee).toFixed(2)}
+                            Delivery fee: {formatCurrency(Number(operational.deliveryZone.deliveryFee), "USD")}
                           </p>
                         )}
                         {operational.deliveryZone.estimatedTimeMinutes && (
@@ -898,9 +899,9 @@ export default function FoodRestaurantDetails() {
                 {pricingData.dynamicPricingBreakdown && (
                   <div className="p-3 bg-muted/50 rounded-lg border" data-testid="card-price-estimate">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Example Order ($100)</span>
+                      <span className="text-sm text-muted-foreground">Example Order ({formatCurrency(100, "USD")})</span>
                       <span className="text-lg font-bold text-primary" data-testid="text-estimated-price">
-                        ${pricingData.dynamicPricingBreakdown.finalPrice.toFixed(2)}
+                        {formatCurrency(pricingData.dynamicPricingBreakdown.finalPrice, "USD")}
                       </span>
                     </div>
                     <div className="space-y-1 text-xs text-muted-foreground">
@@ -1071,7 +1072,7 @@ export default function FoodRestaurantDetails() {
                       )}
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-semibold text-lg" data-testid={`text-item-price-${item.id}`}>
-                          ${item.price.toFixed(2)}
+                          {formatCurrency(item.price, "USD")}
                         </span>
                         {getItemQuantity(item.id) > 0 ? (
                           <div className="flex items-center gap-2">
@@ -1132,7 +1133,7 @@ export default function FoodRestaurantDetails() {
             <Badge variant="secondary" className="ml-auto" data-testid="badge-cart-count">
               {cartItemCount} item{cartItemCount !== 1 ? "s" : ""}
             </Badge>
-            <span className="font-bold">${cartState.items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}</span>
+            <span className="font-bold">{formatCurrency(cartState.items.reduce((sum, item) => sum + item.price * item.quantity, 0), "USD")}</span>
           </Button>
         </div>
       )}

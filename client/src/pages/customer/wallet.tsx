@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Wallet as WalletIcon, TrendingUp, TrendingDown, Clock } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,7 +66,7 @@ export default function CustomerWallet() {
               <p className="text-sm opacity-90">Available Balance</p>
             </div>
             <p className="text-4xl font-bold mb-1" data-testid="text-balance">
-              ${wallet?.balance ? parseFloat(wallet.balance).toFixed(2) : "0.00"}
+              {formatCurrency(wallet?.balance ? parseFloat(wallet.balance) : 0, "USD")}
             </p>
             <p className="text-xs opacity-75">Last updated just now</p>
           </CardContent>
