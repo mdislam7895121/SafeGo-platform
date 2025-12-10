@@ -1,0 +1,219 @@
+You are working on the SafeGo monorepo. The **backend and main business rules are already audited and considered production-ready**. Do NOT redesign pricing, commission, region rules, or KYC logic. Your job now is to **implement concrete frontend fixes** based on a completed audit.
+
+Context:
+- Frontend lives in `client/src/...`
+- Shared API client lives in `client/src/lib/queryClient.ts` and **must be the single source of truth** for authenticated HTTP calls.
+- Backend already exposes all required endpoints (rides, fares, maps, tickets, food orders, parcel, auth, admin, etc.).
+
+The full frontend audit is already done. Do NOT re-audit. Instead, **implement the fixes in this priority order**, and after each group of changes, run TypeScript build + basic local tests.
+
+====================================
+PRIORITY 1 – TOKEN & AUTH CONSISTENCY
+====================================
+
+Goal: There must be **one canonical token key** and one way to talk to the backend.
+
+1. Standardize token storage key
+   - Canonical key: `safego_token`
+   - Files currently using other keys:
+     - `localStorage.getItem("token")`
+       - `client/src/hooks/useRideChat.ts`
+       - `client/src/hooks/use-admin-notifications-ws.ts`
+       - `client/src/pages/driver/map.tsx`
+       - `client/src/pages/driver/trip-earnings.tsx`
+       - `client/src/pages/driver/trip-detail.tsx`
+       - `client/src/pages/driver/trips.tsx`
+       - `client/src/pages/driver/support-chat.tsx`
+       - `client/src/pages/customer/unified-booking.tsx`
+       - `client/src/components/customer/SupportChatDrawer.tsx`
+       - `client/src/pages/admin/observability-center.tsx`
+     - `localStorage.getItem("auth_token")`
+       - `client/src/components/ProfilePhotoUploader.tsx`
+       - `client/src/hooks/use-food-order-notifications.ts`
+     - `localStorage.getItem("safego_token")`
+       - Already used in `AuthContext.tsx`, `queryClient.ts`, `signup*`, some driver/account files.
+
+   IMPLEMENTATION:
+   - Create a small util in `client/src/lib/authToken.ts`:
+
+     - `getAuthToken(): string | null`
+     - `setAuthToken(token: string | null): void`
+     - Internally read/write only `localStorage["safego_token"]`.
+     - Also expose `clearAllLegacyTokens()` that removes `"token"` and `"auth_token"` keys from `localStorage`.
+
+   - Update:
+     - `AuthContext.tsx`, `queryClient.ts`, signup and any other auth-related files to use this utility instead of raw `localStorage` access.
+     - All other files listed above must be refactored to use `getAuthToken()` instead of `"token"` or `"auth_token"`.
+
+   - Ensure logout path:
+     - Central logout logic must call `clearAllLegacyTokens()` so all token variants are removed.
+
+   - WebSockets:
+     - Any WebSocket hook (e.g. `use-admin-notifications-ws.ts`) must call `getAuthToken()` **at connection time** and also listen for token changes if possible (e.g. reconnect when token changes).
+
+2. Replace all raw `fetch()` calls with `apiRequest()`
+   - Except inside `queryClient.ts` and core auth bootstrap (if strictly necessary), **no component or hook may call `fetch` directly for API calls**.
+   - Use `apiRequest` from `@/lib/queryClient` so that:
+     - Authorization header is added consistently.
+     - `credentials: "include"` is set.
+     - 401 responses trigger refresh and retry.
+
+   TARGET FILES (at minimum):
+   - `client/src/pages/customer/bd-ride-booking.tsx`
+   - `client/src/pages/customer/ride-request-page.tsx`
+   - `client/src/pages/customer/parcel-request.tsx`
+   - `client/src/pages/customer/food-restaurant-details.tsx`
+   - `client/src/pages/customer/eats-restaurant.tsx`
+   - `client/src/pages/customer/eats-home.tsx`
+   - `client/src/pages/customer/food-restaurants.tsx`
+   - `client/src/hooks/useRideChat.ts`
+   - `client/src/hooks/use-privacy-policy.ts`
+   - `client/src/hooks/useGoogleMaps.ts` (keep its behavior but route through `apiRequest` when calling our own backend like `/api/maps/config`)
+   - `client/src/components/ProfilePhotoUploader.tsx`
+   - `client/src/components/customer/CustomerEatsHome.tsx`
+   - `client/src/components/customer/SupportChatDrawer.tsx`
+   - `client/src/components/chat/SupportChat.tsx`
+   - `client/src/components/support/UserSupportChat.tsx`
+   - All admin pages using manual `fetch`.
+
+   IMPLEMENTATION NOTES:
+   - Keep request URLs and payloads identical; just route through `apiRequest(url, { method, body, ... })`.
+   - Handle JSON parsing via `apiRequest`’s built-in behavior; remove duplicate `response.ok` checks where redundant.
+   - After refactor, ensure no remaining production `fetch()` calls to our API endpoints via a quick repo search.
+
+====================================
+PRIORITY 2 – REMOVE MOCK DATA & FIX TICKET SEARCH
+====================================
+
+Issue A1 – `bd/ticket-search.tsx` still uses mock results.
+
+1. File: `client/src/pages/bd/ticket-search.tsx`
+   - Remove `MOCK_RESULTS` array and any fallback fake data.
+   - Implement real search using backend endpoint (assume `/api/bd/tickets/search`):
+
+     - Use `apiRequest("/api/bd/tickets/search", { method: "POST", body: JSON.stringify(query) })`.
+     - Query payload should include from, to, date, passenger count, etc., based on existing UI state.
+
+   - Implement robust states:
+     - Loading state (spinner or skeleton list).
+     - Empty state: `"No buses found for your search."` when the API returns an empty list.
+     - Error state: show clear message if the API fails (but **do not** silently fall back to mock data).
+
+   - Ensure all ticket list rendering uses real API data fields (operator name, departure time, arrival time, fare, seat class, etc.).
+
+====================================
+PRIORITY 3 – CURRENCY & PAYMENT RULES
+====================================
+
+Goal: Always trust backend for currency and enforce country-specific payment rules.
+
+1. Replace hardcoded currency symbols
+   - Files with `$` or `৳` hardcoded:
+     - `client/src/pages/rider/trip/receipt.tsx`
+     - `client/src/pages/rider/trip/active.tsx`
+     - `client/src/pages/rider/wallet.tsx`
+     - `client/src/pages/rider/orders.tsx`
+     - `client/src/pages/rider/trips.tsx`
+     - `client/src/pages/rider/parcels.tsx`
+     - `client/src/pages/admin/delivery-driver-verification.tsx`
+     - `client/src/pages/restaurant/order-details.tsx`
+     - `client/src/pages/restaurant/orders-live.tsx`
+
+   IMPLEMENTATION:
+   - Use a single helper, e.g. `formatCurrency(amount, currency)` from a shared util (or create it in `client/src/lib/formatters.ts` if not already present).
+   - Source of truth for currency:
+     - Prefer `fareCurrency` / `currency` field from backend response (ride, order, wallet).
+     - Fallback to `user?.currency` from auth context if needed.
+   - Remove all hardcoded `$` and `৳` from these pages; they must format based on the currency code.
+
+2. Enforce payment method rules
+   - US: `user.countryCode === "US"` → **cash is NOT allowed** for rides, food, parcel.
+   - BD: cash and online both allowed, but must respect backend flags (e.g., `cashAllowed`, `onlineAllowed` on vehicle/restaurant/delivery options).
+
+   Files to update:
+   - `client/src/pages/customer/food-order.tsx`
+   - `client/src/pages/customer/parcel-request.tsx`
+   - `client/src/pages/customer/food-checkout.tsx` (and any other checkout pages)
+
+   IMPLEMENTATION:
+   - Use `user.countryCode` from AuthContext.
+   - Hide or disable the "Cash" option when `user.countryCode === "US"`.
+   - Additionally, respect backend flags (where available) to disable methods that are not allowed for a given service.
+
+====================================
+PRIORITY 4 – ROUTE POLYLINE & MAP EXPERIENCE
+====================================
+
+Goal: Wherever backend provides `routePolyline`, show the actual route on the map.
+
+1. Centralize `decodePolyline`
+   - Choose a single implementation in a shared file (e.g. `client/src/lib/locationService.ts` or `client/src/lib/formatters.ts`).
+   - Remove duplicated implementations from:
+     - `ride-request-page.tsx`
+     - `ride-tracking-page.tsx`
+     - `bd-ride-booking.tsx`
+     - any other files with their own decodePolyline.
+   - Import the shared helper wherever needed.
+
+2. Render `<Polyline>` wherever `routePolyline` exists
+   - `client/src/pages/rider/trip/active.tsx`
+   - `client/src/pages/customer/bd-ride-booking.tsx`
+   - `client/src/pages/customer/ride-tracking-page.tsx`
+   - `client/src/pages/customer/food-order-tracking.tsx` (if tracking driver route)
+
+   IMPLEMENTATION:
+   - When `routePolyline` is non-null:
+     - Decode it into Leaflet lat/lng positions.
+     - Render `<Polyline positions={decodedPath} />` within the map.
+   - Ensure Map bounds include pickup, dropoff, and the polyline path.
+   - Provide a minimal loading state or graceful fallback when `routePolyline` is not yet loaded.
+
+3. Avoid hardcoded default centers where possible
+   - Replace BD/US hardcoded coordinates in:
+     - `ride-request-page.tsx`
+     - `bd-ride-booking.tsx`
+   - Prefer:
+     - User’s current or last known location, or
+     - A backend-provided default (if `/api/config/region-defaults` or similar exists).
+   - If you must keep defaults, keep them but clearly mark them as temporary and ensure they do not override valid backend coordinates.
+
+====================================
+PRIORITY 5 – EMPTY STATES & UX POLISH
+====================================
+
+1. Empty states for “no results”
+   - `client/src/pages/bd/ticket-search.tsx`
+   - `client/src/pages/customer/food-restaurants.tsx`
+   - `client/src/pages/customer/eats-home.tsx`
+
+   IMPLEMENTATION:
+   - When result arrays are empty and not loading, show a friendly message:
+     - Example: `"No results found for your search. Try changing filters or location."`
+
+2. Improve error clarity
+   - For geocoding and maps errors, replace generic toasts with more specific messages, e.g.:
+     - `"We couldn't resolve this address. Please try a different location."`
+     - `"Location services are unavailable. Check your internet connection and try again."`
+
+====================================
+CONSTRAINTS & PROCESS
+====================================
+
+- Do NOT change backend business logic (pricing formulas, commission structure, region rules, KYC requirements).
+- Do NOT introduce new environment variables or external services without necessity.
+- Keep all changes **incremental and type-safe**:
+  - Prefer adding/aligning TypeScript interfaces instead of using `any`.
+- After each major group of changes (Priority 1, 2, 3, 4, 5):
+  - Run TypeScript build / lint.
+  - Run the app and manually sanity-check:
+    - Customer ride booking (BD + US)
+    - Ride tracking page
+    - Food order flow
+    - Parcel flow
+    - Ticket search page
+- At the end, produce a concise summary:
+  - Files changed (with paths)
+  - For each priority item, what you implemented
+  - Any TODOs you intentionally left for future work.
+
+Start now with PRIORITY 1 (token key consistency and fetch → apiRequest migration), then proceed sequentially through the priorities.

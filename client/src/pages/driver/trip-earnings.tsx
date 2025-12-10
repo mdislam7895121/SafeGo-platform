@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import {
   ArrowLeft,
@@ -120,22 +121,13 @@ export default function DriverTripEarnings() {
   const serviceType = searchParams.get("serviceType");
 
   const { data, isLoading, error } = useQuery<EarningsResponse>({
-    queryKey: ["/api/driver/trips", tripId, "earnings"],
+    queryKey: ["/api/driver/trips", tripId, "earnings", serviceType],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (serviceType) {
         params.set("serviceType", serviceType);
       }
-      const response = await fetch(`/api/driver/trips/${tripId}/earnings?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to fetch earnings");
-      }
-      return response.json();
+      return apiRequest(`/api/driver/trips/${tripId}/earnings?${params.toString()}`);
     },
   });
 

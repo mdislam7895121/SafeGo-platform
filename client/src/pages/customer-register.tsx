@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Car, Package, UtensilsCrossed, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { setAuthToken } from "@/lib/authToken";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -201,8 +202,8 @@ export default function CustomerRegister() {
         }),
       });
 
-      // Store token
-      localStorage.setItem("token", loginResponse.token);
+      // Store token using centralized utility
+      setAuthToken(loginResponse.token);
 
       // Step 3: Update customer profile with all KYC data
       const profileData: any = {

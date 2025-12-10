@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/authToken";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -63,18 +65,10 @@ export function SupportChatDrawer({
 
   const fetchMessages = useCallback(async (convId: string) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/support/chat/messages?conversationId=${convId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.messages || []);
-        if (data.conversation) {
-          setConversationStatus(data.conversation.status);
-        }
+      const data = await apiRequest(`/api/support/chat/messages?conversationId=${convId}`);
+      setMessages(data.messages || []);
+      if (data.conversation) {
+        setConversationStatus(data.conversation.status);
       }
     } catch (error) {
       console.error("[SupportChat] Failed to fetch messages:", error);
@@ -84,40 +78,24 @@ export function SupportChatDrawer({
   const startOrResumeConversation = useCallback(async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      
-      const verifyResponse = await fetch("/api/support/chat/verify", {
+      const verifyData = await apiRequest("/api/support/chat/verify", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       });
       
-      if (!verifyResponse.ok) {
-        throw new Error("Verification failed");
-      }
-      
-      const verifyData = await verifyResponse.json();
       const convId = verifyData.conversationId;
       setConversationId(convId);
 
-      const startResponse = await fetch("/api/support/chat/start", {
+      const data = await apiRequest("/api/support/chat/start", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       });
 
-      if (startResponse.ok) {
-        const data = await startResponse.json();
-        setMessages(data.messages || []);
-        setConversationStatus(data.conversation?.status || "open");
-        setIsConnected(true);
-        
-        connectWebSocket(convId);
-      }
+      setMessages(data.messages || []);
+      setConversationStatus(data.conversation?.status || "open");
+      setIsConnected(true);
+      
+      connectWebSocket(convId);
     } catch (error) {
       console.error("[SupportChat] Failed to start conversation:", error);
     } finally {
@@ -126,7 +104,7 @@ export function SupportChatDrawer({
   }, []);
 
   const connectWebSocket = useCallback((convId: string) => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -217,23 +195,15 @@ export function SupportChatDrawer({
 
     setIsSending(true);
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/support/chat/messages", {
+      const data = await apiRequest("/api/support/chat/messages", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId,
           content: text.trim(),
         }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.messages || []);
-      }
+      setMessages(data.messages || []);
     } catch (error) {
       console.error("[SupportChat] Failed to send message:", error);
     } finally {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +73,50 @@ import {
 } from "@/lib/bd-ticket-types";
 import { getRouteDetails } from "@/lib/bd-routes";
 
+interface TicketOperator {
+  id: string;
+  operatorName: string;
+  logo: string | null;
+  averageRating: number | null;
+  totalRatings: number;
+}
+
+interface TicketListing {
+  id: string;
+  routeName: string;
+  vehicleType: string;
+  vehicleBrand: string | null;
+  originCity: string;
+  originStation: string | null;
+  destinationCity: string;
+  destinationStation: string | null;
+  departureTime: string;
+  arrivalTime: string | null;
+  durationMinutes: number | null;
+  basePrice: string;
+  discountPrice: string | null;
+  availableSeats: number;
+  totalSeats: number;
+  amenities: string[];
+  operator: TicketOperator;
+}
+
+interface TicketSearchResponse {
+  listings: TicketListing[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  searchParams: {
+    originCity: string;
+    destinationCity: string;
+    journeyDate: string;
+    dayOfWeek: string;
+  };
+}
+
 interface TicketResult {
   id: string;
   coachName: string;
@@ -93,84 +138,38 @@ interface TicketResult {
   seats?: SeatState[];
 }
 
-const MOCK_RESULTS: TicketResult[] = [
-  {
-    id: "1",
-    coachName: "গ্রীনলাইন এক্সপ্রেস",
-    operatorName: "গ্রীনলাইন পরিবহন",
-    originCity: "Dhaka",
-    originCityBn: "ঢাকা",
-    destinationCity: "Chattogram",
-    destinationCityBn: "চট্টগ্রাম",
-    departureTime: "06:00",
-    arrivalTime: "12:00",
-    duration: "৬ ঘণ্টা",
-    busType: "ac",
+const mapListingToTicketResult = (listing: TicketListing): TicketResult => {
+  const durationHours = listing.durationMinutes ? Math.floor(listing.durationMinutes / 60) : 0;
+  const durationMins = listing.durationMinutes ? listing.durationMinutes % 60 : 0;
+  const durationStr = durationMins > 0 ? `${durationHours} ঘণ্টা ${durationMins} মিনিট` : `${durationHours} ঘণ্টা`;
+  
+  const busTypeMap: Record<string, BusTypeId> = {
+    "ac_bus": "ac",
+    "bus": "non_ac",
+    "coach": "ac_business",
+    "train": "non_ac",
+  };
+
+  return {
+    id: listing.id,
+    coachName: listing.routeName || `${listing.originCity} - ${listing.destinationCity}`,
+    operatorName: listing.operator.operatorName,
+    originCity: listing.originCity,
+    originCityBn: listing.originCity,
+    destinationCity: listing.destinationCity,
+    destinationCityBn: listing.destinationCity,
+    departureTime: listing.departureTime,
+    arrivalTime: listing.arrivalTime || "",
+    duration: durationStr,
+    busType: busTypeMap[listing.vehicleType] || "non_ac",
     seatLayout: "2x2",
-    fare: 1200,
-    totalSeats: 40,
-    availableSeats: 15,
-    rating: 4.5,
-    amenities: ["AC", "WiFi", "USB চার্জিং"],
-  },
-  {
-    id: "2",
-    coachName: "শ্যামলী সুপার",
-    operatorName: "শ্যামলী পরিবহন",
-    originCity: "Dhaka",
-    originCityBn: "ঢাকা",
-    destinationCity: "Chattogram",
-    destinationCityBn: "চট্টগ্রাম",
-    departureTime: "08:30",
-    arrivalTime: "14:30",
-    duration: "৬ ঘণ্টা",
-    busType: "ac_business",
-    seatLayout: "2x1",
-    fare: 1500,
-    totalSeats: 30,
-    availableSeats: 8,
-    rating: 4.8,
-    amenities: ["AC", "WiFi", "USB চার্জিং", "স্ন্যাকস"],
-  },
-  {
-    id: "3",
-    coachName: "হানিফ এক্সপ্রেস",
-    operatorName: "হানিফ এন্টারপ্রাইজ",
-    originCity: "Dhaka",
-    originCityBn: "ঢাকা",
-    destinationCity: "Chattogram",
-    destinationCityBn: "চট্টগ্রাম",
-    departureTime: "10:00",
-    arrivalTime: "16:00",
-    duration: "৬ ঘণ্টা",
-    busType: "non_ac",
-    seatLayout: "2x2",
-    fare: 700,
-    totalSeats: 44,
-    availableSeats: 25,
-    rating: 4.2,
-    amenities: ["পানি"],
-  },
-  {
-    id: "4",
-    coachName: "সোহাগ ডিলাক্স",
-    operatorName: "সোহাগ পরিবহন",
-    originCity: "Dhaka",
-    originCityBn: "ঢাকা",
-    destinationCity: "Chattogram",
-    destinationCityBn: "চট্টগ্রাম",
-    departureTime: "22:00",
-    arrivalTime: "04:00",
-    duration: "৬ ঘণ্টা",
-    busType: "sleeper",
-    seatLayout: "1x1_sleeper",
-    fare: 2000,
-    totalSeats: 20,
-    availableSeats: 5,
-    rating: 4.7,
-    amenities: ["AC", "স্লিপার সিট", "কম্বল", "বালিশ"],
-  },
-];
+    fare: parseFloat(listing.discountPrice || listing.basePrice),
+    totalSeats: listing.totalSeats,
+    availableSeats: listing.availableSeats,
+    rating: listing.operator.averageRating || 4.0,
+    amenities: listing.amenities || [],
+  };
+};
 
 export default function TicketSearchPage() {
   const [, setLocation] = useLocation();
@@ -199,18 +198,23 @@ export default function TicketSearchPage() {
     setIsSearching(true);
     setHasSearched(true);
     
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    const filtered = MOCK_RESULTS.filter((r) => {
-      const matchesOrigin = r.originCity.toLowerCase().includes(originCity.toLowerCase()) ||
-                           r.originCityBn.includes(originCity);
-      const matchesDest = r.destinationCity.toLowerCase().includes(destinationCity.toLowerCase()) ||
-                         r.destinationCityBn.includes(destinationCity);
-      return matchesOrigin && matchesDest;
-    });
-    
-    setResults(filtered.length > 0 ? filtered : MOCK_RESULTS);
-    setIsSearching(false);
+    try {
+      const journeyDate = format(travelDate, "yyyy-MM-dd");
+      const response: TicketSearchResponse = await apiRequest(
+        `/api/tickets/search?originCity=${encodeURIComponent(originCity)}&destinationCity=${encodeURIComponent(destinationCity)}&journeyDate=${journeyDate}`
+      );
+      
+      if (response.listings && response.listings.length > 0) {
+        setResults(response.listings.map(mapListingToTicketResult));
+      } else {
+        setResults([]);
+      }
+    } catch (error) {
+      console.error("Ticket search error:", error);
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleSwapCities = () => {

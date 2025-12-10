@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useLocation } from "wouter";
 import { getPostLoginPath } from "@/lib/roleRedirect";
+import { getAuthToken, setAuthToken, clearAllLegacyTokens } from "@/lib/authToken";
 
 interface User {
   id: string;
@@ -29,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const validateSession = async () => {
-      const storedToken = localStorage.getItem("safego_token");
+      const storedToken = getAuthToken();
       const storedUser = localStorage.getItem("safego_user");
 
       if (storedToken && storedUser) {
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(JSON.parse(storedUser));
           } else {
             // Token is invalid/expired, clear the stored data
-            localStorage.removeItem("safego_token");
+            setAuthToken(null);
             localStorage.removeItem("safego_user");
             setToken(null);
             setUser(null);
@@ -81,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await response.json();
     
     // Store auth data FIRST before any state updates
-    localStorage.setItem("safego_token", data.token);
+    setAuthToken(data.token);
     localStorage.setItem("safego_user", JSON.stringify(data.user));
     
     // Update React state
@@ -129,11 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     
     // Clear all localStorage items related to SafeGo
-    localStorage.removeItem("safego_token");
+    clearAllLegacyTokens();
     localStorage.removeItem("safego_user");
     localStorage.removeItem("safego_eats_cart");
     localStorage.removeItem("safego_ride_booking");
-    localStorage.removeItem("auth_token");
     
     // Clear all sessionStorage
     sessionStorage.clear();

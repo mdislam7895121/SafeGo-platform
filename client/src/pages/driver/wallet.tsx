@@ -92,11 +92,7 @@ export default function DriverWallet() {
   // Fetch wallet summary (unified payout API)
   const { data: summary, isLoading: loadingSummary } = useQuery<WalletSummary>({
     queryKey: ["/api/payout/summary"],
-    queryFn: async () => {
-      const response = await fetch("/api/payout/summary", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch wallet summary");
-      return response.json();
-    },
+    queryFn: () => apiRequest("/api/payout/summary"),
   });
 
   // Fetch recent payouts (unified payout API)
@@ -106,21 +102,13 @@ export default function DriverWallet() {
     hasMore: boolean;
   }>({
     queryKey: ["/api/payout/history"],
-    queryFn: async () => {
-      const response = await fetch("/api/payout/history?limit=5", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch payouts");
-      return response.json();
-    },
+    queryFn: () => apiRequest("/api/payout/history?limit=5"),
   });
 
   // Fetch payout methods (unified payout API)
   const { data: payoutMethodsData, isLoading: loadingMethod } = useQuery<PayoutMethodsResponse>({
     queryKey: ["/api/payout/methods"],
-    queryFn: async () => {
-      const response = await fetch("/api/payout/methods", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch payout methods");
-      return response.json();
-    },
+    queryFn: () => apiRequest("/api/payout/methods"),
   });
 
   // Cash out / payout request mutation (unified payout API)

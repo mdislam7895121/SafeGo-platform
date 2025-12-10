@@ -85,13 +85,7 @@ export default function DriverPayouts() {
 
   const { data: payoutsData, isLoading: loadingPayouts } = useQuery<PayoutsResponse>({
     queryKey: ["/api/driver/payouts", page],
-    queryFn: async () => {
-      const response = await fetch(`/api/driver/payouts?page=${page}&limit=20`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch payouts");
-      return response.json();
-    },
+    queryFn: () => apiRequest(`/api/driver/payouts?page=${page}&limit=20`),
   });
 
   const { data: payoutMethod, isLoading: loadingMethod } = useQuery<PayoutMethod>({

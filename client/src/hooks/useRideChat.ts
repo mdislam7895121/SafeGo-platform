@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getAuthToken } from "@/lib/authToken";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ChatMessage {
   id: string;
@@ -55,20 +57,12 @@ export function useRideChat({
     if (!rideId) return;
     
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/rides/${rideId}/chat`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.messages || []);
-        const unread = (data.messages || []).filter(
-          (m: ChatMessage) => m.senderRole === "driver" && !m.isRead
-        ).length;
-        setUnreadCount(unread);
-      }
+      const data = await apiRequest(`/api/rides/${rideId}/chat`);
+      setMessages(data.messages || []);
+      const unread = (data.messages || []).filter(
+        (m: ChatMessage) => m.senderRole === "driver" && !m.isRead
+      ).length;
+      setUnreadCount(unread);
     } catch (error) {
       console.error("[useRideChat] Failed to fetch messages:", error);
     }
@@ -88,7 +82,7 @@ export function useRideChat({
 
     fetchMessages();
 
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";

@@ -64,6 +64,7 @@ import { useDriverNavigation } from "@/hooks/useDriverNavigation";
 import { useDriverAvailability } from "@/hooks/useDriverAvailability";
 import { IncomingTripRequest, type TripRequest } from "@/components/driver/IncomingTripRequest";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/authToken";
 import {
   NavigationProvider,
   NAVIGATION_PROVIDERS,
@@ -315,7 +316,7 @@ export default function DriverMapPage() {
   const [demoIsOnline, setDemoIsOnline] = useState(false);
 
   // Get auth token for WebSocket connection
-  const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const authToken = typeof window !== 'undefined' ? getAuthToken() : null;
 
   // Fetch service preferences from API
   const { data: preferencesData, isLoading: isLoadingPrefs } = useQuery<{

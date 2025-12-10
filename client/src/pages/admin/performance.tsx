@@ -24,6 +24,7 @@ import {
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { setAuthToken } from "@/lib/authToken";
 
 export default function PerformanceDashboard() {
   const [, setLocation] = useLocation();
@@ -41,7 +42,7 @@ export default function PerformanceDashboard() {
     if (capabilitiesQueryError) {
       const errorStatus = (capabilitiesQueryError as any)?.status;
       if (errorStatus === 401) {
-        localStorage.removeItem("token");
+        setAuthToken(null);
         setLocation("/login");
       } else {
         setCapabilitiesError(true);

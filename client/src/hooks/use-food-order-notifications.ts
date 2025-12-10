@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthToken } from "@/lib/authToken";
 
 interface OrderStatusUpdate {
   orderId: string;
@@ -42,7 +43,7 @@ export function useFoodOrderNotifications({
   const { toast } = useToast();
 
   const getToken = useCallback(() => {
-    return localStorage.getItem("auth_token");
+    return getAuthToken();
   }, []);
 
   const connect = useCallback(() => {

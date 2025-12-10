@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import {
   Car,
@@ -159,15 +160,7 @@ export default function DriverTrips() {
   const { data, isLoading, isFetching, refetch } = useQuery<TripHistoryResponse>({
     queryKey: ["/api/driver/trips", serviceTypeFilter, statusFilter, dateFilter, customStartDate, customEndDate, offset],
     queryFn: async () => {
-      const response = await fetch(`/api/driver/trips?${buildQueryParams()}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch trip history");
-      }
-      return response.json();
+      return apiRequest(`/api/driver/trips?${buildQueryParams()}`);
     },
   });
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import { Gift, TrendingUp, Clock, Target, Zap, DollarSign, Trophy, CheckCircle, Car, UtensilsCrossed, Package, ArrowLeft, AlertCircle, Timer, RefreshCw, Star, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -412,13 +413,7 @@ export default function DriverPromotions() {
 
   const { data: promotionData, isLoading: loadingPromotions, refetch: refetchPromotions } = useQuery<{ date: string; promotions: DriverPromotion[] }>({
     queryKey: ["/api/driver/promotions/active", selectedDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/driver/promotions/active?date=${selectedDate}`, {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed to fetch promotions');
-      return res.json();
-    },
+    queryFn: () => apiRequest(`/api/driver/promotions/active?date=${selectedDate}`),
     refetchInterval: 30000,
   });
 

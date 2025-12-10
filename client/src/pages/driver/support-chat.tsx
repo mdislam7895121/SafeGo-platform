@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Send, MessageCircle, User, Bot, ThumbsUp, ThumbsDown, Star } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/authToken";
 import { useToast } from "@/hooks/use-toast";
 import { ROLE_SUPPORT_TOPICS } from "@/config/supportTopics";
 
@@ -279,7 +280,7 @@ export default function DriverSupportChat() {
         const sinceParam = lastMessageTimeRef.current ? `&since=${lastMessageTimeRef.current}` : "";
         const res = await fetch(`/api/support/chat/messages?conversationId=${conversationId}${sinceParam}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${getAuthToken()}`,
           },
           signal: abortController.signal, // Cancel request on cleanup
         });

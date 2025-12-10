@@ -39,6 +39,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { setAuthToken } from "@/lib/authToken";
 
 const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
@@ -99,7 +100,7 @@ export default function AnalyticsDashboard() {
     if (capabilitiesQueryError) {
       const errorStatus = (capabilitiesQueryError as any)?.status;
       if (errorStatus === 401) {
-        localStorage.removeItem("token");
+        setAuthToken(null);
         setLocation("/login");
       } else {
         setCapabilitiesError(true);

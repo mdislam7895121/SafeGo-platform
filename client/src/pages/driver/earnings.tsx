@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,22 +88,15 @@ export default function DriverEarnings() {
 
   const { data: earningsData, isLoading: loadingEarnings } = useQuery<EarningsResponse>({
     queryKey: ["/api/driver/earnings", activeTab, page],
-    queryFn: async () => {
-      const response = await fetch(`/api/driver/earnings?type=${activeTab}&page=${page}&limit=20`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch earnings");
-      return response.json();
-    },
+    queryFn: () => apiRequest(`/api/driver/earnings?type=${activeTab}&page=${page}&limit=20`),
   });
 
   const { data: tlcData } = useQuery<{ success: boolean; data: TLCComplianceData }>({
     queryKey: ["/api/tlc/driver/current/compliance"],
     queryFn: async () => {
-      const response = await fetch("/api/tlc/driver/current/session", {
-        credentials: "include",
-      });
-      if (!response.ok) {
+      try {
+        return await apiRequest("/api/tlc/driver/current/session");
+      } catch {
         return {
           success: true,
           data: {
@@ -119,7 +113,6 @@ export default function DriverEarnings() {
           },
         };
       }
-      return response.json();
     },
     enabled: !!summary,
   });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { getAuthToken } from "@/lib/authToken";
 
 interface NotificationEvent {
   id: string;
@@ -37,14 +38,8 @@ export function useAdminNotificationsWs(options: UseAdminNotificationsWsOptions 
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  const { data: authData } = useQuery<{ token?: string }>({
-    queryKey: ['/api/auth/token'],
-    enabled: false,
-    staleTime: Infinity,
-  });
-
   const connect = useCallback(() => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token || !enabled) {
       return;
     }

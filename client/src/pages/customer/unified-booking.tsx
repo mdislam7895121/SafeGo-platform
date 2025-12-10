@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, useLocation } from "wouter";
+import { getAuthToken } from "@/lib/authToken";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
@@ -552,7 +553,7 @@ export default function UnifiedBookingPage() {
   const [dispatchSessionId, setDispatchSessionId] = useState<string | null>(null);
   
   // Get auth token for WebSocket
-  const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const authToken = typeof window !== 'undefined' ? getAuthToken() : null;
   const [tripStartTime, setTripStartTime] = useState<Date | null>(null);
   const [tripEndTime, setTripEndTime] = useState<Date | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(0);

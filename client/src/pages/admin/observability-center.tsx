@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/authToken";
 import { 
   Activity, 
   Server, 
@@ -161,7 +162,7 @@ export default function ObservabilityCenter() {
   const wsRef = useRef<WebSocket | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  const getToken = () => localStorage.getItem("token");
+  const getToken = () => getAuthToken();
 
   const [accessDenied, setAccessDenied] = useState(false);
 

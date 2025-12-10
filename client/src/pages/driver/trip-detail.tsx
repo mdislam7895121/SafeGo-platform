@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import {
   Car,
@@ -102,21 +103,13 @@ export default function DriverTripDetail() {
   const serviceType = searchParams.get("serviceType");
 
   const { data, isLoading, refetch, isFetching } = useQuery<TripDetailResponse>({
-    queryKey: ["/api/driver/trips", tripId],
+    queryKey: ["/api/driver/trips", tripId, serviceType],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (serviceType) {
         params.set("serviceType", serviceType);
       }
-      const response = await fetch(`/api/driver/trips/${tripId}?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch trip details");
-      }
-      return response.json();
+      return apiRequest(`/api/driver/trips/${tripId}?${params.toString()}`);
     },
   });
 

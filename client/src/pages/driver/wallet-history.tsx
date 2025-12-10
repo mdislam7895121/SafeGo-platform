@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,15 +114,7 @@ export default function DriverWalletHistory() {
 
   const { data: historyData, isLoading: loadingHistory } = useQuery<PayoutHistoryResponse>({
     queryKey: ["/api/payout/history", statusFilter, offset],
-    queryFn: async () => {
-      const response = await fetch(`/api/payout/history?${queryParams.toString()}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch payout history");
-      }
-      return response.json();
-    },
+    queryFn: () => apiRequest(`/api/payout/history?${queryParams.toString()}`),
   });
 
   const { data: statsData, isLoading: loadingStats } = useQuery<PayoutStatsResponse>({

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Camera, Trash2, Loader2, Upload, User, AlertCircle } from "lucide-react";
+import { uploadWithAuth, apiRequest } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,21 +77,7 @@ export function ProfilePhotoUploader({
       const formData = new FormData();
       formData.append("file", file);
 
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch("/api/profile/upload-photo", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Upload failed");
-      }
-
-      return response.json();
+      return uploadWithAuth("/api/profile/upload-photo", formData);
     },
     onSuccess: (data) => {
       toast({
@@ -119,20 +106,7 @@ export function ProfilePhotoUploader({
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch("/api/profile/remove-photo", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Delete failed");
-      }
-
-      return response.json();
+      return apiRequest("/api/profile/remove-photo", { method: "DELETE" });
     },
     onSuccess: (data) => {
       toast({

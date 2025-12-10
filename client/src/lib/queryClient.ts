@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getAuthToken, setAuthToken } from "./authToken";
 
 class ApiError extends Error {
   status: number;
@@ -36,19 +37,19 @@ async function refreshAccessToken(): Promise<string | null> {
 
       if (!res.ok) {
         // Refresh failed - clear token and return null
-        localStorage.removeItem("safego_token");
+        setAuthToken(null);
         return null;
       }
 
       const data = await res.json();
       if (data.token) {
-        localStorage.setItem("safego_token", data.token);
+        setAuthToken(data.token);
         return data.token;
       }
       return null;
     } catch (error) {
       console.error("Token refresh failed:", error);
-      localStorage.removeItem("safego_token");
+      setAuthToken(null);
       return null;
     } finally {
       isRefreshing = false;
@@ -87,7 +88,7 @@ export async function fetchWithAuth(
   options?: RequestInit,
   retryOnUnauthorized = true
 ): Promise<Response> {
-  const token = localStorage.getItem("safego_token");
+  const token = getAuthToken();
   const headers: HeadersInit = { ...options?.headers };
   
   if (token) {
@@ -147,7 +148,7 @@ export async function apiRequest(
 export async function uploadWithAuth(url: string, formData: FormData): Promise<any> {
   // Proactively refresh token if we're close to expiry (within 2 minutes)
   // This prevents token expiration during long file uploads
-  const token = localStorage.getItem("safego_token");
+  const token = getAuthToken();
   if (token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
