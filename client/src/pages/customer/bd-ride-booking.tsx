@@ -268,7 +268,7 @@ export default function BDRideBooking() {
         }),
       });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { ride: { id: string } }) => {
       toast({
         title: "Ride Requested",
         description: "Looking for a driver nearby...",
@@ -276,7 +276,7 @@ export default function BDRideBooking() {
       queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
       setLocation(`/customer/ride-details/${data.ride.id}`);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Request Failed",
         description: error.message || "Could not request ride",

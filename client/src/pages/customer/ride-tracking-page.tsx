@@ -320,7 +320,7 @@ export default function RideTrackingPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/rides", rideId] });
       setShowCancelDialog(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Cancel Failed",
         description: error.message || "Could not cancel ride",

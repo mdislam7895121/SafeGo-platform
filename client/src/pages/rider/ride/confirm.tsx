@@ -92,7 +92,7 @@ export default function RideConfirmPage() {
 
       return response;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { ride: { id: string } }) => {
       toast({
         title: "Ride Requested!",
         description: "Finding you a driver...",
@@ -100,7 +100,7 @@ export default function RideConfirmPage() {
       setActiveRide(data.ride.id);
       setLocation("/rider/trip/active");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const errorMessage = error.message || "Failed to request ride. Please try again.";
       setRequestError(errorMessage);
       toast({
