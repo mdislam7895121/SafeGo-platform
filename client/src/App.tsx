@@ -477,6 +477,21 @@ function Router() {
       <Route path="/driver/signup">
         <Redirect to="/partner/driver/register" />
       </Route>
+      <Route path="/food">
+        <Redirect to="/customer/food" />
+      </Route>
+      <Route path="/parcel">
+        <Redirect to="/customer/parcel" />
+      </Route>
+      <Route path="/shops">
+        <Redirect to="/customer/bd-shops" />
+      </Route>
+      <Route path="/tickets">
+        <Redirect to="/customer/bd-tickets" />
+      </Route>
+      <Route path="/business">
+        <Redirect to="/partner/restaurant/start" />
+      </Route>
 
       {/* Customer routes - NEW UNIFIED BOOKING DESIGN */}
       <Route path="/customer">
