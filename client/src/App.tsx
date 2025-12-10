@@ -237,6 +237,11 @@ import AdminContactCenter from "@/pages/admin/contact-center";
 import AdminContactCenterDetail from "@/pages/admin/contact-center-detail";
 import AdminOnboardingCenter from "@/pages/admin/onboarding-center";
 import AdminOnboardingCenterDetail from "@/pages/admin/onboarding-center-detail";
+import AdminOnboardingDrivers from "@/pages/admin/onboarding-drivers";
+import AdminOnboardingRestaurants from "@/pages/admin/onboarding-restaurants";
+import AdminOnboardingShops from "@/pages/admin/onboarding-shops";
+import AdminOnboardingTickets from "@/pages/admin/onboarding-tickets";
+import AdminOnboardingDetail from "@/pages/admin/onboarding-detail";
 import AdminComplaintDetails from "@/pages/admin/complaint-details";
 import AdminUsers from "@/pages/admin/users";
 import AdminParcels from "@/pages/admin/parcels";
@@ -1950,6 +1955,62 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Application Details">
             <AdminOnboardingCenterDetail />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/drivers">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Drivers Onboarding">
+            <AdminOnboardingDrivers />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/drivers/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Driver Application">
+            <AdminOnboardingDetail />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/restaurants">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Restaurants Onboarding">
+            <AdminOnboardingRestaurants />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/restaurants/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Restaurant Application">
+            <AdminOnboardingDetail />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/shops">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Shops Onboarding">
+            <AdminOnboardingShops />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/shops/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Shop Application">
+            <AdminOnboardingDetail />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/tickets">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Tickets Onboarding">
+            <AdminOnboardingTickets />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/tickets/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ticket Application">
+            <AdminOnboardingDetail />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

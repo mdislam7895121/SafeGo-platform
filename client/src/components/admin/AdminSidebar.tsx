@@ -37,6 +37,8 @@ import {
   ChevronDown,
   Rocket,
   MessageSquare,
+  Store,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 import { SafePilotSidebarIcon } from "@/components/safepilot/SafePilotLogo";
@@ -252,6 +254,30 @@ const phase3aNavItems: NavItem[] = [
     title: "Onboarding Center",
     href: "/admin/onboarding-center",
     icon: Users,
+    navKey: "dashboard",
+  },
+  {
+    title: "Drivers Onboarding",
+    href: "/admin/onboarding/drivers",
+    icon: Car,
+    navKey: "dashboard",
+  },
+  {
+    title: "Restaurants Onboarding",
+    href: "/admin/onboarding/restaurants",
+    icon: UtensilsCrossed,
+    navKey: "dashboard",
+  },
+  {
+    title: "Shops Onboarding",
+    href: "/admin/onboarding/shops",
+    icon: Store,
+    navKey: "dashboard",
+  },
+  {
+    title: "Tickets Onboarding",
+    href: "/admin/onboarding/tickets",
+    icon: Ticket,
     navKey: "dashboard",
   },
   {
