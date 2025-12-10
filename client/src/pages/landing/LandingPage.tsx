@@ -14,7 +14,7 @@
  * All CTAs use existing public routes only. No secrets exposed.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { 
   Car, UtensilsCrossed, Package, Store, Ticket, Shield, Lock, MapPin,
@@ -416,7 +416,7 @@ const FAQS = [
   },
 ];
 
-function LandingHeader() {
+const LandingHeader = memo(function LandingHeader() {
   return (
     <header className="sticky top-0 z-50 w-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
       <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -457,9 +457,9 @@ function LandingHeader() {
       </div>
     </header>
   );
-}
+});
 
-function RegionToggle({ 
+const RegionToggle = memo(function RegionToggle({ 
   selectedRegion, 
   onRegionChange 
 }: { 
@@ -497,9 +497,9 @@ function RegionToggle({
       ))}
     </div>
   );
-}
+});
 
-function HeroSection({ 
+const HeroSection = memo(function HeroSection({ 
   selectedRegion, 
   onRegionChange 
 }: { 
@@ -622,9 +622,9 @@ function HeroSection({
       </div>
     </section>
   );
-}
+});
 
-function ServicesSection({ selectedRegion }: { selectedRegion: Region }) {
+const ServicesSection = memo(function ServicesSection({ selectedRegion }: { selectedRegion: Region }) {
   const services = REGION_SERVICES[selectedRegion];
   
   return (
@@ -665,9 +665,9 @@ function ServicesSection({ selectedRegion }: { selectedRegion: Region }) {
       </div>
     </section>
   );
-}
+});
 
-function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
+const PartnerSection = memo(function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
   const config = PARTNER_CONFIG[selectedRegion];
   
   return (
@@ -779,9 +779,9 @@ function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
       </div>
     </section>
   );
-}
+});
 
-function HowItWorksSection({ selectedRegion }: { selectedRegion: Region }) {
+const HowItWorksSection = memo(function HowItWorksSection({ selectedRegion }: { selectedRegion: Region }) {
   const availableServices = HOW_IT_WORKS_SERVICES[selectedRegion];
   const flows = availableServices
     .map(id => HOW_IT_WORKS_DATA[id as keyof typeof HOW_IT_WORKS_DATA])
@@ -833,9 +833,9 @@ function HowItWorksSection({ selectedRegion }: { selectedRegion: Region }) {
       </div>
     </section>
   );
-}
+});
 
-function SafetySection() {
+const SafetySection = memo(function SafetySection() {
   return (
     <section id="safety" className="py-20 lg:py-24 bg-gradient-to-br from-gray-50 via-gray-50 to-blue-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-blue-950/30 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -886,9 +886,9 @@ function SafetySection() {
       </div>
     </section>
   );
-}
+});
 
-function FAQSection() {
+const FAQSection = memo(function FAQSection() {
   return (
     <section id="faq" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -926,9 +926,9 @@ function FAQSection() {
       </div>
     </section>
   );
-}
+});
 
-function CTASection() {
+const CTASection = memo(function CTASection() {
   return (
     <section className="py-20 lg:py-24 bg-blue-600 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -956,9 +956,9 @@ function CTASection() {
       </div>
     </section>
   );
-}
+});
 
-function LandingFooter() {
+const LandingFooter = memo(function LandingFooter() {
   return (
     <footer className="bg-gray-900 text-gray-400 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1026,7 +1026,7 @@ function LandingFooter() {
       </div>
     </footer>
   );
-}
+});
 
 export default function LandingPage() {
   const [selectedRegion, setSelectedRegion] = useState<Region>("BD");
