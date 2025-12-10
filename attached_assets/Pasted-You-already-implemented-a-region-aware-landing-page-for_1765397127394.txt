@@ -1,0 +1,75 @@
+You already implemented a region-aware landing page for Bangladesh / United States / Global. Now I need you to extend the same region-awareness to the contact / help center page so that **only Bangladesh** shows support options for **Local Shops** and **Tickets & Travel**, because these services are not available in the United States or Global regions.
+
+Goals:
+
+1) Region-aware contact categories
+2) Region-aware “Contact Our Teams” cards
+3) No changes for United States and Global (they must remain exactly as they are now)
+
+Details:
+
+A. Contact form category dropdown (Bangladesh only)
+
+On the `/contact` page there is a “Send Us a Message” form with:
+- Full Name
+- Email Address
+- Category (select dropdown)
+- Message
+
+Right now the Category dropdown includes these options (or similar):
+- General Inquiry
+- Rides & Transportation
+- Food Delivery
+- Parcel Delivery
+- Driver/Courier Support
+- Business Partnership
+- Payments & Billing
+- Safety Concern
+- Technical Issue
+- Other
+
+I want this dropdown to become **region-aware** like the landing page.
+
+1. Introduce a configuration object, for example:
+
+   ```ts
+   const CONTACT_CATEGORY_CONFIG = {
+     bangladesh: [
+       "General Inquiry",
+       "Rides & Transportation",
+       "Food Delivery",
+       "Parcel Delivery",
+       "Local Shops",
+       "Tickets & Travel",
+       "Driver/Courier Support",
+       "Business Partnership",
+       "Payments & Billing",
+       "Safety Concern",
+       "Technical Issue",
+       "Other",
+     ],
+     united_states: [
+       "General Inquiry",
+       "Rides & Transportation",
+       "Food Delivery",
+       "Parcel Delivery",
+       "Driver/Courier Support",
+       "Business Partnership",
+       "Payments & Billing",
+       "Safety Concern",
+       "Technical Issue",
+       "Other",
+     ],
+     global: [
+       "General Inquiry",
+       "Rides & Transportation",
+       "Food Delivery",
+       "Parcel Delivery",
+       "Driver/Courier Support",
+       "Business Partnership",
+       "Payments & Billing",
+       "Safety Concern",
+       "Technical Issue",
+       "Other",
+     ],
+   } as const;

@@ -1,13 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { 
   ChevronLeft, Car, UtensilsCrossed, Package, User, CreditCard, Shield, 
-  Building2, Smartphone, Search, ChevronDown, ChevronUp, Mail
+  Building2, Smartphone, Search, ChevronDown, ChevronUp, Mail, Store, Ticket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLandingSeo } from "@/components/landing/LandingSeo";
+
+type Region = "BD" | "US" | "GLOBAL";
+
+type HelpCategory = {
+  id: string;
+  title: string;
+  icon: typeof Car;
+  color: string;
+  description: string;
+};
+
+const BASE_HELP_CATEGORIES: HelpCategory[] = [
+  { id: "rides", title: "Rides", icon: Car, color: "bg-blue-500", description: "Booking, fares, and ride issues" },
+  { id: "food", title: "Food Delivery", icon: UtensilsCrossed, color: "bg-orange-500", description: "Orders, restaurants, and delivery" },
+  { id: "parcel", title: "Parcel Delivery", icon: Package, color: "bg-green-500", description: "Sending and receiving packages" },
+  { id: "account", title: "Account & Login", icon: User, color: "bg-purple-500", description: "Profile, verification, and access" },
+  { id: "payments", title: "Payments", icon: CreditCard, color: "bg-pink-500", description: "Billing, refunds, and wallets" },
+  { id: "safety", title: "Safety", icon: Shield, color: "bg-red-500", description: "Security, SOS, and reporting" },
+  { id: "partners", title: "Partners", icon: Building2, color: "bg-teal-500", description: "Drivers, restaurants, and businesses" },
+  { id: "technical", title: "App & Technical", icon: Smartphone, color: "bg-gray-500", description: "App issues and troubleshooting" }
+];
+
+const BD_ONLY_CATEGORIES: HelpCategory[] = [
+  { id: "shops", title: "Local Shops", icon: Store, color: "bg-cyan-500", description: "Shop orders and marketplace" },
+  { id: "tickets", title: "Tickets & Travel", icon: Ticket, color: "bg-indigo-500", description: "Bus, train, and travel bookings" }
+];
+
+const HELP_CATEGORIES_CONFIG: Record<Region, HelpCategory[]> = {
+  BD: [
+    ...BASE_HELP_CATEGORIES.slice(0, 3),
+    ...BD_ONLY_CATEGORIES,
+    ...BASE_HELP_CATEGORIES.slice(3)
+  ],
+  US: BASE_HELP_CATEGORIES,
+  GLOBAL: BASE_HELP_CATEGORIES
+};
 
 function HelpHeader() {
   return (
@@ -54,17 +90,6 @@ function HelpFooter() {
     </footer>
   );
 }
-
-const HELP_CATEGORIES = [
-  { id: "rides", title: "Rides", icon: Car, color: "bg-blue-500", description: "Booking, fares, and ride issues" },
-  { id: "food", title: "Food Delivery", icon: UtensilsCrossed, color: "bg-orange-500", description: "Orders, restaurants, and delivery" },
-  { id: "parcel", title: "Parcel Delivery", icon: Package, color: "bg-green-500", description: "Sending and receiving packages" },
-  { id: "account", title: "Account & Login", icon: User, color: "bg-purple-500", description: "Profile, verification, and access" },
-  { id: "payments", title: "Payments", icon: CreditCard, color: "bg-pink-500", description: "Billing, refunds, and wallets" },
-  { id: "safety", title: "Safety", icon: Shield, color: "bg-red-500", description: "Security, SOS, and reporting" },
-  { id: "partners", title: "Partners", icon: Building2, color: "bg-teal-500", description: "Drivers, restaurants, and businesses" },
-  { id: "technical", title: "App & Technical", icon: Smartphone, color: "bg-gray-500", description: "App issues and troubleshooting" }
-];
 
 const FAQ_DATA: Record<string, { question: string; answer: string }[]> = {
   rides: [
@@ -122,6 +147,20 @@ const FAQ_DATA: Record<string, { question: string; answer: string }[]> = {
     { question: "I'm not receiving notifications", answer: "Check that notifications are enabled for SafeGo in your device settings. Also verify that Do Not Disturb mode is off and battery optimization isn't blocking the app." },
     { question: "How do I update the app?", answer: "Visit your device's app store (Play Store or App Store), search for SafeGo, and tap 'Update' if available. Enable auto-updates for the latest features." },
     { question: "The app is slow or crashing", answer: "Try clearing the app cache, ensuring you have enough storage space, and updating to the latest version. If problems continue, contact our technical support team." }
+  ],
+  shops: [
+    { question: "How do I order from local shops?", answer: "Select 'Shops' in the app, browse nearby stores, add items to your cart, and checkout. A delivery partner will pick up and deliver your order." },
+    { question: "What types of shops are available?", answer: "We partner with grocery stores, pharmacies, convenience stores, electronics shops, and more. Browse the Shops section to see all available options in your area." },
+    { question: "Can I track my shop order?", answer: "Yes, you can track your order in real-time from the moment it's accepted until delivery. You'll receive notifications at each step." },
+    { question: "What if an item is out of stock?", answer: "If an item is unavailable, the shop will contact you to suggest alternatives. You can approve the substitution or request a refund for that item." },
+    { question: "How do I return a shop item?", answer: "Contact support within 24 hours of delivery with your order details. We'll arrange a return pickup or provide instructions based on the item type." }
+  ],
+  tickets: [
+    { question: "How do I book bus or train tickets?", answer: "Select 'Tickets & Travel' in the app, choose your travel type, enter your origin and destination, select date and time, and complete the booking." },
+    { question: "Can I cancel my ticket booking?", answer: "Yes, you can cancel tickets before departure. Cancellation fees and refund policies vary by operator. Check the booking details for specific terms." },
+    { question: "How do I get my ticket after booking?", answer: "E-tickets are available in the app immediately after booking. You can also download them as PDF or receive them via SMS/email." },
+    { question: "What travel services are available?", answer: "We offer bus tickets, train tickets, and launch (boat) tickets in Bangladesh. Check the app for available routes and operators in your area." },
+    { question: "How do I modify my travel booking?", answer: "For date or time changes, go to your booking in the app and select 'Modify'. Changes are subject to operator policies and may incur fees." }
   ]
 };
 
@@ -154,6 +193,16 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 export default function HelpPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRegion, setSelectedRegion] = useState<Region>("BD");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("safego-region");
+    if (stored && ["BD", "US", "GLOBAL"].includes(stored)) {
+      setSelectedRegion(stored as Region);
+    }
+  }, []);
+
+  const helpCategories = HELP_CATEGORIES_CONFIG[selectedRegion];
 
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://safego.replit.app';
 
@@ -165,7 +214,7 @@ export default function HelpPage() {
     breadcrumbs: [{ name: 'Home', url: '/' }, { name: 'Help Center', url: '/help' }]
   });
 
-  const filteredFAQs = selectedCategory ? FAQ_DATA[selectedCategory] : [];
+  const filteredFAQs = selectedCategory ? (FAQ_DATA[selectedCategory] || []) : [];
 
   const allFAQs = Object.entries(FAQ_DATA).flatMap(([category, faqs]) =>
     faqs.map(faq => ({ ...faq, category }))
@@ -236,7 +285,7 @@ export default function HelpPage() {
                   Browse by Category
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {HELP_CATEGORIES.map((category) => (
+                  {helpCategories.map((category) => (
                     <Card
                       key={category.id}
                       className={`cursor-pointer hover-elevate transition-all ${
@@ -269,7 +318,7 @@ export default function HelpPage() {
                 <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                      {HELP_CATEGORIES.find(c => c.id === selectedCategory)?.title} FAQs
+                      {helpCategories.find(c => c.id === selectedCategory)?.title} FAQs
                     </h2>
                     <Button
                       variant="ghost"

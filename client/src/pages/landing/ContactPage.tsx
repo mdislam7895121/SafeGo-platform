@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Mail, Phone, MessageSquare, Building2, Scale, Newspaper, AlertTriangle, HelpCircle, Send, CheckCircle } from "lucide-react";
+import { ChevronLeft, Mail, Phone, MessageSquare, Building2, Scale, Newspaper, AlertTriangle, HelpCircle, Send, CheckCircle, Store, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,201 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLandingSeo } from "@/components/landing/LandingSeo";
+
+type Region = "BD" | "US" | "GLOBAL";
+
+const CONTACT_CATEGORY_CONFIG: Record<Region, { value: string; label: string }[]> = {
+  BD: [
+    { value: "general", label: "General Inquiry" },
+    { value: "rides", label: "Rides & Transportation" },
+    { value: "food", label: "Food Delivery" },
+    { value: "parcel", label: "Parcel Delivery" },
+    { value: "shops", label: "Local Shops" },
+    { value: "tickets", label: "Tickets & Travel" },
+    { value: "driver", label: "Driver/Courier Support" },
+    { value: "partner", label: "Business Partnership" },
+    { value: "payment", label: "Payments & Billing" },
+    { value: "safety", label: "Safety Concern" },
+    { value: "technical", label: "Technical Issue" },
+    { value: "other", label: "Other" }
+  ],
+  US: [
+    { value: "general", label: "General Inquiry" },
+    { value: "rides", label: "Rides & Transportation" },
+    { value: "food", label: "Food Delivery" },
+    { value: "parcel", label: "Parcel Delivery" },
+    { value: "driver", label: "Driver/Courier Support" },
+    { value: "partner", label: "Business Partnership" },
+    { value: "payment", label: "Payments & Billing" },
+    { value: "safety", label: "Safety Concern" },
+    { value: "technical", label: "Technical Issue" },
+    { value: "other", label: "Other" }
+  ],
+  GLOBAL: [
+    { value: "general", label: "General Inquiry" },
+    { value: "rides", label: "Rides & Transportation" },
+    { value: "food", label: "Food Delivery" },
+    { value: "parcel", label: "Parcel Delivery" },
+    { value: "driver", label: "Driver/Courier Support" },
+    { value: "partner", label: "Business Partnership" },
+    { value: "payment", label: "Payments & Billing" },
+    { value: "safety", label: "Safety Concern" },
+    { value: "technical", label: "Technical Issue" },
+    { value: "other", label: "Other" }
+  ]
+};
+
+const CONTACT_CARDS_CONFIG: Record<Region, {
+  id: string;
+  title: string;
+  email: string;
+  description: string;
+  icon: typeof MessageSquare;
+  color: string;
+}[]> = {
+  BD: [
+    {
+      id: "support",
+      title: "General Support",
+      email: "support@safego.com",
+      description: "For general inquiries and customer support",
+      icon: MessageSquare,
+      color: "bg-blue-500"
+    },
+    {
+      id: "drivers",
+      title: "Driver & Courier Support",
+      email: "drivers@safego.com",
+      description: "For driver onboarding and delivery partner support",
+      icon: Mail,
+      color: "bg-green-500"
+    },
+    {
+      id: "partners",
+      title: "Restaurant & Business Partners",
+      email: "partners@safego.com",
+      description: "For business partnerships and restaurant inquiries",
+      icon: Building2,
+      color: "bg-purple-500"
+    },
+    {
+      id: "shops",
+      title: "Local Shops Support",
+      email: "shops@safego.com",
+      description: "For local shop onboarding and marketplace support",
+      icon: Store,
+      color: "bg-cyan-500"
+    },
+    {
+      id: "tickets",
+      title: "Tickets & Travel Support",
+      email: "travel@safego.com",
+      description: "For bus/train tickets and travel bookings",
+      icon: Ticket,
+      color: "bg-indigo-500"
+    },
+    {
+      id: "press",
+      title: "Media & Press",
+      email: "press@safego.com",
+      description: "For media inquiries and press releases",
+      icon: Newspaper,
+      color: "bg-orange-500"
+    },
+    {
+      id: "legal",
+      title: "Legal & Compliance",
+      email: "legal@safego.com",
+      description: "For legal matters and compliance inquiries",
+      icon: Scale,
+      color: "bg-red-500"
+    }
+  ],
+  US: [
+    {
+      id: "support",
+      title: "General Support",
+      email: "support@safego.com",
+      description: "For general inquiries and customer support",
+      icon: MessageSquare,
+      color: "bg-blue-500"
+    },
+    {
+      id: "drivers",
+      title: "Driver & Courier Support",
+      email: "drivers@safego.com",
+      description: "For driver onboarding and delivery partner support",
+      icon: Mail,
+      color: "bg-green-500"
+    },
+    {
+      id: "partners",
+      title: "Restaurant & Business Partners",
+      email: "partners@safego.com",
+      description: "For business partnerships and restaurant inquiries",
+      icon: Building2,
+      color: "bg-purple-500"
+    },
+    {
+      id: "press",
+      title: "Media & Press",
+      email: "press@safego.com",
+      description: "For media inquiries and press releases",
+      icon: Newspaper,
+      color: "bg-orange-500"
+    },
+    {
+      id: "legal",
+      title: "Legal & Compliance",
+      email: "legal@safego.com",
+      description: "For legal matters and compliance inquiries",
+      icon: Scale,
+      color: "bg-red-500"
+    }
+  ],
+  GLOBAL: [
+    {
+      id: "support",
+      title: "General Support",
+      email: "support@safego.com",
+      description: "For general inquiries and customer support",
+      icon: MessageSquare,
+      color: "bg-blue-500"
+    },
+    {
+      id: "drivers",
+      title: "Driver & Courier Support",
+      email: "drivers@safego.com",
+      description: "For driver onboarding and delivery partner support",
+      icon: Mail,
+      color: "bg-green-500"
+    },
+    {
+      id: "partners",
+      title: "Restaurant & Business Partners",
+      email: "partners@safego.com",
+      description: "For business partnerships and restaurant inquiries",
+      icon: Building2,
+      color: "bg-purple-500"
+    },
+    {
+      id: "press",
+      title: "Media & Press",
+      email: "press@safego.com",
+      description: "For media inquiries and press releases",
+      icon: Newspaper,
+      color: "bg-orange-500"
+    },
+    {
+      id: "legal",
+      title: "Legal & Compliance",
+      email: "legal@safego.com",
+      description: "For legal matters and compliance inquiries",
+      icon: Scale,
+      color: "bg-red-500"
+    }
+  ]
+};
 
 function ContactHeader() {
   return (
@@ -55,62 +250,6 @@ function ContactFooter() {
   );
 }
 
-const CONTACT_CARDS = [
-  {
-    id: "support",
-    title: "General Support",
-    email: "support@safego.com",
-    description: "For general inquiries and customer support",
-    icon: MessageSquare,
-    color: "bg-blue-500"
-  },
-  {
-    id: "drivers",
-    title: "Driver & Courier Support",
-    email: "drivers@safego.com",
-    description: "For driver onboarding and delivery partner support",
-    icon: Mail,
-    color: "bg-green-500"
-  },
-  {
-    id: "partners",
-    title: "Restaurant & Business Partners",
-    email: "partners@safego.com",
-    description: "For business partnerships and restaurant inquiries",
-    icon: Building2,
-    color: "bg-purple-500"
-  },
-  {
-    id: "press",
-    title: "Media & Press",
-    email: "press@safego.com",
-    description: "For media inquiries and press releases",
-    icon: Newspaper,
-    color: "bg-orange-500"
-  },
-  {
-    id: "legal",
-    title: "Legal & Compliance",
-    email: "legal@safego.com",
-    description: "For legal matters and compliance inquiries",
-    icon: Scale,
-    color: "bg-red-500"
-  }
-];
-
-const CONTACT_CATEGORIES = [
-  { value: "general", label: "General Inquiry" },
-  { value: "rides", label: "Rides & Transportation" },
-  { value: "food", label: "Food Delivery" },
-  { value: "parcel", label: "Parcel Delivery" },
-  { value: "driver", label: "Driver/Courier Support" },
-  { value: "partner", label: "Business Partnership" },
-  { value: "payment", label: "Payments & Billing" },
-  { value: "safety", label: "Safety Concern" },
-  { value: "technical", label: "Technical Issue" },
-  { value: "other", label: "Other" }
-];
-
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
@@ -119,6 +258,17 @@ export default function ContactPage() {
     message: ""
   });
   const [submitted, setSubmitted] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<Region>("BD");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("safego-region");
+    if (stored && ["BD", "US", "GLOBAL"].includes(stored)) {
+      setSelectedRegion(stored as Region);
+    }
+  }, []);
+
+  const contactCategories = CONTACT_CATEGORY_CONFIG[selectedRegion];
+  const contactCards = CONTACT_CARDS_CONFIG[selectedRegion];
 
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://safego.replit.app';
 
@@ -160,7 +310,7 @@ export default function ContactPage() {
               Contact Our Teams
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {CONTACT_CARDS.map((card) => (
+              {contactCards.map((card) => (
                 <Card key={card.id} className="hover-elevate" data-testid={`contact-card-${card.id}`}>
                   <CardContent className="p-6">
                     <div className="flex items-start gap-4">
@@ -250,7 +400,7 @@ export default function ContactPage() {
                           <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {CONTACT_CATEGORIES.map((cat) => (
+                          {contactCategories.map((cat) => (
                             <SelectItem key={cat.value} value={cat.value}>
                               {cat.label}
                             </SelectItem>
