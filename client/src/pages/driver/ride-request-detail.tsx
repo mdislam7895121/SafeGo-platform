@@ -92,13 +92,7 @@ export default function DriverRideRequestDetail() {
 
   const { data: requestData, isLoading, error } = useQuery<{ request: RideRequestDetail }>({
     queryKey: ["/api/driver/trips/requests", params.id],
-    queryFn: async () => {
-      const response = await fetch(`/api/driver/trips/requests/${params.id}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch request details");
-      return response.json();
-    },
+    queryFn: async () => apiRequest(`/api/driver/trips/requests/${params.id}`),
     enabled: !!params.id,
     refetchInterval: 10000,
   });

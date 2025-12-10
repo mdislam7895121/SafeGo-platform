@@ -122,9 +122,7 @@ export default function BDShopOrders() {
 
   const { data, isLoading } = useQuery<{ orders: Order[] }>({
     queryKey: ["/api/bd/orders", statusFilter],
-    queryFn: () => fetch(`/api/bd/orders${statusFilter ? `?status=${statusFilter}` : ""}`, {
-      credentials: "include",
-    }).then(res => res.json()),
+    queryFn: () => apiRequest(`/api/bd/orders${statusFilter ? `?status=${statusFilter}` : ""}`),
   });
 
   const rateMutation = useMutation({

@@ -204,13 +204,7 @@ export default function BDRideDetail() {
   const { data: ride, isLoading, error } = useQuery<BDRideDetails>({
     queryKey: ["/api/rides/bd", rideId],
     queryFn: async () => {
-      const response = await fetch(`/api/rides/${rideId}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch ride details");
-      }
-      const data = await response.json();
+      const data = await apiRequest(`/api/rides/${rideId}`);
       return {
         ...data,
         fareBreakdown: data.fareBreakdown || {
