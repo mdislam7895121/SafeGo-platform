@@ -305,6 +305,9 @@ export default function FoodCheckout() {
 
   const paymentMethods = paymentMethodsData?.paymentMethods || [];
   const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
+  
+  const isCashAllowed = profileData?.countryCode !== "US";
+  
   const selectedPaymentMethod = state.paymentMethod 
     ? (state.paymentMethod === "cash" || state.paymentMethod === "wallet" 
         ? state.paymentMethod 
@@ -1306,24 +1309,26 @@ export default function FoodCheckout() {
               onValueChange={(value) => handlePaymentSelect(value)}
               className="space-y-3"
             >
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                  Cash
-                </h4>
-                <Label
-                  htmlFor="payment-cash"
-                  className="flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover-elevate"
-                >
-                  <RadioGroupItem value="cash" id="payment-cash" data-testid="radio-payment-cash" />
-                  <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center flex-shrink-0">
-                    <CreditCard className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Cash on Delivery</p>
-                    <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
-                  </div>
-                </Label>
-              </div>
+              {isCashAllowed && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                    Cash
+                  </h4>
+                  <Label
+                    htmlFor="payment-cash"
+                    className="flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover-elevate"
+                  >
+                    <RadioGroupItem value="cash" id="payment-cash" data-testid="radio-payment-cash" />
+                    <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Cash on Delivery</p>
+                      <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
+                    </div>
+                  </Label>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">

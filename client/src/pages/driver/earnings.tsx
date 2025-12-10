@@ -27,6 +27,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { DriverIncentiveDashboard } from "@/components/incentives/DriverIncentiveDashboard";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface EarningSummary {
   currency: string;
@@ -117,12 +118,9 @@ export default function DriverEarnings() {
     enabled: !!summary,
   });
 
-  const formatCurrency = (amount: number, currency?: string) => {
+  const formatAmount = (amount: number, currency?: string) => {
     const curr = currency || summary?.currency || "USD";
-    if (curr === "BDT") {
-      return `৳${amount.toFixed(2)}`;
-    }
-    return `$${amount.toFixed(2)}`;
+    return formatCurrency(amount, curr);
   };
 
   const getTypeIcon = (type: string) => {
@@ -194,7 +192,7 @@ export default function DriverEarnings() {
                 <div>
                   <p className="font-medium text-destructive">Outstanding Commission Debt</p>
                   <p className="text-sm text-muted-foreground">
-                    You have {formatCurrency(summary?.negativeBalance || 0)} in outstanding commissions that will be deducted from future earnings.
+                    You have {formatAmount(summary?.negativeBalance || 0)} in outstanding commissions that will be deducted from future earnings.
                   </p>
                 </div>
               </div>
@@ -211,7 +209,7 @@ export default function DriverEarnings() {
                 <span className="text-sm text-muted-foreground">Available</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-available-balance">
-                {formatCurrency(summary?.availableBalance || 0)}
+                {formatAmount(summary?.availableBalance || 0)}
               </p>
               <Link href="/driver/wallet">
                 <span className="inline-flex items-center text-sm text-primary hover:underline mt-1 cursor-pointer" data-testid="link-view-wallet">
@@ -228,7 +226,7 @@ export default function DriverEarnings() {
                 <span className="text-sm text-muted-foreground">This Week</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-this-week">
-                {formatCurrency(summary?.thisWeekEarnings || 0)}
+                {formatAmount(summary?.thisWeekEarnings || 0)}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
                 {summary?.thisWeekTrips || 0} trips
@@ -243,7 +241,7 @@ export default function DriverEarnings() {
                 <span className="text-sm text-muted-foreground">Pending</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-pending">
-                {formatCurrency(summary?.pendingPayouts || 0)}
+                {formatAmount(summary?.pendingPayouts || 0)}
               </p>
               <Link href="/driver/payouts">
                 <span className="inline-flex items-center text-sm text-primary hover:underline mt-1 cursor-pointer" data-testid="link-view-payouts">
@@ -260,7 +258,7 @@ export default function DriverEarnings() {
                 <span className="text-sm text-muted-foreground">All Time</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-all-time">
-                {formatCurrency(summary?.totalEarnedAllTime || 0)}
+                {formatAmount(summary?.totalEarnedAllTime || 0)}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Total earned</p>
             </CardContent>
@@ -300,7 +298,7 @@ export default function DriverEarnings() {
                 <div>
                   <p className="text-sm text-muted-foreground">Rides</p>
                   <p className="font-semibold" data-testid="text-rides-earnings">
-                    {formatCurrency(summary?.breakdown?.rides || 0)}
+                    {formatAmount(summary?.breakdown?.rides || 0)}
                   </p>
                 </div>
               </div>
@@ -311,7 +309,7 @@ export default function DriverEarnings() {
                 <div>
                   <p className="text-sm text-muted-foreground">Food</p>
                   <p className="font-semibold" data-testid="text-food-earnings">
-                    {formatCurrency(summary?.breakdown?.food || 0)}
+                    {formatAmount(summary?.breakdown?.food || 0)}
                   </p>
                 </div>
               </div>
@@ -322,7 +320,7 @@ export default function DriverEarnings() {
                 <div>
                   <p className="text-sm text-muted-foreground">Parcels</p>
                   <p className="font-semibold" data-testid="text-parcel-earnings">
-                    {formatCurrency(summary?.breakdown?.parcel || 0)}
+                    {formatAmount(summary?.breakdown?.parcel || 0)}
                   </p>
                 </div>
               </div>
@@ -370,35 +368,35 @@ export default function DriverEarnings() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Base Earnings</span>
                   <span className="font-medium" data-testid="text-tlc-base-earnings">
-                    {formatCurrency(tlcData?.data?.baseEarnings || summary?.thisWeekEarnings || 0)}
+                    {formatAmount(tlcData?.data?.baseEarnings || summary?.thisWeekEarnings || 0)}
                   </span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Incentives & Bonuses</span>
                   <span className="font-medium text-green-600" data-testid="text-tlc-incentives">
-                    +{formatCurrency(tlcData?.data?.incentives || 0)}
+                    +{formatAmount(tlcData?.data?.incentives || 0)}
                   </span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Per-Ride TLC Adjustments</span>
                   <span className="font-medium text-blue-600" data-testid="text-tlc-per-ride">
-                    +{formatCurrency(tlcData?.data?.perRideAdjustments || 0)}
+                    +{formatAmount(tlcData?.data?.perRideAdjustments || 0)}
                   </span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Hourly Guarantee Adjustments</span>
                   <span className="font-medium text-purple-600" data-testid="text-tlc-hourly">
-                    +{formatCurrency(tlcData?.data?.hourlyAdjustments || 0)}
+                    +{formatAmount(tlcData?.data?.hourlyAdjustments || 0)}
                   </span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Weekly Guarantee Adjustment</span>
                   <span className="font-medium text-amber-600" data-testid="text-tlc-weekly">
-                    +{formatCurrency(tlcData?.data?.weeklyAdjustment || 0)}
+                    +{formatAmount(tlcData?.data?.weeklyAdjustment || 0)}
                   </span>
                 </div>
                 
@@ -406,7 +404,7 @@ export default function DriverEarnings() {
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Final Weekly Payout</span>
                     <span className="font-bold text-lg text-green-600" data-testid="text-tlc-final-payout">
-                      {formatCurrency(tlcData?.data?.finalPayout || summary?.thisWeekEarnings || 0)}
+                      {formatAmount(tlcData?.data?.finalPayout || summary?.thisWeekEarnings || 0)}
                     </span>
                   </div>
                 </div>
@@ -486,10 +484,10 @@ export default function DriverEarnings() {
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-green-600" data-testid={`text-earning-amount-${earning.id}`}>
-                            +{formatCurrency(earning.netEarning)}
+                            +{formatAmount(earning.netEarning)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Fare: {formatCurrency(earning.grossAmount)} · Fee: {formatCurrency(earning.commission)}
+                            Fare: {formatAmount(earning.grossAmount)} · Fee: {formatAmount(earning.commission)}
                           </p>
                         </div>
                       </div>

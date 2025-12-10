@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { decodePolyline } from "@/lib/formatters";
 import {
   Dialog,
   DialogContent,
@@ -400,6 +401,13 @@ export default function RiderTripActivePage() {
   const isCompleted = ride.status === "completed";
   const isCancelled = ride.status?.startsWith("cancelled");
 
+  const routeCoordinates = useMemo(() => {
+    if (ride?.routePolyline) {
+      return decodePolyline(ride.routePolyline);
+    }
+    return undefined;
+  }, [ride?.routePolyline]);
+
   return (
     <div className="flex flex-col h-full" data-testid="rider-trip-active-page">
       <div className={`p-4 ${config.bgColor}`}>
@@ -439,6 +447,7 @@ export default function RiderTripActivePage() {
               label: ride.dropoffAddress,
             } : null}
             activeLeg={ride.status === "in_progress" ? "to_dropoff" : "to_pickup"}
+            routeCoordinates={routeCoordinates}
             showEtaOverlay={true}
             autoFollow={true}
             className="h-full w-full"

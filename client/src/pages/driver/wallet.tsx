@@ -143,12 +143,6 @@ export default function DriverWallet() {
     },
   });
 
-  const formatCurrency = (amount: number, currency: string) => {
-    if (currency === "BDT") {
-      return `৳${amount.toFixed(2)}`;
-    }
-    return `$${amount.toFixed(2)}`;
-  };
 
   const formatPayoutMethod = (method: PayoutMethod | undefined) => {
     if (!method) return "Add payout method";
