@@ -20,6 +20,7 @@ import {
   Truck,
   Box,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Parcel {
   id: string;
@@ -30,6 +31,7 @@ interface Parcel {
   recipientPhone: string;
   packageSize: string;
   price: number;
+  currency?: string;
   trackingCode?: string;
   estimatedDelivery?: string;
   courierName?: string;
@@ -80,7 +82,7 @@ function ParcelCard({ parcel }: { parcel: Parcel }) {
 
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-4 text-muted-foreground">
-            <span className="font-medium text-foreground">${parcel.price.toFixed(2)}</span>
+            <span className="font-medium text-foreground">{formatCurrency(parcel.price, parcel.currency || "USD")}</span>
             <Badge variant="outline">{parcel.packageSize}</Badge>
           </div>
           <Link href={`/rider/parcels/${parcel.id}`}>

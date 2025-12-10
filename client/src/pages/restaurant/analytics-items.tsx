@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TrendingUp, TrendingDown, AlertCircle, Clock } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface ItemAnalytics {
   topItems: { itemName: string; orderCount: number; totalAttempts: number; revenue: number }[];
@@ -23,7 +24,7 @@ export default function AnalyticsItems() {
     queryKey: [`/api/restaurant/analytics/items?startDate=${startDate}&endDate=${endDate}`],
   });
 
-  const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
+  const formatAmount = (amount: number) => formatCurrency(amount, "USD");
 
   if (isLoading) {
     return (
@@ -93,7 +94,7 @@ export default function AnalyticsItems() {
                       </div>
                     </div>
                     <div className="text-lg font-bold text-green-600">
-                      {formatCurrency(item.revenue)}
+                      {formatAmount(item.revenue)}
                     </div>
                   </div>
                 ))
@@ -130,7 +131,7 @@ export default function AnalyticsItems() {
                       </div>
                     </div>
                     <div className="text-lg font-bold text-destructive">
-                      {formatCurrency(item.revenue)}
+                      {formatAmount(item.revenue)}
                     </div>
                   </div>
                 ))

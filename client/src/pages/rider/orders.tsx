@@ -19,6 +19,7 @@ import {
   MapPin,
   Store,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface FoodOrder {
   id: string;
@@ -27,6 +28,7 @@ interface FoodOrder {
   restaurantImage?: string;
   items: { name: string; quantity: number }[];
   totalAmount: number;
+  currency?: string;
   deliveryAddress: string;
   estimatedDelivery?: string;
   driverName?: string;
@@ -88,7 +90,7 @@ function OrderCard({ order }: { order: FoodOrder }) {
         </div>
 
         <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">${order.totalAmount.toFixed(2)}</span>
+          <span className="font-medium">{formatCurrency(order.totalAmount, order.currency || "USD")}</span>
           <div className="flex gap-2">
             <Link href={`/rider/orders?reorder=${order.id}`}>
               <Button variant="outline" size="sm" data-testid={`button-reorder-${order.id}`}>

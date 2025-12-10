@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ordersKeys } from "@/lib/queryKeys";
 import { formatDistanceToNow } from "date-fns";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { KYCBanner } from "@/components/restaurant/KYCBanner";
 import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
 import { PerformanceInsights } from "@/components/restaurant/PerformanceInsights";
@@ -546,7 +547,7 @@ export default function RestaurantHome() {
                   </p>
                   <div className="flex items-baseline gap-2">
                     <p className="text-3xl font-bold text-green-600" data-testid="text-period-earnings">
-                      {currentEarnings > 0 ? `$${currentEarnings.toFixed(2)}` : "—"}
+                      {currentEarnings > 0 ? formatCurrency(currentEarnings, "USD") : "—"}
                     </p>
                     {timePeriod !== 'today' && earningsTrend !== 0 && (
                       <span 

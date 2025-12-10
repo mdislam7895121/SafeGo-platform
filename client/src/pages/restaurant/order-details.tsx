@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { formatCurrency } from "@/lib/formatCurrency";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -359,7 +360,7 @@ export default function RestaurantOrderDetails() {
                       </p>
                     </div>
                     <p className="font-medium" data-testid={`text-item-total-${idx}`}>
-                      ${((item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                      {formatCurrency((item.price || 0) * (item.quantity || 1), order.currency || "USD")}
                     </p>
                   </div>
                 ))}
@@ -370,31 +371,31 @@ export default function RestaurantOrderDetails() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span data-testid="text-subtotal">${order.subtotal?.toFixed(2) || "0.00"}</span>
+                  <span data-testid="text-subtotal">{formatCurrency(order.subtotal || 0, order.currency || "USD")}</span>
                 </div>
                 {order.deliveryFee && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Delivery Fee</span>
-                    <span data-testid="text-delivery-fee">${order.deliveryFee.toFixed(2)}</span>
+                    <span data-testid="text-delivery-fee">{formatCurrency(order.deliveryFee, order.currency || "USD")}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">SafeGo Fee</span>
                   <span className="text-red-600 dark:text-red-400" data-testid="text-safego-fee">
-                    -${order.safegoCommission?.toFixed(2) || "0.00"}
+                    -{formatCurrency(order.safegoCommission || 0, order.currency || "USD")}
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold text-base">
                   <span>Your Payout</span>
                   <span className="text-green-600 dark:text-green-400" data-testid="text-restaurant-payout">
-                    ${order.restaurantPayout?.toFixed(2) || "0.00"}
+                    {formatCurrency(order.restaurantPayout || 0, order.currency || "USD")}
                   </span>
                 </div>
                 <div className="flex justify-between font-semibold text-base">
                   <span>Customer Total</span>
                   <span data-testid="text-service-fare">
-                    ${order.serviceFare?.toFixed(2) || "0.00"}
+                    {formatCurrency(order.serviceFare || 0, order.currency || "USD")}
                   </span>
                 </div>
               </div>

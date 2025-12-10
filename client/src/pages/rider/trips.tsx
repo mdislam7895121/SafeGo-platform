@@ -18,6 +18,7 @@ import {
   Star,
   Navigation,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Trip {
   id: string;
@@ -25,6 +26,7 @@ interface Trip {
   pickupAddress: string;
   dropoffAddress: string;
   fare: number;
+  fareCurrency?: string;
   distance: number;
   duration: number;
   driverName?: string;
@@ -81,7 +83,7 @@ function TripCard({ trip }: { trip: Trip }) {
 
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-4 text-muted-foreground">
-            <span>${trip.fare.toFixed(2)}</span>
+            <span>{formatCurrency(trip.fare, trip.fareCurrency || "USD")}</span>
             <span>{trip.distance.toFixed(1)} km</span>
             <span>{trip.duration} min</span>
           </div>

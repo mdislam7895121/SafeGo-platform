@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface LocationData {
   address: string;
@@ -142,6 +143,12 @@ export default function ParcelRequest() {
   const { data: zones } = useQuery<ZoneData>({
     queryKey: ["/api/parcel/bd/zones"],
   });
+
+  const { data: profileData } = useQuery<{ countryCode?: string }>({
+    queryKey: ["/api/customer/profile"],
+  });
+
+  const isCashAllowed = profileData?.countryCode !== "US";
 
   const volumetricWeight = useMemo(() => {
     const l = parseFloat(lengthCm) || 0;
@@ -738,7 +745,7 @@ export default function ParcelRequest() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cash" | "online")} className="grid grid-cols-2 gap-2">
+              <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cash" | "online")} className={isCashAllowed ? "grid grid-cols-2 gap-2" : ""}>
                 <div className="relative">
                   <RadioGroupItem value="online" id="online" className="peer sr-only" />
                   <Label
@@ -749,16 +756,18 @@ export default function ParcelRequest() {
                     Online Pay
                   </Label>
                 </div>
-                <div className="relative">
-                  <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
-                  <Label
-                    htmlFor="cash"
-                    className="flex items-center justify-center gap-2 rounded-lg border-2 border-muted bg-popover p-3 hover-elevate cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5"
-                    data-testid="radio-payment-cash"
-                  >
-                    Cash
-                  </Label>
-                </div>
+                {isCashAllowed && (
+                  <div className="relative">
+                    <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
+                    <Label
+                      htmlFor="cash"
+                      className="flex items-center justify-center gap-2 rounded-lg border-2 border-muted bg-popover p-3 hover-elevate cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5"
+                      data-testid="radio-payment-cash"
+                    >
+                      Cash
+                    </Label>
+                  </div>
+                )}
               </RadioGroup>
             </CardContent>
           </Card>
@@ -778,13 +787,13 @@ export default function ParcelRequest() {
                 {pricing.breakdown.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{item.label}</span>
-                    <span>৳{item.amount.toFixed(2)}</span>
+                    <span>{formatCurrency(item.amount, pricing.currency || "BDT")}</span>
                   </div>
                 ))}
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total</span>
-                  <span className="text-primary">৳{pricing.totalDeliveryCharge.toFixed(2)}</span>
+                  <span className="text-primary">{formatCurrency(pricing.totalDeliveryCharge, pricing.currency || "BDT")}</span>
                 </div>
                 {pricing.estimatedDays && (
                   <p className="text-xs text-muted-foreground text-center">

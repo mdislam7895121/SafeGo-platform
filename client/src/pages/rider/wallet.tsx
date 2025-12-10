@@ -15,6 +15,7 @@ import {
   Clock,
   Percent,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface WalletData {
   balance: number;
@@ -84,7 +85,7 @@ export default function RiderWallet() {
               SafeGo Balance
             </CardDescription>
             <CardTitle className="text-3xl" data-testid="text-wallet-balance">
-              ${balance.toFixed(2)}
+              {formatCurrency(balance, walletData?.currency || "USD")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -106,7 +107,7 @@ export default function RiderWallet() {
             <CardDescription>Ride Credits</CardDescription>
             <CardTitle className="text-3xl flex items-center gap-2" data-testid="text-wallet-credits">
               <Gift className="h-6 w-6 text-purple-500" />
-              ${credits.toFixed(2)}
+              {formatCurrency(credits, walletData?.currency || "USD")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -232,7 +233,7 @@ export default function RiderWallet() {
                   <span className={`font-medium ${
                     txn.type === "credit" ? "text-green-500" : "text-foreground"
                   }`}>
-                    {txn.type === "credit" ? "+" : "-"}${Math.abs(txn.amount).toFixed(2)}
+                    {txn.type === "credit" ? "+" : "-"}{formatCurrency(Math.abs(txn.amount), walletData?.currency || "USD")}
                   </span>
                 </div>
               ))}

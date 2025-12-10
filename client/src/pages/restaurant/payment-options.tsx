@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CreditCard, Smartphone, Banknote, Wallet, Info } from "lucide-react";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface PaymentMethod {
   id: string;
@@ -89,12 +90,12 @@ export default function PaymentOptionsPage() {
               <CardContent className="text-sm text-muted-foreground space-y-1">
                 {method.minAmount && (
                   <p data-testid={`text-min-amount-${method.id}`}>
-                    Minimum: ৳{parseFloat(method.minAmount).toFixed(2)}
+                    Minimum: {formatCurrency(method.minAmount, "BDT")}
                   </p>
                 )}
                 {method.maxAmount && (
                   <p data-testid={`text-max-amount-${method.id}`}>
-                    Maximum: ৳{parseFloat(method.maxAmount).toFixed(2)}
+                    Maximum: {formatCurrency(method.maxAmount, "BDT")}
                   </p>
                 )}
                 {method.requiresKycLevel !== "NONE" && (

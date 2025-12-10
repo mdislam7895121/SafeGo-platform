@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ordersKeys } from "@/lib/queryKeys";
 import { format } from "date-fns";
 import { useState } from "react";
+import { formatCurrency } from "@/lib/formatCurrency";
 import {
   Dialog,
   DialogContent,
@@ -275,7 +276,7 @@ export default function LiveOrders() {
                         <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
                       </div>
                       <p className="font-semibold">
-                        ${Number(item.price * item.quantity).toFixed(2)}
+                        {formatCurrency(Number(item.price * item.quantity), selectedOrder.currency || "USD")}
                       </p>
                     </div>
                   ))}
@@ -286,7 +287,7 @@ export default function LiveOrders() {
               <div className="flex items-center justify-between pt-3 border-t">
                 <span className="font-semibold">Total</span>
                 <span className="text-xl font-bold text-primary">
-                  ${Number(selectedOrder.totalAmount).toFixed(2)}
+                  {formatCurrency(Number(selectedOrder.totalAmount), selectedOrder.currency || "USD")}
                 </span>
               </div>
 
