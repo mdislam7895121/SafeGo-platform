@@ -1015,6 +1015,12 @@ function LandingFooter() {
               <Link href="/cookies" className="hover:text-white transition-colors">Cookie Policy</Link>
             </div>
           </div>
+          
+          <div className="mt-6 pt-6 border-t border-gray-800">
+            <p className="text-center text-xs text-gray-500">
+              SafeGo services are in testing mode. Some features are disabled or simulated. Public launch will include full KYC, payment, safety, and legal compliance systems.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

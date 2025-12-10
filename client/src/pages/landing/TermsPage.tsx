@@ -54,6 +54,12 @@ export default function TermsPage() {
       <LegalHeader />
       <main className="flex-1 py-12 lg:py-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-6 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <p className="text-sm text-amber-800 dark:text-amber-200 text-center">
+              Testing Version - These terms will be updated before public launch.
+            </p>
+          </div>
+          
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-8">
             Terms of Service
           </h1>
