@@ -8,13 +8,14 @@ import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { securityHeaders, corsMiddleware } from "./middleware/securityHeaders";
+import { securityHeaders, corsMiddleware, csrfProtection } from "./middleware/securityHeaders";
 
 const app = express();
 
-// Apply CORS and security headers globally before any other middleware
+// Apply CORS, security headers, and CSRF protection globally before any other middleware
 app.use(corsMiddleware);
 app.use(securityHeaders);
+app.use(csrfProtection);
 
 // Parse cookies for refresh token handling
 app.use(cookieParser());
