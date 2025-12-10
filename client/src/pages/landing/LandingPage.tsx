@@ -7,9 +7,9 @@
  * 
  * Region-aware features:
  * - HERO_CONFIG: Controls hero description per region
- * - REGION_SERVICES: Controls which services appear (BD: 5, US: 4, GLOBAL: 3)
+ * - REGION_SERVICES: Controls which services appear (BD: 5, US: 3, GLOBAL: 3)
  * - PARTNER_CONFIG: Controls partner section text per region
- * - HOW_IT_WORKS_CONFIG: Controls which service flows to show per region
+ * - HOW_IT_WORKS_SERVICES: Controls which service flows to show per region
  * 
  * All CTAs use existing public routes only. No secrets exposed.
  */
