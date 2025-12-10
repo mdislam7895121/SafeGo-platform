@@ -279,17 +279,17 @@ function HeroSection({
             </p>
             
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Link href="/ride">
+              <a href="#services">
                 <Button size="lg" className="w-full sm:w-auto rounded-full px-8 bg-blue-600 hover:bg-blue-700" data-testid="button-explore-services">
                   Explore services
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
-              </Link>
-              <Link href="/drive">
+              </a>
+              <a href="#partners">
                 <Button variant="outline" size="lg" className="w-full sm:w-auto rounded-full px-8 border-gray-300 dark:border-gray-700" data-testid="button-become-partner">
                   Become a partner
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
           
@@ -615,11 +615,11 @@ function CTASection() {
             <Smartphone className="mr-2 h-4 w-4" />
             Download the app
           </Button>
-          <Link href="/drive">
+          <a href="#partners">
             <Button size="lg" variant="outline" className="rounded-full px-8 border-white/30 text-white hover:bg-white/10 hover:text-white" data-testid="button-cta-partner">
               Become a partner
             </Button>
-          </Link>
+          </a>
         </div>
       </div>
     </section>
@@ -653,9 +653,9 @@ function LandingFooter() {
             <h3 className="font-semibold text-white mb-4">Partners</h3>
             <ul className="space-y-3 text-sm">
               <li><Link href="/driver/signup" className="hover:text-white transition-colors">Drive with us</Link></li>
-              <li><Link href="/delivery" className="hover:text-white transition-colors">Deliver with us</Link></li>
+              <li><Link href="/driver/signup" className="hover:text-white transition-colors">Deliver with us</Link></li>
               <li><Link href="/restaurant/signup" className="hover:text-white transition-colors">Restaurant partners</Link></li>
-              <li><Link href="/partner/shop/start" className="hover:text-white transition-colors">Shop partners</Link></li>
+              <li><Link href="/business" className="hover:text-white transition-colors">Shop partners</Link></li>
             </ul>
           </div>
           <div>
