@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
-import { ChevronLeft, Car, UtensilsCrossed, Store, Ticket, Phone, Mail, MapPin, Clock, CheckCircle, XCircle, Clock4, Send, Loader2 } from "lucide-react";
+import { ChevronLeft, Car, UtensilsCrossed, Store, Ticket, Phone, Mail, MapPin, Clock, CheckCircle, XCircle, Clock4, Send, Loader2, Bell, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,18 @@ interface AdminNote {
   text: string;
   addedAt: string;
   addedBy: string;
+}
+
+interface NotificationLog {
+  id: string;
+  createdAt: string;
+  toEmail: string;
+  subject: string;
+  templateName: string;
+  statusTrigger: string;
+  previousStatus?: string;
+  success: boolean;
+  errorMessage?: string;
 }
 
 interface Application {
@@ -102,6 +114,16 @@ export default function AdminOnboardingDetail() {
     enabled: !!type && !!id
   });
 
+  const { data: notificationData } = useQuery<{ logs: NotificationLog[] }>({
+    queryKey: ['/api/partner-onboarding/notifications', id],
+    queryFn: async () => {
+      const response = await fetch(`/api/partner-onboarding/notifications/${id}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+      return response.json();
+    },
+    enabled: !!id
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ status, note }: { status: string; note?: string }) => {
       const response = await fetch(`/api/partner-onboarding/${type}/${id}`, {
@@ -116,7 +138,8 @@ export default function AdminOnboardingDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/partner-onboarding', type, id] });
       queryClient.invalidateQueries({ queryKey: ['/api/partner-onboarding', type] });
-      toast({ title: "Updated", description: "Application status updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/partner-onboarding/notifications', id] });
+      toast({ title: "Updated", description: "Application status updated successfully. Email notification sent." });
       setAdminNote("");
       setNewStatus("");
     },
@@ -337,6 +360,50 @@ export default function AdminOnboardingDetail() {
                       <p className="text-xs text-muted-foreground mt-1">
                         {note.addedBy} - {formatDistanceToNow(new Date(note.addedAt), { addSuffix: true })}
                       </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Email Notifications
+              </CardTitle>
+              <CardDescription>Notification history for this application</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!notificationData?.logs || notificationData.logs.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No notifications sent yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {notificationData.logs.map((log) => (
+                    <div key={log.id} className="p-3 bg-muted/50 rounded-md">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <Badge variant={log.success ? "default" : "destructive"} className="text-xs">
+                          {log.success ? (
+                            <><CheckCircle className="h-3 w-3 mr-1" /> Sent</>
+                          ) : (
+                            <><AlertCircle className="h-3 w-3 mr-1" /> Failed</>
+                          )}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium">{log.subject}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        To: {log.toEmail}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Status change: {log.previousStatus || 'N/A'} → {log.statusTrigger}
+                      </p>
+                      {log.errorMessage && (
+                        <p className="text-xs text-destructive mt-1">Error: {log.errorMessage}</p>
+                      )}
                     </div>
                   ))}
                 </div>
