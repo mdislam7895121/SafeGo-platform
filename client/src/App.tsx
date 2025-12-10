@@ -233,6 +233,8 @@ import AdminCustomerDetails from "@/pages/admin/customer-details";
 import AdminRestaurants from "@/pages/admin/restaurants";
 import AdminRestaurantDetails from "@/pages/admin/restaurant-details";
 import AdminComplaints from "@/pages/admin/complaints";
+import AdminContactCenter from "@/pages/admin/contact-center";
+import AdminContactCenterDetail from "@/pages/admin/contact-center-detail";
 import AdminComplaintDetails from "@/pages/admin/complaint-details";
 import AdminUsers from "@/pages/admin/users";
 import AdminParcels from "@/pages/admin/parcels";
@@ -1916,6 +1918,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Restaurant Settings">
             <AdminRestaurantSettings />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/contact-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Contact Center">
+            <AdminContactCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/contact-center/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Contact Details">
+            <AdminContactCenterDetail />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

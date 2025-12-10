@@ -36,6 +36,7 @@ import {
   Route,
   ChevronDown,
   Rocket,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { SafePilotSidebarIcon } from "@/components/safepilot/SafePilotLogo";
@@ -239,6 +240,12 @@ const phase3aNavItems: NavItem[] = [
     title: "Support Panel",
     href: "/admin/customer-support-panel",
     icon: UserCog,
+    navKey: "dashboard",
+  },
+  {
+    title: "Contact Center",
+    href: "/admin/contact-center",
+    icon: MessageSquare,
     navKey: "dashboard",
   },
   {
