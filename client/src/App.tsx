@@ -242,6 +242,7 @@ import AdminOnboardingRestaurants from "@/pages/admin/onboarding-restaurants";
 import AdminOnboardingShops from "@/pages/admin/onboarding-shops";
 import AdminOnboardingTickets from "@/pages/admin/onboarding-tickets";
 import AdminOnboardingDetail from "@/pages/admin/onboarding-detail";
+import AdminNotificationLogs from "@/pages/admin/notification-logs";
 import AdminComplaintDetails from "@/pages/admin/complaint-details";
 import AdminUsers from "@/pages/admin/users";
 import AdminParcels from "@/pages/admin/parcels";
@@ -2011,6 +2012,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Ticket Application">
             <AdminOnboardingDetail />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding/notification-logs">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Notification Logs">
+            <AdminNotificationLogs />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
