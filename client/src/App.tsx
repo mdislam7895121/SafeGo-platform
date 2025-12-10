@@ -461,6 +461,23 @@ function Router() {
         <Redirect to="/signup" />
       </Route>
 
+      {/* SEO-friendly short routes - redirect to actual destinations */}
+      <Route path="/ride">
+        <Redirect to="/customer/ride-booking" />
+      </Route>
+      <Route path="/drive">
+        <Redirect to="/partner/ride/start" />
+      </Route>
+      <Route path="/delivery">
+        <Redirect to="/partner/delivery/start" />
+      </Route>
+      <Route path="/restaurant/signup">
+        <Redirect to="/partner/restaurant/start" />
+      </Route>
+      <Route path="/driver/signup">
+        <Redirect to="/partner/driver/register" />
+      </Route>
+
       {/* Customer routes - NEW UNIFIED BOOKING DESIGN */}
       <Route path="/customer">
         <ProtectedRoute allowedRoles={["customer"]}>
