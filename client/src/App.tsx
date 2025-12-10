@@ -425,8 +425,9 @@ import ShopPartnerStart from "@/pages/partner/shop-start";
 import TicketOperatorStart from "@/pages/partner/ticket-start";
 
 import NotFound from "@/pages/not-found";
+import LandingPage from "@/pages/landing/LandingPage";
 
-function HomeRedirect() {
+function DashboardRedirect() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -436,7 +437,6 @@ function HomeRedirect() {
   }
 
   if (user) {
-    // Use centralized role-based routing helper
     return <Redirect to={getPostLoginPath(user)} />;
   }
 
@@ -447,7 +447,8 @@ function Router() {
   return (
     <Switch>
       {/* Public routes */}
-      <Route path="/" component={HomeRedirect} />
+      <Route path="/" component={LandingPage} />
+      <Route path="/dashboard" component={DashboardRedirect} />
       <Route path="/login" component={Login} />
       <Route path="/auth/login" component={Login} />
       <Route path="/signup" component={Signup} />

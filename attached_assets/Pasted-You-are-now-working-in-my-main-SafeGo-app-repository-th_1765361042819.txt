@@ -1,0 +1,191 @@
+You are now working in my main SafeGo app repository (the one with the full backend and the /ride booking + tracking flows). The goal is:
+
+> Make the marketing landing page and the ride app live on the SAME project and SAME domain.
+
+Do NOT touch the backend contracts or database. Do NOT redesign the UI of the ride map or dashboards. Only do routing + landing wiring.
+
+High-level requirements
+
+1. The root path `/` must show the SafeGo marketing landing page (hero, services, partner cards, how it works, safety, FAQ, final CTA).
+2. The same React app must also handle `/ride`, `/drive`, `/business`, etc. using our existing booking/tracking implementation and auth logic.
+3. All navigation and buttons on the landing page must link to INTERNAL routes (no external domain, no 404).
+
+Assume this is a React + TypeScript app with a `client/src` folder and existing pages like:
+
+- `client/src/pages/customer/ride-request-page.tsx` (or an equivalent ride page)
+- `client/src/pages/customer/ride-tracking-page.tsx`
+- A central router (e.g. `client/src/main.tsx`, `client/src/router.tsx`, or similar)
+
+Follow these steps exactly.
+
+────────────────
+1. Create the Landing page component
+────────────────
+
+1.1. Create a new page component for the landing page:
+
+- File: `client/src/pages/landing/LandingPage.tsx` (or another appropriate folder, but keep it under `client/src/pages`).
+- Export a default `LandingPage` React component.
+
+1.2. Inside `LandingPage.tsx`, build the content using our existing design structure from the current SafeGo marketing site:
+
+Sections to include (in this order):
+
+- Hero:
+  - Left: “Move, eat, and deliver with SafeGo” style heading.
+  - Sub-text: “One platform for rides, food delivery, and parcel delivery — launching first in Bangladesh.”
+  - Two buttons:
+    - Primary: “Explore services”
+    - Secondary: “Become a partner”
+- SafeGo Services:
+  - Cards for: Rides, Food delivery, Parcel delivery, Local Shops, Tickets & Travel (if already in the copy).
+- Become a partner:
+  - Two columns: “For drivers & couriers” and “For restaurants & shops”.
+- How SafeGo works:
+  - Three flows: Rides, Food delivery, Parcel delivery (step-by-step bullets).
+- Safety & Security:
+  - Columns for “Your safety comes first”, “Safety while you work”, “Protecting your data and privacy”.
+- Support & FAQ:
+  - FAQ cards (How do I request a SafeGo ride? When is SafeGo launching? How do I become a driver or courier? etc.).
+- Final CTA:
+  - “Ready to move with SafeGo?” section with buttons:
+    - “Download the app”
+    - “Become a partner”
+
+Use our existing design primitives:
+
+- Buttons, cards, typography, and layout components from `client/src/components` instead of inventing new styling systems.
+- Keep the visual layout similar to the current marketing site, but you do NOT need pixel-perfect reproduction. Prioritize clean, consistent structure.
+
+Important: This is a purely static marketing page. Do NOT add any new API calls here.
+
+────────────────
+2. Wire the root route `/` to the Landing page
+────────────────
+
+2.1. Find our main router configuration. It will be in one of these files:
+
+- `client/src/main.tsx`
+- `client/src/router.tsx`
+- `client/src/App.tsx`
+- Or a similar routing entrypoint.
+
+2.2. Add a route for `/` that renders `LandingPage`:
+
+- If using React Router:
+
+  - Import `LandingPage` from `client/src/pages/landing/LandingPage`.
+  - Add a route: `{ path: "/", element: <LandingPage /> }` as the top-level public route.
+  - Do NOT break existing routes, especially `/ride`, `/customer/...`, `/driver/...`, `/admin/...`.
+
+- If using a custom router structure, follow the existing pattern for pages to make `/` show the landing component.
+
+2.3. Ensure that the existing `/ride` booking page continues to work exactly as before. Do NOT move or rename the ride booking files.
+
+────────────────
+3. Update the top navigation to use internal routes
+────────────────
+
+3.1. Find the main header / navbar component used by the landing site:
+
+- Likely in something like `client/src/components/layout/Header.tsx`, `Navbar.tsx`, or `client/src/components/marketing/TopNav.tsx`.
+
+3.2. Make sure the navbar uses internal routing (React Router `<Link>` or equivalent) instead of hardcoded full URLs.
+
+Update the nav items to:
+
+- Logo: links to `/`
+- “Ride”: links to `/ride`
+- “Drive”: links to `/drive` (or `/drivers/signup` if that’s the driver entry in this app)
+- “Business”: links to `/business` (or an existing partner/merchant entry page)
+- “About”: link to an existing about page route if present; otherwise keep it pointing to `/#how-it-works` anchor on the landing page.
+
+3.3. Right-side buttons:
+
+- “Login” → link to `/auth/login` (or the correct login route in this project).
+- “Sign up” → link to `/auth/signup` (customer signup route).
+
+Do NOT use `SAFEGO_APP_BASE_URL` or any external domain here. These should be internal app links.
+
+────────────────
+4. Wire CTA buttons to the internal app
+────────────────
+
+In `LandingPage.tsx`, connect all call-to-action buttons to internal routes:
+
+- Hero:
+  - “Explore services” → `/ride`
+  - “Become a partner” → `/drive` or `/partners` (choose the route we already have for partner onboarding).
+- SafeGo Services cards:
+  - “Rides” → `/ride`
+  - “Food delivery” → existing customer food ordering entry route (e.g. `/customer/food` or `/eats` if such a route exists).
+  - “Parcel delivery” → parcel request route (e.g. `/customer/parcel`).
+  - “Local Shops” → the shops/basket entry page (if implemented).
+  - “Tickets & Travel” → existing ticket search page, if it exists; otherwise leave as a non-clickable label.
+- Become a partner section:
+  - “Earn as a SafeGo driver or delivery partner” → driver signup route (`/driver/signup` or the correct driver onboarding entry).
+  - “Grow your restaurant or shop with SafeGo” → restaurant/shop partner signup route (`/restaurant/signup` or equivalent).
+- Final CTA:
+  - “Download the app” → keep as placeholder or external store link if already configured.
+  - “Become a partner” → same as above partner route.
+
+Again: NO external hardcoded `https://safegoglobal.com/drive` links. Always use internal React routing.
+
+────────────────
+5. Region tabs (Bangladesh / United States / Global)
+────────────────
+
+5.1. The landing hero has region tabs like:
+
+- Bangladesh
+- United States
+- Global
+
+Connect these to our existing region / country handling WITHOUT breaking the ride flows:
+
+- If we already have a `RegionContext`, `useRegion()` hook, or similar:
+
+  - Use it so that clicking “Bangladesh” sets region to “BD”, “United States” sets region to “US”, and “Global” to `"GLOBAL"` or the value used in our app.
+  - Make sure this region is consistent with what the `/ride` page already uses for BD vs US rules.
+
+- If there is NO region context yet in this project:
+
+  - Implement the simplest possible solution:
+    - Store the selected region in `localStorage` and/or URL query parameter `?region=BD` / `?region=US`.
+    - Ensure that the existing `/ride` booking page reads the same region source it currently uses (do not rewrite ride logic, just reuse its region detection if it exists).
+  - Do NOT add new backend endpoints for region.
+
+The visual design of the tabs must stay the same; only behavior should update.
+
+────────────────
+6. Clean up external base URL usage for landing → app
+────────────────
+
+6.1. Search the entire project for any constant or usage of `SAFEGO_APP_BASE_URL` or similar variables that build full URLs for `/ride`, `/drive`, etc.
+
+- If these are only used in the landing / CTA components, refactor them to internal routing and remove those references.
+- If some external integration still needs them (for example, external emails or PDFs), keep them only in those back-office places and NOT in the main landing UI.
+
+The public web navigation should not generate `https://safegoglobal.com/ride` manually. It should rely on the same React routing that powers the app pages.
+
+────────────────
+7. Verification checklist
+────────────────
+
+After you finish, verify the following inside this ONE project:
+
+1. `/` loads the new SafeGo landing page with all sections.
+2. `/ride` still loads the fully functional ride booking map and backend integration.
+3. Clicking “Explore services” on the hero correctly goes to `/ride` with no 404.
+4. Clicking “Become a partner” goes to the correct driver/partner entry page.
+5. The top navigation “Ride”, “Drive”, “Business”, “About”, “Login”, “Sign up” all work and stay inside the same app (no full page 404 from another project).
+6. The region tabs switch the region state in a way that the `/ride` page can read (BD vs US rules), without breaking any existing BD/US logic.
+7. There are no references in the landing code to external hardcoded `safegoglobal.com/...` routes for internal navigation.
+
+Do NOT change:
+
+- Backend endpoints or their contracts.
+- Auth logic or token handling.
+- The existing ride map layout or booking UX.
+
+Only add the landing page page/component, routes, and internal links described above, so that SafeGo’s marketing landing and the operational app share one domain and one codebase.
