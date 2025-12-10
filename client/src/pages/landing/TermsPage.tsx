@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLandingSeo } from "@/components/landing/LandingSeo";
 
 function LegalHeader() {
   return (
@@ -49,6 +50,16 @@ function LegalFooter() {
 }
 
 export default function TermsPage() {
+  const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://safego.replit.app';
+  
+  useLandingSeo({
+    title: 'Terms of Service | SafeGo',
+    description: 'Read the SafeGo Terms of Service. Understand the rules and guidelines for using our ride-hailing, food delivery, and parcel delivery platform.',
+    keywords: 'terms of service, user agreement, SafeGo terms, legal terms',
+    canonicalUrl: `${BASE_URL}/terms`,
+    breadcrumbs: [{ name: 'Home', url: '/' }, { name: 'Terms of Service', url: '/terms' }]
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="terms-page">
       <LegalHeader />

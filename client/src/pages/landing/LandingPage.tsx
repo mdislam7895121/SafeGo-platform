@@ -22,6 +22,7 @@ import {
   CreditCard, Bell, Headphones, Eye, FileCheck, Zap, Navigation,
   UserCheck, ShieldCheck, Database, Server, Globe, ArrowRight
 } from "lucide-react";
+import { useLandingSeo } from "@/components/landing/LandingSeo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -1041,6 +1042,17 @@ export default function LandingPage() {
     setSelectedRegion(region);
     localStorage.setItem("safego-region", region);
   };
+
+  const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://safego.replit.app';
+
+  useLandingSeo({
+    title: `SafeGo - Ride, Deliver, Connect | ${selectedRegion === 'BD' ? 'Bangladesh' : selectedRegion === 'US' ? 'USA' : 'Global'}`,
+    description: HERO_CONFIG[selectedRegion].description,
+    keywords: 'ride-hailing, food delivery, parcel delivery, super app, SafeGo',
+    canonicalUrl: `${BASE_URL}/`,
+    region: selectedRegion === 'GLOBAL' ? 'global' : selectedRegion,
+    breadcrumbs: [{ name: 'Home', url: '/' }]
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="landing-page">

@@ -47,6 +47,19 @@ app.use("/uploads", express.static("uploads"));
 // Serve attached assets (demo images, stock photos) statically
 app.use("/attached_assets", express.static("attached_assets"));
 
+// Serve SEO files with appropriate caching
+app.get("/sitemap.xml", (_req, res) => {
+  res.setHeader("Content-Type", "application/xml");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.sendFile("sitemap.xml", { root: "./client/public" });
+});
+
+app.get("/robots.txt", (_req, res) => {
+  res.setHeader("Content-Type", "text/plain");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.sendFile("robots.txt", { root: "./client/public" });
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

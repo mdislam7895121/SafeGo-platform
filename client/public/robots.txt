@@ -1,0 +1,29 @@
+User-agent: *
+Allow: /
+Allow: /ride
+Allow: /drive
+Allow: /business
+Allow: /safety
+Allow: /support
+Allow: /privacy
+Allow: /terms
+Allow: /cookies
+
+Disallow: /api/
+Disallow: /admin/
+Disallow: /driver/
+Disallow: /restaurant/
+Disallow: /customer/
+
+Sitemap: https://safego.replit.app/sitemap.xml
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+
+# Block sensitive paths
+Disallow: /api/auth/
+Disallow: /api/admin/
+Disallow: /api/driver/
+Disallow: /api/customer/
+Disallow: /api/payment/
+Disallow: /uploads/

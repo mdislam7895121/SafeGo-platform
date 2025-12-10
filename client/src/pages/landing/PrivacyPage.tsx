@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLandingSeo } from "@/components/landing/LandingSeo";
 
 function LegalHeader() {
   return (
@@ -49,6 +50,16 @@ function LegalFooter() {
 }
 
 export default function PrivacyPage() {
+  const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://safego.replit.app';
+  
+  useLandingSeo({
+    title: 'Privacy Policy | SafeGo',
+    description: 'Learn how SafeGo collects, uses, and protects your personal information. Our privacy policy covers data handling for ride-hailing, food delivery, and parcel services.',
+    keywords: 'privacy policy, data protection, personal information, SafeGo privacy',
+    canonicalUrl: `${BASE_URL}/privacy`,
+    breadcrumbs: [{ name: 'Home', url: '/' }, { name: 'Privacy Policy', url: '/privacy' }]
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="privacy-page">
       <LegalHeader />

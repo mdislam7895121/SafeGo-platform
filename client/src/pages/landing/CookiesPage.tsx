@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLandingSeo } from "@/components/landing/LandingSeo";
 
 function LegalHeader() {
   return (
@@ -49,6 +50,16 @@ function LegalFooter() {
 }
 
 export default function CookiesPage() {
+  const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://safego.replit.app';
+  
+  useLandingSeo({
+    title: 'Cookie Policy | SafeGo',
+    description: 'Learn about how SafeGo uses cookies to improve your experience. Understand cookie types and how to manage your preferences.',
+    keywords: 'cookie policy, cookies, tracking, SafeGo cookies, privacy',
+    canonicalUrl: `${BASE_URL}/cookies`,
+    breadcrumbs: [{ name: 'Home', url: '/' }, { name: 'Cookie Policy', url: '/cookies' }]
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="cookies-page">
       <LegalHeader />
