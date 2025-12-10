@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, fetchWithAuth } from "@/lib/queryClient";
 import {
   Calendar,
   Clock,
@@ -124,83 +124,80 @@ function HeatmapCell({ value, maxValue }: { value: number; maxValue: number }) {
 }
 
 export default function OperationsCenter() {
-  const { token } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   const [period, setPeriod] = useState("24h");
   const [showNewReportDialog, setShowNewReportDialog] = useState(false);
 
-  const headers = { Authorization: `Bearer ${token}` };
-
   const { data: systemStatus, isLoading: loadingStatus } = useQuery({
     queryKey: ["/api/admin/phase3a/system/status-panel"],
-    queryFn: () => fetch("/api/admin/phase3a/system/status-panel", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/system/status-panel").then(r => r.json()),
     refetchInterval: 30000,
   });
 
   const { data: onlineAdmins, isLoading: loadingAdmins } = useQuery({
     queryKey: ["/api/admin/phase3a/presence/online"],
-    queryFn: () => fetch("/api/admin/phase3a/presence/online", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/presence/online").then(r => r.json()),
     refetchInterval: 30000,
   });
 
   const { data: scheduledReports } = useQuery({
     queryKey: ["/api/admin/phase3a/reports/scheduled"],
-    queryFn: () => fetch("/api/admin/phase3a/reports/scheduled", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/reports/scheduled").then(r => r.json()),
   });
 
   const { data: productivity } = useQuery({
     queryKey: ["/api/admin/phase3a/productivity/stats", period],
-    queryFn: () => fetch(`/api/admin/phase3a/productivity/stats?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3a/productivity/stats?period=${period}`).then(r => r.json()),
   });
 
   const { data: failedLogins } = useQuery({
     queryKey: ["/api/admin/phase3a/security/failed-logins"],
-    queryFn: () => fetch("/api/admin/phase3a/security/failed-logins", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/security/failed-logins").then(r => r.json()),
   });
 
   const { data: heatmapData } = useQuery({
     queryKey: ["/api/admin/phase3a/analytics/activity-heatmap"],
-    queryFn: () => fetch("/api/admin/phase3a/analytics/activity-heatmap", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/analytics/activity-heatmap").then(r => r.json()),
   });
 
   const { data: dataQuality } = useQuery({
     queryKey: ["/api/admin/phase3a/data-quality/issues"],
-    queryFn: () => fetch("/api/admin/phase3a/data-quality/issues", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/data-quality/issues").then(r => r.json()),
   });
 
   const { data: quarantine } = useQuery({
     queryKey: ["/api/admin/phase3a/quarantine/items"],
-    queryFn: () => fetch("/api/admin/phase3a/quarantine/items", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/quarantine/items").then(r => r.json()),
   });
 
   const { data: apiUsage } = useQuery({
     queryKey: ["/api/admin/phase3a/analytics/api-usage", period],
-    queryFn: () => fetch(`/api/admin/phase3a/analytics/api-usage?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3a/analytics/api-usage?period=${period}`).then(r => r.json()),
   });
 
   const { data: countrySettings } = useQuery({
     queryKey: ["/api/admin/phase3a/compliance/country-settings"],
-    queryFn: () => fetch("/api/admin/phase3a/compliance/country-settings", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/compliance/country-settings").then(r => r.json()),
   });
 
   const { data: configPreview } = useQuery({
     queryKey: ["/api/admin/phase3a/config/preview"],
-    queryFn: () => fetch("/api/admin/phase3a/config/preview", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3a/config/preview").then(r => r.json()),
   });
 
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch("/api/admin/phase3a/presence/heartbeat", {
+      fetchWithAuth("/api/admin/phase3a/presence/heartbeat", {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPage: "/admin/operations-center" }),
       }).catch(() => {});
     }, 60000);
 
-    fetch("/api/admin/phase3a/presence/heartbeat", {
+    fetchWithAuth("/api/admin/phase3a/presence/heartbeat", {
       method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentPage: "/admin/operations-center" }),
     }).catch(() => {});
 

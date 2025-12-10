@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, fetchWithAuth } from "@/lib/queryClient";
 import {
   Car,
   UtensilsCrossed,
@@ -229,77 +229,74 @@ function ServiceHealthIndicator({ service }: { service: { name: string; status: 
 }
 
 export default function IntelligenceDashboard() {
-  const { token } = useAuth();
   const { toast } = useToast();
   const [period, setPeriod] = useState("7d");
   const [activeTab, setActiveTab] = useState("overview");
 
-  const headers = { Authorization: `Bearer ${token}` };
-
   const { data: ridesAnalytics, isLoading: loadingRides } = useQuery({
     queryKey: ["/api/admin/phase3c/analytics/rides", period],
-    queryFn: () => fetch(`/api/admin/phase3c/analytics/rides?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3c/analytics/rides?period=${period}`).then(r => r.json()),
   });
 
   const { data: eatsAnalytics, isLoading: loadingEats } = useQuery({
     queryKey: ["/api/admin/phase3c/analytics/eats", period],
-    queryFn: () => fetch(`/api/admin/phase3c/analytics/eats?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3c/analytics/eats?period=${period}`).then(r => r.json()),
   });
 
   const { data: parcelAnalytics, isLoading: loadingParcel } = useQuery({
     queryKey: ["/api/admin/phase3c/analytics/parcel", period],
-    queryFn: () => fetch(`/api/admin/phase3c/analytics/parcel?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3c/analytics/parcel?period=${period}`).then(r => r.json()),
   });
 
   const { data: driverIntelligence, isLoading: loadingDrivers } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/drivers"],
-    queryFn: () => fetch("/api/admin/phase3c/intelligence/drivers", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3c/intelligence/drivers").then(r => r.json()),
   });
 
   const { data: satisfaction, isLoading: loadingSatisfaction } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/satisfaction", period],
-    queryFn: () => fetch(`/api/admin/phase3c/intelligence/satisfaction?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3c/intelligence/satisfaction?period=${period}`).then(r => r.json()),
   });
 
   const { data: fraudData, isLoading: loadingFraud } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/fraud"],
-    queryFn: () => fetch("/api/admin/phase3c/intelligence/fraud", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3c/intelligence/fraud").then(r => r.json()),
   });
 
   const { data: healthData, isLoading: loadingHealth } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/health"],
-    queryFn: () => fetch("/api/admin/phase3c/intelligence/health", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3c/intelligence/health").then(r => r.json()),
     refetchInterval: 30000,
   });
 
   const { data: insights, isLoading: loadingInsights } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/insights"],
-    queryFn: () => fetch("/api/admin/phase3c/intelligence/insights", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3c/intelligence/insights").then(r => r.json()),
   });
 
   const { data: incidents, isLoading: loadingIncidents } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/incidents"],
-    queryFn: () => fetch("/api/admin/phase3c/intelligence/incidents", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3c/intelligence/incidents").then(r => r.json()),
   });
 
   const { data: earningsIrregularities, isLoading: loadingEarnings } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/earnings-irregularities", period],
-    queryFn: () => fetch(`/api/admin/phase3c/intelligence/earnings-irregularities?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3c/intelligence/earnings-irregularities?period=${period}`).then(r => r.json()),
   });
 
   const { data: complaintPatterns, isLoading: loadingComplaints } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/complaint-patterns", period],
-    queryFn: () => fetch(`/api/admin/phase3c/intelligence/complaint-patterns?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3c/intelligence/complaint-patterns?period=${period}`).then(r => r.json()),
   });
 
   const { data: aiSummary, isLoading: loadingAiSummary } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/ai-summary"],
-    queryFn: () => fetch("/api/admin/phase3c/intelligence/ai-summary", { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth("/api/admin/phase3c/intelligence/ai-summary").then(r => r.json()),
   });
 
   const { data: rankings, isLoading: loadingRankings } = useQuery({
     queryKey: ["/api/admin/phase3c/intelligence/rankings", period],
-    queryFn: () => fetch(`/api/admin/phase3c/intelligence/rankings?period=${period}`, { headers }).then(r => r.json()),
+    queryFn: () => fetchWithAuth(`/api/admin/phase3c/intelligence/rankings?period=${period}`).then(r => r.json()),
   });
 
   const actionMutation = useMutation({

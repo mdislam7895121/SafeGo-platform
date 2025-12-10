@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, MessageCircle, User, Bot, ThumbsUp, ThumbsDown, Star } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getAuthToken } from "@/lib/authToken";
+import { apiRequest, queryClient, fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ROLE_SUPPORT_TOPICS } from "@/config/supportTopics";
 
@@ -278,10 +277,7 @@ export default function DriverSupportChat() {
       try {
         // Use ref to access latest lastMessageTime without triggering effect recreation
         const sinceParam = lastMessageTimeRef.current ? `&since=${lastMessageTimeRef.current}` : "";
-        const res = await fetch(`/api/support/chat/messages?conversationId=${conversationId}${sinceParam}`, {
-          headers: {
-            'Authorization': `Bearer ${getAuthToken()}`,
-          },
+        const res = await fetchWithAuth(`/api/support/chat/messages?conversationId=${conversationId}${sinceParam}`, {
           signal: abortController.signal, // Cancel request on cleanup
         });
         

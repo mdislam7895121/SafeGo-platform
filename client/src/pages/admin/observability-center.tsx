@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, fetchWithAuth } from "@/lib/queryClient";
 import { getAuthToken } from "@/lib/authToken";
 import { 
   Activity, 
@@ -162,16 +162,12 @@ export default function ObservabilityCenter() {
   const wsRef = useRef<WebSocket | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  const getToken = () => getAuthToken();
-
   const [accessDenied, setAccessDenied] = useState(false);
 
   const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError, refetch: refetchDashboard } = useQuery({
     queryKey: ["/api/admin/observability/dashboard"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/observability/dashboard", {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const response = await fetchWithAuth("/api/admin/observability/dashboard");
       if (response.status === 403) {
         setAccessDenied(true);
         throw new Error("Access denied");
@@ -196,9 +192,7 @@ export default function ObservabilityCenter() {
       const startTime = new Date(Date.now() - parseInt(logFilters.hours) * 60 * 60 * 1000);
       params.append("startTime", startTime.toISOString());
       params.append("limit", "100");
-      const response = await fetch(`/api/admin/observability/logs?${params}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const response = await fetchWithAuth(`/api/admin/observability/logs?${params}`);
       return response.json();
     },
     refetchInterval: isLiveTail ? 3000 : undefined,
@@ -207,9 +201,7 @@ export default function ObservabilityCenter() {
   const { data: correlationsData, isLoading: isCorrelationsLoading, refetch: refetchCorrelations } = useQuery({
     queryKey: ["/api/admin/observability/correlations"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/observability/correlations?limit=50", {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const response = await fetchWithAuth("/api/admin/observability/correlations?limit=50");
       return response.json();
     },
   });
@@ -217,9 +209,7 @@ export default function ObservabilityCenter() {
   const { data: alertsData, refetch: refetchAlerts } = useQuery({
     queryKey: ["/api/admin/observability/alerts"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/observability/alerts", {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const response = await fetchWithAuth("/api/admin/observability/alerts");
       return response.json();
     },
   });
@@ -227,9 +217,7 @@ export default function ObservabilityCenter() {
   const { data: logStatsData } = useQuery({
     queryKey: ["/api/admin/observability/logs/stats"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/observability/logs/stats?hours=24", {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const response = await fetchWithAuth("/api/admin/observability/logs/stats?hours=24");
       return response.json();
     },
     refetchInterval: 60000,
@@ -237,11 +225,10 @@ export default function ObservabilityCenter() {
 
   const exportLogsMutation = useMutation({
     mutationFn: async (format: "csv" | "json") => {
-      const response = await fetch("/api/admin/observability/logs/export", {
+      const response = await fetchWithAuth("/api/admin/observability/logs/export", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
         },
         body: JSON.stringify({
           format,
@@ -270,11 +257,10 @@ export default function ObservabilityCenter() {
 
   const updateCorrelationStatusMutation = useMutation({
     mutationFn: async ({ correlationId, status, resolutionNotes }: { correlationId: string; status: string; resolutionNotes?: string }) => {
-      const response = await fetch(`/api/admin/observability/correlations/${correlationId}/status`, {
+      const response = await fetchWithAuth(`/api/admin/observability/correlations/${correlationId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
         },
         body: JSON.stringify({ status, resolutionNotes }),
       });
@@ -289,7 +275,7 @@ export default function ObservabilityCenter() {
   useEffect(() => {
     if (!isLiveTail) return;
 
-    const token = getToken();
+    const token = getAuthToken();
     if (!token) return;
 
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";

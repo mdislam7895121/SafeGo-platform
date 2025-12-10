@@ -30,7 +30,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getAuthToken } from "@/lib/authToken";
 import { 
   ArrowLeft, ArrowRight, Loader2, CheckCircle2, Upload, User, MapPin,
   IdCard, Truck, FileText, ClipboardCheck, Car, Bike, Footprints, Globe
@@ -46,7 +45,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, uploadWithAuth } from "@/lib/queryClient";
 
 interface OnboardingDraft {
   id: string;
@@ -221,21 +220,9 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
       formData.append("file", file);
       formData.append("documentType", "profile_photo");
 
-      const token = getAuthToken();
-      const response = await fetch("/api/delivery-driver/onboarding/upload", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const data = await uploadWithAuth("/api/delivery-driver/onboarding/upload", formData);
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Upload failed");
-      }
-
-      if (data.url) {
+      if (data?.url) {
         setPreview(data.url);
         onChange(data.url);
         setIsUploading(false);

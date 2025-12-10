@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { getAuthToken } from "@/lib/authToken";
+import { fetchWithAuth } from "@/lib/queryClient";
 
 export default function TaxInfo() {
   const { data: driverData, isLoading } = useQuery({
@@ -69,11 +69,7 @@ function USTaxView({ driverData }: { driverData: any }) {
   // Download US tax document
   const downloadTaxDocument = async (type: string, year: number) => {
     try {
-      const response = await fetch(`/api/driver/tax-documents/${type}?year=${year}`, {
-        headers: {
-          Authorization: `Bearer ${getAuthToken()}`,
-        },
-      });
+      const response = await fetchWithAuth(`/api/driver/tax-documents/${type}?year=${year}`);
 
       if (!response.ok) {
         throw new Error("Failed to download document");
@@ -294,11 +290,7 @@ function BangladeshTaxView({ driverData }: { driverData: any }) {
   // Download BD tax document
   const downloadBDTaxDocument = async (year: number) => {
     try {
-      const response = await fetch(`/api/driver/bd-tax-documents/${year}`, {
-        headers: {
-          Authorization: `Bearer ${getAuthToken()}`,
-        },
-      });
+      const response = await fetchWithAuth(`/api/driver/bd-tax-documents/${year}`);
 
       if (!response.ok) {
         throw new Error("Failed to download document");
