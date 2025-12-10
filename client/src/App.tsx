@@ -442,6 +442,14 @@ import CookiesPage from "@/pages/landing/CookiesPage";
 import ContactPage from "@/pages/landing/ContactPage";
 import PartnerOnboardingPage from "@/pages/landing/PartnerOnboardingPage";
 import HelpPage from "@/pages/landing/HelpPage";
+import SafetyPage from "@/pages/landing/SafetyPage";
+import SupportPage from "@/pages/landing/SupportPage";
+import HelpCenterPage from "@/pages/landing/HelpCenterPage";
+import DataDeletionPage from "@/pages/landing/DataDeletionPage";
+import PartnerTermsPage from "@/pages/landing/PartnerTermsPage";
+import SafetyPolicyPage from "@/pages/landing/SafetyPolicyPage";
+import CommunityGuidelinesPage from "@/pages/landing/CommunityGuidelinesPage";
+import AccessibilityPage from "@/pages/landing/AccessibilityPage";
 
 function DashboardRedirect() {
   const { user, isLoading } = useAuth();
@@ -470,6 +478,14 @@ function Router() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/partner" component={PartnerOnboardingPage} />
       <Route path="/help" component={HelpPage} />
+      <Route path="/safety" component={SafetyPage} />
+      <Route path="/support" component={SupportPage} />
+      <Route path="/help-center" component={HelpCenterPage} />
+      <Route path="/data-deletion" component={DataDeletionPage} />
+      <Route path="/partner-terms" component={PartnerTermsPage} />
+      <Route path="/safety-policy" component={SafetyPolicyPage} />
+      <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
+      <Route path="/accessibility" component={AccessibilityPage} />
       <Route path="/dashboard" component={DashboardRedirect} />
       <Route path="/login" component={Login} />
       <Route path="/auth/login" component={Login} />
