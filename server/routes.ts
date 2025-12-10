@@ -93,6 +93,7 @@ import ratingRoutes from "./routes/rating"; // SafeGo Master Tasks 37-42: Rating
 import adminReputationRoutes from "./routes/admin-reputation"; // SafeGo Master Tasks 37-42: Admin Reputation Center
 import dataRightsRoutes from "./routes/data-rights"; // SafeGo Master Tasks 43-47: Data Rights & Retention Layer
 import systemHealthRoutes from "./routes/system-health"; // SafeGo Master Tasks 48-51: Pre-Launch System Readiness
+import contactSubmissionsRoutes from "./routes/contact-submissions"; // Public Contact Form Submissions
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -401,6 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/kitchen", kitchenRoutes); // Phase 3: Kitchen Ticket System
   app.use("/api/parcel", parcelPublicRoutes); // SafeGo Parcel: Public pricing/zones endpoints (no auth)
   app.use("/api/parcel", parcelRoutes); // Phase 3: Parcel Pricing, Scheduling & POD (auth required)
+  app.use("/api/contact", contactSubmissionsRoutes); // Public Contact Form Submissions (rate limited for POST, auth required for admin GET)
   app.use("/api/phase5", phase5Routes); // Phase 5: Experience Intelligence & Real-Time Optimization
   app.use("/api", phase6Routes); // Phase 6: Security Hardening & Deployment Readiness (includes /health)
   app.use("/api/security", securityRoutes); // Phase 6B: Customer Security Features (SOS, device trust, privacy)
