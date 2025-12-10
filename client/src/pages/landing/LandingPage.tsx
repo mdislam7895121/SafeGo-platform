@@ -1087,56 +1087,64 @@ const CTA_CONFIG: Record<Region, { subtitle: string }> = {
 };
 
 const CTASection = memo(function CTASection({ selectedRegion }: { selectedRegion: Region }) {
-  const config = CTA_CONFIG[selectedRegion];
+  const config = CTA_CONFIG[selectedRegion] || CTA_CONFIG.GLOBAL;
   
   return (
-    <section className="py-20 bg-blue-600 relative overflow-hidden" style={{ paddingTop: '80px', paddingBottom: '80px' }}>
+    <section 
+      className="bg-blue-600 relative overflow-hidden" 
+      style={{ paddingTop: '80px', paddingBottom: '80px' }}
+      data-testid="section-cta"
+    >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-50" />
         <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-700 rounded-full blur-3xl opacity-50" />
       </div>
       
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="font-bold text-white" style={{ fontSize: '36px', lineHeight: '1.2' }}>
+        <h2 
+          className="font-bold text-white leading-tight"
+          style={{ fontSize: '36px' }}
+        >
           Ready to move with SafeGo?
         </h2>
-        <p className="mt-4 max-w-2xl mx-auto text-blue-100" style={{ fontSize: '18px', opacity: 0.9 }}>
+        <p 
+          className="mt-4 max-w-2xl mx-auto text-blue-100/90"
+          style={{ fontSize: '18px' }}
+        >
           {config.subtitle}
         </p>
         
-        <div className="mt-10 flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8">
+        <div className="mt-10 flex flex-col items-center gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <a 
               href="https://www.apple.com/app-store/" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="transition-transform hover:scale-105 active:scale-95"
+              className="block rounded-lg overflow-visible hover-elevate"
               data-testid="link-app-store"
             >
               <img 
                 src={appStoreBadge} 
                 alt="Download on the App Store" 
-                className="h-12 sm:h-14 w-auto object-contain"
+                className="h-12 sm:h-14 w-auto object-contain rounded-lg"
               />
             </a>
             <a 
               href="https://play.google.com/store" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="transition-transform hover:scale-105 active:scale-95"
+              className="block rounded-lg overflow-visible hover-elevate"
               data-testid="link-google-play"
             >
               <img 
                 src={playStoreBadge} 
                 alt="Get it on Google Play" 
-                className="h-12 sm:h-14 w-auto object-contain"
+                className="h-12 sm:h-14 w-auto object-contain rounded-lg"
               />
             </a>
           </div>
           
-          <div className="hidden lg:block w-px h-12 bg-white/20" />
-          
-          <a href="#partners">
+          <a href="#partners" className="mt-2 sm:mt-0">
             <Button 
               size="lg" 
               variant="outline" 
