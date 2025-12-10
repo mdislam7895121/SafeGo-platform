@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import "@/styles/safego-header.css";
 
 export const SafeGoHeader = () => {
   const [isScrolled, setIsScrolled] = useState(false);
