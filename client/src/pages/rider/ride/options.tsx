@@ -48,6 +48,7 @@ import { useRideBooking, type RideOption, type PaymentMethod, type RouteAlternat
 import { SafeGoMap } from "@/components/maps/SafeGoMap";
 import { clientGetRouteAlternatives } from "@/hooks/useGoogleMaps";
 import { decodePolyline } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { useFareCalculation } from "@/hooks/useFareCalculation";
 import type { RouteFareBreakdown, RouteInfoRequest } from "@/lib/fareTypes";
 import { 
@@ -67,14 +68,6 @@ const VEHICLE_CATEGORY_ORDER_ACTIVE: VehicleCategoryId[] = VEHICLE_CATEGORY_ORDE
   (id) => VEHICLE_CATEGORIES[id]?.isActive
 );
 
-function formatCurrency(amount: number, currency: string = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
 
 function FareBreakdownDialog({
   isOpen,

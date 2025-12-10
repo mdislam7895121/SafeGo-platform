@@ -75,14 +75,7 @@ export default function FoodRestaurants() {
   const { data, isLoading, error } = useQuery<RestaurantsResponse>({
     queryKey: ['/api/customer/food/restaurants', sortBy, cuisineType, openNow, favoritesOnly],
     queryFn: async () => {
-      const res = await fetch(`/api/customer/food/restaurants?${queryParams.toString()}`, {
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw errData;
-      }
-      return res.json();
+      return apiRequest(`/api/customer/food/restaurants?${queryParams.toString()}`);
     },
     retry: 1,
   });

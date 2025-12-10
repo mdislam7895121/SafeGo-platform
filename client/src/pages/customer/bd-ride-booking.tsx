@@ -241,13 +241,7 @@ export default function BDRideBooking() {
         estimatedDistanceKm: estimatedDistance!.toString(),
         estimatedDurationMin: estimatedDuration!.toString(),
       });
-      const response = await fetch(`/api/rides/bd/fare-estimate?${params}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch fare estimate");
-      }
-      return response.json();
+      return apiRequest(`/api/rides/bd/fare-estimate?${params}`);
     },
     staleTime: 30 * 1000,
   });
