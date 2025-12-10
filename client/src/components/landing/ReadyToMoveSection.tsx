@@ -30,11 +30,11 @@ export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedReg
       }}
       data-testid="section-cta"
     >
-      {/* Highlight overlay layer */}
+      {/* Highlight overlay gradient */}
       <div 
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, rgba(255,255,255,0.05), transparent 50%)',
+          background: 'linear-gradient(to top, rgba(255,255,255,0.08), transparent)',
         }}
       />
       
@@ -42,11 +42,14 @@ export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedReg
       <div 
         className="absolute inset-0 pointer-events-none"
         style={{
-          boxShadow: 'inset 0 0 120px 40px rgba(0,0,0,0.15)',
+          boxShadow: 'inset 0 0 120px rgba(0,0,0,0.35)',
         }}
       />
 
-      <div className="relative max-w-[1000px] mx-auto px-6 sm:px-8 text-center">
+      <div 
+        className="relative mx-auto px-6 sm:px-8 text-center"
+        style={{ maxWidth: '920px' }}
+      >
         <h2
           id="ready-to-move-heading"
           className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white"
@@ -57,36 +60,37 @@ export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedReg
 
         <p 
           className="text-base sm:text-lg text-white/90 max-w-2xl mx-auto"
-          style={{ marginBottom: '40px' }}
+          style={{ marginBottom: '36px' }}
         >
           {config.subtitle}
         </p>
 
-        {/* App Store Badges */}
+        {/* App Store Badges - centered with proper spacing */}
         <div 
-          className="flex flex-col sm:flex-row flex-wrap items-center justify-center mb-10"
-          style={{ gap: '16px' }}
+          className="flex flex-col sm:flex-row flex-wrap items-center justify-center"
+          style={{ 
+            gap: '18px',
+            marginBottom: '40px'
+          }}
         >
           {/* App Store Badge */}
           <a
             href="#"
             aria-label="Download SafeGo on the App Store (coming soon)"
-            className="group inline-flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600"
+            className="inline-flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600"
             style={{
-              background: 'rgba(0,0,0,0.98)',
-              borderRadius: '15px',
-              padding: '14px 22px',
-              boxShadow: '0 10px 24px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.1)',
+              background: '#000000',
+              borderRadius: '16px',
+              padding: '16px 24px',
+              boxShadow: '0 10px 28px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.12)',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-3px)';
-              e.currentTarget.style.filter = 'brightness(1.1)';
-              e.currentTarget.style.boxShadow = '0 14px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12)';
+              e.currentTarget.style.boxShadow = '0 14px 36px rgba(0,0,0,0.55), inset 0 2px 4px rgba(255,255,255,0.15)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.filter = 'brightness(1)';
-              e.currentTarget.style.boxShadow = '0 10px 24px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.1)';
+              e.currentTarget.style.boxShadow = '0 10px 28px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.12)';
             }}
             data-testid="link-app-store"
           >
@@ -114,22 +118,20 @@ export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedReg
           <a
             href="#"
             aria-label="Get SafeGo on Google Play (coming soon)"
-            className="group inline-flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600"
+            className="inline-flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600"
             style={{
-              background: 'rgba(0,0,0,0.98)',
-              borderRadius: '15px',
-              padding: '14px 22px',
-              boxShadow: '0 10px 24px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.1)',
+              background: '#000000',
+              borderRadius: '16px',
+              padding: '16px 24px',
+              boxShadow: '0 10px 28px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.12)',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-3px)';
-              e.currentTarget.style.filter = 'brightness(1.1)';
-              e.currentTarget.style.boxShadow = '0 14px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12)';
+              e.currentTarget.style.boxShadow = '0 14px 36px rgba(0,0,0,0.55), inset 0 2px 4px rgba(255,255,255,0.15)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.filter = 'brightness(1)';
-              e.currentTarget.style.boxShadow = '0 10px 24px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.1)';
+              e.currentTarget.style.boxShadow = '0 10px 28px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.12)';
             }}
             data-testid="link-google-play"
           >
@@ -162,24 +164,24 @@ export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedReg
             style={{
               borderRadius: '40px',
               background: '#ffffff',
-              color: '#0054F5',
-              padding: '14px 36px',
+              color: '#004DFF',
+              padding: '14px 38px',
               fontSize: '16px',
-              boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
+              boxShadow: '0 8px 22px rgba(0,0,0,0.30)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 22px rgba(0,0,0,0.28)';
+              e.currentTarget.style.transform = 'translateY(-3px)';
+              e.currentTarget.style.boxShadow = '0 12px 28px rgba(0,0,0,0.38)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.25)';
+              e.currentTarget.style.boxShadow = '0 8px 22px rgba(0,0,0,0.30)';
             }}
             onMouseDown={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
             }}
             onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.transform = 'translateY(-3px)';
             }}
             data-testid="button-cta-partner"
           >
