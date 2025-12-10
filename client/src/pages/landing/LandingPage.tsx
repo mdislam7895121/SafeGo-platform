@@ -1091,64 +1091,114 @@ const CTASection = memo(function CTASection({ selectedRegion }: { selectedRegion
   
   return (
     <section 
-      className="bg-blue-600 relative overflow-hidden" 
-      style={{ paddingTop: '80px', paddingBottom: '80px' }}
+      className="relative overflow-hidden"
+      style={{ 
+        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)',
+        paddingTop: '80px', 
+        paddingBottom: '80px',
+        marginBottom: '40px'
+      }}
       data-testid="section-cta"
     >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-50" />
-        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-700 rounded-full blur-3xl opacity-50" />
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-400/30 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-800/40 rounded-full blur-3xl" />
       </div>
       
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <div className="relative max-w-4xl mx-auto px-6 text-center">
         <h2 
-          className="font-bold text-white leading-tight"
-          style={{ fontSize: '36px' }}
+          className="font-bold text-white"
+          style={{ 
+            fontSize: '34px', 
+            lineHeight: '1.4',
+            marginBottom: '16px'
+          }}
         >
           Ready to move with SafeGo?
         </h2>
+        
         <p 
-          className="mt-4 max-w-2xl mx-auto text-blue-100/90"
-          style={{ fontSize: '18px' }}
+          className="text-blue-100 max-w-2xl mx-auto"
+          style={{ 
+            fontSize: '18px', 
+            lineHeight: '1.4',
+            opacity: 0.95
+          }}
         >
           {config.subtitle}
         </p>
         
-        <div className="mt-10 flex flex-col items-center gap-6">
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <a 
-              href="https://www.apple.com/app-store/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block rounded-lg overflow-visible hover-elevate"
-              data-testid="link-app-store"
-            >
-              <img 
-                src={appStoreBadge} 
-                alt="Download on the App Store" 
-                className="h-12 sm:h-14 w-auto object-contain rounded-lg"
-              />
-            </a>
-            <a 
-              href="https://play.google.com/store" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block rounded-lg overflow-visible hover-elevate"
-              data-testid="link-google-play"
-            >
-              <img 
-                src={playStoreBadge} 
-                alt="Get it on Google Play" 
-                className="h-12 sm:h-14 w-auto object-contain rounded-lg"
-              />
-            </a>
-          </div>
+        <div 
+          className="flex flex-col sm:flex-row items-center justify-center"
+          style={{ marginTop: '40px', gap: '18px' }}
+        >
+          <a 
+            href="https://www.apple.com/app-store/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="block transition-all duration-200 ease-out hover:shadow-xl"
+            style={{ 
+              transform: 'scale(1)',
+              transition: 'transform 0.2s ease-out, box-shadow 0.2s ease-out'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.04)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            data-testid="link-app-store"
+          >
+            <img 
+              src={appStoreBadge} 
+              alt="Download on the App Store" 
+              style={{ 
+                width: '170px', 
+                height: 'auto',
+                minWidth: '160px',
+                maxWidth: '180px'
+              }}
+              className="object-contain rounded-lg shadow-lg"
+            />
+          </a>
           
-          <a href="#partners" className="mt-2 sm:mt-0">
+          <a 
+            href="https://play.google.com/store" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="block transition-all duration-200 ease-out hover:shadow-xl"
+            style={{ 
+              transform: 'scale(1)',
+              transition: 'transform 0.2s ease-out, box-shadow 0.2s ease-out'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.04)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            data-testid="link-google-play"
+          >
+            <img 
+              src={playStoreBadge} 
+              alt="Get it on Google Play" 
+              style={{ 
+                width: '170px', 
+                height: 'auto',
+                minWidth: '160px',
+                maxWidth: '180px'
+              }}
+              className="object-contain rounded-lg shadow-lg"
+            />
+          </a>
+        </div>
+        
+        <div style={{ marginTop: '32px' }}>
+          <a href="#partners">
             <Button 
               size="lg" 
-              variant="outline" 
-              className="rounded-full px-8 border-white/30 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm" 
+              className="rounded-full px-10 py-3 text-base font-semibold bg-white text-blue-600 hover:bg-gray-100 shadow-lg transition-all duration-200"
+              style={{ minHeight: '52px' }}
               data-testid="button-cta-partner"
             >
               Become a partner
