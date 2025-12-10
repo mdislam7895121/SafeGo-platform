@@ -389,32 +389,173 @@ const SAFETY_SECTIONS = [
   },
 ];
 
-const FAQS = [
-  {
-    question: "How do I request a SafeGo ride?",
-    answer: "Open the SafeGo app, enter your destination, choose your preferred vehicle type, and tap Request. A nearby driver will accept your ride and arrive at your pickup location within minutes.",
-  },
-  {
-    question: "When is SafeGo launching in Bangladesh?",
-    answer: "SafeGo is launching first in Dhaka, Bangladesh. Sign up to be notified when we go live in your area and get early access to exclusive promotions.",
-  },
-  {
-    question: "How do I become a driver or courier?",
-    answer: "Visit the 'Become a Partner' section and select your preferred service. Complete the registration form, submit required documents (license, vehicle papers, NID), and start earning once approved.",
-  },
-  {
-    question: "What payment methods are accepted?",
-    answer: "SafeGo accepts cash, credit/debit cards, bKash, Nagad, and other popular mobile wallets in Bangladesh. More payment options will be added as we expand.",
-  },
-  {
-    question: "How is my safety ensured?",
-    answer: "All drivers undergo thorough background checks and vehicle inspections. Every trip includes real-time GPS tracking, an emergency SOS button, and 24/7 support from our safety team.",
-  },
-  {
-    question: "Can I schedule rides in advance?",
-    answer: "Yes! You can schedule rides up to 7 days in advance. Select your date and time when booking, and a driver will be assigned automatically.",
-  },
-];
+type RegionKey = "bangladesh" | "united_states" | "global";
+
+type FaqItem = {
+  id: string;
+  question: string;
+  answer: string;
+  category: "rides" | "food" | "parcel" | "shops" | "tickets" | "account" | "payments" | "safety" | "general";
+};
+
+const FAQ_CONFIG: Record<RegionKey, FaqItem[]> = {
+  bangladesh: [
+    {
+      id: "bd-rides-1",
+      question: "How do I request a SafeGo ride in Bangladesh?",
+      answer: "Open the SafeGo app, enter your destination, choose from CNG, bike, or car options, and tap Request. A nearby driver will accept your ride and arrive at your pickup location within minutes.",
+      category: "rides"
+    },
+    {
+      id: "bd-launch-1",
+      question: "When is SafeGo launching in Bangladesh?",
+      answer: "SafeGo is launching first in Dhaka, Bangladesh. Sign up to be notified when we go live in your area and get early access to exclusive promotions.",
+      category: "general"
+    },
+    {
+      id: "bd-partner-1",
+      question: "How do I become a driver or courier in Bangladesh?",
+      answer: "Visit the 'Become a Partner' section and select your preferred service. Complete the registration form, submit required documents (license, vehicle papers, NID), and start earning once approved.",
+      category: "general"
+    },
+    {
+      id: "bd-payments-1",
+      question: "What payment methods are accepted in Bangladesh?",
+      answer: "SafeGo accepts cash, bKash, Nagad, Rocket, and credit/debit cards. More payment options will be added as we expand across the country.",
+      category: "payments"
+    },
+    {
+      id: "bd-shops-1",
+      question: "How does the Local Shops service work?",
+      answer: "Browse nearby grocery stores, pharmacies, and retail shops in the app. Add items to your cart, checkout, and a SafeGo delivery partner will pick up and deliver your order to your doorstep.",
+      category: "shops"
+    },
+    {
+      id: "bd-tickets-1",
+      question: "Can I book bus or train tickets through SafeGo?",
+      answer: "Yes! Our Tickets & Travel feature lets you book inter-city bus tickets, train reservations, and launch (boat) tickets across Bangladesh, all from one app.",
+      category: "tickets"
+    },
+    {
+      id: "bd-safety-1",
+      question: "How is my safety ensured?",
+      answer: "All drivers undergo thorough background checks and vehicle inspections. Every trip includes real-time GPS tracking, an emergency SOS button, and 24/7 support from our safety team.",
+      category: "safety"
+    },
+    {
+      id: "bd-schedule-1",
+      question: "Can I schedule rides in advance?",
+      answer: "Yes! You can schedule rides up to 7 days in advance. Select your date and time when booking, and a driver will be assigned automatically.",
+      category: "rides"
+    }
+  ],
+  united_states: [
+    {
+      id: "us-rides-1",
+      question: "How do I request a SafeGo ride?",
+      answer: "Open the SafeGo app, enter your destination, choose your preferred vehicle type (Economy, Comfort, or XL), and tap Request. A nearby driver will accept your ride and arrive within minutes.",
+      category: "rides"
+    },
+    {
+      id: "us-launch-1",
+      question: "Where is SafeGo available in the United States?",
+      answer: "SafeGo is currently expanding across major US cities. Sign up to be notified when we launch in your area and receive exclusive promotional offers.",
+      category: "general"
+    },
+    {
+      id: "us-partner-1",
+      question: "How do I become a SafeGo driver?",
+      answer: "Visit the 'Become a Partner' section and complete the application. You'll need a valid driver's license, vehicle registration, insurance, and pass a background check.",
+      category: "general"
+    },
+    {
+      id: "us-payments-1",
+      question: "What payment methods are accepted?",
+      answer: "SafeGo accepts all major credit and debit cards, Apple Pay, Google Pay, PayPal, and SafeGo Wallet credits. Cash is not available in the US market.",
+      category: "payments"
+    },
+    {
+      id: "us-food-1",
+      question: "How does food delivery work?",
+      answer: "Browse restaurants in your area, select your items, and checkout. Track your order in real-time as a SafeGo courier picks up and delivers your meal.",
+      category: "food"
+    },
+    {
+      id: "us-safety-1",
+      question: "How is my safety ensured?",
+      answer: "All drivers undergo comprehensive background checks including DMV and criminal history. Every trip includes real-time GPS tracking, trip sharing, an emergency SOS button, and 24/7 support.",
+      category: "safety"
+    },
+    {
+      id: "us-schedule-1",
+      question: "Can I schedule rides in advance?",
+      answer: "Yes! You can schedule rides up to 7 days in advance. Select your date and time when booking, and a driver will be assigned automatically.",
+      category: "rides"
+    },
+    {
+      id: "us-parcel-1",
+      question: "How do I send a package?",
+      answer: "Select 'Parcel' in the app, enter pickup and delivery addresses, choose package size, and confirm. A courier will pick up your package and deliver it same-day or scheduled.",
+      category: "parcel"
+    }
+  ],
+  global: [
+    {
+      id: "gl-rides-1",
+      question: "How do I request a SafeGo ride?",
+      answer: "Open the SafeGo app, enter your destination, choose your preferred vehicle type, and tap Request. A nearby driver will accept your ride and arrive at your pickup location within minutes.",
+      category: "rides"
+    },
+    {
+      id: "gl-launch-1",
+      question: "Where is SafeGo available?",
+      answer: "SafeGo is currently available in Bangladesh and expanding to the United States. Sign up to be notified when we launch in your region and get early access to exclusive promotions.",
+      category: "general"
+    },
+    {
+      id: "gl-partner-1",
+      question: "How do I become a driver or courier?",
+      answer: "Visit the 'Become a Partner' section and select your preferred service. Complete the registration form, submit required documents, and start earning once approved.",
+      category: "general"
+    },
+    {
+      id: "gl-payments-1",
+      question: "What payment methods are accepted?",
+      answer: "SafeGo accepts various payment methods depending on your region, including cash, credit/debit cards, and popular mobile wallets. Check the app for available options in your area.",
+      category: "payments"
+    },
+    {
+      id: "gl-food-1",
+      question: "How does food delivery work?",
+      answer: "Browse restaurants in your area, select your items, and checkout. Track your order in real-time as a SafeGo courier picks up and delivers your meal.",
+      category: "food"
+    },
+    {
+      id: "gl-safety-1",
+      question: "How is my safety ensured?",
+      answer: "All drivers undergo thorough background checks and vehicle inspections. Every trip includes real-time GPS tracking, an emergency SOS button, and 24/7 support from our safety team.",
+      category: "safety"
+    },
+    {
+      id: "gl-schedule-1",
+      question: "Can I schedule rides in advance?",
+      answer: "Yes! You can schedule rides up to 7 days in advance. Select your date and time when booking, and a driver will be assigned automatically.",
+      category: "rides"
+    },
+    {
+      id: "gl-parcel-1",
+      question: "How do I send a package?",
+      answer: "Select 'Parcel' in the app, enter pickup and delivery addresses, choose package size, and confirm. A courier will pick up your package and deliver it to the destination.",
+      category: "parcel"
+    }
+  ]
+};
+
+const REGION_TO_FAQ_KEY: Record<"BD" | "US" | "GLOBAL", RegionKey> = {
+  BD: "bangladesh",
+  US: "united_states",
+  GLOBAL: "global"
+};
 
 const LandingHeader = memo(function LandingHeader() {
   return (
@@ -888,7 +1029,10 @@ const SafetySection = memo(function SafetySection() {
   );
 });
 
-const FAQSection = memo(function FAQSection() {
+const FAQSection = memo(function FAQSection({ selectedRegion }: { selectedRegion: "BD" | "US" | "GLOBAL" }) {
+  const regionKey = REGION_TO_FAQ_KEY[selectedRegion];
+  const faqs = FAQ_CONFIG[regionKey];
+
   return (
     <section id="faq" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -906,12 +1050,12 @@ const FAQSection = memo(function FAQSection() {
         
         <div className="max-w-3xl mx-auto">
           <Accordion type="single" collapsible className="w-full space-y-4">
-            {FAQS.map((faq, index) => (
+            {faqs.map((faq) => (
               <AccordionItem 
-                key={index} 
-                value={`item-${index}`} 
+                key={faq.id} 
+                value={faq.id} 
                 className="border border-gray-200 dark:border-gray-800 rounded-xl px-6 data-[state=open]:bg-gray-50 dark:data-[state=open]:bg-gray-900 data-[state=open]:border-blue-200 dark:data-[state=open]:border-blue-800 transition-colors duration-200"
-                data-testid={`faq-item-${index}`}
+                data-testid={`faq-item-${faq.id}`}
               >
                 <AccordionTrigger className="text-left text-gray-900 dark:text-white hover:no-underline py-5 text-base font-medium">
                   {faq.question}
@@ -1066,7 +1210,7 @@ export default function LandingPage() {
         <PartnerSection selectedRegion={selectedRegion} />
         <HowItWorksSection selectedRegion={selectedRegion} />
         <SafetySection />
-        <FAQSection />
+        <FAQSection selectedRegion={selectedRegion} />
         <CTASection />
       </main>
       <LandingFooter />
