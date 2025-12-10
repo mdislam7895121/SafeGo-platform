@@ -1242,6 +1242,7 @@ const FAQSection = memo(function FAQSection({ selectedRegion }: { selectedRegion
 
 import GlobalFooter from "@/components/landing/GlobalFooter";
 import { ReadyToMoveSection } from "@/components/landing/ReadyToMoveSection";
+import { SafeGoHeader } from "@/components/layout/SafeGoHeader";
 
 export default function LandingPage() {
   const [selectedRegion, setSelectedRegion] = useState<Region>("BD");
@@ -1271,7 +1272,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="landing-page">
-      <LandingHeader />
+      <SafeGoHeader />
       <main className="flex-1">
         <HeroSection 
           selectedRegion={selectedRegion} 
