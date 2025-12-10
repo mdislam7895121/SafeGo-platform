@@ -235,6 +235,8 @@ import AdminRestaurantDetails from "@/pages/admin/restaurant-details";
 import AdminComplaints from "@/pages/admin/complaints";
 import AdminContactCenter from "@/pages/admin/contact-center";
 import AdminContactCenterDetail from "@/pages/admin/contact-center-detail";
+import AdminOnboardingCenter from "@/pages/admin/onboarding-center";
+import AdminOnboardingCenterDetail from "@/pages/admin/onboarding-center-detail";
 import AdminComplaintDetails from "@/pages/admin/complaint-details";
 import AdminUsers from "@/pages/admin/users";
 import AdminParcels from "@/pages/admin/parcels";
@@ -432,6 +434,7 @@ import PrivacyPage from "@/pages/landing/PrivacyPage";
 import TermsPage from "@/pages/landing/TermsPage";
 import CookiesPage from "@/pages/landing/CookiesPage";
 import ContactPage from "@/pages/landing/ContactPage";
+import PartnerOnboardingPage from "@/pages/landing/PartnerOnboardingPage";
 import HelpPage from "@/pages/landing/HelpPage";
 
 function DashboardRedirect() {
@@ -459,6 +462,7 @@ function Router() {
       <Route path="/terms" component={TermsPage} />
       <Route path="/cookies" component={CookiesPage} />
       <Route path="/contact" component={ContactPage} />
+      <Route path="/partner" component={PartnerOnboardingPage} />
       <Route path="/help" component={HelpPage} />
       <Route path="/dashboard" component={DashboardRedirect} />
       <Route path="/login" component={Login} />
@@ -1932,6 +1936,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Contact Details">
             <AdminContactCenterDetail />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Partner Onboarding">
+            <AdminOnboardingCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding-center/:type/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Application Details">
+            <AdminOnboardingCenterDetail />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

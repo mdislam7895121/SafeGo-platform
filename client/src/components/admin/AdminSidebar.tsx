@@ -249,6 +249,12 @@ const phase3aNavItems: NavItem[] = [
     navKey: "dashboard",
   },
   {
+    title: "Onboarding Center",
+    href: "/admin/onboarding-center",
+    icon: Users,
+    navKey: "dashboard",
+  },
+  {
     title: "Compliance Center",
     href: "/admin/compliance-center",
     icon: FileWarning,
