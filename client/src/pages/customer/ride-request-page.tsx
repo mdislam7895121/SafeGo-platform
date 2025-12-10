@@ -497,7 +497,7 @@ export default function RideRequestPage() {
   );
 
   const defaultCenter: [number, number] = isBD ? [23.8103, 90.4125] : [40.7128, -74.006];
-  const currency = isBD ? "BDT" : "USD";
+  const currency = fareEstimate?.vehicleOptions?.[0]?.currency || selectedVehicleOption?.currency || "USD";
 
   return (
     <div className="flex flex-col h-screen bg-background" data-testid="ride-request-page">

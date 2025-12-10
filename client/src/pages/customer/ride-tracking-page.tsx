@@ -111,6 +111,7 @@ interface RideData {
     currency: string;
   };
   etaMinutes?: number;
+  routePolyline?: string;
 }
 
 const pickupIcon = L.divIcon({
@@ -277,6 +278,44 @@ function formatCurrency(amount: number, currency: string): string {
   return `$${amount.toFixed(2)}`;
 }
 
+function decodePolyline(encoded: string): [number, number][] {
+  const points: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let b;
+    let shift = 0;
+    let result = 0;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+
+    points.push([lat / 1e5, lng / 1e5]);
+  }
+
+  return points;
+}
+
 export default function RideTrackingPage() {
   const [, params] = useRoute("/customer/ride-tracking/:id");
   const [, setLocation] = useLocation();
@@ -304,13 +343,7 @@ export default function RideTrackingPage() {
       return 5000;
     },
     queryFn: async () => {
-      const response = await fetch(`/api/rides/${rideId}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch ride details");
-      }
-      return response.json();
+      return apiRequest(`/api/rides/${rideId}`, { method: "GET" });
     },
   });
 
@@ -438,6 +471,12 @@ export default function RideTrackingPage() {
             <Marker
               position={[ride.driver.currentLat, ride.driver.currentLng]}
               icon={driverIcon}
+            />
+          )}
+          {ride.routePolyline && (
+            <Polyline
+              positions={decodePolyline(ride.routePolyline)}
+              pathOptions={{ color: "#3B82F6", weight: 4, opacity: 0.8 }}
             />
           )}
         </MapContainer>
