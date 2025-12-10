@@ -14588,8 +14588,8 @@ model DriverNavigationSession {
   @@map("driver_navigation_sessions")
 }
 
-// Support Ticket - Public contact form submissions tracked by admin
-model SupportTicket {
+// Public Contact Form Submission - from landing page contact form
+model ContactSubmission {
   id            String    @id @default(uuid())
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -14600,12 +14600,12 @@ model SupportTicket {
   country       String    // "Bangladesh" or "United States"
   region        String?   // "BD", "US", or "GLOBAL"
 
-  // Ticket details
+  // Submission details
   category      String    // "rides", "food", "parcel", "shops", "tickets", "safety", etc.
   categoryLabel String    // Human-readable label e.g. "Rides & Transportation"
   message       String    @db.Text
 
-  // Ticket classification
+  // Classification
   source        String    @default("landing_contact_form")
   status        String    @default("open")   // open, pending, resolved
   priority      String    @default("low")    // low, normal, high
@@ -14613,7 +14613,7 @@ model SupportTicket {
   // Related service mapping
   relatedService String?  // rides, food, parcel, shops, tickets, driver, business, payments, safety, technical, general
 
-  // Assignment
+  // Assignment & resolution
   assignedToAdminId String?
   resolvedAt    DateTime?
 
@@ -14630,5 +14630,5 @@ model SupportTicket {
   @@index([relatedService])
   @@index([createdAt])
   @@index([assignedToAdminId])
-  @@map("support_tickets")
+  @@map("contact_submissions")
 }
