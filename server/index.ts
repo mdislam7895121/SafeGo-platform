@@ -10,11 +10,18 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { securityHeaders, corsMiddleware, csrfProtection, landingRateLimiter, httpsRedirect, notFoundProbeDetector, cspViolationHandler } from "./middleware/securityHeaders";
 import { secureErrorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { compressionMiddleware, staticAssetCaching, cdnHeaders, earlyHints } from "./middleware/performance";
 
 const app = express();
 
 // Force HTTPS redirect first (production only)
 app.use(httpsRedirect);
+
+// Performance optimizations - compression and caching
+app.use(compressionMiddleware);
+app.use(staticAssetCaching);
+app.use(cdnHeaders);
+app.use(earlyHints);
 
 // Apply CORS, security headers, CSRF protection, and landing page rate limiting globally
 app.use(corsMiddleware);
@@ -61,6 +68,10 @@ app.get("/robots.txt", (_req, res) => {
 });
 
 app.use((req, res, next) => {
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|webp|svg|ico|woff2|woff|ttf|eot|map)$/)) {
+    return next();
+  }
+  
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
@@ -73,16 +84,11 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
+    if (path.startsWith("/api") && (duration > 50 || res.statusCode >= 400)) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (capturedJsonResponse && res.statusCode >= 400) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse).slice(0, 100)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
       log(logLine);
     }
   });
