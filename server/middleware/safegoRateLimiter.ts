@@ -22,6 +22,12 @@ const rateLimitStore = new Map<string, RateLimitWindow>();
 const BLOCK_DURATION_MS = 15 * 60 * 1000;
 
 const ENDPOINT_CONFIGS: Record<string, EndpointConfig> = {
+  landing: {
+    maxRequests: 100,
+    windowMs: 5 * 60 * 1000,
+    blockDurationMs: BLOCK_DURATION_MS,
+    description: 'Landing page endpoints'
+  },
   auth: {
     maxRequests: 5,
     windowMs: 60 * 1000,
@@ -243,6 +249,7 @@ export function safegoRateLimiter(customCategory?: string) {
   };
 }
 
+export const rateLimitLanding = safegoRateLimiter('landing');
 export const rateLimitAuth = safegoRateLimiter('auth');
 export const rateLimitBooking = safegoRateLimiter('booking');
 export const rateLimitPayment = safegoRateLimiter('payment');

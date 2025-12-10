@@ -8,14 +8,15 @@ import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { securityHeaders, corsMiddleware, csrfProtection } from "./middleware/securityHeaders";
+import { securityHeaders, corsMiddleware, csrfProtection, landingRateLimiter } from "./middleware/securityHeaders";
 
 const app = express();
 
-// Apply CORS, security headers, and CSRF protection globally before any other middleware
+// Apply CORS, security headers, CSRF protection, and landing page rate limiting globally
 app.use(corsMiddleware);
 app.use(securityHeaders);
 app.use(csrfProtection);
+app.use(landingRateLimiter);
 
 // Parse cookies for refresh token handling
 app.use(cookieParser());

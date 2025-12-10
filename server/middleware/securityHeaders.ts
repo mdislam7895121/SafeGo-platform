@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { getClientIp } from '../utils/ip';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -11,6 +12,50 @@ const LANDING_ROUTES = ['/', '/ride', '/drive', '/business', '/safety', '/suppor
 function isLandingRoute(path: string): boolean {
   return LANDING_ROUTES.includes(path) || path.startsWith('/privacy') || path.startsWith('/terms') || path.startsWith('/cookies');
 }
+
+interface LandingRateWindow {
+  count: number;
+  windowStart: number;
+  blockedUntil?: number;
+}
+
+const landingRateLimitStore = new Map<string, LandingRateWindow>();
+const LANDING_MAX_REQUESTS = 100;
+const LANDING_WINDOW_MS = 5 * 60 * 1000;
+const LANDING_BLOCK_DURATION_MS = 15 * 60 * 1000;
+
+const BOT_SIGNATURES = [
+  /curl\//i,
+  /wget\//i,
+  /python-requests/i,
+  /scrapy/i,
+  /phantomjs/i,
+  /headlesschrome/i,
+  /python-urllib/i,
+  /java\//i,
+  /libwww-perl/i,
+  /http-client/i,
+  /nikto/i,
+  /sqlmap/i,
+  /nmap/i,
+  /masscan/i
+];
+
+function isSuspiciousBot(userAgent: string): boolean {
+  if (!userAgent) return true;
+  return BOT_SIGNATURES.some(pattern => pattern.test(userAgent));
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, window] of landingRateLimitStore.entries()) {
+    if (window.blockedUntil && window.blockedUntil < now) {
+      landingRateLimitStore.delete(key);
+    } else if (now - window.windowStart > LANDING_WINDOW_MS * 2) {
+      landingRateLimitStore.delete(key);
+    }
+  }
+}, 60 * 1000);
 
 export function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
   const origin = req.headers.origin;
@@ -161,6 +206,67 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
 
   res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
 
+  next();
+}
+
+export function landingRateLimiter(req: Request, res: Response, next: NextFunction): void {
+  if (!isLandingRoute(req.path)) {
+    return next();
+  }
+
+  const ip = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || '';
+  const now = Date.now();
+
+  if (isSuspiciousBot(userAgent) && isProduction) {
+    res.status(403).json({ error: 'Access denied' });
+    return;
+  }
+
+  const key = `landing:${ip}`;
+  let window = landingRateLimitStore.get(key);
+
+  if (window?.blockedUntil && window.blockedUntil > now) {
+    const remainingMs = window.blockedUntil - now;
+    const remainingMin = Math.ceil(remainingMs / 60000);
+
+    res.setHeader('Retry-After', Math.ceil(remainingMs / 1000).toString());
+    res.setHeader('X-RateLimit-Limit', LANDING_MAX_REQUESTS.toString());
+    res.setHeader('X-RateLimit-Remaining', '0');
+
+    res.status(429).json({
+      error: `Too many requests. Please try again in ${remainingMin} minutes.`
+    });
+    return;
+  }
+
+  if (!window || (now - window.windowStart > LANDING_WINDOW_MS)) {
+    window = {
+      count: 0,
+      windowStart: now
+    };
+    landingRateLimitStore.set(key, window);
+  }
+
+  window.count++;
+
+  const remaining = Math.max(0, LANDING_MAX_REQUESTS - window.count);
+  res.setHeader('X-RateLimit-Limit', LANDING_MAX_REQUESTS.toString());
+  res.setHeader('X-RateLimit-Remaining', remaining.toString());
+  res.setHeader('X-RateLimit-Reset', Math.ceil((window.windowStart + LANDING_WINDOW_MS) / 1000).toString());
+
+  if (window.count > LANDING_MAX_REQUESTS) {
+    window.blockedUntil = now + LANDING_BLOCK_DURATION_MS;
+    landingRateLimitStore.set(key, window);
+
+    res.setHeader('Retry-After', Math.ceil(LANDING_BLOCK_DURATION_MS / 1000).toString());
+    res.status(429).json({
+      error: 'Too many requests. IP temporarily blocked for 15 minutes.'
+    });
+    return;
+  }
+
+  landingRateLimitStore.set(key, window);
   next();
 }
 
