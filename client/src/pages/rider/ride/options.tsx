@@ -47,7 +47,7 @@ import {
 import { useRideBooking, type RideOption, type PaymentMethod, type RouteAlternative } from "@/contexts/RideBookingContext";
 import { SafeGoMap } from "@/components/maps/SafeGoMap";
 import { clientGetRouteAlternatives } from "@/hooks/useGoogleMaps";
-import { decodePolyline } from "@/lib/locationService";
+import { decodePolyline } from "@/lib/formatters";
 import { useFareCalculation } from "@/hooks/useFareCalculation";
 import type { RouteFareBreakdown, RouteInfoRequest } from "@/lib/fareTypes";
 import { 

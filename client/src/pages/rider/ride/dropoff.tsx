@@ -15,7 +15,8 @@ import { useRideBooking, type RouteData } from "@/contexts/RideBookingContext";
 import { MapContainer, TileLayer, useMap, Polyline, Marker } from "react-leaflet";
 import { DraggableMarker } from "@/components/maps/DraggableMarker";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
-import { reverseGeocode, addRecentLocation, getRouteDirections, decodePolyline } from "@/lib/locationService";
+import { reverseGeocode, addRecentLocation, getRouteDirections } from "@/lib/locationService";
+import { decodePolyline } from "@/lib/formatters";
 import "leaflet/dist/leaflet.css";
 
 function createPickupIcon() {
