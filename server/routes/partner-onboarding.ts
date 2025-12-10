@@ -298,18 +298,21 @@ router.get('/drivers', authenticateToken, requireRole(['admin']), async (req: Au
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
-    const where: any = {};
-    if (status && status !== 'all') where.status = status;
-    if (region && region !== 'all') where.region = region;
-    if (city) where.city = { contains: city as string, mode: 'insensitive' };
-    if (serviceType && serviceType !== 'all') where.serviceType = serviceType;
+    const conditions: any[] = [];
+    if (status && status !== 'all') conditions.push({ status });
+    if (region && region !== 'all') conditions.push({ region });
+    if (city) conditions.push({ city: { contains: city as string, mode: 'insensitive' } });
+    if (serviceType && serviceType !== 'all') conditions.push({ serviceType });
     if (search) {
-      where.OR = [
-        { fullName: { contains: search as string, mode: 'insensitive' } },
-        { phoneNumber: { contains: search as string, mode: 'insensitive' } },
-        { email: { contains: search as string, mode: 'insensitive' } }
-      ];
+      conditions.push({
+        OR: [
+          { fullName: { contains: search as string, mode: 'insensitive' } },
+          { phoneNumber: { contains: search as string, mode: 'insensitive' } },
+          { email: { contains: search as string, mode: 'insensitive' } }
+        ]
+      });
     }
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     const [applications, total] = await Promise.all([
       prisma.driverPartnerApplication.findMany({
@@ -348,17 +351,20 @@ router.get('/restaurants', authenticateToken, requireRole(['admin']), async (req
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
-    const where: any = {};
-    if (status && status !== 'all') where.status = status;
-    if (city) where.city = { contains: city as string, mode: 'insensitive' };
-    if (cuisineType) where.cuisineType = cuisineType;
+    const conditions: any[] = [];
+    if (status && status !== 'all') conditions.push({ status });
+    if (city) conditions.push({ city: { contains: city as string, mode: 'insensitive' } });
+    if (cuisineType) conditions.push({ cuisineType });
     if (search) {
-      where.OR = [
-        { restaurantName: { contains: search as string, mode: 'insensitive' } },
-        { ownerName: { contains: search as string, mode: 'insensitive' } },
-        { phoneNumber: { contains: search as string, mode: 'insensitive' } }
-      ];
+      conditions.push({
+        OR: [
+          { restaurantName: { contains: search as string, mode: 'insensitive' } },
+          { ownerName: { contains: search as string, mode: 'insensitive' } },
+          { phoneNumber: { contains: search as string, mode: 'insensitive' } }
+        ]
+      });
     }
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     const [applications, total] = await Promise.all([
       prisma.restaurantPartnerApplication.findMany({
@@ -397,17 +403,20 @@ router.get('/shops', authenticateToken, requireRole(['admin']), async (req: Auth
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
-    const where: any = {};
-    if (status && status !== 'all') where.status = status;
-    if (city) where.city = { contains: city as string, mode: 'insensitive' };
-    if (category) where.category = category;
+    const conditions: any[] = [];
+    if (status && status !== 'all') conditions.push({ status });
+    if (city) conditions.push({ city: { contains: city as string, mode: 'insensitive' } });
+    if (category) conditions.push({ category });
     if (search) {
-      where.OR = [
-        { shopName: { contains: search as string, mode: 'insensitive' } },
-        { ownerName: { contains: search as string, mode: 'insensitive' } },
-        { phoneNumber: { contains: search as string, mode: 'insensitive' } }
-      ];
+      conditions.push({
+        OR: [
+          { shopName: { contains: search as string, mode: 'insensitive' } },
+          { ownerName: { contains: search as string, mode: 'insensitive' } },
+          { phoneNumber: { contains: search as string, mode: 'insensitive' } }
+        ]
+      });
     }
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     const [applications, total] = await Promise.all([
       prisma.shopPartnerApplication.findMany({
@@ -446,17 +455,20 @@ router.get('/tickets', authenticateToken, requireRole(['admin']), async (req: Au
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
-    const where: any = {};
-    if (status && status !== 'all') where.status = status;
-    if (city) where.city = { contains: city as string, mode: 'insensitive' };
-    if (ticketType) where.ticketType = ticketType;
+    const conditions: any[] = [];
+    if (status && status !== 'all') conditions.push({ status });
+    if (city) conditions.push({ city: { contains: city as string, mode: 'insensitive' } });
+    if (ticketType) conditions.push({ ticketType });
     if (search) {
-      where.OR = [
-        { businessName: { contains: search as string, mode: 'insensitive' } },
-        { contactPerson: { contains: search as string, mode: 'insensitive' } },
-        { phoneNumber: { contains: search as string, mode: 'insensitive' } }
-      ];
+      conditions.push({
+        OR: [
+          { businessName: { contains: search as string, mode: 'insensitive' } },
+          { contactPerson: { contains: search as string, mode: 'insensitive' } },
+          { phoneNumber: { contains: search as string, mode: 'insensitive' } }
+        ]
+      });
     }
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     const [applications, total] = await Promise.all([
       prisma.ticketPartnerApplication.findMany({
