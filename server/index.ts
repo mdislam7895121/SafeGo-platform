@@ -8,7 +8,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { securityHeaders, corsMiddleware, csrfProtection, landingRateLimiter, httpsRedirect } from "./middleware/securityHeaders";
+import { securityHeaders, corsMiddleware, csrfProtection, landingRateLimiter, httpsRedirect, notFoundProbeDetector, cspViolationHandler } from "./middleware/securityHeaders";
 
 const app = express();
 
@@ -20,6 +20,10 @@ app.use(corsMiddleware);
 app.use(securityHeaders);
 app.use(csrfProtection);
 app.use(landingRateLimiter);
+app.use(notFoundProbeDetector);
+
+// CSP violation reporting endpoint
+app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), cspViolationHandler);
 
 // Parse cookies for refresh token handling
 app.use(cookieParser());

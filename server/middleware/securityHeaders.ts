@@ -3,6 +3,85 @@ import { getClientIp } from '../utils/ip';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+type SecurityEventType = 
+  | 'BLOCKED_IP'
+  | 'RATE_LIMIT_TRIGGERED'
+  | 'CSP_VIOLATION'
+  | 'SUSPICIOUS_USER_AGENT'
+  | 'REPEATED_404_PROBE'
+  | 'BOT_BLOCKED';
+
+interface SecurityLogEntry {
+  timestamp: string;
+  type: SecurityEventType;
+  ip: string;
+  userAgent: string;
+  path: string;
+  method: string;
+  details?: Record<string, unknown>;
+}
+
+const securityLogs: SecurityLogEntry[] = [];
+const MAX_SECURITY_LOGS = 10000;
+
+const notFoundProbes = new Map<string, { count: number; firstSeen: number; paths: string[] }>();
+const PROBE_WINDOW_MS = 5 * 60 * 1000;
+const PROBE_THRESHOLD = 10;
+
+function logSecurityEvent(entry: Omit<SecurityLogEntry, 'timestamp'>): void {
+  const logEntry: SecurityLogEntry = {
+    ...entry,
+    timestamp: new Date().toISOString()
+  };
+  
+  securityLogs.push(logEntry);
+  
+  if (securityLogs.length > MAX_SECURITY_LOGS) {
+    securityLogs.shift();
+  }
+  
+  console.log(`[SecurityLog] ${logEntry.type} | IP: ${logEntry.ip} | Path: ${logEntry.path} | UA: ${logEntry.userAgent.substring(0, 50)}...`);
+}
+
+export function getSecurityLogs(limit = 100): SecurityLogEntry[] {
+  return securityLogs.slice(-limit);
+}
+
+export function getSecurityStats(): {
+  totalEvents: number;
+  byType: Record<string, number>;
+  recentBlocks: number;
+} {
+  const now = Date.now();
+  const oneHourAgo = now - 60 * 60 * 1000;
+  
+  const stats = {
+    totalEvents: securityLogs.length,
+    byType: {} as Record<string, number>,
+    recentBlocks: 0
+  };
+  
+  for (const log of securityLogs) {
+    stats.byType[log.type] = (stats.byType[log.type] || 0) + 1;
+    
+    if (new Date(log.timestamp).getTime() > oneHourAgo && 
+        (log.type === 'BLOCKED_IP' || log.type === 'RATE_LIMIT_TRIGGERED')) {
+      stats.recentBlocks++;
+    }
+  }
+  
+  return stats;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, data] of notFoundProbes.entries()) {
+    if (now - data.firstSeen > PROBE_WINDOW_MS * 2) {
+      notFoundProbes.delete(ip);
+    }
+  }
+}, 60 * 1000);
+
 const ALLOWED_ORIGINS = isProduction
   ? [process.env.FRONTEND_URL || 'https://safego.replit.app']
   : ['http://localhost:5000', 'http://0.0.0.0:5000'];
@@ -195,7 +274,8 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
         "manifest-src 'self'",
         "media-src 'self'",
         "upgrade-insecure-requests",
-        "block-all-mixed-content"
+        "block-all-mixed-content",
+        "report-uri /api/csp-report"
       ]
     : [
         "default-src 'self'",
@@ -211,7 +291,8 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
         "object-src 'none'",
         "worker-src 'self' blob:",
         "manifest-src 'self'",
-        "media-src 'self'"
+        "media-src 'self'",
+        "report-uri /api/csp-report"
       ];
 
   res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
@@ -228,9 +309,27 @@ export function landingRateLimiter(req: Request, res: Response, next: NextFuncti
   const userAgent = req.headers['user-agent'] || '';
   const now = Date.now();
 
-  if (isSuspiciousBot(userAgent) && isProduction) {
-    res.status(403).json({ error: 'Access denied' });
-    return;
+  if (isSuspiciousBot(userAgent)) {
+    logSecurityEvent({
+      type: 'SUSPICIOUS_USER_AGENT',
+      ip,
+      userAgent,
+      path: req.path,
+      method: req.method,
+      details: { blocked: isProduction }
+    });
+    
+    if (isProduction) {
+      logSecurityEvent({
+        type: 'BOT_BLOCKED',
+        ip,
+        userAgent,
+        path: req.path,
+        method: req.method
+      });
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
   }
 
   const key = `landing:${ip}`;
@@ -269,6 +368,24 @@ export function landingRateLimiter(req: Request, res: Response, next: NextFuncti
     window.blockedUntil = now + LANDING_BLOCK_DURATION_MS;
     landingRateLimitStore.set(key, window);
 
+    logSecurityEvent({
+      type: 'RATE_LIMIT_TRIGGERED',
+      ip,
+      userAgent,
+      path: req.path,
+      method: req.method,
+      details: { requestCount: window.count, blockDurationMs: LANDING_BLOCK_DURATION_MS }
+    });
+
+    logSecurityEvent({
+      type: 'BLOCKED_IP',
+      ip,
+      userAgent,
+      path: req.path,
+      method: req.method,
+      details: { reason: 'rate_limit', blockedUntil: new Date(window.blockedUntil).toISOString() }
+    });
+
     res.setHeader('Retry-After', Math.ceil(LANDING_BLOCK_DURATION_MS / 1000).toString());
     res.status(429).json({
       error: 'Too many requests. IP temporarily blocked for 15 minutes.'
@@ -277,6 +394,68 @@ export function landingRateLimiter(req: Request, res: Response, next: NextFuncti
   }
 
   landingRateLimitStore.set(key, window);
+  next();
+}
+
+export function cspViolationHandler(req: Request, res: Response): void {
+  const ip = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || '';
+  const violation = req.body;
+
+  logSecurityEvent({
+    type: 'CSP_VIOLATION',
+    ip,
+    userAgent,
+    path: req.path,
+    method: req.method,
+    details: {
+      documentUri: violation?.['document-uri'],
+      violatedDirective: violation?.['violated-directive'],
+      blockedUri: violation?.['blocked-uri'],
+      sourceFile: violation?.['source-file'],
+      lineNumber: violation?.['line-number']
+    }
+  });
+
+  res.status(204).end();
+}
+
+export function notFoundProbeDetector(req: Request, res: Response, next: NextFunction): void {
+  res.on('finish', () => {
+    if (res.statusCode === 404) {
+      const ip = getClientIp(req);
+      const userAgent = req.headers['user-agent'] || '';
+      const now = Date.now();
+
+      let probe = notFoundProbes.get(ip);
+
+      if (!probe || (now - probe.firstSeen > PROBE_WINDOW_MS)) {
+        probe = { count: 0, firstSeen: now, paths: [] };
+      }
+
+      probe.count++;
+      if (probe.paths.length < 20) {
+        probe.paths.push(req.path);
+      }
+      notFoundProbes.set(ip, probe);
+
+      if (probe.count >= PROBE_THRESHOLD) {
+        logSecurityEvent({
+          type: 'REPEATED_404_PROBE',
+          ip,
+          userAgent,
+          path: req.path,
+          method: req.method,
+          details: {
+            probeCount: probe.count,
+            probedPaths: probe.paths,
+            windowMs: PROBE_WINDOW_MS
+          }
+        });
+      }
+    }
+  });
+
   next();
 }
 
