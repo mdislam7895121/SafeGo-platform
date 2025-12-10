@@ -1,0 +1,88 @@
+You are working on the SafeGo marketing landing page at the root route (/).
+
+Goal of this task:
+Make the landing page services fully region-aware. When the user selects “Bangladesh” in the region switcher, they must see all 5 Bangladesh services in BOTH:
+- the hero “SafeGo Services” card, and
+- the “SafeGo Services” section lower on the page.
+
+The 5 Bangladesh services are:
+
+1) Rides
+   - Description: "Safe & reliable transportation"
+   - Route: /ride
+2) Food delivery
+   - Description: "Delicious meals delivered hot and fresh"
+   - Route: /food
+3) Parcel delivery
+   - Description: "Send packages anywhere with real-time tracking"
+   - Route: /parcel
+4) Local shops
+   - Description: "Shop from nearby groceries, pharmacies, and stores"
+   - Route: /shops
+5) Tickets & Travel
+   - Description: "Book bus, launch, train, and event tickets in one place"
+   - Route: /tickets
+
+IMPLEMENTATION REQUIREMENTS
+
+1) Find the main landing page component (for example LandingPage.tsx, Home.tsx, or similar) and the code that:
+   - Renders the region selector (Bangladesh, United States, Global).
+   - Renders the hero card "SafeGo Services".
+   - Renders the lower “SafeGo Services” cards section.
+
+2) Introduce a region-to-services mapping constant. For example:
+
+   const REGION_SERVICES = {
+     bangladesh: [
+       { id: "rides",   label: "Rides",          description: "...", route: "/ride",    icon: RideIcon },
+       { id: "food",    label: "Food delivery",  description: "...", route: "/food",    icon: FoodIcon },
+       { id: "parcel",  label: "Parcel delivery",description: "...", route: "/parcel",  icon: ParcelIcon },
+       { id: "shops",   label: "Local shops",    description: "...", route: "/shops",   icon: ShopIcon },
+       { id: "tickets", label: "Tickets & Travel", description: "...", route: "/tickets", icon: TicketIcon },
+     ],
+     united_states: [
+       // you can reuse the same or a reduced subset for now:
+       // rides, food, parcel, shops
+     ],
+     global: [
+       // generic minimal set: rides, food, parcel
+     ],
+   } as const;
+
+   The exact icon imports can reuse whatever icons the project already uses for Rides, Food, Parcel, Shops, and Tickets.
+
+3) Make sure the region switcher controls a single state variable such as:
+
+   const [activeRegion, setActiveRegion] = useState<"bangladesh" | "united_states" | "global">("bangladesh");
+
+   The Bangladesh button should set activeRegion to "bangladesh", the US button to "united_states", and the Global button to "global".
+
+4) In the hero “SafeGo Services” card:
+   - Replace any hardcoded list of services with a derived list:
+     const services = REGION_SERVICES[activeRegion];
+   - Render only those services for the current activeRegion.
+   - When Bangladesh is selected, this MUST show exactly the 5 services listed above.
+
+5) In the lower “SafeGo Services” section:
+   - Also use REGION_SERVICES[activeRegion] instead of any hardcoded list.
+   - Cards, titles, and descriptions must match the mapping for the selected region.
+   - Ensure the layout stays consistent when it shows 3, 4, or 5 cards (e.g., use a responsive grid).
+
+6) For each service card (both hero card and services section), ensure:
+   - Clicking / tapping it either:
+     - navigates to the correct internal route (e.g., /ride, /food, /parcel, /shops, /tickets), OR
+     - will be wired later but already uses the correct href or router link component.
+   - Do NOT change any backend logic; this is a frontend-only change.
+
+7) Security and safety:
+   - Do NOT introduce any new external scripts.
+   - Do NOT hardcode any secrets or API keys.
+   - Only use existing icons/components that already live in the project.
+
+DELIVERABLES:
+- Update the landing page so that:
+  - Selecting Bangladesh clearly shows all 5 services listed above.
+  - Other regions (United States, Global) still work and show their respective service subsets.
+- After changes, summarize:
+  1) Which files you edited.
+  2) A quick note confirming that Bangladesh now shows 5 services in both the hero card and the services section, based on REGION_SERVICES.
