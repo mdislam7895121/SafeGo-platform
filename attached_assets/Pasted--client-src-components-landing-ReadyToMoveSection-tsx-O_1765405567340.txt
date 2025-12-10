@@ -1,0 +1,86 @@
+// client/src/components/landing/ReadyToMoveSection.tsx
+// Or wherever your landing CTA section lives
+
+export function ReadyToMoveSection() {
+  return (
+    <section
+      aria-labelledby="ready-to-move-heading"
+      className="bg-gradient-to-b from-[#0054F5] to-[#0131A0] py-24 md:py-28"
+    >
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        {/* Title */}
+        <h2
+          id="ready-to-move-heading"
+          className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-3"
+        >
+          Ready to move with SafeGo?
+        </h2>
+
+        {/* Subtitle – BD only for now */}
+        <p className="text-base sm:text-lg text-white/90 max-w-2xl mx-auto mb-9">
+          SafeGo is launching soon in Bangladesh. App download links will be
+          available on release.
+        </p>
+
+        {/* App badges */}
+        <div className="flex flex-wrap items-center justify-center gap-4 mb-9">
+          {/* App Store badge */}
+          <a
+            href="#"
+            aria-label="Download SafeGo on the App Store (coming soon)"
+            className="group inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-transform duration-150 hover:-translate-y-0.5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+                <span className="text-2xl" aria-hidden="true">
+                  
+                </span>
+              </div>
+              <div className="text-left leading-tight">
+                <div className="text-[11px] uppercase tracking-[0.12em] text-white/70">
+                  Download on the
+                </div>
+                <div className="text-lg font-semibold text-white">
+                  App Store
+                </div>
+              </div>
+            </div>
+          </a>
+
+          {/* Google Play badge */}
+          <a
+            href="#"
+            aria-label="Get SafeGo on Google Play (coming soon)"
+            className="group inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-transform duration-150 hover:-translate-y-0.5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+                <span className="text-xl" aria-hidden="true">
+                  ▶
+                </span>
+              </div>
+              <div className="text-left leading-tight">
+                <div className="text-[11px] uppercase tracking-[0.12em] text-white/70">
+                  Get it on
+                </div>
+                <div className="text-lg font-semibold text-white">
+                  Google Play
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
+
+        {/* Become a partner button */}
+        <div>
+          <a
+            href="/partners"
+            className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3 text-sm sm:text-base font-semibold text-[#0054F5] shadow-md shadow-black/20 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5"
+          >
+            Become a partner
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
