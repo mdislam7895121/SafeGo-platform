@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useKycStatus } from "@/hooks/useKycStatus";
+import { KycEnforcementBanner } from "@/components/KycEnforcementBanner";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -147,6 +149,8 @@ export default function ParcelRequest() {
   const { data: profileData } = useQuery<{ countryCode?: string }>({
     queryKey: ["/api/customer/profile"],
   });
+
+  const { data: kycStatus } = useKycStatus(true);
 
   const isCashAllowed = profileData?.countryCode !== "US";
 
@@ -805,11 +809,14 @@ export default function ParcelRequest() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-3">
+          {kycStatus?.requiresKycBeforeBooking && (
+            <KycEnforcementBanner kycStatus={kycStatus} />
+          )}
           <Button
             type="submit"
             className="w-full h-12"
-            disabled={createParcelMutation.isPending || !pricing}
+            disabled={createParcelMutation.isPending || !pricing || kycStatus?.requiresKycBeforeBooking}
             onClick={handleSubmit}
             data-testid="button-confirm-parcel"
           >

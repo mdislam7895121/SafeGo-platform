@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/sheet";
 import { useEatsCart } from "@/contexts/EatsCartContext";
 import { useToast } from "@/hooks/use-toast";
+import { useKycStatus } from "@/hooks/useKycStatus";
+import { KycEnforcementBanner } from "@/components/KycEnforcementBanner";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
@@ -229,6 +231,8 @@ export default function FoodCheckout() {
   const { data: profileData, isLoading: profileLoading } = useQuery<CustomerProfile>({
     queryKey: ["/api/customer/profile"],
   });
+
+  const { data: kycStatus } = useKycStatus(true);
 
   const { data: paymentMethodsData, isLoading: paymentMethodsLoading } = useQuery<PaymentMethodsResponse>({
     queryKey: ["/api/customer/payment-methods"],
@@ -1165,13 +1169,17 @@ export default function FoodCheckout() {
             </CardContent>
           </Card>
         )}
+
+        {kycStatus?.requiresKycBeforeBooking && (
+          <KycEnforcementBanner kycStatus={kycStatus} />
+        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50 pb-safe">
         <Button
           className="w-full h-12 text-base"
           onClick={handleReviewOrder}
-          disabled={isSubmitting || (!hasMinimumOrder && !!state.restaurant?.minOrderAmount)}
+          disabled={isSubmitting || (!hasMinimumOrder && !!state.restaurant?.minOrderAmount) || kycStatus?.requiresKycBeforeBooking}
           data-testid="button-review-order"
         >
           {isSubmitting ? (

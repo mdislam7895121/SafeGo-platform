@@ -15,6 +15,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useKycStatus } from "@/hooks/useKycStatus";
+import { KycEnforcementBanner } from "@/components/KycEnforcementBanner";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { decodePolyline } from "@/lib/formatters";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
@@ -211,6 +213,8 @@ export default function RideRequestPage() {
   const countryCode = user?.countryCode || "US";
   const isUS = countryCode === "US";
   const isBD = countryCode === "BD";
+
+  const { data: kycStatus, isLoading: kycLoading } = useKycStatus(!!user);
 
   const [pickupLocation, setPickupLocation] = useState<LocationData | null>(null);
   const [dropoffLocation, setDropoffLocation] = useState<LocationData | null>(null);
@@ -593,6 +597,12 @@ export default function RideRequestPage() {
       </div>
 
       <div className="bg-card border-t max-h-[55vh] overflow-y-auto shrink-0">
+        {kycStatus?.requiresKycBeforeBooking && (
+          <div className="p-3 sm:p-4">
+            <KycEnforcementBanner kycStatus={kycStatus} />
+          </div>
+        )}
+
         {fareLoading && (
           <div className="p-4 space-y-3">
             <Skeleton className="h-20 w-full" />
@@ -804,7 +814,8 @@ export default function RideRequestPage() {
                 !selectedVehicle ||
                 !pickupLocation ||
                 !dropoffLocation ||
-                requestRideMutation.isPending
+                requestRideMutation.isPending ||
+                kycStatus?.requiresKycBeforeBooking
               }
               onClick={handleRequestRide}
               data-testid="button-request-ride"

@@ -64,6 +64,7 @@ import {
   CircleDot,
   AlertTriangle,
 } from "lucide-react";
+import { TipCard } from "@/components/TipCard";
 
 interface RideData {
   id: string;
@@ -114,6 +115,8 @@ interface RideData {
   };
   etaMinutes?: number;
   routePolyline?: string;
+  tipAmount?: number | null;
+  tipSettledAt?: string | null;
 }
 
 const pickupIcon = L.divIcon({
@@ -616,6 +619,15 @@ export default function RideTrackingPage() {
               )}
             </CardContent>
           </Card>
+
+          {ride.status === "completed" && !ride.tipAmount && (
+            <TipCard
+              rideId={ride.id}
+              currency={ride.fareCurrency}
+              existingTip={ride.tipAmount}
+              className="mb-3"
+            />
+          )}
 
           {ride.status === "completed" && (
             <Button

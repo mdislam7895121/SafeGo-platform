@@ -15,6 +15,92 @@ router.use(authenticateToken);
 router.use(requireRole(["customer"]));
 
 // ====================================================
+// GET /api/customer/kyc-status
+// Get customer KYC verification status for booking enforcement
+// ====================================================
+router.get("/kyc-status", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, countryCode: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    // If no profile exists, treat as unsubmitted
+    if (!customerProfile) {
+      return res.json({
+        isVerified: false,
+        verificationStatus: "unsubmitted",
+        countryCode: user.countryCode,
+        missingFields: user.countryCode === "BD" 
+          ? ["nidNumber", "nidFrontImageUrl", "nidBackImageUrl", "dateOfBirth"]
+          : ["governmentIdType", "governmentIdLast4", "homeAddress", "dateOfBirth"],
+        requiresKycBeforeBooking: true,
+        reason: "Please complete your profile verification to book rides and services.",
+      });
+    }
+
+    // Determine missing fields based on country
+    const missingFields: string[] = [];
+    
+    if (user.countryCode === "BD") {
+      if (!customerProfile.nidNumber) missingFields.push("nidNumber");
+      if (!customerProfile.nidFrontImageUrl) missingFields.push("nidFrontImageUrl");
+      if (!customerProfile.nidBackImageUrl) missingFields.push("nidBackImageUrl");
+      if (!customerProfile.dateOfBirth) missingFields.push("dateOfBirth");
+    } else {
+      // US
+      if (!customerProfile.governmentIdType) missingFields.push("governmentIdType");
+      if (!customerProfile.governmentIdLast4) missingFields.push("governmentIdLast4");
+      if (!customerProfile.homeAddress) missingFields.push("homeAddress");
+      if (!customerProfile.dateOfBirth) missingFields.push("dateOfBirth");
+    }
+
+    // Normalize verification status
+    const verificationStatus = customerProfile.verificationStatus || "unsubmitted";
+    const isVerified = customerProfile.isVerified === true && verificationStatus === "approved";
+
+    // Determine if KYC is required before booking
+    // BD: Strict KYC required
+    // US: KYC required if not approved
+    const requiresKycBeforeBooking = !isVerified;
+
+    // Generate human-readable reason
+    let reason = "";
+    if (isVerified) {
+      reason = "Your account is verified. You can book rides and services.";
+    } else if (verificationStatus === "pending") {
+      reason = "Your verification is pending review. Please wait for approval.";
+    } else if (verificationStatus === "rejected") {
+      reason = customerProfile.rejectionReason || "Your verification was rejected. Please resubmit your documents.";
+    } else {
+      reason = "Please complete your profile verification to book rides and services.";
+    }
+
+    res.json({
+      isVerified,
+      verificationStatus,
+      countryCode: user.countryCode,
+      missingFields,
+      requiresKycBeforeBooking,
+      reason,
+    });
+  } catch (error) {
+    console.error("Get KYC status error:", error);
+    res.status(500).json({ error: "Failed to get KYC status" });
+  }
+});
+
+// ====================================================
 // GET /api/customer/profile
 // Get customer profile
 // ====================================================

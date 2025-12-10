@@ -1809,6 +1809,118 @@ router.delete("/dispatch/:sessionId", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// POST /api/rides/:id/tip
+// Add a tip for a completed ride (customer only)
+// ====================================================
+router.post("/:id/tip", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { id: rideId } = req.params;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can add tips" });
+    }
+
+    // Validate request body
+    const tipSchema = z.object({
+      amount: z.number().positive("Tip amount must be greater than zero"),
+      currency: z.string().optional(),
+    });
+
+    const parsed = tipSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Invalid tip data", 
+        details: parsed.error.errors 
+      });
+    }
+
+    const { amount, currency } = parsed.data;
+
+    // Get customer profile
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Get ride and verify ownership
+    const ride = await prisma.ride.findUnique({
+      where: { id: rideId },
+      select: {
+        id: true,
+        status: true,
+        paymentMethod: true,
+        customerId: true,
+        customer: { select: { id: true } },
+        driver: { include: { user: { select: { countryCode: true } } } },
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    if (ride.customerId !== customerProfile.id) {
+      return res.status(403).json({ error: "You can only tip your own rides" });
+    }
+
+    // Ride must be completed
+    if (ride.status !== "completed") {
+      return res.status(400).json({ error: "Tips can only be added to completed rides" });
+    }
+
+    // Determine currency
+    const rideCurrency = ride.driver?.user?.countryCode === "BD" ? "BDT" : "USD";
+    const tipCurrency = currency || rideCurrency;
+
+    // Validate currency matches ride currency
+    if (tipCurrency !== rideCurrency) {
+      return res.status(400).json({ 
+        error: `Tip currency must match ride currency (${rideCurrency})` 
+      });
+    }
+
+    // Use the ride's payment method for the tip to maintain consistency
+    const tipPaymentMethod = ride.paymentMethod === "cash" ? "cash" : "online";
+
+    // Use the existing tipService to record the tip
+    const result = await tipService.recordTip({
+      entityId: rideId,
+      entityType: "ride",
+      tipAmount: amount,
+      tipPaymentMethod,
+      tippedBy: customerProfile.id,
+    });
+
+    if (!result.success) {
+      if (result.alreadyProcessed) {
+        return res.status(409).json({ 
+          error: "Tip already added for this ride",
+          tipAmount: result.tipAmount,
+          tipCurrency: rideCurrency,
+        });
+      }
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      tipAmount: result.tipAmount,
+      tipCurrency: rideCurrency,
+      message: "Thank you! Your tip has been added.",
+    });
+  } catch (error) {
+    console.error("Add tip error:", error);
+    res.status(500).json({ error: "Failed to add tip" });
+  }
+});
+
 // Helper: Calculate haversine distance between two points in meters
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000; // Earth's radius in meters

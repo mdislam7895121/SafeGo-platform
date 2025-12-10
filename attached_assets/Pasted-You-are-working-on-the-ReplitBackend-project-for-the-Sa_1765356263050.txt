@@ -1,0 +1,283 @@
+You are working on the “ReplitBackend” project for the SafeGo platform.
+
+Context:
+- A full backend and frontend audit has already been completed.
+- 24 of 26 items (A1–F5) are fixed.
+- The remaining 2 items were marked as “SCOPED OUT” because they require backend endpoints:
+  - D3 – KYC enforcement banners on booking flows
+  - D5 – Tip interface for completed rides
+
+Your job now is to FINISH these last 2 items properly.
+You ARE allowed to change the backend in this task.
+Do not touch the /ride landing page yet — this task is only for app flows, not the public landing page.
+
+==================================================
+GOAL
+==================================================
+
+1) Implement a clean backend API for customer KYC status.
+2) Implement a clean backend API for customer tips on rides.
+3) Wire both into the existing frontend so:
+   - Unsafe users (not KYC-verified) cannot confirm rides/orders without a clear message.
+   - Customers can add a tip for their driver after a ride is completed.
+4) Follow existing SafeGo rules:
+   - 4 roles: customer, driver, restaurant, admin.
+   - Country-specific KYC for BD and US.
+   - Commission and payout logic already defined in the backend.
+   - No “home-made” pricing or status engines in the frontend.
+
+Do NOT redesign UI. Only add the minimum UX to complete D3 and D5.
+
+==================================================
+PART 1 – BACKEND: KYC STATUS API (D3)
+==================================================
+
+1. Reuse existing models & patterns
+   - There are already entities like:
+     - User (with role and countryCode)
+     - CustomerProfile / DriverProfile (with verificationStatus, isVerified, etc.)
+   - There is already /api/customer/profile.
+   - DO NOT create new tables. Reuse the existing profile + KYC fields.
+
+2. Add a dedicated endpoint for KYC status
+
+   Create an authenticated endpoint:
+
+   - Method: GET
+   - Route:  /api/customer/kyc-status
+   - Auth:   customer only (must use the same auth middleware as /api/customer/profile)
+
+   Response shape (example):
+
+   {
+     "isVerified": boolean,                  // true if fully KYC-verified
+     "verificationStatus": "pending" | "approved" | "rejected" | "unsubmitted",
+     "countryCode": "BD" | "US",
+     "missingFields": string[],              // e.g. ["nidNumber", "drivingLicenseNumber"]
+     "requiresKycBeforeBooking": boolean,    // true if this customer must finish KYC to book
+     "reason": string                        // human-readable explanation
+   }
+
+   Behavior rules:
+
+   - For BD customers:
+     - requiresKycBeforeBooking = true if NOT fully verified.
+   - For US customers:
+     - requiresKycBeforeBooking = true if backend rules already say so
+       (for now: if verificationStatus !== "approved").
+   - If there is no CustomerProfile yet:
+     - Treat as "unsubmitted", isVerified=false, requiresKycBeforeBooking=true.
+
+   Implementation details:
+
+   - Follow existing controller/service structure in this repo.
+   - Put business logic into a service (e.g. customerKycService.ts) and keep the controller thin.
+   - Use existing error handling / ApiError pattern.
+   - Add tests if the project already has tests for controllers/services.
+
+3. Do NOT break existing APIs
+
+   - /api/customer/profile must keep its current behavior.
+   - The new /api/customer/kyc-status endpoint is additive only.
+   - No changes to admin KYC endpoints.
+
+==================================================
+PART 2 – BACKEND: TIP API (D5)
+==================================================
+
+We need a simple, safe way for a customer to add a tip for a completed ride.
+
+1. Data model
+
+   - Reuse the existing Ride entity (or equivalent).
+   - If a tip field already exists (e.g. tipAmount, tipCurrency), use it.
+   - If not, add:
+     - tipAmount: number (stored in smallest currency unit if that’s the existing pattern).
+     - tipCurrency: string | null (ISO code, e.g. "USD", "BDT").
+
+   - Driver payout calculation:
+     - There is already driverPayout and safegoCommission.
+     - For this task:
+       - Add tipAmount on top of the existing driverPayout.
+       - DO NOT change safegoCommission logic.
+       - A simple approach: driverPayoutWithTip = driverPayout + tipAmount.
+       - If the schema already has separate “driverPayout” and “tipAmount”, leave the existing payout field and rely on both values in reports.
+
+2. New endpoint
+
+   - Method: POST
+   - Route:  /api/rides/:id/tip
+   - Auth:   customer only (must be the customer who owns this ride)
+   - Body:
+
+   {
+     "amount": number,         // tip amount in ride currency
+     "currency": string | null // optional; defaults to ride.fareCurrency
+   }
+
+   Validation rules:
+
+   - The ride must belong to the current authenticated customer.
+   - Ride status must be "completed" (or "in_progress" if business rules allow tipping before completion – keep it “completed” if unsure).
+   - amount must be > 0.
+   - currency must match ride.fareCurrency if provided.
+   - If tipAmount is already set, decide one of:
+       - Either allow overriding (update to new amount)
+       - Or reject with e.g. 409 Conflict "Tip already set for this ride".
+     Choose the approach that fits existing coding style and document it in the controller.
+
+   Behavior:
+
+   - Save tipAmount and tipCurrency on the ride.
+   - Optionally, record a tip event in an existing audit/log mechanism if available.
+   - Return the updated ride or at least { success: true, tipAmount, tipCurrency }.
+
+3. Security:
+
+   - Use the same auth middleware as other /api/rides endpoints.
+   - Do not allow drivers or admins to call this endpoint as if they were the customer.
+   - Validate and sanitize all inputs (numbers, strings).
+
+==================================================
+PART 3 – FRONTEND: KYC ENFORCEMENT (D3)
+==================================================
+
+Goal: If KYC is not complete and requiresKycBeforeBooking=true, the user must NOT be able to confirm a ride/order/parcel without a clear banner. They can still browse and see prices.
+
+Target pages (at minimum):
+
+- client/src/pages/customer/ride-request-page.tsx
+- client/src/pages/customer/parcel-request.tsx
+- client/src/pages/customer/food-checkout.tsx
+- Any shared “unified booking” or “checkout” flows that submit a ride/order.
+
+1. Create a small hook for KYC status
+
+   Example: client/src/hooks/useKycStatus.ts (or similar):
+
+   - Uses apiRequest("/api/customer/kyc-status") with proper typing.
+   - Exposes { data, isLoading, error, refetch }.
+   - Uses the shared apiClient/queryClient patterns already used elsewhere.
+
+2. Booking enforcement
+
+   In each booking/checkout page:
+
+   - Fetch KYC status as soon as the page mounts (or when the user is authenticated).
+   - Show a banner if:
+       - data.requiresKycBeforeBooking === true
+   - Banner text example (adjust to design system):
+
+     - Title: “Complete KYC to continue”
+     - Body:  “To book rides and place orders, please finish your KYC verification in your profile.”
+     - For BD vs US you may tweak wording slightly based on data.countryCode.
+
+   - Disable the primary submit button (e.g. “Confirm SafeGo X”, “Place Order”, “Request Ride”) when:
+       - requiresKycBeforeBooking === true
+       - and !data.isVerified
+
+   - The button should show a short explanation tooltip or inline text:
+       - “KYC verification required. Go to Profile → Verification to complete your documents.”
+
+   Important:
+   - Do NOT block the user from viewing prices or estimates.
+   - Only block the final action that creates the ride/order.
+
+3. Reuse same UI pattern
+
+   - Use existing Alert/Callout components (if present).
+   - Do not introduce a new design system.
+   - Keep the implementation minimal but consistent across ride, parcel, and food flows.
+
+==================================================
+PART 4 – FRONTEND: TIP UI (D5)
+==================================================
+
+Goal: When a ride is completed, the customer can add a tip to the driver from the app.
+
+Primary target pages:
+
+- client/src/pages/customer/ride-tracking-page.tsx
+- Any “trip receipt” / “trip details” page that is customer-facing and shows a completed ride.
+
+1. Data source
+
+   - Reuse the existing GET /api/rides/:id endpoint and/or /api/rides/:id/live-tracking.
+   - Ensure the ride object in the frontend includes:
+       - tipAmount (if present)
+       - fareCurrency
+   - If needed, extend the TypeScript types for the Ride object to include tipAmount and tipCurrency.
+
+2. UI behavior
+
+   On customer ride-tracking-page.tsx:
+
+   - When ride.status === "completed" AND ride.tipAmount is null/undefined:
+       - Show a small “Add a tip” card under the driver details or near the fare summary.
+
+   - The card can include:
+       - Three quick buttons: e.g. +5, +10, +20 (in the ride’s currency).
+       - One custom input for amount.
+       - A “Send tip” button.
+
+   - Once the tip is submitted successfully:
+       - Hide the input controls.
+       - Show a confirmation message: “Thank you! Your tip has been added.”
+       - Update local state to reflect tipAmount so the UI is consistent without full page reload.
+
+3. API integration
+
+   - Use apiRequest to call POST /api/rides/:id/tip with { amount, currency }.
+   - Respect the auth/refresh mechanism. Never use raw fetch here.
+   - Handle error cases:
+       - If backend returns conflict “tip already set”, show a small non-blocking error toast.
+       - If any other error occurs, show a generic error message and keep the UI.
+
+4. Keep UX simple
+
+   - No complex multi-step flows.
+   - No redesign of the entire page.
+   - Just a compact card that appears only for eligible rides.
+
+==================================================
+PART 5 – GENERAL RULES
+==================================================
+
+1. Do NOT change anything about the public /ride landing page in this task.
+   - That integration will be handled in a separate prompt later.
+
+2. Do NOT introduce any new mock backends or fake data.
+   - Always go through the real backend services.
+
+3. Always use apiRequest (from lib/queryClient.ts) for new API calls.
+   - No new raw fetch calls.
+
+4. Keep types strict.
+   - Define/extend TypeScript interfaces for KycStatusResponse and TipResponse.
+   - Avoid `any` in new code.
+
+5. After implementation, run the existing dev server and basic checks.
+   - Ensure ride booking, parcel ordering, and food ordering still work when KYC is approved.
+   - Ensure they are blocked with a clear message when KYC is required and incomplete.
+   - Ensure tipping works on completed rides without breaking fare display.
+
+==================================================
+FINAL OUTPUT REQUIREMENT
+==================================================
+
+At the end of your work, write a short, structured summary:
+
+1. Backend changes
+   - List each new file or modified file (with paths).
+   - Briefly explain what was added (KYC endpoint, tip endpoint, schema changes).
+
+2. Frontend changes
+   - List each page/hook/component changed.
+   - Explain how KYC enforcement works on each booking page.
+   - Explain how the tip UI behaves on the ride-tracking and receipt pages.
+
+3. D3 and D5 status
+   - Explicitly confirm: “D3 – KYC enforcement: COMPLETE”
+   - Explicitly confirm: “D5 – Tip interface: COMPLETE”
+
+Do not ask me questions in the output. Just perform the implementation, then show the summary.
