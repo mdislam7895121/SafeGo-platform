@@ -258,6 +258,8 @@ export default function ContactPage() {
     message: ""
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<Region>("BD");
 
   useEffect(() => {
@@ -280,13 +282,47 @@ export default function ContactPage() {
     breadcrumbs: [{ name: 'Home', url: '/' }, { name: 'Contact', url: '/contact' }]
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    const categoryLabel = contactCategories.find(c => c.value === formData.category)?.label || formData.category;
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.name,
+          email: formData.email,
+          category: formData.category,
+          categoryLabel,
+          message: formData.message,
+          region: selectedRegion
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit your message');
+      }
+
+      setSubmitted(true);
+      setFormData({ name: "", email: "", category: "", message: "" });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (submitError) setSubmitError(null);
   };
 
   return (
@@ -422,9 +458,24 @@ export default function ContactPage() {
                       />
                     </div>
 
-                    <Button type="submit" className="w-full" data-testid="button-submit">
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Message
+                    {submitError && (
+                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300" data-testid="error-message">
+                        {submitError}
+                      </div>
+                    )}
+
+                    <Button type="submit" className="w-full" disabled={isSubmitting} data-testid="button-submit">
+                      {isSubmitting ? (
+                        <>
+                          <span className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Message
+                        </>
+                      )}
                     </Button>
                   </form>
                 </CardContent>

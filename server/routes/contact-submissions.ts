@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { rateLimitSupport } from '../middleware/rateLimit';
-import { authenticateToken, AuthRequest, requireAdminAccess, hasAdminCapability } from '../middleware/auth';
+import { authenticateToken, requireRole, type AuthRequest } from '../middleware/auth';
 import { getClientIp } from '../utils/ip';
 import { logAuditEvent } from '../utils/audit';
 
@@ -111,11 +111,8 @@ router.post('/', rateLimitSupport, async (req: Request, res: Response) => {
   }
 });
 
-router.get('/', authenticateToken, requireAdminAccess, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
   try {
-    if (!hasAdminCapability(req.user, 'SUPPORT_VIEW')) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
 
     const {
       status,
@@ -220,11 +217,8 @@ router.get('/', authenticateToken, requireAdminAccess, async (req: AuthRequest, 
   }
 });
 
-router.get('/:id', authenticateToken, requireAdminAccess, async (req: AuthRequest, res: Response) => {
+router.get('/:id', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
   try {
-    if (!hasAdminCapability(req.user, 'SUPPORT_VIEW')) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
 
     const { id } = req.params;
 
@@ -250,11 +244,8 @@ const updateSubmissionSchema = z.object({
   internalNote: z.string().max(2000).optional()
 });
 
-router.patch('/:id', authenticateToken, requireAdminAccess, async (req: AuthRequest, res: Response) => {
+router.patch('/:id', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
   try {
-    if (!hasAdminCapability(req.user, 'SUPPORT_MANAGE')) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
 
     const { id } = req.params;
     const validationResult = updateSubmissionSchema.safeParse(req.body);
