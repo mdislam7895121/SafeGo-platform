@@ -2,12 +2,14 @@
  * SafeGo Marketing Landing Page
  * Last Updated: December 2024
  * 
+ * Uber-level professional design with region-aware content.
  * This is a visual/UX refactor only - no backend changes.
  * 
  * Region-aware features:
+ * - HERO_CONFIG: Controls hero description per region
  * - REGION_SERVICES: Controls which services appear (BD: 5, US: 4, GLOBAL: 3)
  * - PARTNER_CONFIG: Controls partner section text per region
- * - HERO_CONFIG: Controls hero description per region
+ * - HOW_IT_WORKS_CONFIG: Controls which service flows to show per region
  * 
  * All CTAs use existing public routes only. No secrets exposed.
  */
@@ -18,7 +20,7 @@ import {
   Car, UtensilsCrossed, Package, Store, Ticket, Shield, Lock, MapPin,
   ChevronRight, Check, Users, Clock, Phone, Star, Smartphone,
   CreditCard, Bell, Headphones, Eye, FileCheck, Zap, Navigation,
-  UserCheck, ShieldCheck, Database, Server
+  UserCheck, ShieldCheck, Database, Server, Globe, ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,68 +48,129 @@ const HERO_CONFIG: Record<Region, {
   description: string;
 }> = {
   BD: {
-    description: "One platform for rides, food delivery, parcel delivery, local shops, and tickets — launching first in Bangladesh.",
+    description: "One platform for rides, food, parcels, local shops, and tickets. Launching first in Bangladesh.",
   },
   US: {
-    description: "Safe, reliable rides, food delivery, and parcel services with strong compliance and driver protection.",
+    description: "Safe, reliable rides and deliveries with strong compliance and driver protection built in.",
   },
   GLOBAL: {
-    description: "A global, secure mobility and delivery platform — move, eat, and deliver anywhere with SafeGo.",
+    description: "A secure global mobility platform. Move, eat, and deliver anywhere with SafeGo.",
   },
 };
 
 const PARTNER_CONFIG: Record<Region, {
   driverCard: {
     title: string;
+    description: string;
+    benefits: string[];
+    requirements: string[];
   };
   businessCard: {
     title: string;
     description: string;
-    bullets: string[];
+    benefits: string[];
+    requirements: string[];
   };
 }> = {
   BD: {
     driverCard: {
       title: "For Drivers & Couriers",
+      description: "Earn on your own schedule. Drive or deliver when it works for you.",
+      benefits: [
+        "Flexible hours — work when you want",
+        "Weekly payouts with transparent earnings",
+        "Clear commission structure, no surprises",
+        "Bonuses and incentives for top performers",
+      ],
+      requirements: [
+        "Valid driving license",
+        "Vehicle registration papers",
+        "National ID card",
+        "Smartphone with internet",
+      ],
     },
     businessCard: {
       title: "For Restaurants & Shops",
       description: "Reach more customers and grow your business with SafeGo.",
-      bullets: [
+      benefits: [
         "Access thousands of hungry customers",
         "Easy-to-use order management dashboard",
         "Real-time analytics and business insights",
         "Marketing support to boost visibility",
+      ],
+      requirements: [
+        "Valid trade license",
+        "Business registration documents",
+        "Bank account for payouts",
+        "Menu or product catalog",
       ],
     },
   },
   US: {
     driverCard: {
       title: "For Drivers & Couriers",
+      description: "Earn on your own schedule with full transparency and protection.",
+      benefits: [
+        "Flexible hours — work when you want",
+        "Weekly payouts with transparent earnings",
+        "Clear commission structure, no surprises",
+        "Insurance coverage on all trips",
+      ],
+      requirements: [
+        "Valid US driver's license",
+        "Vehicle registration & insurance",
+        "Background check clearance",
+        "Smartphone with iOS or Android",
+      ],
     },
     businessCard: {
       title: "For Restaurants",
       description: "Reach more customers and grow your restaurant with SafeGo.",
-      bullets: [
+      benefits: [
         "Access thousands of hungry customers",
         "Easy-to-use order management dashboard",
         "Real-time analytics and business insights",
-        "Marketing support to boost visibility",
+        "Dedicated account manager support",
+      ],
+      requirements: [
+        "Valid business license",
+        "Food service permit",
+        "Bank account for payouts",
+        "Digital menu ready",
       ],
     },
   },
   GLOBAL: {
     driverCard: {
       title: "For Drivers & Couriers",
+      description: "Join the global SafeGo network and earn on your terms.",
+      benefits: [
+        "Flexible hours — work when you want",
+        "Weekly payouts with transparent earnings",
+        "Clear commission structure, no surprises",
+        "Bonuses and incentives for top performers",
+      ],
+      requirements: [
+        "Valid local driving license",
+        "Vehicle registration papers",
+        "Government-issued ID",
+        "Smartphone with internet",
+      ],
     },
     businessCard: {
       title: "For Restaurants & Shops",
-      description: "Reach more customers and grow your business with SafeGo.",
-      bullets: [
+      description: "Expand your reach with SafeGo's global delivery network.",
+      benefits: [
         "Access thousands of hungry customers",
         "Easy-to-use order management dashboard",
         "Real-time analytics and business insights",
         "Marketing support to boost visibility",
+      ],
+      requirements: [
+        "Valid business license",
+        "Business registration documents",
+        "Bank account for payouts",
+        "Menu or product catalog",
       ],
     },
   },
@@ -128,7 +191,7 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "food",
       title: "Food Delivery",
-      description: "Delicious meals delivered hot and fresh",
+      description: "Delicious meals delivered fast",
       icon: UtensilsCrossed,
       bgColor: "bg-orange-50 dark:bg-orange-950/30",
       iconColor: "text-orange-600 dark:text-orange-400",
@@ -138,7 +201,7 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "parcel",
       title: "Parcel Delivery",
-      description: "Send packages anywhere with real-time tracking",
+      description: "Send packages with tracking",
       icon: Package,
       bgColor: "bg-green-50 dark:bg-green-950/30",
       iconColor: "text-green-600 dark:text-green-400",
@@ -148,7 +211,7 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "shops",
       title: "Local Shops",
-      description: "Shop from nearby groceries, pharmacies, and stores",
+      description: "Groceries, pharmacy & more",
       icon: Store,
       bgColor: "bg-purple-50 dark:bg-purple-950/30",
       iconColor: "text-purple-600 dark:text-purple-400",
@@ -158,7 +221,7 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "tickets",
       title: "Tickets & Travel",
-      description: "Book bus, launch, train, and event tickets in one place",
+      description: "Bus, train & event tickets",
       icon: Ticket,
       bgColor: "bg-pink-50 dark:bg-pink-950/30",
       iconColor: "text-pink-600 dark:text-pink-400",
@@ -180,7 +243,7 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "food",
       title: "Food Delivery",
-      description: "Delicious meals delivered hot and fresh",
+      description: "Delicious meals delivered fast",
       icon: UtensilsCrossed,
       bgColor: "bg-orange-50 dark:bg-orange-950/30",
       iconColor: "text-orange-600 dark:text-orange-400",
@@ -190,22 +253,12 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "parcel",
       title: "Parcel Delivery",
-      description: "Send packages anywhere with real-time tracking",
+      description: "Send packages with tracking",
       icon: Package,
       bgColor: "bg-green-50 dark:bg-green-950/30",
       iconColor: "text-green-600 dark:text-green-400",
       heroColor: "text-green-500",
       link: "/parcel",
-    },
-    {
-      id: "shops",
-      title: "Local Shops",
-      description: "Shop from nearby groceries and stores",
-      icon: Store,
-      bgColor: "bg-purple-50 dark:bg-purple-950/30",
-      iconColor: "text-purple-600 dark:text-purple-400",
-      heroColor: "text-purple-500",
-      link: "/shops",
     },
   ],
   GLOBAL: [
@@ -222,7 +275,7 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "food",
       title: "Food Delivery",
-      description: "Delicious meals delivered hot and fresh",
+      description: "Delicious meals delivered fast",
       icon: UtensilsCrossed,
       bgColor: "bg-orange-50 dark:bg-orange-950/30",
       iconColor: "text-orange-600 dark:text-orange-400",
@@ -232,7 +285,7 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
     {
       id: "parcel",
       title: "Parcel Delivery",
-      description: "Send packages anywhere with real-time tracking",
+      description: "Send packages with tracking",
       icon: Package,
       bgColor: "bg-green-50 dark:bg-green-950/30",
       iconColor: "text-green-600 dark:text-green-400",
@@ -242,40 +295,55 @@ const REGION_SERVICES: Record<Region, ServiceItem[]> = {
   ],
 };
 
-const HOW_IT_WORKS = {
+const HOW_IT_WORKS_DATA = {
   rides: {
+    id: "rides",
     title: "Rides",
     icon: Car,
+    iconBg: "bg-blue-100 dark:bg-blue-900/30",
+    iconColor: "text-blue-600 dark:text-blue-400",
     steps: [
-      "Enter your pickup and drop-off locations",
-      "See fare estimate and choose your ride type",
-      "Driver accepts and heads to your location",
-      "Track your driver in real-time on the map",
-      "Rate your experience and tip if you'd like",
+      "Enter pickup and drop-off locations",
+      "Choose your ride type and see fare",
+      "Driver accepts and heads your way",
+      "Track your driver on the map",
+      "Rate and tip after arrival",
     ],
   },
   food: {
+    id: "food",
     title: "Food Delivery",
     icon: UtensilsCrossed,
+    iconBg: "bg-orange-100 dark:bg-orange-900/30",
+    iconColor: "text-orange-600 dark:text-orange-400",
     steps: [
-      "Browse restaurants and menus near you",
-      "Add items to your cart and customize",
-      "Place your order and track preparation",
+      "Browse restaurants near you",
+      "Add items and customize your order",
+      "Place order and track preparation",
       "Watch your delivery in real-time",
-      "Enjoy your meal and rate the experience",
+      "Enjoy your meal and rate",
     ],
   },
   parcel: {
+    id: "parcel",
     title: "Parcel Delivery",
     icon: Package,
+    iconBg: "bg-green-100 dark:bg-green-900/30",
+    iconColor: "text-green-600 dark:text-green-400",
     steps: [
-      "Enter pickup and delivery addresses",
+      "Enter pickup and delivery address",
       "Specify package size and weight",
-      "Choose delivery speed (Regular/Express)",
-      "Track your package in real-time",
-      "Recipient confirms with signature",
+      "Choose Regular or Express speed",
+      "Track package in real-time",
+      "Recipient confirms delivery",
     ],
   },
+};
+
+const HOW_IT_WORKS_SERVICES: Record<Region, string[]> = {
+  BD: ["rides", "food", "parcel"],
+  US: ["rides", "food", "parcel"],
+  GLOBAL: ["rides", "food", "parcel"],
 };
 
 const SAFETY_SECTIONS = [
@@ -315,7 +383,7 @@ const SAFETY_SECTIONS = [
       { icon: Database, text: "End-to-end encryption for all data" },
       { icon: Eye, text: "Personal info never shared without consent" },
       { icon: Server, text: "GDPR-compliant data handling" },
-      { icon: FileCheck, text: "Regular security audits" },
+      { icon: FileCheck, text: "Regular third-party security audits" },
     ],
   },
 ];
@@ -349,38 +417,38 @@ const FAQS = [
 
 function LandingHeader() {
   return (
-    <header className="sticky top-0 z-50 w-full bg-white dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
+    <header className="sticky top-0 z-50 w-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
       <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
               <span className="text-white font-bold text-xl">S</span>
             </div>
             <span className="font-bold text-xl text-gray-900 dark:text-white">SafeGo</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/ride" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+          <nav className="hidden md:flex items-center gap-1">
+            <Link href="/ride" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
               Ride
             </Link>
-            <Link href="/drive" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+            <Link href="/drive" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
               Drive
             </Link>
-            <Link href="/business" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
+            <Link href="/business" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
               Business
             </Link>
-            <a href="#how-it-works" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
-              About
+            <a href="#safety" className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+              Safety
             </a>
           </nav>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/login">
-            <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300" data-testid="button-login">
+            <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" data-testid="button-login">
               Log in
             </Button>
           </Link>
           <Link href="/signup">
-            <Button size="sm" className="rounded-full px-5 bg-blue-600 hover:bg-blue-700" data-testid="button-signup">
+            <Button size="sm" className="rounded-full px-5 bg-blue-600 hover:bg-blue-700 shadow-sm" data-testid="button-signup">
               Sign up
             </Button>
           </Link>
@@ -404,15 +472,22 @@ function RegionToggle({
   ];
 
   return (
-    <div className="inline-flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+    <div 
+      className="inline-flex items-center p-1.5 bg-gray-100 dark:bg-gray-800 rounded-full shadow-sm"
+      role="tablist"
+      aria-label="Select region"
+    >
       {regions.map((region) => (
         <button
           key={region.id}
+          role="tab"
+          aria-selected={selectedRegion === region.id}
+          aria-controls={`region-content-${region.id}`}
           onClick={() => onRegionChange(region.id)}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
             selectedRegion === region.id
-              ? "bg-blue-600 text-white shadow-sm"
-              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              ? "bg-blue-600 text-white shadow-md"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
           }`}
           data-testid={`region-tab-${region.id.toLowerCase()}`}
         >
@@ -434,66 +509,114 @@ function HeroSection({
   const heroConfig = HERO_CONFIG[selectedRegion];
   
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-blue-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/20 py-16 lg:py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div className="text-center lg:text-left">
+    <section className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-blue-50/50 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/30 py-16 lg:py-24">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-100 dark:bg-blue-900/20 rounded-full blur-3xl opacity-50" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-100 dark:bg-purple-900/20 rounded-full blur-3xl opacity-50" />
+      </div>
+      
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          <div className="lg:col-span-7 text-center lg:text-left">
             <div className="flex justify-center lg:justify-start mb-8">
               <RegionToggle selectedRegion={selectedRegion} onRegionChange={onRegionChange} />
             </div>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-[1.1] tracking-tight">
               Move, eat, and<br />
               deliver with <span className="text-blue-600">SafeGo</span>
             </h1>
             
-            <p className="mt-6 text-lg text-gray-600 dark:text-gray-400 max-w-xl mx-auto lg:mx-0">
+            <p 
+              className="mt-6 text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-lg mx-auto lg:mx-0 leading-relaxed transition-opacity duration-300"
+              id={`region-content-${selectedRegion}`}
+            >
               {heroConfig.description}
             </p>
             
-            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <a href="#services">
-                <Button size="lg" className="w-full sm:w-auto rounded-full px-8 bg-blue-600 hover:bg-blue-700" data-testid="button-explore-services">
+                <Button size="lg" className="w-full sm:w-auto rounded-full px-8 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/25 hover:shadow-xl hover:shadow-blue-600/30 transition-all duration-200" data-testid="button-explore-services">
                   Explore services
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               </a>
               <a href="#partners">
-                <Button variant="outline" size="lg" className="w-full sm:w-auto rounded-full px-8 border-gray-300 dark:border-gray-700" data-testid="button-become-partner">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto rounded-full px-8 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200" data-testid="button-become-partner">
                   Become a partner
                 </Button>
               </a>
             </div>
           </div>
           
-          <div className="hidden lg:block">
-            <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xl rounded-2xl overflow-hidden">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">SafeGo Services</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">All-in-one platform</p>
-              </div>
-              <CardContent className="p-0">
-                {services.map((service, index) => (
-                  <Link 
-                    key={service.id}
-                    href={service.link}
-                    className={`flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
-                      index !== services.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''
-                    }`}
-                    data-testid={`hero-service-${service.id}`}
-                  >
-                    <div className={`p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 ${service.heroColor}`}>
-                      <service.icon className="h-5 w-5" />
+          <div className="lg:col-span-5 hidden lg:block">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-3xl blur-2xl" />
+              <Card className="relative bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-2xl rounded-2xl overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-blue-600 shadow-sm">
+                      <Globe className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{service.title}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{service.description}</p>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">SafeGo Services</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">All-in-one platform</p>
                     </div>
-                  </Link>
-                ))}
-              </CardContent>
-            </Card>
+                  </div>
+                </div>
+                <CardContent className="p-0">
+                  {services.map((service, index) => (
+                    <Link 
+                      key={service.id}
+                      href={service.link}
+                      className={`flex items-center gap-4 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${
+                        index !== services.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''
+                      }`}
+                      data-testid={`hero-service-${service.id}`}
+                    >
+                      <div className={`p-3 rounded-xl ${service.bgColor} group-hover:scale-105 transition-transform duration-200`}>
+                        <service.icon className={`h-5 w-5 ${service.iconColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-white">{service.title}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{service.description}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-200" />
+                    </Link>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
           </div>
+        </div>
+        
+        <div className="lg:hidden mt-12">
+          <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">SafeGo Services</h3>
+            </div>
+            <CardContent className="p-0">
+              {services.map((service, index) => (
+                <Link 
+                  key={service.id}
+                  href={service.link}
+                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
+                    index !== services.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''
+                  }`}
+                  data-testid={`hero-service-mobile-${service.id}`}
+                >
+                  <div className={`p-2.5 rounded-xl ${service.bgColor}`}>
+                    <service.icon className={`h-5 w-5 ${service.iconColor}`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">{service.title}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{service.description}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </section>
@@ -502,34 +625,35 @@ function HeroSection({
 
 function ServicesSection({ selectedRegion }: { selectedRegion: Region }) {
   const services = REGION_SERVICES[selectedRegion];
-  const gridCols = services.length === 5 ? 'lg:grid-cols-5' : services.length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3';
   
   return (
-    <section id="services" className="py-20 bg-white dark:bg-gray-950">
+    <section id="services" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4">
+        <div className="text-center mb-14">
+          <span className="inline-block px-4 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4 uppercase tracking-wide">
             Our Services
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">SafeGo Services</h2>
-          <p className="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Everything you need, all in one app. Choose a service to get started.
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
+            Everything in one app
+          </h2>
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Choose a service to get started with SafeGo
           </p>
         </div>
         
-        <div className={`grid grid-cols-1 sm:grid-cols-2 ${gridCols} gap-6`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {services.map((service) => (
             <Link key={service.id} href={service.link}>
               <Card 
-                className="h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200 cursor-pointer group rounded-xl" 
+                className="h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group rounded-2xl" 
                 data-testid={`service-card-${service.id}`}
               >
-                <CardContent className="p-6 text-center">
-                  <div className={`inline-flex p-4 rounded-2xl ${service.bgColor} mb-4 group-hover:scale-110 transition-transform duration-200`}>
-                    <service.icon className={`h-7 w-7 ${service.iconColor}`} />
+                <CardContent className="p-8 text-center">
+                  <div className={`inline-flex p-5 rounded-2xl ${service.bgColor} mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                    <service.icon className={`h-8 w-8 ${service.iconColor}`} />
                   </div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{service.title}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{service.title}</h3>
+                  <p className="text-gray-500 dark:text-gray-400 leading-relaxed">
                     {service.description}
                   </p>
                 </CardContent>
@@ -546,56 +670,59 @@ function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
   const config = PARTNER_CONFIG[selectedRegion];
   
   return (
-    <section id="partners" className="py-20 bg-gray-50 dark:bg-gray-900">
+    <section id="partners" className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4">
+        <div className="text-center mb-14">
+          <span className="inline-block px-4 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4 uppercase tracking-wide">
             Join Us
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">Become a Partner</h2>
-          <p className="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
+            Become a Partner
+          </h2>
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Turn your time or business into earnings with SafeGo
           </p>
         </div>
         
-        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          <Card className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden" data-testid="partner-card-drivers">
+        <div className="grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          <Card className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl transition-all duration-300" data-testid="partner-card-drivers">
             <CardContent className="p-8">
-              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 w-fit mb-6">
+              <div className="p-3.5 rounded-2xl bg-blue-100 dark:bg-blue-900/30 w-fit mb-6">
                 <Car className="h-7 w-7 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{config.driverCard.title}</h3>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{config.driverCard.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Earn on your own schedule. Drive or deliver when it works for you.
+                {config.driverCard.description}
               </p>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Flexible hours — work when you want</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Weekly payouts with transparent earnings</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Clear commission structure, no surprises</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Bonuses and incentives for top performers</span>
-                </li>
-              </ul>
+              
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide mb-3">What you get</h4>
+                <ul className="space-y-3">
+                  {config.driverCard.benefits.map((benefit, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30 flex-shrink-0">
+                        <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{benefit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="mb-8">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide mb-3">Basic requirements</h4>
+                <ul className="space-y-2">
+                  {config.driverCard.requirements.map((req, index) => (
+                    <li key={index} className="flex items-center gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 flex-shrink-0" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
               <Link href="/driver/signup">
-                <Button className="w-full rounded-full bg-blue-600 hover:bg-blue-700" data-testid="button-driver-signup">
+                <Button className="w-full rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/25 hover:shadow-xl transition-all duration-200" data-testid="button-driver-signup">
                   Start driving
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -603,27 +730,44 @@ function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
             </CardContent>
           </Card>
           
-          <Card className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden" data-testid="partner-card-restaurants">
+          <Card className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden hover:border-orange-300 dark:hover:border-orange-700 hover:shadow-xl transition-all duration-300" data-testid="partner-card-restaurants">
             <CardContent className="p-8">
-              <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-900/30 w-fit mb-6">
+              <div className="p-3.5 rounded-2xl bg-orange-100 dark:bg-orange-900/30 w-fit mb-6">
                 <Store className="h-7 w-7 text-orange-600 dark:text-orange-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{config.businessCard.title}</h3>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{config.businessCard.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 {config.businessCard.description}
               </p>
-              <ul className="space-y-3 mb-8">
-                {config.businessCard.bullets.map((bullet, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
-                      <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{bullet}</span>
-                  </li>
-                ))}
-              </ul>
+              
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide mb-3">What you get</h4>
+                <ul className="space-y-3">
+                  {config.businessCard.benefits.map((benefit, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <div className="mt-0.5 p-0.5 rounded-full bg-green-100 dark:bg-green-900/30 flex-shrink-0">
+                        <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{benefit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="mb-8">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide mb-3">Basic requirements</h4>
+                <ul className="space-y-2">
+                  {config.businessCard.requirements.map((req, index) => (
+                    <li key={index} className="flex items-center gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 flex-shrink-0" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
               <Link href="/restaurant/signup">
-                <Button className="w-full rounded-full bg-blue-600 hover:bg-blue-700" data-testid="button-restaurant-signup">
+                <Button className="w-full rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/25 hover:shadow-xl transition-all duration-200" data-testid="button-restaurant-signup">
                   Register your business
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -636,41 +780,48 @@ function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
   );
 }
 
-function HowItWorksSection() {
+function HowItWorksSection({ selectedRegion }: { selectedRegion: Region }) {
+  const availableServices = HOW_IT_WORKS_SERVICES[selectedRegion];
+  const flows = availableServices
+    .map(id => HOW_IT_WORKS_DATA[id as keyof typeof HOW_IT_WORKS_DATA])
+    .filter(Boolean);
+  
   return (
-    <section id="how-it-works" className="py-20 bg-white dark:bg-gray-950">
+    <section id="how-it-works" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4">
+        <div className="text-center mb-14">
+          <span className="inline-block px-4 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4 uppercase tracking-wide">
             How It Works
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">How SafeGo Works</h2>
-          <p className="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Simple steps to get started with any of our services
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
+            Simple steps to get started
+          </h2>
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Getting a ride, ordering food, or sending a parcel takes just minutes
           </p>
         </div>
         
-        <div className="grid md:grid-cols-3 gap-8">
-          {Object.entries(HOW_IT_WORKS).map(([key, flow]) => (
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          {flows.map((flow) => (
             <Card 
-              key={key} 
-              className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 rounded-xl" 
-              data-testid={`how-it-works-${key}`}
+              key={flow.id} 
+              className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 rounded-2xl hover:shadow-lg transition-shadow duration-300" 
+              data-testid={`how-it-works-${flow.id}`}
             >
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30">
-                    <flow.icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <div className={`p-3 rounded-xl ${flow.iconBg}`}>
+                    <flow.icon className={`h-5 w-5 ${flow.iconColor}`} />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{flow.title}</h3>
                 </div>
                 <ol className="space-y-4">
                   {flow.steps.map((step, index) => (
                     <li key={index} className="flex items-start gap-3">
-                      <span className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-600 text-white text-xs font-semibold flex items-center justify-center">
+                      <span className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-600 text-white text-xs font-semibold flex items-center justify-center shadow-sm">
                         {index + 1}
                       </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400 pt-0.5">{step}</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400 pt-0.5 leading-relaxed">{step}</span>
                     </li>
                   ))}
                 </ol>
@@ -685,36 +836,45 @@ function HowItWorksSection() {
 
 function SafetySection() {
   return (
-    <section id="safety" className="py-20 bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4">
+    <section id="safety" className="py-20 lg:py-24 bg-gradient-to-br from-gray-50 via-gray-50 to-blue-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-blue-950/30 relative overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-green-100 dark:bg-green-900/20 rounded-full blur-3xl opacity-30" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-100 dark:bg-blue-900/20 rounded-full blur-3xl opacity-30" />
+      </div>
+      
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-14">
+          <span className="inline-block px-4 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4 uppercase tracking-wide">
             Trust & Safety
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">Safety & Security</h2>
-          <p className="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Your safety is our top priority at every step
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
+            Safety & Security
+          </h2>
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Your safety and privacy are our top priority at every step
           </p>
         </div>
         
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {SAFETY_SECTIONS.map((section, idx) => (
             <Card 
               key={idx} 
-              className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-xl" 
+              className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-2xl hover:shadow-xl hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-300" 
               data-testid={`safety-card-${idx}`}
             >
               <CardContent className="p-6">
-                <div className={`p-3 rounded-xl ${section.iconBg} w-fit mb-4`}>
+                <div className={`p-3.5 rounded-2xl ${section.iconBg} w-fit mb-5`}>
                   <section.icon className={`h-6 w-6 ${section.iconColor}`} />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{section.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{section.subtitle}</p>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">{section.title}</h3>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-5">{section.subtitle}</p>
                 <ul className="space-y-3">
                   {section.points.map((point, pointIdx) => (
                     <li key={pointIdx} className="flex items-start gap-3">
-                      <point.icon className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{point.text}</span>
+                      <div className="p-1 rounded-lg bg-gray-100 dark:bg-gray-800 mt-0.5 flex-shrink-0">
+                        <point.icon className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+                      </div>
+                      <span className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{point.text}</span>
                     </li>
                   ))}
                 </ul>
@@ -729,14 +889,16 @@ function SafetySection() {
 
 function FAQSection() {
   return (
-    <section id="faq" className="py-20 bg-white dark:bg-gray-950">
+    <section id="faq" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4">
+        <div className="text-center mb-14">
+          <span className="inline-block px-4 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 rounded-full mb-4 uppercase tracking-wide">
             Support
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">Frequently Asked Questions</h2>
-          <p className="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
+            Frequently Asked Questions
+          </h2>
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Got questions? We've got answers.
           </p>
         </div>
@@ -747,13 +909,13 @@ function FAQSection() {
               <AccordionItem 
                 key={index} 
                 value={`item-${index}`} 
-                className="border border-gray-200 dark:border-gray-800 rounded-xl px-6 data-[state=open]:bg-gray-50 dark:data-[state=open]:bg-gray-900"
+                className="border border-gray-200 dark:border-gray-800 rounded-xl px-6 data-[state=open]:bg-gray-50 dark:data-[state=open]:bg-gray-900 data-[state=open]:border-blue-200 dark:data-[state=open]:border-blue-800 transition-colors duration-200"
                 data-testid={`faq-item-${index}`}
               >
-                <AccordionTrigger className="text-left text-gray-900 dark:text-white hover:no-underline py-4">
+                <AccordionTrigger className="text-left text-gray-900 dark:text-white hover:no-underline py-5 text-base font-medium">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-gray-600 dark:text-gray-400 pb-4">
+                <AccordionContent className="text-gray-600 dark:text-gray-400 pb-5 leading-relaxed">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
@@ -767,20 +929,25 @@ function FAQSection() {
 
 function CTASection() {
   return (
-    <section className="py-20 bg-blue-600">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl sm:text-4xl font-bold text-white">Ready to move with SafeGo?</h2>
-        <p className="mt-4 text-blue-100 max-w-xl mx-auto">
-          Join thousands of users who trust SafeGo for their daily transportation and delivery needs.
+    <section className="py-20 lg:py-24 bg-blue-600 relative overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-50" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-700 rounded-full blur-3xl opacity-50" />
+      </div>
+      
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Ready to move with SafeGo?</h2>
+        <p className="mt-4 text-lg text-blue-100 max-w-xl mx-auto">
+          Join thousands of users who trust SafeGo for their daily rides and deliveries.
         </p>
         
-        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" variant="secondary" className="rounded-full px-8" data-testid="button-download-app">
+        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+          <Button size="lg" variant="secondary" className="rounded-full px-8 shadow-lg" data-testid="button-download-app">
             <Smartphone className="mr-2 h-4 w-4" />
             Download the app
           </Button>
           <a href="#partners">
-            <Button size="lg" variant="outline" className="rounded-full px-8 border-white/30 text-white hover:bg-white/10 hover:text-white" data-testid="button-cta-partner">
+            <Button size="lg" variant="outline" className="rounded-full px-8 border-white/30 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm" data-testid="button-cta-partner">
               Become a partner
             </Button>
           </a>
@@ -792,11 +959,11 @@ function CTASection() {
 
 function LandingFooter() {
   return (
-    <footer className="bg-gray-900 text-gray-400 py-16">
+    <footer className="bg-gray-900 text-gray-400 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12 mb-12">
           <div>
-            <h3 className="font-semibold text-white mb-4">Company</h3>
+            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Company</h3>
             <ul className="space-y-3 text-sm">
               <li><a href="#" className="hover:text-white transition-colors">About us</a></li>
               <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
@@ -805,7 +972,7 @@ function LandingFooter() {
             </ul>
           </div>
           <div>
-            <h3 className="font-semibold text-white mb-4">Services</h3>
+            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Services</h3>
             <ul className="space-y-3 text-sm">
               <li><Link href="/ride" className="hover:text-white transition-colors">Ride</Link></li>
               <li><Link href="/food" className="hover:text-white transition-colors">Food</Link></li>
@@ -814,7 +981,7 @@ function LandingFooter() {
             </ul>
           </div>
           <div>
-            <h3 className="font-semibold text-white mb-4">Partners</h3>
+            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Partners</h3>
             <ul className="space-y-3 text-sm">
               <li><Link href="/driver/signup" className="hover:text-white transition-colors">Drive with us</Link></li>
               <li><Link href="/driver/signup" className="hover:text-white transition-colors">Deliver with us</Link></li>
@@ -823,7 +990,7 @@ function LandingFooter() {
             </ul>
           </div>
           <div>
-            <h3 className="font-semibold text-white mb-4">Support</h3>
+            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Support</h3>
             <ul className="space-y-3 text-sm">
               <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>
               <li><a href="#safety" className="hover:text-white transition-colors">Safety</a></li>
@@ -834,14 +1001,14 @@ function LandingFooter() {
         </div>
         
         <div className="border-t border-gray-800 pt-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
                 <span className="text-white font-bold">S</span>
               </div>
               <span className="font-semibold text-white">SafeGo</span>
             </div>
-            <p>&copy; {new Date().getFullYear()} SafeGo Global. All rights reserved.</p>
+            <p className="text-gray-500">&copy; {new Date().getFullYear()} SafeGo Global. All rights reserved.</p>
             <div className="flex items-center gap-6">
               <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
               <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
@@ -879,7 +1046,7 @@ export default function LandingPage() {
         />
         <ServicesSection selectedRegion={selectedRegion} />
         <PartnerSection selectedRegion={selectedRegion} />
-        <HowItWorksSection />
+        <HowItWorksSection selectedRegion={selectedRegion} />
         <SafetySection />
         <FAQSection />
         <CTASection />
