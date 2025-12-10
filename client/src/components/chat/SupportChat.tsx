@@ -11,6 +11,7 @@ import { VerificationCard } from "./VerificationCard";
 import { getTopicsForRole } from "@/config/supportTopics";
 import { ArrowLeft, Send, Loader2, HelpCircle, X, MessageCircle, Shield } from "lucide-react";
 import { useLocation } from "wouter";
+import { getAuthToken } from "@/lib/authToken";
 
 interface ChatMessage {
   id: string;
@@ -275,7 +276,7 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
         const sinceParam = `&since=${lastMessageTime}`;
         const res = await fetch(`/api/support/chat/messages?conversationId=${conversationId}${sinceParam}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('safego_token')}`,
+            'Authorization': `Bearer ${getAuthToken()}`,
           },
         });
         

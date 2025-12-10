@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthToken } from "@/lib/authToken";
 
 export default function TaxInfo() {
   const { data: driverData, isLoading } = useQuery({
@@ -70,7 +71,7 @@ function USTaxView({ driverData }: { driverData: any }) {
     try {
       const response = await fetch(`/api/driver/tax-documents/${type}?year=${year}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("safego_token")}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -295,7 +296,7 @@ function BangladeshTaxView({ driverData }: { driverData: any }) {
     try {
       const response = await fetch(`/api/driver/bd-tax-documents/${year}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("safego_token")}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 

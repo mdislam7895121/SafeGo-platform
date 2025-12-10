@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
+import { setAuthToken } from "@/lib/authToken";
 import { Car, Package, UtensilsCrossed, Loader2, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
 
 interface PasswordStrength {
@@ -146,7 +147,7 @@ export default function Signup() {
 
       const { token, user: loggedInUser } = await loginResponse.json();
 
-      localStorage.setItem("safego_token", token);
+      setAuthToken(token);
       localStorage.setItem("safego_user", JSON.stringify(loggedInUser));
 
       toast({

@@ -30,6 +30,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { getAuthToken } from "@/lib/authToken";
 import { 
   ArrowLeft, ArrowRight, Loader2, CheckCircle2, Upload, User, MapPin,
   IdCard, Truck, FileText, ClipboardCheck, Car, Bike, Footprints, Globe
@@ -220,7 +221,7 @@ function ProfilePhotoUpload({ value, onChange }: { value: string; onChange: (url
       formData.append("file", file);
       formData.append("documentType", "profile_photo");
 
-      const token = localStorage.getItem("safego_token");
+      const token = getAuthToken();
       const response = await fetch("/api/delivery-driver/onboarding/upload", {
         method: "POST",
         body: formData,

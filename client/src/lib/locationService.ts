@@ -1,3 +1,5 @@
+import { getAuthToken } from "@/lib/authToken";
+
 export interface PlaceDetails {
   placeId: string;
   name?: string;
@@ -53,11 +55,6 @@ const MAX_RECENT_LOCATIONS = 10;
 
 function isClient(): boolean {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
-}
-
-function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("safego_token");
 }
 
 // Reverse geocode using client-side Google Maps SDK (preferred)

@@ -5,6 +5,7 @@ import { useSignup } from "@/contexts/SignupContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
+import { setAuthToken } from "@/lib/authToken";
 import { 
   Car, 
   UtensilsCrossed, 
@@ -202,7 +203,7 @@ export default function SignupRoleSelection() {
 
       const { token, user: loggedInUser } = await loginResponse.json();
 
-      localStorage.setItem("safego_token", token);
+      setAuthToken(token);
       localStorage.setItem("safego_user", JSON.stringify(loggedInUser));
 
       toast({
