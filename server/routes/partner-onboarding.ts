@@ -5,6 +5,7 @@ import { rateLimitSupport } from '../middleware/rateLimit';
 import { authenticateToken, requireRole, type AuthRequest } from '../middleware/auth';
 import { getClientIp } from '../utils/ip';
 import { logAuditEvent } from '../utils/audit';
+import { triggerPartnerNotification, getNotificationLogs, type PartnerType } from '../services/partnerEmailService';
 
 const router = Router();
 
@@ -584,6 +585,20 @@ router.patch('/drivers/:id', authenticateToken, requireRole(['admin']), async (r
       success: true
     });
 
+    // Trigger email notification (non-blocking)
+    triggerPartnerNotification({
+      partnerType: 'DRIVER',
+      applicationId: existing.id,
+      newStatus: status,
+      previousStatus: existing.status,
+      recipientEmail: existing.email,
+      recipientName: existing.fullName,
+      region: existing.region,
+      country: existing.country,
+      adminId: req.user?.id,
+      additionalData: { serviceType: existing.serviceType, vehicleType: existing.vehicleType }
+    }).catch(err => console.error('[PartnerOnboarding] Driver email notification failed:', err));
+
     return res.json(updated);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update application' });
@@ -632,6 +647,20 @@ router.patch('/restaurants/:id', authenticateToken, requireRole(['admin']), asyn
       metadata: { previousStatus: existing.status, newStatus: status },
       success: true
     });
+
+    // Trigger email notification (non-blocking)
+    triggerPartnerNotification({
+      partnerType: 'RESTAURANT',
+      applicationId: existing.id,
+      newStatus: status,
+      previousStatus: existing.status,
+      recipientEmail: existing.businessEmail,
+      recipientName: existing.ownerName,
+      region: existing.region,
+      country: existing.country,
+      adminId: req.user?.id,
+      additionalData: { restaurantName: existing.restaurantName, cuisineType: existing.cuisineType }
+    }).catch(err => console.error('[PartnerOnboarding] Restaurant email notification failed:', err));
 
     return res.json(updated);
   } catch (error) {
@@ -682,6 +711,22 @@ router.patch('/shops/:id', authenticateToken, requireRole(['admin']), async (req
       success: true
     });
 
+    // Trigger email notification (non-blocking) - only if email exists
+    if (existing.email) {
+      triggerPartnerNotification({
+        partnerType: 'SHOP',
+        applicationId: existing.id,
+        newStatus: status,
+        previousStatus: existing.status,
+        recipientEmail: existing.email,
+        recipientName: existing.ownerName,
+        region: existing.region,
+        country: existing.country,
+        adminId: req.user?.id,
+        additionalData: { shopName: existing.shopName, category: existing.category }
+      }).catch(err => console.error('[PartnerOnboarding] Shop email notification failed:', err));
+    }
+
     return res.json(updated);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update application' });
@@ -731,9 +776,64 @@ router.patch('/tickets/:id', authenticateToken, requireRole(['admin']), async (r
       success: true
     });
 
+    // Trigger email notification (non-blocking) - only if email exists
+    if (existing.email) {
+      triggerPartnerNotification({
+        partnerType: 'TICKET',
+        applicationId: existing.id,
+        newStatus: status,
+        previousStatus: existing.status,
+        recipientEmail: existing.email,
+        recipientName: existing.contactPerson,
+        region: existing.region,
+        country: existing.country,
+        adminId: req.user?.id,
+        additionalData: { businessName: existing.businessName, ticketType: existing.ticketType }
+      }).catch(err => console.error('[PartnerOnboarding] Ticket email notification failed:', err));
+    }
+
     return res.json(updated);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update application' });
+  }
+});
+
+// ========================================
+// NOTIFICATION LOGS ENDPOINTS
+// ========================================
+
+router.get('/notifications/logs', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { partnerType, success, page = '1', limit = '20' } = req.query;
+    
+    const result = await getNotificationLogs({
+      partnerType: partnerType as string,
+      success: success === 'true' ? true : success === 'false' ? false : undefined,
+      page: parseInt(page as string),
+      limit: parseInt(limit as string)
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error('[PartnerOnboarding] Get notification logs error:', error);
+    return res.status(500).json({ error: 'Failed to fetch notification logs' });
+  }
+});
+
+router.get('/notifications/:applicationId', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { applicationId } = req.params;
+    
+    const result = await getNotificationLogs({
+      partnerApplicationId: applicationId,
+      page: 1,
+      limit: 100
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error('[PartnerOnboarding] Get application notifications error:', error);
+    return res.status(500).json({ error: 'Failed to fetch notification history' });
   }
 });
 
