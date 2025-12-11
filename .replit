@@ -40,3 +40,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["stripe:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+FEATURE_BD_ONLINE_PAYMENTS_ENABLED = "true"
