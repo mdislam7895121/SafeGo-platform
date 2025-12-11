@@ -1,0 +1,65 @@
+STOP all current work.
+
+You have introduced unauthorized structural changes:
+- minimal app structure
+- new landing page
+- Simplify landing page
+- Lazy loading refactors
+- New file: client/src/routes/AuthenticatedApp.tsx
+- Edited App.tsx with new architecture
+- Removed original landing routing behavior
+
+These changes violate the SafeGo global architecture rules.
+
+===============================
+RESTORE REQUIRED — IMMEDIATELY
+===============================
+
+Your next task is:
+
+1. **Perform a full audit** of your last 30 actions  
+   Identify all files you modified:
+   - App.tsx
+   - index.tsx
+   - router files
+   - any new routes (AuthenticatedApp.tsx, etc.)
+   - landing page components
+
+2. **REVERT every change related to:**
+   - new minimalist landing page
+   - simplified app structure
+   - lazy loading refactor attempts
+   - new or altered routing models
+   - new nested authenticated routing structure
+
+3. **RESTORE the original SafeGo landing page exactly as it was**  
+   using git history / checkpoints.
+
+4. **RESTORE original App.tsx routing**, including:
+   - "/" loads the original SafeGo landing page
+   - "/login" and "/signup" unchanged
+   - no role-based routing at startup
+   - no new AuthenticatedApp wrapper
+   - no new lazy-loading strategy
+
+5. **Do NOT redesign anything.**  
+   Your job is to **repair**, not to rebuild.
+
+6. **After restore, run a full system stability test**:
+   - landing page loads correctly
+   - login works
+   - signup works
+   - ride/food/parcel pages load
+   - admin dashboards load
+   - BD/US country routes work
+   - no WebSocket HMR errors
+   - no “Unexpected end of input”
+
+7. Give a CLEAN summary:
+   - Which files were reverted
+   - Which checkpoints you used
+   - Confirmation that the original landing page is restored
+   - Confirmation all other modules still work
+
+Do not introduce ANY new architecture, files, or design.  
+ONLY RESTORE what we had before your breaking changes.
