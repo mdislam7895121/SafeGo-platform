@@ -130,41 +130,39 @@ function Router() {
     return <Redirect to={redirectPath} />;
   }
 
-  // Only load role-specific route modules when user is authenticated with that role
-  const isAdmin = user?.role === 'admin';
-  const isDriver = user?.role === 'driver' || user?.role === 'delivery_driver';
-  const isRestaurant = user?.role === 'restaurant';
-
   return (
-    <>
-      {/* Conditionally load route modules based on user role */}
-      {isAdmin && (
+    <Switch>
+      {/* Public Routes - load immediately without auth check */}
+      <Route path="/">
+        <Login />
+      </Route>
+      <Route path="/login">
+        <Login />
+      </Route>
+      <Route path="/signup">
+        <Signup />
+      </Route>
+      
+      {/* Admin Routes - lazy loaded, auth checked inside component */}
+      <Route path="/admin/:rest*">
         <Suspense fallback={<LoadingSpinner />}>
           <AdminRoutes />
         </Suspense>
-      )}
-      {isDriver && (
+      </Route>
+      
+      {/* Driver Routes - lazy loaded, auth checked inside component */}
+      <Route path="/driver/:rest*">
         <Suspense fallback={<LoadingSpinner />}>
           <DriverRoutes />
         </Suspense>
-      )}
-      {isRestaurant && (
+      </Route>
+      
+      {/* Restaurant Routes - lazy loaded, auth checked inside component */}
+      <Route path="/restaurant/:rest*">
         <Suspense fallback={<LoadingSpinner />}>
           <RestaurantRoutes />
         </Suspense>
-      )}
-      
-      <Switch>
-        {/* Public Routes */}
-        <Route path="/">
-          <Login />
-        </Route>
-        <Route path="/login">
-          <Login />
-        </Route>
-        <Route path="/signup">
-          <Signup />
-        </Route>
+      </Route>
 
       {/* Customer Routes */}
       <Route path="/customer">
@@ -392,7 +390,6 @@ function Router() {
       {/* 404 */}
       <Route component={NotFound} />
     </Switch>
-    </>
   );
 }
 
