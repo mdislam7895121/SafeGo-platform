@@ -1,0 +1,329 @@
+[SAFEGO GLOBAL MASTER RULES – DO NOT SKIP, DO NOT DOWNGRADE]
+
+You are working on the SafeGo global super-app platform (rides + food + parcel).  
+You MUST follow all rules below. If anything conflicts, choose the stricter/safer rule.  
+All changes must be NON-BREAKING, ADDITIVE, and BACKWARD-COMPATIBLE.
+
+====================================================
+1) CORE ROLES – ALWAYS 4, NEVER MIX ACCESS
+====================================================
+SafeGo has exactly these 4 main roles:
+
+1. CUSTOMER
+2. DRIVER
+3. RESTAURANT (MERCHANT)
+4. ADMIN
+
+For every feature, respect these boundaries:
+
+- Each role has its own:
+  - signup/onboarding steps
+  - KYC data and verification flags
+  - dashboard and navigation
+  - permissions and allowed actions
+  - status views (e.g. trips, orders, deliveries)
+
+- Role isolation:
+  - Customers CANNOT see driver/restaurant documents (NID, license, etc.).
+  - Drivers CANNOT see customer NID or sensitive KYC info.
+  - Restaurants CANNOT see other restaurants’ data, documents, or balances.
+  - Only Admin can approve/reject KYC, change verification_status, change pricing/commissions, and block/unblock users.
+  - Each user can edit ONLY their own profile and their own saved payment methods.
+
+Do NOT remove or rename any existing roles, routes, or permission flags. Only extend.
+
+====================================================
+2) GLOBAL SERVICES – ALWAYS 3
+====================================================
+SafeGo always supports these 3 services:
+
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+All new features must work conceptually for all 3 services (even if some are “coming soon” in a specific UI).
+
+The backend is SHARED and GLOBAL.  
+Frontends (web/mobile) are just clients calling shared APIs.  
+Do NOT create separate pricing or payment engines inside the frontend.
+
+====================================================
+3) COUNTRY-SPECIFIC KYC (BD vs US)
+====================================================
+SafeGo is global, but KYC is per-country. Preserve and use these mandatory fields.
+
+3.1 Bangladesh ("BD") – required fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status (e.g. "pending" | "approved" | "rejected" | "need_more_info")
+- is_verified (boolean)
+
+3.2 United States ("US") – required fields:
+
+For all verified users:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type  (e.g. "SSN", "StateID", "Passport")
+- government_id_last4
+- verification_status
+- is_verified
+
+Additional for US DRIVERS:
+- driver_license_number
+- driver_license_image_front
+- driver_license_image_back
+- driver_license_expiry
+- ssn_last4 (optional, stored securely)
+- any NYC/TLC-specific fields that already exist (must be preserved)
+
+Do NOT delete or relax these. You may add more fields but not remove existing ones.
+
+====================================================
+4) ADMIN PANEL – MANDATORY POWERS
+====================================================
+Admin panel is central. Admin must be able to:
+
+- View and verify:
+  - customers
+  - drivers
+  - restaurants
+- Approve/reject KYC with:
+  - verification_status
+  - is_verified
+  - rejection_reason (text)
+- Update platform economics (per country and per service):
+  - base pricing
+  - surge/dynamic pricing config
+  - service fees
+  - commission percentages for drivers and restaurants
+- Block/unblock:
+  - any customer
+  - any driver
+  - any restaurant
+- Manage payouts and settlements:
+  - view driver_wallet_balance and driver_wallet_negative_balance
+  - view restaurant_wallet_balance and restaurant_wallet_negative_balance
+  - record settlements and mark commissions as paid
+- See audit logs for sensitive operations.
+
+Any new financial or payment feature must expose appropriate admin views or be wired into existing admin modules.
+
+====================================================
+5) CORE COLLECTIONS – rides, food_orders, deliveries
+====================================================
+The following core collections/tables MUST continue to exist.  
+You may only ADD fields, NEVER delete or rename existing fields:
+
+1) rides
+2) food_orders
+3) deliveries
+
+Each must contain (or be extended to contain):
+
+- Identity:
+  - id
+  - customer_id
+  - driver_id (for food_orders: delivery_driver_id if separate)
+  - restaurant_id (for food_orders)
+
+- Geo/route:
+  - pickup_address, pickup_lat, pickup_lng
+  - dropoff_address, dropoff_lat, dropoff_lng
+
+- Monetary:
+  - base_fare or item_total
+  - taxes
+  - service_fee
+  - safe_go_commission_amount
+  - driver_earnings
+  - restaurant_earnings (for food_orders)
+
+- Payment-related:
+  - we will ADD more fields in the tasks, but do not remove anything existing
+
+- Time:
+  - created_at
+  - updated_at
+  - status_changed_at
+  - completed_at (when applicable)
+
+- Ratings & feedback:
+  - customer_rating
+  - customer_feedback
+  - driver_rating
+  - driver_feedback
+  - restaurant_rating
+  - restaurant_feedback (for food_orders)
+
+====================================================
+6) COMMISSION & PAYOUT RULES – FIXED LOGIC
+====================================================
+These rules are global and must always hold:
+
+1) If customer pays CASH for a RIDE:
+   - Driver receives the full cash amount from the customer.
+   - SafeGo’s commission becomes a negative balance in driver_wallet_balance.
+   - driver_wallet_negative_balance reflects sum of unsettled commissions.
+   - Driver must settle weekly (admin manages/records settlements).
+
+2) If customer pays CASH for a FOOD ORDER:
+   - Restaurant receives the full cash amount from the customer.
+   - SafeGo’s commission becomes a negative balance in restaurant_wallet_balance.
+   - Restaurant settles with SafeGo later, managed via admin.
+
+3) If payment is ONLINE (through official gateway like Stripe, SSLCOMMERZ, etc.):
+   - SafeGo automatically keeps commission_amount from the online charge.
+   - Driver/restaurant see only their net earnings in their wallet.
+   - No negative balance is created from that specific commission.
+
+4) Admin can settle negative balances for driver/restaurant:
+   - Adjust balances
+   - Mark involved orders as is_commission_settled = true
+   - Record a settlement entry with meta fields (who/when/how).
+
+Your payment features must plug into these rules, not replace them.
+
+====================================================
+7) SECURITY RULES – ACCESS & DATA
+====================================================
+- Customers:
+  - Cannot view driver/restaurant KYC docs or internal admin notes.
+  - Can view only their own profile, their saved payment methods, and their own trips/orders.
+
+- Drivers:
+  - Cannot view customer sensitive KYC (NID, government_id_last4, etc.).
+  - See only customer info needed to perform the job (name, pickup, dropoff, phone if allowed).
+
+- Restaurants:
+  - Cannot see any other restaurant’s data or payment config.
+  - See only their own orders, menus, balances.
+
+- Admin:
+  - Only role that can change pricing, commission, verification, and blocking.
+  - Can view sensitive KYC documents and balances across the system.
+
+Payments:
+- Never store full card numbers or CVV.
+- Only store tokens/ids from payment gateways (Stripe, SSLCOMMERZ, etc.).
+- Use environment variables for all API keys and secrets.
+- Log payment events but NEVER log full card details.
+
+====================================================
+8) STATUS FLOWS – MUST BE COMPLETE
+====================================================
+Ride statuses:
+- requested
+- searching_driver
+- accepted
+- driver_arriving
+- in_progress
+- completed
+- cancelled_by_customer
+- cancelled_by_driver
+- cancelled_by_system
+
+Food statuses:
+- placed
+- accepted
+- preparing
+- ready_for_pickup
+- picked_up
+- on_the_way
+- delivered
+- cancelled_by_customer
+- cancelled_by_restaurant
+- cancelled_by_system
+
+Parcel statuses:
+- requested
+- searching_driver
+- accepted
+- picked_up
+- on_the_way
+- delivered
+- cancelled_by_customer
+- cancelled_by_driver
+- cancelled_by_system
+
+Payment state (e.g. cash vs online) must NOT replace these service statuses; it is additional.
+
+====================================================
+9) ONBOARDING – BLOCK ACCESS UNTIL VERIFIED
+====================================================
+For each role (customer, driver, restaurant):
+
+- Multi-step onboarding:
+  - Basic info
+  - Address
+  - Country selection (e.g. "BD", "US")
+  - ID/KYC upload (country-specific fields as above)
+  - Emergency contact
+- Default:
+  - verification_status = "pending"
+  - is_verified = false
+- Access to money-making features is blocked until admin approves.
+
+Do NOT loosen this. Only admin can move a user from pending to approved.
+
+====================================================
+10) NOTIFICATIONS – MINIMUM EVENTS
+====================================================
+You must keep or extend notifications for:
+
+- New ride request → to drivers.
+- Order changes → to customers, drivers, restaurants.
+- Parcel delivery updates → to customers and drivers.
+- KYC result → to users when:
+  - approved
+  - rejected (with reason)
+  - need_more_info
+- Important admin notifications:
+  - large negative balance
+  - payment gateway failures or suspicious activity
+
+For payment features, send notifications when:
+- payment method added or removed
+- default payment method changed
+- payment failed (online)
+- settlement recorded (optional but recommended for trust).
+
+====================================================
+11) ARCHITECTURE & NON-BREAKING RULES
+====================================================
+- There is a single shared backend for all regions and frontends.
+- /ride, /food, /delivery landing pages are pure clients of backend APIs.
+- Currencies, payment options, and price breakdowns come from backend.
+- DO NOT:
+  - rename existing fields,
+  - delete fields or tables,
+  - break existing endpoints.
+- You MAY:
+  - add new nullable fields,
+  - add new tables/collections,
+  - add new endpoints,
+  - add new admin sections.
+
+If there is any chance a change breaks existing flows, design it with:
+- feature flags,
+- default values,
+- backward-compatible migration logic.
+
+====================================================
+12) SECURITY ROADMAP PHASE – CURRENT FOCUS
+====================================================
+For these tasks, assume:
+- Phase: “SafeGo BD Online Payments + Finance Dashboard”
+- Goals:
+  - Introduce online payments in Bangladesh via a proper gateway (SSLCOMMERZ-first).
+  - Keep US Stripe logic intact and isolated.
+  - Provide a clear Admin Finance Dashboard for revenue, balances, and settlements.
+  - Avoid storing any sensitive card/wallet data on our servers.
