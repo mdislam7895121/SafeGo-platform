@@ -130,25 +130,41 @@ function Router() {
     return <Redirect to={redirectPath} />;
   }
 
+  // Only load role-specific route modules when user is authenticated with that role
+  const isAdmin = user?.role === 'admin';
+  const isDriver = user?.role === 'driver' || user?.role === 'delivery_driver';
+  const isRestaurant = user?.role === 'restaurant';
+
   return (
-    <Switch>
-      {/* Public Routes */}
-      <Route path="/">
-        <Login />
-      </Route>
-      <Route path="/login">
-        <Login />
-      </Route>
-      <Route path="/signup">
-        <Signup />
-      </Route>
+    <>
+      {/* Conditionally load route modules based on user role */}
+      {isAdmin && (
+        <Suspense fallback={<LoadingSpinner />}>
+          <AdminRoutes />
+        </Suspense>
+      )}
+      {isDriver && (
+        <Suspense fallback={<LoadingSpinner />}>
+          <DriverRoutes />
+        </Suspense>
+      )}
+      {isRestaurant && (
+        <Suspense fallback={<LoadingSpinner />}>
+          <RestaurantRoutes />
+        </Suspense>
+      )}
       
-      {/* Lazy-loaded major route modules */}
-      <Suspense fallback={<LoadingSpinner />}>
-        <AdminRoutes />
-        <DriverRoutes />
-        <RestaurantRoutes />
-      </Suspense>
+      <Switch>
+        {/* Public Routes */}
+        <Route path="/">
+          <Login />
+        </Route>
+        <Route path="/login">
+          <Login />
+        </Route>
+        <Route path="/signup">
+          <Signup />
+        </Route>
 
       {/* Customer Routes */}
       <Route path="/customer">
@@ -376,6 +392,7 @@ function Router() {
       {/* 404 */}
       <Route component={NotFound} />
     </Switch>
+    </>
   );
 }
 
