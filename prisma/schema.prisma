@@ -463,8 +463,14 @@ model Delivery {
   incentiveAwards        IncentiveAward[]     @relation("DeliveryIncentiveAwards") // Phase 2A: Proper relation to incentive awards
 
   // Phase 2B: Online payment integration (additive only)
-  paymentId     String? // FK to payments table (for online payments)
-  paymentStatus String? // mirrors payments.status for fast queries (paid, failed, pending)
+  paymentId           String? // FK to payments table (for online payments)
+  paymentStatus       String? // mirrors payments.status for fast queries (paid, failed, pending)
+  paymentCountryCode  String? // BD, US - country where payment was processed
+  paymentCurrency     String? // BDT, USD - currency used for payment
+  paymentProvider     String? // cash, sslcommerz, stripe - payment gateway used
+  paymentReferenceId  String? // Gateway transaction/session ID
+  paymentMetadata     Json?   // Gateway response data (safely stored)
+  isCommissionSettled Boolean @default(false) // True when SafeGo commission is settled
 
   // Phase 3: Parcel size/weight pricing (Task 26) - additive only
   parcelSizeCategory ParcelSizeCategory? // small, medium, large, oversized
@@ -1163,8 +1169,14 @@ model FoodOrder {
   driverIncentiveAwards  IncentiveAward[]     @relation("FoodOrderIncentiveAwards") // Phase 2A: Proper relation to driver incentive awards
 
   // Phase 2B: Online payment integration (additive only)
-  paymentId     String? // FK to payments table (for online payments)
-  paymentStatus String? // mirrors payments.status for fast queries (paid, failed, pending)
+  paymentId           String? // FK to payments table (for online payments)
+  paymentStatus       String? // mirrors payments.status for fast queries (paid, failed, pending)
+  paymentCountryCode  String? // BD, US - country where payment was processed
+  paymentCurrency     String? // BDT, USD - currency used for payment
+  paymentProvider     String? // cash, sslcommerz, stripe - payment gateway used
+  paymentReferenceId  String? // Gateway transaction/session ID
+  paymentMetadata     Json?   // Gateway response data (safely stored)
+  isCommissionSettled Boolean @default(false) // True when SafeGo commission is settled
 
   // Phase 3: Kitchen system (Task 25) - additive only
   prepTimeMinutes Int? // Calculated prep time for this order
@@ -1728,8 +1740,14 @@ model Ride {
   incentiveAwards        IncentiveAward[]     @relation("RideIncentiveAwards") // Phase 2A: Proper relation to incentive awards
 
   // Phase 2B: Online payment integration (additive only)
-  paymentId     String? // FK to payments table (for online payments)
-  paymentStatus String? // mirrors payments.status for fast queries (paid, failed, pending)
+  paymentId           String? // FK to payments table (for online payments)
+  paymentStatus       String? // mirrors payments.status for fast queries (paid, failed, pending)
+  paymentCountryCode  String? // BD, US - country where payment was processed
+  paymentCurrency     String? // BDT, USD - currency used for payment
+  paymentProvider     String? // cash, sslcommerz, stripe - payment gateway used
+  paymentReferenceId  String? // Gateway transaction/session ID
+  paymentMetadata     Json?   // Gateway response data (safely stored)
+  isCommissionSettled Boolean @default(false) // True when SafeGo commission is settled
 
   // Phase 6B: Safety & Security relations
   sosAlerts       SOSAlert[]              @relation("RideSOSAlerts")

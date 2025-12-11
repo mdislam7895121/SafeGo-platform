@@ -47,6 +47,7 @@ const DEFAULT_METHOD_ICONS: Record<string, string> = {
   rocket: "smartphone",
   upay: "smartphone",
   sslcommerz: "credit-card",
+  sslcommerz_online: "credit-card",
   cash: "banknote",
 };
 
@@ -59,6 +60,7 @@ const DEFAULT_METHOD_NAMES: Record<string, string> = {
   rocket: "Rocket",
   upay: "Upay",
   sslcommerz: "Card/Bank (SSLCommerz)",
+  sslcommerz_online: "Online Payment (Cards & Wallets)",
   cash: "Cash",
 };
 
@@ -71,8 +73,14 @@ const DEFAULT_METHOD_DESCRIPTIONS: Record<string, string> = {
   rocket: "Pay with Rocket mobile wallet",
   upay: "Pay with Upay mobile wallet",
   sslcommerz: "Pay with cards or bank transfer",
+  sslcommerz_online: "Pay securely with cards, mobile wallets, and bank accounts via SSLCOMMERZ",
   cash: "Pay your driver or restaurant in cash",
 };
+
+function isBdOnlinePaymentsEnabled(): boolean {
+  return process.env.FEATURE_BD_ONLINE_PAYMENTS_ENABLED === "true" &&
+    !!process.env.SSLCOMMERZ_STORE_ID_BD || !!process.env.SSLCOMMERZ_SANDBOX_STORE_ID_BD;
+}
 
 export class PaymentOptionsService {
   static async getAvailableMethodsForCustomer(
@@ -109,7 +117,16 @@ export class PaymentOptionsService {
       orderBy: [{ sortOrder: "asc" }, { priority: "desc" }],
     });
 
-    const availableMethods: PaymentMethodOption[] = configs.map((config) => ({
+    const bdOnlineEnabled = isBdOnlinePaymentsEnabled();
+    
+    const filteredConfigs = configs.filter((config) => {
+      if (countryCode === "BD" && config.provider === "sslcommerz" && !bdOnlineEnabled) {
+        return false;
+      }
+      return true;
+    });
+
+    const availableMethods: PaymentMethodOption[] = filteredConfigs.map((config) => ({
       methodCode: config.methodType,
       displayName: config.displayName || DEFAULT_METHOD_NAMES[config.methodType] || config.methodType,
       description: config.description || DEFAULT_METHOD_DESCRIPTIONS[config.methodType] || "",
@@ -187,7 +204,16 @@ export class PaymentOptionsService {
       orderBy: [{ sortOrder: "asc" }, { priority: "desc" }],
     });
 
-    const methods: PaymentMethodOption[] = configs.map((config) => ({
+    const bdOnlineEnabled = isBdOnlinePaymentsEnabled();
+    
+    const filteredConfigs = configs.filter((config) => {
+      if (countryCode === "BD" && config.provider === "sslcommerz" && !bdOnlineEnabled) {
+        return false;
+      }
+      return true;
+    });
+
+    const methods: PaymentMethodOption[] = filteredConfigs.map((config) => ({
       methodCode: config.methodType,
       displayName: config.displayName || DEFAULT_METHOD_NAMES[config.methodType] || config.methodType,
       description: config.description || DEFAULT_METHOD_DESCRIPTIONS[config.methodType] || "",
