@@ -1,0 +1,145 @@
+You are working on the SafeGo landing page project.
+
+Goal: Redesign the main site header/navbar so it feels premium (Uber-level), is fully responsive, and consistent with the existing SafeGo footer logo. The header must look great on both desktop and mobile and be ready for public launch.
+
+Tech context:
+- Frontend: React + TypeScript
+- Styling: Tailwind CSS / utility classes (or the existing design system in this repo)
+- Landing page: client/src/pages/landing/LandingPage.tsx
+- There is already a header area with: SafeGo logo, navigation links (Ride, Drive, Business, Safety), and Log in / Sign up buttons.
+- Footer already has the correct SafeGo logo styling (blue rounded square with white “S” and “SafeGo” wordmark). The header logo must visually match it.
+
+### 1. Locate and refactor the header component
+
+1. Find the main site header/navbar component used on the landing page. 
+   - It may live in something like client/src/components/layout/Header.tsx or directly inside LandingPage.tsx.
+   - If the header markup is inline in LandingPage.tsx, extract it into a dedicated reusable component, e.g.:
+     - client/src/components/layout/MainHeader.tsx
+
+2. Ensure the LandingPage imports and uses this new <MainHeader /> at the top.
+
+### 2. Desktop header design (premium look)
+
+Implement a clean, premium navbar with this structure:
+
+- Full-width bar pinned to the top of the page.
+- Background: solid white with a very subtle bottom border and soft shadow.
+- Content centered in a max-width container (matching the landing hero width).
+- Flex layout:
+  - Left: SafeGo logo
+  - Center: navigation links
+  - Right: Log in / Sign up buttons
+
+Details:
+
+1. **Logo block (left)**  
+   - Reuse the same visual style as the footer logo:
+     - Rounded blue square icon with white “S”.
+     - “SafeGo” text to the right in the same font weight / size used in the footer (slightly bolder than body text).
+   - Vertically center icon and text.
+   - Make the entire logo clickable and link to the landing root route “/”.
+
+2. **Navigation links (center)**  
+   Use these labels and order:
+   - Ride
+   - Drive
+   - Business
+   - Safety
+
+   Requirements:
+   - Display them in a single horizontal row.
+   - Use medium font weight.
+   - Default color: neutral/dark (#111–#222), opacity ~80%.
+   - Hover: increase opacity and show an underline or bottom border indicator.
+   - Add a subtle “active” state when the landing page is in the “Ride” area (for now, just treat the landing as “Ride” and highlight that link).
+   - Add accessible focus states for keyboard users.
+
+3. **Auth buttons (right)**  
+   - “Log in” = text button.
+   - “Sign up” = primary pill button.
+   - Use spacing so they don’t touch the right edge.
+   - Suggested style:
+     - Log in: simple text with hover underline.
+     - Sign up: rounded full pill, SafeGo primary blue background, white text, slight shadow, subtle hover lift (e.g., transform + shadow change).
+   - Both buttons should be clearly tappable and aligned with the nav text.
+
+4. **Navbar container styles**  
+   - Height: around 64–72px on desktop.
+   - Add a very light drop shadow or 1px bottom border to separate from the page content.
+   - Make the header sticky at the top on scroll (position: sticky; top: 0; high z-index) so it stays visible as users scroll down the landing page.
+   - Ensure background remains opaque (no transparency glitches) so content under it doesn’t bleed through.
+
+### 3. Mobile header & menu design
+
+On mobile (e.g., < 768px width), convert the header into a compact layout with a hamburger menu:
+
+1. **Top bar layout (mobile)**  
+   - Left: SafeGo logo (same as desktop, but slightly smaller).
+   - Right: Hamburger icon (three lines).
+   - Hide the center navigation and auth buttons on the top bar at this breakpoint.
+
+2. **Hamburger menu behavior**  
+   - When the user taps the hamburger icon, open a full-screen or large slide-down menu overlay.
+   - The overlay should:
+     - Use a light background (white or very light neutral).
+     - Show the nav links in a vertical list:
+       - Ride
+       - Drive
+       - Business
+       - Safety
+     - Under the links, show two full-width buttons:
+       - “Log in” (outline / ghost style)
+       - “Sign up” (primary blue filled button)
+   - Add large tap areas (good vertical padding) so items are easy to tap.
+   - Include a close “X” icon in the top-right of the overlay.
+   - When the menu is open, prevent the body from scrolling behind it (no background scroll).
+   - Make sure ARIA attributes (aria-expanded, aria-controls, role="button" or <button>) are used for accessibility.
+
+3. **Responsive typography and spacing**  
+   - Slightly reduce logo text and nav font size on small screens so content doesn’t wrap awkwardly.
+   - Maintain generous vertical padding for the mobile menu items so it feels like a native app drawer.
+
+### 4. Consistency with footer logo
+
+- Reuse the same logo component or styles as the footer, so the SafeGo brand mark is identical in header and footer.
+- If a shared Logo component doesn’t exist yet, create one (e.g., client/src/components/common/SafeGoLogo.tsx) and use it in both header and footer to avoid duplication.
+
+### 5. Code quality and structure
+
+- Use a clear component structure, for example:
+
+  - client/src/components/layout/MainHeader.tsx  // main header
+  - client/src/components/common/SafeGoLogo.tsx // reusable logo component
+
+- Keep all new logic strongly typed with TypeScript.
+- Keep styling consistent with the existing design system / Tailwind conventions already used in the project.
+- Add comments in the header component explaining:
+  - Desktop layout
+  - Mobile menu behavior
+  - Where to add future routes (if we later link Ride/Drive to real pages)
+
+### 6. Final checks
+
+After implementing:
+
+1. Run the app and verify:
+   - Desktop:
+     - Header looks premium and aligned with the rest of the landing page.
+     - Logo matches the footer logo.
+     - Nav links and buttons are correctly spaced and visually balanced.
+   - Mobile:
+     - Top bar shows only logo + hamburger.
+     - Hamburger opens and closes the full menu smoothly.
+     - Links and buttons are easy to tap, and the background doesn’t scroll when menu is open.
+
+2. Take a screenshot of:
+   - Desktop header
+   - Mobile header (closed)
+   - Mobile menu (opened)
+
+3. Confirm in your final message exactly:
+   - Which files you created or modified (with paths).
+   - How the mobile menu is implemented.
+   - Any important CSS/Tailwind classes used for layout and responsiveness.
+
+Once everything is working and visually polished, stop and ask me to review the header before making any unrelated changes.
