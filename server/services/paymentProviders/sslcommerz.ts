@@ -188,7 +188,7 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
   }
 
   async capturePayment(params: CapturePaymentParams): Promise<CapturePaymentResult> {
-    console.log(`[SSLCommerz] Capture not applicable - payments are captured automatically`);
+    console.log(`[SSLCommerz] Capture not applicable - SSLCOMMERZ auto-captures at payment completion`);
     return {
       success: true,
       status: PaymentStatus.captured,
@@ -197,7 +197,7 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
   }
 
   async cancelPayment(params: CancelPaymentParams): Promise<CancelPaymentResult> {
-    console.log(`[SSLCommerz] Payment cancellation: ${params.providerPaymentId}`);
+    console.log(`[SSLCommerz] Payment session cancelled locally: ${params.providerPaymentId}`);
     return {
       success: true,
       status: PaymentStatus.cancelled,
@@ -298,27 +298,47 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
 
       let paymentStatus: PaymentStatus;
       let eventType: string;
+      let validatedAmount = amount;
+      let validatedBankTranId = bankTranId;
 
-      switch (status) {
-        case "VALID":
-        case "VALIDATED":
-          paymentStatus = PaymentStatus.succeeded;
-          eventType = "payment.succeeded";
-          break;
-        case "FAILED":
-          paymentStatus = PaymentStatus.failed;
-          eventType = "payment.failed";
-          break;
-        case "CANCELLED":
-          paymentStatus = PaymentStatus.cancelled;
-          eventType = "payment.cancelled";
-          break;
-        default:
+      if (status === "VALID" || status === "VALIDATED") {
+        if (valId) {
+          console.log(`[SSLCommerz] Validating transaction via API: val_id=${valId}`);
+          const validationResult = await this.validateTransaction(valId);
+          
+          if (!validationResult || validationResult.status !== "VALID" && validationResult.status !== "VALIDATED") {
+            console.warn(`[SSLCommerz] Transaction validation failed for val_id: ${valId}`, validationResult);
+            paymentStatus = PaymentStatus.failed;
+            eventType = "payment.failed";
+          } else {
+            console.log(`[SSLCommerz] Transaction validated successfully: ${tranId}`);
+            paymentStatus = PaymentStatus.succeeded;
+            eventType = "payment.succeeded";
+            validatedAmount = validationResult.amount || amount;
+            validatedBankTranId = validationResult.bank_tran_id || bankTranId;
+          }
+        } else {
+          console.warn(`[SSLCommerz] No val_id for VALID status, cannot verify`);
           paymentStatus = PaymentStatus.processing;
           eventType = "payment.processing";
+        }
+      } else {
+        switch (status) {
+          case "FAILED":
+            paymentStatus = PaymentStatus.failed;
+            eventType = "payment.failed";
+            break;
+          case "CANCELLED":
+            paymentStatus = PaymentStatus.cancelled;
+            eventType = "payment.cancelled";
+            break;
+          default:
+            paymentStatus = PaymentStatus.processing;
+            eventType = "payment.processing";
+        }
       }
 
-      console.log(`[SSLCommerz] Webhook received: ${eventType} for ${tranId}`);
+      console.log(`[SSLCommerz] Webhook processed: ${eventType} for ${tranId}, status=${paymentStatus}`);
 
       return {
         success: true,
@@ -328,13 +348,14 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
           status: paymentStatus,
           metadata: {
             valId,
-            amount,
+            amount: validatedAmount,
             storeAmount,
-            bankTranId,
+            bankTranId: validatedBankTranId,
             cardType,
             entityId,
             serviceType,
             customerId,
+            validatedViaApi: !!valId,
           },
         },
       };
