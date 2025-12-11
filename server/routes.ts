@@ -17,6 +17,7 @@ import driverIncentivesRoutes from "./routes/driver-incentives"; // D19: Driver 
 import driverSafetyRoutes from "./routes/driver-safety"; // D20: Driver Safety Center & Incident Reporting
 import driverTrustScoreRoutes from "./routes/driver-trust-score"; // D21: Driver Trust Score System
 import driverFoodDeliveryRoutes from "./routes/driver-food-delivery"; // Step 46: Driver Food Delivery Flow
+import driverRideActionsRoutes from "./routes/driver-ride-actions"; // Driver Ride Trip Flow: status, accept, arriving, start, complete
 import customerRoutes from "./routes/customer";
 import customerFoodRoutes from "./routes/customer-food";
 import customerSupportRoutes from "./routes/customer-support"; // Phase 12
@@ -95,6 +96,7 @@ import securityHardeningRoutes from "./routes/security"; // SafeGo Master Tasks 
 import ratingRoutes from "./routes/rating"; // SafeGo Master Tasks 37-42: Ratings & Reputation Engine
 import adminReputationRoutes from "./routes/admin-reputation"; // SafeGo Master Tasks 37-42: Admin Reputation Center
 import adminFinanceRoutes from "./routes/admin-finance"; // Admin Finance Dashboard: Revenue, Balances, Settlements
+import adminOpsMonitoringRoutes from "./routes/admin-operations-monitoring"; // Admin Operations Monitoring: Active Rides, Driver Status
 import dataRightsRoutes from "./routes/data-rights"; // SafeGo Master Tasks 43-47: Data Rights & Retention Layer
 import systemHealthRoutes from "./routes/system-health"; // SafeGo Master Tasks 48-51: Pre-Launch System Readiness
 import contactSubmissionsRoutes from "./routes/contact-submissions"; // Public Contact Form Submissions
@@ -355,6 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/driver/safety", driverSafetyRoutes); // D20: Driver Safety Center & Incident Reporting
   app.use("/api/driver/trust-score", driverTrustScoreRoutes); // D21: Driver Trust Score System
   app.use("/api/driver/food-delivery", driverFoodDeliveryRoutes); // Step 46: Driver Food Delivery Flow
+  app.use("/api/driver/ride-actions", driverRideActionsRoutes); // Driver Ride Trip Flow: accept, arriving, start, complete
   app.use("/api/customer", customerRoutes);
   app.use("/api/customer", customerSupportRoutes); // Phase 12
   app.use("/api/customer/payment", customerPaymentRoutes); // Customer Payment Methods
@@ -388,6 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rating", ratingRoutes); // SafeGo Master Tasks 37-42: Ratings & Reputation Engine
   app.use("/api/admin/reputation", adminReputationRoutes); // SafeGo Master Tasks 37-42: Admin Reputation Center
   app.use("/api/admin/finance", adminFinanceRoutes); // Admin Finance Dashboard: Revenue, Balances, Settlements
+  app.use("/api/admin/ops", adminOpsMonitoringRoutes); // Admin Operations Monitoring: Active Rides, Driver Status
   app.use(dataRightsRoutes); // SafeGo Master Tasks 43-47: Data Rights & Retention Layer
   app.use(systemHealthRoutes); // SafeGo Master Tasks 48-51: Pre-Launch System Readiness
   app.use("/api/food-orders", foodOrderRoutes);

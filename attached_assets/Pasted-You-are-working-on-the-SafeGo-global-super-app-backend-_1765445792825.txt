@@ -1,0 +1,487 @@
+You are working on the SafeGo global super-app backend and admin platform.  
+Follow ALL existing SafeGo master rules and DO NOT break any existing features, APIs, or schemas.  
+All changes must be additive and backward-compatible.
+
+────────────────────────────────
+SAFEGO MASTER RULES (DO NOT SKIP)
+────────────────────────────────
+1) Roles – always 4 distinct roles:
+   - Customer
+   - Driver
+   - Restaurant/Merchant
+   - Admin
+
+   Each role must have its own:
+   - signup/onboarding (multi-step)
+   - dashboard
+   - permissions & data visibility
+   - verification / status flags
+
+   Never mix role access. No role may see another’s sensitive data except where explicitly required (e.g. Admin).
+
+2) Global services – SafeGo always supports:
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+   All new logic must support these three, even if some flows reuse shared components.
+
+3) Country branching – At minimum, support:
+   - Bangladesh ("BD")
+   - United States ("US")
+
+   Every critical flow must branch correctly by country, especially payments, KYC, and driver rules.
+
+4) Country-specific KYC (must remain intact):
+
+   BANGLADESH (BD) mandatory:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID_number
+   - NID_image_front
+   - NID_image_back
+   - emergency_contact_name
+   - emergency_contact_phone
+   - verification_status ("pending" | "verified" | "rejected" | "need_more_info")
+   - is_verified (boolean)
+
+   UNITED STATES (US) mandatory:
+   - date_of_birth
+   - home_address
+   - emergency_contact_name
+   - emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - For drivers:
+     - driver_license_number
+     - driver_license_image
+     - driver_license_expiry
+     - ssn_last4 (optional)
+   - verification_status ("pending" | "verified" | "rejected" | "need_more_info")
+   - is_verified (boolean)
+
+   For NYC drivers:
+   - TLC license number (optional)
+   - FHV permit (optional)
+   - DMV inspection document (required)
+   TLC/FHV must remain optional; DMV inspection required.
+
+   Do NOT rename/remove any existing KYC fields.
+
+5) Onboarding rules:
+   - All roles use multi-step onboarding:
+     - Step 1: basic info
+     - Step 2: address (country-specific)
+     - Step 3: ID/KYC upload (country-specific)
+     - Step 4: emergency contact
+   - verification_status starts as "pending".
+   - Access blocked until Admin approves (is_verified = true).
+   - There is a single, simple, secure customer signup only.
+   - All partners (drivers, delivery couriers, restaurants, other partners) are created later via onboarding flows after login, linked to the customer account.
+   - Do NOT change login/signup behavior; only driver onboarding logic may be extended.
+
+6) Admin Panel capabilities (must stay):
+   - Approve/reject KYC for:
+     - customers
+     - drivers
+     - restaurants
+   - Set:
+     - verification_status
+     - rejection_reason
+   - Block/unblock any user.
+   - Manage:
+     - pricing rules
+     - fees
+     - commissions
+   - Manage payouts:
+     - settle driver negative balances
+     - settle restaurant negative balances
+     - mark debts as paid
+   - View:
+     - driver_wallet_balance (including negative)
+     - restaurant_wallet_balance (including negative)
+   Only Admin can change pricing, commission, verification, and blocking.
+
+7) Core collections (do NOT remove; only extend):
+   - rides
+   - food_orders
+   - deliveries
+
+   Each MUST include:
+   - Identity:
+     - customer_id
+     - driver_id (nullable while unassigned)
+     - restaurant_id (for food_orders)
+   - Locations:
+     - pickup_address, pickup_lat, pickup_lng
+     - dropoff_address, dropoff_lat, dropoff_lng
+   - Money:
+     - base_fare
+     - distance_fare
+     - service_fee
+     - safego_commission_amount
+     - driver_earnings_amount / restaurant_earnings_amount
+   - Payment:
+     - payment_method ("cash" | "online_gateway")
+     - payment_gateway ("sslcommerz_bd" | "stripe_us" | null)
+     - payment_status ("unpaid" | "pending" | "paid" | "failed" | "refunded")
+     - payment_reference (gateway transaction id)
+     - currency ("BDT" | "USD")
+     - paid_at (timestamp | null)
+   - Timestamps:
+     - created_at
+     - updated_at
+     - completed_at (nullable)
+   - Ratings/feedback:
+     - customer_rating
+     - customer_feedback
+     - driver_rating
+     - driver_feedback
+
+8) Commission & payout rules (unchangeable):
+
+   1. If customer pays CASH:
+      - Driver gets all cash.
+      - SafeGo commission becomes negative balance in driver_wallet_balance.
+      - Driver must settle weekly; Admin can mark settlement as paid.
+
+   2. If food order is CASH:
+      - Restaurant gets all cash.
+      - Commission becomes negative balance in restaurant_wallet.
+
+   3. If payment is ONLINE (any country):
+      - SafeGo keeps its commission automatically.
+      - Driver/restaurant wallets only receive net earnings.
+      - No extra negative balance for online orders.
+
+   4. Admin manages and settles balances.
+
+   You must respect these rules in any driver trip logic (earnings, wallets).
+
+   Additional US payment constraint (current phase):
+   - In US, customer cash payments are disabled for now.
+   - Only online card payments (Stripe) are allowed until a later prompt changes this.
+
+9) Security & privacy:
+   - Customers cannot see driver documents (NID, license, etc.).
+   - Drivers cannot see customer NID or any sensitive KYC.
+   - Restaurants cannot see other restaurants.
+   - Only Admin can change pricing, commission, verification, blocking.
+   - Each user can update only their own profile.
+   - No card/CVV storage; Stripe tokens only.
+   - Secrets live only in env vars.
+
+10) Status flows (must be used, not reinvented):
+
+   Ride:
+   - requested → searching_driver → accepted → driver_arriving → in_progress → completed
+   - or cancelled_* at any stage (cancelled_by_customer, cancelled_by_driver, cancelled_by_system).
+
+   Food:
+   - placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+   - or cancelled_*.
+
+   Parcel:
+   - requested → searching_driver → accepted → picked_up → on_the_way → delivered
+   - or cancelled_*.
+
+11) Notifications:
+   - New ride alert for drivers.
+   - Order updates for food & parcel.
+   - Driver arrival & trip start.
+   - Payment success/failure.
+   - Verification approval/rejection.
+   - Important Admin notifications (policy/pricing changes).
+
+12) Architecture:
+   - One shared SafeGo backend (pricing, GPS, status, country rules).
+   - Frontends (including /ride landing page) are thin clients calling backend APIs.
+   - Do NOT add business logic to landing pages; only backend.
+   - Currency/region must come from backend responses.
+
+13) Security roadmap phase for this task:
+   - “Driver Trip & Location Safety”:
+     - Validate that only verified, unblocked drivers can go online.
+     - Ensure trip actions are authorized (driver can only update trips assigned to them).
+     - Log critical status transitions for audit.
+     - Basic fraud-prevention checks (no overlapping active trips per driver).
+
+────────────────────────────────
+TASK: DRIVER GO ONLINE/OFFLINE + FULL RIDE TRIP FLOW (BD + US)
+────────────────────────────────
+Goal: Implement a complete, backend-driven driver availability and ride trip flow for both BD and US, using the existing rides collection, payments, and status flows, without breaking any current features.
+
+This task must cover:
+- Driver online/offline toggle
+- Matching drivers to ride requests (searching_driver → accepted)
+- Driver arrival & trip start/end
+- Country-specific constraints (US vs BD)
+- Proper updates to rides, wallets, and notifications
+
+────────────────────────────────
+A) DRIVER ONLINE/OFFLINE STATE MODEL
+────────────────────────────────
+1. Add or confirm driver state fields (non-breaking) in driver profile:
+   - is_online (boolean)
+   - current_status ("offline" | "available" | "on_trip")
+   - last_online_at (timestamp | null)
+   - last_offline_at (timestamp | null)
+   - active_trip_id (nullable, references rides.id)
+
+2. Rules:
+   - Driver can only set is_online = true if:
+     - verification_status = "verified"
+     - is_verified = true
+     - not blocked by admin
+     - required documents uploaded & not expired (for US: license expiry, DMV inspection).
+   - If driver has an active_trip_id with ride status not in ["completed", "cancelled_*"], force:
+     - current_status = "on_trip"
+     - is_online = true but not available for new trips.
+   - Only when active_trip_id is null and ride status is terminal may driver be "available".
+
+3. API endpoints (backend only; frontend just calls them):
+   - POST /api/driver/status/online
+   - POST /api/driver/status/offline
+   - GET  /api/driver/status/me
+
+   These must:
+   - Authenticate the driver.
+   - Enforce the rules above.
+   - Return safe payload with:
+     - is_online
+     - current_status
+     - active_trip summary (if any)
+     - country and service capabilities (ride/food/parcel).
+
+────────────────────────────────
+B) RIDE REQUEST FLOW (CUSTOMER SIDE)
+────────────────────────────────
+We already have ride creation logic; extend it to properly use the status flow and driver matching, without changing public APIs in a breaking way.
+
+1. When a customer requests a ride:
+   - Use existing endpoint (or extend it):
+     - POST /api/rides/request
+   - Behavior:
+     - Create a ride record:
+       - status = "requested"
+       - payment_method, payment_gateway, currency set according to country rules (BD vs US).
+     - Immediately transition:
+       - status = "searching_driver"
+     - Trigger driver search (see next section).
+
+2. Ensure BD vs US payment config:
+   - BD: may allow "cash" and "online_gateway" (SSLCommerz).
+   - US: currently only "online_gateway" (Stripe); cash must not be offered.
+
+────────────────────────────────
+C) DRIVER MATCHING (SEARCHING_DRIVER → ACCEPTED)
+────────────────────────────────
+1. Implement a matching service (backend only, additive):
+   - File: e.g., server/services/DriverMatchingService.ts
+   - Expose function:
+     - findAndNotifyNearbyDrivers(ride_id)
+   - Use:
+     - pickup_lat/pickup_lng
+     - driver current location (if stored) or at least city/area.
+   - Only consider drivers where:
+     - is_online = true
+     - current_status = "available"
+     - country matches ride country
+     - service supports ride-hailing.
+
+2. Notification:
+   - For each candidate driver:
+     - Create a ride offer and push notification/in-app alert:
+       - "New ride request" with pickup location, fare estimate, etc.
+
+3. Driver decision endpoints:
+   - POST /api/driver/rides/{rideId}/accept
+   - POST /api/driver/rides/{rideId}/reject
+
+   Rules:
+   - Only a driver who was offered this ride can accept.
+   - Once one driver accepts:
+     - Lock the ride to that driver_id.
+     - Set ride.status = "accepted".
+     - Set driver.current_status = "on_trip".
+     - Set driver.active_trip_id = ride.id.
+     - Cancel other pending offers (soft-cancel for other drivers).
+   - If all drivers reject or timeout:
+     - ride.status may remain "searching_driver" or transition to "cancelled_by_system" with clear reason.
+     - Notify customer that no drivers are available.
+
+────────────────────────────────
+D) RIDE PROGRESSION (DRIVER_ARRIVING → IN_PROGRESS → COMPLETED)
+────────────────────────────────
+Implement backend endpoints for each step, using the status flow:
+
+1. Driver arriving:
+   - POST /api/driver/rides/{rideId}/arriving
+   - Preconditions:
+     - Authenticated driver.
+     - ride.driver_id == current driver.
+     - ride.status == "accepted".
+   - Updates:
+     - ride.status = "driver_arriving".
+     - Optionally record ETA or driver location snapshot.
+   - Notifications:
+     - Notify customer: driver is arriving.
+
+2. Start trip:
+   - POST /api/driver/rides/{rideId}/start
+   - Preconditions:
+     - ride.status in ["accepted", "driver_arriving"].
+   - Updates:
+     - ride.status = "in_progress".
+     - record trip_start_time, trip_start_location.
+
+3. End/complete trip:
+   - POST /api/driver/rides/{rideId}/complete
+   - Preconditions:
+     - ride.status = "in_progress".
+   - Logic:
+     - Calculate final fare using backend pricing, distance, time, etc.
+     - Apply commission rules:
+       - safego_commission_amount
+       - driver_earnings_amount
+     - For payment:
+       - If payment_method = "cash":
+         - payment_status = "unpaid" or "paid_cash" per existing logic, but DO NOT break commission debt rules.
+       - If payment_method = "online_gateway":
+         - Confirm payment or mark as payable (Stripe/SSLCommerz integration already handles actual charge).
+     - Set:
+       - ride.status = "completed"
+       - completed_at = now()
+     - Release driver:
+       - driver.current_status = "available"
+       - driver.active_trip_id = null
+       - is_online remains true (driver stays online unless they toggle offline).
+
+   - Notifications:
+     - To customer: trip completed, fare, rating prompt.
+     - To driver: earnings summary.
+
+4. Cancellation endpoints:
+   - POST /api/customer/rides/{rideId}/cancel
+   - POST /api/driver/rides/{rideId}/cancel
+
+   Rules:
+   - Respect existing cancellation status codes:
+     - cancelled_by_customer
+     - cancelled_by_driver
+     - cancelled_by_system
+   - Depending on timing:
+     - Apply cancellation fee logic (can be stubbed for now but keep room for it).
+   - After cancellation:
+     - driver.current_status = "available"
+     - driver.active_trip_id = null (if driver had been assigned).
+
+────────────────────────────────
+E) LOCATION & BASIC SAFETY CHECKS
+────────────────────────────────
+1. Driver location updates:
+   - Ensure there is a non-breaking API endpoint:
+     - POST /api/driver/location/update
+   - Store:
+     - lat, lng
+     - updated_at
+   - Use these locations in DriverMatchingService where possible.
+
+2. Safety checks:
+   - Prevent driver from having multiple active rides:
+     - At most one ride with status not in ["completed", "cancelled_*"] per driver.
+   - Validate that only the assigned driver can update status for a ride.
+   - Log security-critical events (e.g., abnormal status jumps).
+
+────────────────────────────────
+F) CUSTOMER & DRIVER DASHBOARD UPDATES
+────────────────────────────────
+1. Driver dashboard:
+   - Show:
+     - is_online toggle (connected to /api/driver/status/online/offline)
+     - current_status
+     - active_trip summary (pickup, dropoff, status)
+   - When active_trip exists:
+     - Hide duplicate "Go Online" actions.
+     - Focus UI on trip actions: Arriving, Start, Complete, Cancel (where applicable).
+
+2. Customer app:
+   - For active ride:
+     - Show real-time ride status:
+       - requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled
+     - Poll or subscribe to backend updates.
+   - For history:
+     - Use existing rides collection with new fields (fare, status, timestamps).
+
+3. Landing page /ride:
+   - Use backend data only; do NOT embed new pricing/business logic.
+   - It may call the same APIs for preview/demo but must not diverge from core backend rules.
+
+────────────────────────────────
+G) ADMIN PANEL – MONITORING (READ-ONLY FOR THIS TASK)
+────────────────────────────────
+Extend Admin panel in a non-breaking way to allow monitoring (not changing logic):
+
+1. Add “Active Rides” view:
+   - List rides where status not in ["completed", "cancelled_*"].
+   - Columns:
+     - ride_id, customer_id, driver_id
+     - country
+     - pickup & dropoff short labels
+     - status
+     - created_at, updated_at
+   - Filters:
+     - country
+     - status
+     - driver_id
+
+2. Add “Driver Online Status” view:
+   - List drivers with:
+     - is_online
+     - current_status
+     - active_trip_id
+     - country
+     - verification_status
+     - blocked flag
+
+No new admin mutations for pricing or payouts in this task; views are for monitoring only.
+
+────────────────────────────────
+H) NON-BREAKING IMPLEMENTATION REQUIREMENTS
+────────────────────────────────
+- Do NOT rename or delete any existing fields or routes.
+- Only ADD:
+  - new optional fields to driver profile and rides.
+  - new service modules (e.g., DriverMatchingService).
+  - new endpoints under /api/driver/... and /api/rides/... that are compatible with existing clients.
+  - new Admin monitoring pages.
+- Preserve:
+  - Existing SSLCommerz and Stripe integrations.
+  - Existing food and parcel flows (no regressions).
+- Reuse the existing status enums; do not invent new states outside the established flows.
+
+────────────────────────────────
+I) DELIVERABLES
+────────────────────────────────
+At the end, provide:
+
+1. A short summary of all endpoints added or updated:
+   - driver online/offline
+   - ride request & driver matching
+   - trip status transitions (arriving, start, complete, cancel)
+   - location update endpoints
+   - admin monitoring views
+
+2. Instructions for manual testing:
+   - BD ride with cash payment (customer + driver flow).
+   - BD ride with online payment (SSLCommerz sandbox).
+   - US ride with Stripe online payment.
+   - Cancellation scenarios (customer cancels before accept, driver cancels after accept, system no-driver scenario).
+
+3. A list of files/modules changed or created and why each change is backward-compatible with:
+   - existing rides/food_orders/deliveries data
+   - existing Bangladesh payment flows
+   - existing US Stripe flows
+   - existing admin and landing page behavior.
