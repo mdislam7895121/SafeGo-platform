@@ -1,0 +1,412 @@
+[SAFEGO TASK – CUSTOMER PAYMENT METHOD UI + BACKEND CONFIG (COUNTRY-BASED)]
+
+You are now implementing the CUSTOMER PAYMENT METHOD layer for SafeGo, including:
+
+- Country-based available payment options (for BD and US).
+- A “Payment Methods” screen in the CUSTOMER app.
+- Backend tables and APIs to store customer payment preferences.
+- Integration with the existing country-based payment engine and order collections (rides, food_orders, deliveries).
+
+All changes must follow the MASTER RULES above and be non-breaking.
+
+====================================================
+1) GOAL & SCOPE
+====================================================
+Implement a full, production-ready and demo-ready system that:
+
+1. Shows the right payment options to each CUSTOMER based on their country (BD or US).
+2. Always includes CASH as an option in every country.
+3. Allows customers to:
+   - view available payment options (per country),
+   - add and manage their saved payment methods (where applicable),
+   - choose a default payment method,
+   - select/change payment method at checkout for rides, food orders, and parcel deliveries.
+4. Integrates with the backend payment engine by:
+   - storing the selected payment_method and provider on each ride/food_order/delivery,
+   - using codes like "stripe_card", "bkash", "nagad", "cash".
+5. Gives Admin control over which methods are active per country and per service.
+
+====================================================
+2) COUNTRY & METHOD MATRIX – BUSINESS RULES
+====================================================
+Implement a country-based matrix for payment methods.
+
+For now, support:
+
+2.1 United States ("US") – Payment Options for Customers:
+- "stripe_card"   → Card payments via Stripe (Visa, Mastercard, AmEx, etc.)
+- "apple_pay"     → Via Stripe or platform-level (iOS only)
+- "google_pay"    → Via Stripe or platform-level (Android only)
+- "cash"          → Cash payment to driver/restaurant
+
+2.2 Bangladesh ("BD") – Payment Options for Customers:
+- "bkash"         → MFS
+- "nagad"         → MFS
+- "rocket"        → MFS
+- "upay"          → MFS (optional)
+- "sslcommerz"    → Aggregated gateway (cards+MFS+bank)
+- "cash"          → Cash payment to driver/restaurant
+
+Notes:
+- All countries MUST support "cash".
+- Local gateways for BD (bkash, nagad, etc.) can initially be “placeholder” methods, wired via a generic online provider interface so they can be implemented in the future.
+- If a gateway is disabled in config, it must not appear for customers, but "cash" must still remain.
+
+====================================================
+3) DATA MODEL – ADDITIVE EXTENSIONS
+====================================================
+Extend the data model ADDITIVELY. Do not remove or rename existing fields.
+
+3.1 Country payment catalog (config level)
+Create or extend a config table/collection, for example:
+
+payment_methods_catalog
+- id
+- country_code          (e.g. "US", "BD")
+- service_type          (e.g. "ride", "food", "delivery", or "global" for shared)
+- method_code           (e.g. "stripe_card", "bkash", "nagad", "cash")
+- display_name          (e.g. "Debit/Credit Card", "bKash", "Cash")
+- description           (short human-readable text)
+- provider              (e.g. "stripe", "bkash", "nagad", "sslcommerz", "cash")
+- is_default_for_country (boolean; at most 1 default per country per service_type)
+- is_active             (boolean)
+- sort_order            (number; used for ordering in UI)
+- created_at, updated_at
+
+Seed initial values:
+
+US:
+- stripe_card, provider="stripe", active = true, default_for_country for ride/food/delivery.
+- apple_pay, provider="stripe" or "apple_pay", active = true.
+- google_pay, provider="stripe" or "google_pay", active = true.
+- cash, provider="cash", active = true.
+
+BD:
+- bkash, provider="bkash", active = true (or can be phased in).
+- nagad, provider="nagad", active = true.
+- rocket, provider="rocket", active = false or true (configurable).
+- upay, provider="upay", active = false or true.
+- sslcommerz, provider="sslcommerz", active = true (aggregator).
+- cash, provider="cash", active = true, default_for_country if no online gateway is required yet.
+
+3.2 Customer payment methods (saved methods)
+Create a table/collection for CUSTOMER-specific payment methods:
+
+customer_payment_methods
+- id
+- customer_id
+- country_code
+- method_code     (must match catalog.method_code)
+- provider        (e.g. "stripe", "bkash", "cash")
+- label           (e.g. "My Visa card", "Personal bKash", "Home Cash")
+- masked_details  (e.g. "•••• 4242", or last4 of phone/account – never full data)
+- external_token  (e.g. Stripe payment_method id, billing agreement id, etc.)
+- is_default      (boolean; at most 1 default per customer per country)
+- is_active       (boolean)
+- created_at, updated_at
+
+Rules:
+- For "cash", you may store one auto-created record per country per customer, OR treat it as a virtual method without external_token.
+- For online methods (Stripe, bkash, etc.), never store raw card or sensitive secrets, only tokens.
+
+3.3 Connect to orders (rides, food_orders, deliveries)
+Ensure each of the core collections has these fields (ADD if missing):
+
+- payment_country_code    (string)
+- payment_currency        (string, e.g. "USD", "BDT")
+- payment_method          (string, e.g. "stripe_card", "bkash", "cash")
+- payment_provider        (string, e.g. "stripe", "bkash", "cash")
+- payment_status          (string enum: "not_required", "pending", "requires_action", "authorized", "captured", "failed", "refunded", "cancelled")
+- payment_reference_id    (string; e.g. Stripe payment_intent id, bkash transaction id, or a cash reference)
+- payment_metadata        (JSON/object with provider-specific fields)
+- is_commission_settled   (boolean, default false)
+
+These fields must integrate with any existing payment engine, not replace it.
+
+====================================================
+4) BACKEND LOGIC – COUNTRY-AWARE AVAILABILITY
+====================================================
+Create a reusable backend service, for example: PaymentOptionsService.
+
+Responsibilities:
+- Determine which payment methods are available for a given customer and service type (ride/food/delivery).
+- Use:
+  - customer.country_code
+  - payment_methods_catalog (filtered by country_code, service_type, is_active)
+- Always include "cash" if present and active in the catalog.
+
+Pseudo-logic:
+
+getAvailableMethods(customerId, serviceType):
+  customer = getCustomer(customerId)
+  country = customer.country_code
+  methods = payment_methods_catalog where
+    country_code = country AND
+    (service_type = serviceType OR service_type = "global") AND
+    is_active = true
+  if "cash" method is not found, create a virtual cash option
+  return sorted methods by sort_order
+
+Fallback:
+- If a country has no active methods at all, fallback to:
+  - currency = default for that country (e.g. USD or BDT)
+  - methods = just ["cash"].
+
+====================================================
+5) CUSTOMER-FACING APIS
+====================================================
+Design REST/GraphQL endpoints (names can vary, behavior MUST match):
+
+5.1 GET /api/customer/payment/options
+Input:
+- authenticated customer (from auth token)
+- optional query param: service_type ("ride"|"food"|"delivery")
+
+Behavior:
+- Determine customer.country_code.
+- Load available methods via PaymentOptionsService.
+- Load existing customer_payment_methods and mark which are saved vs generic.
+- Determine default method:
+  - customer_payment_methods.is_default if any
+  - else catalog.is_default_for_country
+  - else cash.
+
+Response:
+- country_code
+- currency_code
+- service_type
+- available_methods: array of objects like:
+  - method_code
+  - display_name
+  - description
+  - provider
+  - supports_saving (e.g. Stripe card = true, cash = false)
+  - is_default_candidate (boolean)
+- saved_methods: array of customer_payment_methods (masked details only)
+- selected_default_method_code
+
+5.2 POST /api/customer/payment-methods
+Purpose:
+- Save a new payment method for the customer (where applicable).
+
+Input:
+- method_code (must be available in that country)
+- provider
+- method_token / provider_payload (for Stripe, etc.)
+- label (optional)
+
+Behavior:
+- Validate method_code is allowed in customer.country_code and method supports saving.
+- For Stripe:
+  - create or attach payment_method using Stripe API.
+  - store only Stripe payment_method id as external_token.
+- For local gateways:
+  - store a reference or masked identifier, never raw full details.
+- Create customer_payment_methods row.
+- Optionally set as default if this is the first saved non-cash method.
+
+Response:
+- created payment method (id, label, masked_details, is_default, etc.)
+
+5.3 PATCH /api/customer/payment-methods/:id/set-default
+Purpose:
+- Set a specific customer payment method as default.
+
+Behavior:
+- Ensure method belongs to authenticated customer.
+- Set all other methods is_default=false for that customer and country.
+- Set requested method is_default=true.
+- Update default method logic for future orders.
+
+5.4 DELETE /api/customer/payment-methods/:id
+Purpose:
+- Disable a saved payment method.
+
+Behavior:
+- Soft delete: set is_active=false.
+- If deleted method was default:
+  - re-compute default (another saved method or fallback to cash).
+
+5.5 USE IN CHECKOUT (rides, food, parcel)
+At creation of ride/food_order/delivery:
+
+- Client sends:
+  - payment_method_code (optional; if omitted, use default from API)
+- Backend:
+  - Validate that method_code is allowed for customer.country_code and service.
+  - Set:
+    - payment_country_code = customer.country_code
+    - payment_currency = from country config
+    - payment_method = method_code
+    - payment_provider = according to catalog
+    - payment_status = "pending" (for online) or "not_required"/"pending" for cash, depending on logic.
+  - Call existing Payment Engine if online (Stripe etc.) to create payment intent.
+  - Return any needed client secrets for online methods.
+
+====================================================
+6) CUSTOMER UI – PAYMENT METHOD SCREEN
+====================================================
+Implement the CUSTOMER app/payment UI as follows:
+
+6.1 Location
+- Accessible from:
+  - Customer Profile → “Payment methods”
+  - Also accessible from checkout screens (Ride, Food, Parcel) via “Change payment method” link.
+
+6.2 Layout (mobile-first, but also desktop-friendly)
+Sections:
+
+1) Header:
+   - Title: “Payment methods”
+   - Subtitle: “Choose how you want to pay in your country.”
+
+2) Default payment method card:
+   - Shows:
+     - method icon (card, bkash, nagad, cash, etc.)
+     - display_name
+     - small country/currency info (e.g. “United States – USD” or “Bangladesh – BDT”)
+     - badge: “Default”
+
+3) “Available methods in your country” list:
+   - For each catalog method (country-based):
+     - icon
+     - display_name
+     - description
+     - chip/badge:
+       - “Recommended” for stripe_card (US) or proper primary method (BD in future).
+       - “Cash” clearly labeled as “Pay your driver/restaurant in cash.”
+     - toggle/CTA depending on method:
+       - If supports saving (e.g. stripe_card): button “Add card” or “Manage cards”.
+       - If not (cash): label “No setup needed”.
+
+4) “Your saved methods” section:
+   - List customer_payment_methods:
+     - e.g. “Visa ending in 4242” with radio button for default selection.
+     - For BD future: “bKash (01••••••••)” etc.
+   - Actions:
+     - Set as default
+     - Remove (soft delete)
+
+5) Info note:
+   - Text: “Payment options vary by country. Cash is always available, and online payments may use local gateways where supported.”
+
+6.3 Checkout integration:
+On each checkout (Ride, Food, Parcel):
+
+- Show a compact payment section:
+  - “Pay with: [Default method name] (Change)”
+- Tapping “Change” opens a bottom sheet or page:
+  - List of available methods for that service & country (same as /payment/options).
+  - Simple selection:
+    - Choose method → Confirm → send selection to backend with order creation.
+
+====================================================
+7) ADMIN PANEL – PAYMENT METHOD CONFIG & VISIBILITY
+====================================================
+Extend Admin panel with:
+
+7.1 “Payment Methods by Country” section:
+- Table with rows:
+  - country_code
+  - service_type (ride/food/delivery/global)
+  - method_code
+  - display_name
+  - provider
+  - is_active
+  - is_default_for_country
+  - sort_order
+
+Admin can:
+- Activate/deactivate a method for a country/service combination.
+- Change default method for a country/service.
+- Change sort_order (to control the order in UI).
+- See a preview of how customers will see methods in that country.
+
+7.2 “Customer payment methods” viewer:
+- Read-only view (for debugging/audit):
+  - Filter by customer_id, country, provider, method_code.
+  - Show:
+    - label
+    - masked_details
+    - method_code
+    - provider
+    - is_default
+    - is_active
+  - NEVER show full card or sensitive IDs (only masked or last4).
+
+7.3 Integration with commission & wallet:
+- Ensure Admin already has views for:
+  - driver_wallet_negative_balance
+  - restaurant_wallet_negative_balance
+- These do not change, but Admin should now be able to:
+  - Filter reports by payment_method and provider (e.g. see breakdown of cash vs online).
+
+====================================================
+8) SECURITY & PRIVACY REQUIREMENTS
+====================================================
+- Do NOT store raw card numbers or CVV.
+- For Stripe:
+  - Store only Stripe payment_method id or customer id.
+- For local gateways (bkash, nagad, etc.):
+  - Store only masked identifier (e.g. last 4 of mobile/account) and a token or reference if applicable.
+- Ensure:
+  - Customer can see only their own customer_payment_methods.
+  - Admin can see only masked details, not full instruments.
+
+- All payment secrets (Stripe keys, local gateway keys) must live in environment variables, not code or database.
+
+====================================================
+9) DEMO & TESTING SETUP
+====================================================
+Create a demo-ready setup:
+
+9.1 Seed data:
+- One US test customer with:
+  - country_code = "US"
+  - one saved stripe_card method (dummy/Stripe test mode).
+- One BD test customer with:
+  - country_code = "BD"
+  - no saved online methods, but cash always available.
+
+- Seed payment_methods_catalog for:
+  - US: stripe_card, apple_pay, google_pay, cash.
+  - BD: bkash, nagad, sslcommerz, cash (others optional).
+
+9.2 Manual test flows:
+- US:
+  - Customer visits “Payment methods” → sees Stripe card and cash.
+  - Customer adds a card (Stripe test) → sees it in “Your saved methods”.
+  - Sets card as default → checkout pre-selects card.
+  - Switches to cash at checkout → order records payment_method="cash".
+
+- BD:
+  - Customer visits “Payment methods” → sees bkash, nagad, sslcommerz, cash.
+  - Initially only cash is functional; others may show “Coming soon” in description if no real gateway yet.
+  - Checkout defaults to cash; payment_method="cash" saved on orders.
+
+9.3 Automated tests (if test framework exists):
+- Validate that:
+  - getAvailableMethods returns correct methods for US and BD.
+  - “cash” always appears as available.
+  - Customer cannot set an unsupported method_code (e.g. "stripe_card" in BD if disabled).
+  - Default selection logic works as expected.
+
+====================================================
+10) DOCUMENTATION
+====================================================
+Add or extend a markdown doc:
+
+- File: docs/customer_payment_methods_overview.md
+
+Include:
+- explanation of payment_methods_catalog
+- explanation of customer_payment_methods
+- country-based matrix for US and BD
+- how default method is chosen
+- how this integrates with:
+  - rides.payment_method
+  - food_orders.payment_method
+  - deliveries.payment_method
+- notes on security and masking of sensitive data.
+
+End of task. Implement everything described above in one integrated, production-ready and demo-ready update, without breaking any existing SafeGo features.

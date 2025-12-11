@@ -2679,8 +2679,8 @@ model PayoutBatch {
 model CountryPaymentConfig {
   id                   String   @id @default(uuid())
   countryCode          String // BD, US, etc.
-  serviceType          String // RIDE, FOOD, PARCEL
-  methodType           String // PaymentMethodType enum value
+  serviceType          String // RIDE, FOOD, PARCEL, GLOBAL
+  methodType           String // PaymentMethodType enum value (stripe_card, bkash, nagad, cash, etc.)
   provider             String // PaymentProvider enum value
   isEnabled            Boolean  @default(true)
   priority             Int      @default(0)
@@ -2693,8 +2693,17 @@ model CountryPaymentConfig {
   createdByAdminId     String?
   lastUpdatedByAdminId String?
 
+  // Customer-facing display fields (additive)
+  displayName          String?  // e.g. "Debit/Credit Card", "bKash", "Cash"
+  description          String?  // Short human-readable text
+  iconName             String?  // Icon identifier (e.g. "credit-card", "smartphone", "banknote")
+  sortOrder            Int      @default(0) // UI display order
+  supportsSaving       Boolean  @default(false) // Whether customers can save this method
+  isDefaultForCountry  Boolean  @default(false) // Default method for this country/service
+
   @@unique([countryCode, serviceType, methodType, provider])
   @@index([countryCode, serviceType])
+  @@index([countryCode, serviceType, isEnabled])
   @@index([isEnabled])
   @@index([createdByAdminId])
   @@map("country_payment_configs")
