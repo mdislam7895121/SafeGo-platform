@@ -1,0 +1,115 @@
+You are upgrading the SafeGo Admin Phase-2 enterprise features.  
+Follow the exact tasks in strict serial order (Task 1 → Task 14).  
+Do not skip, merge, or reorder any task.  
+Every task must be completed fully, tested, documented, and optimized before moving to the next.
+
+===========================
+ PHASE-2 MASTER TASK LIST
+===========================
+
+TASK 1 — Complete Feature Flags UI (Enterprise Version)
+• Add grouped flags (Ride, Food, Shop, Ticket, Rental, System)
+• Add environment previews (Development / Staging / Production)
+• Add rollout slider (0–100%)
+• Add “Enable for specific region”
+• Add “Enable for specific partner type”
+• Add audit logging for any flag change
+• Add mobile-safe responsive UI
+• Apply security validation: only Super Admin can modify flags
+
+TASK 2 — Build Notification Center (Admin Enterprise)
+• Add categories: System Alerts, Partner KYC Alerts, Risk Events, Payout Alerts
+• Add filters, search, and pagination
+• Add a real-time WebSocket listener
+• Add “Mark as read”, “Archive”, “Resolve”
+• Add sound + visual alert for critical severity
+• Add notification detail panel
+• Add log trail for each alert
+
+TASK 3 — Implement Global Theme System (Dark/Light + Brand Themes)
+• Add theme switcher in admin settings
+• Add 100% Tailwind-compatible variable tokens
+• Add high-contrast accessibility mode (ADA/WCAG)
+• Add SafeGo brand theme presets (BD & USA)
+• Add enterprise design polish for cards, tables, and forms
+
+TASK 4 — Mobile Optimization for Admin Dashboard
+• Make People & KYC responsive
+• Make Safety Center responsive
+• Make Feature Flags responsive
+• Add bottom navigation for mobile view
+• Fix overflow, text wrap, and card scaling
+• Lighthouse performance pass: 90+ score
+
+TASK 5 — Regression Tests (Full Platform)
+• Re-run ALL Phase-1 tests: 300+ tests
+• Re-run ALL Partner tests: Ride, Food, Shop, Ticket & Rental
+• Re-run ALL Admin tests
+• Add automated regression suite for new Phase-2 UI
+• Fix any broken relationship or null data
+• Validate database integrity for all modules
+
+TASK 6 — Enterprise Audit Report System
+• Auto-generate admin action logs (KYC, flags, payout, safety)
+• Export audit logs to PDF & CSV
+• Add daily/weekly automated report creation
+• Add admin filtering (role / action / status / date)
+• Add USA-compliant audit structure + BD-compliant audit structure
+
+TASK 7 — Risk Center Enhancements
+• Add Risk Event severity scale
+• Add incident timeline
+• Add admin notes + attachments
+• Add “Escalate to supervisor” workflow
+• Add automated risk scoring
+• Add detection for suspicious partner activity
+
+TASK 8 — Final Security Reinforcement
+• Implement CSRF protection site-wide
+• Enforce admin device verification
+• Apply rate limiting to sensitive endpoints
+• Validate JWT rotation & session renewal
+• Add environment config validation (no fallbacks allowed)
+• Remove all unused endpoints, logs, and debug routes
+
+TASK 9 — Admin UI Polish (Enterprise Finish)
+• Add skeleton loading screens
+• Add card shadows, spacing, and elevation
+• Unify icon sizes + typography scale
+• Add animation constraints (reduced motion option)
+• Fix all non-critical UI warnings
+
+TASK 10 — Multi-Region Readiness (BD + USA)
+• Add BD regulatory switches (NID/KYC rules)
+• Add USA regulatory switches (SSN/State rules)
+• Add currency selectors (BDT / USD)
+• Add tax profile fields for partners
+• Add regional availability flags
+
+TASK 11 — Performance Optimization
+• Reduce bundle size
+• Remove unused imports
+• Optimize Prisma queries
+• Add query caching where allowed
+• Improve Lighthouse score (Performance 90+)
+
+TASK 12 — Documentation Update
+• Update admin-phase2.md
+• Add UI screenshots
+• Add API references
+• Add BD & USA compliance notes
+• Add feature diagrams
+
+TASK 13 — Final Architect Review
+• Validate all admin workflows
+• Validate all security rules
+• Validate DB relationships
+• Validate performance benchmarks
+• Approve final release build
+
+TASK 14 — Phase-2 Release Package
+• Generate release notes
+• Generate changelog
+• Generate deployment instructions
+• Generate admin training guide
+• Prepare “Phase-2 Completion Report”

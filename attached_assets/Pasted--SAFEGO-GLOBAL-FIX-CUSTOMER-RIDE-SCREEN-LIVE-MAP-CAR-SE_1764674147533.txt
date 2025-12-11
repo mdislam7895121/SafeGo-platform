@@ -1,0 +1,175 @@
+# SAFEGO GLOBAL — FIX CUSTOMER RIDE SCREEN (LIVE MAP + CAR SELECTION)
+
+You must follow ALL existing SafeGo master rules.
+This task must be ADDITIVE and NON-BREAKING.
+
+====================================================
+0) SAFEGO MASTER RULES (MUST PRESERVE)
+====================================================
+ROLES (no mixing, no renaming):
+1) customer
+2) driver
+3) restaurant
+4) admin
+
+BD-only expansion roles (already implemented):
+5) shop_partner        // small shops / e-store
+6) ticket_operator     // tickets + rental
+
+SERVICES (must all keep working):
+- Ride-hailing
+- Food delivery (Eats)
+- Parcel delivery
+
+COUNTRY-SPECIFIC KYC (no schema change):
+
+Bangladesh ("BD") mandatory:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number + front/back images
+- emergency_contact details
+- verification_status
+- is_verified
+
+United States ("US") mandatory:
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status
+- is_verified
+
+ADMIN PANEL (must stay as-is, features only extend):
+- verify customers, drivers, restaurants, shop partners, ticket operators
+- approve/reject KYC with rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view negative balances for drivers, restaurants, BD shop partners, BD ticket operators
+
+MANDATORY COLLECTIONS (NO BREAKING CHANGES):
+
+1) rides
+   - customer_id
+   - driver_id
+   - pickup_address + geolocation
+   - dropoff_address + geolocation
+   - fees, commission
+   - payment_method / payment_status
+   - timestamps (requested, accepted, started, completed/cancelled)
+   - status flow
+   - rating + feedback
+
+2) food_orders
+   (unchanged, do not touch)
+
+3) deliveries
+   (unchanged, do not touch)
+
+COMMISSION & PAYOUT RULES (KEEP EXACTLY):
+
+1) CASH ride:
+   - Driver receives full cash.
+   - SafeGo commission becomes negative driver_wallet_balance.
+   - Driver must settle weekly.
+
+2) CASH food:
+   - Restaurant receives full cash.
+   - Commission becomes negative restaurant_wallet.
+
+3) CASH BD ticket/rental:
+   - Ticket operator receives all cash.
+   - Commission becomes negative operator_wallet_balance.
+
+4) ONLINE payment:
+   - SafeGo keeps commission automatically.
+
+5) Admin can settle negative balances and mark them as paid.
+
+SECURITY RULES (MUST KEEP):
+- Customers cannot view driver documents (NID, license).
+- Drivers cannot view customer NID or sensitive info.
+- Restaurants cannot view other restaurants.
+- Shop partners cannot view restaurant/ticket internal data.
+- Ticket operators cannot view other operators’ internal data.
+- Only admin can change pricing, commission, verification, blocking.
+- Users may update only their own profile.
+
+STATUS FLOWS (DO NOT MODIFY):
+
+Ride:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+ONBOARDING (ALL ROLES):
+- multi-step onboarding
+- verification_status = "pending" until admin approves
+- block full access until approved
+
+NOTIFICATIONS (KEEP, YOU MAY EXTEND):
+- new ride alert for driver
+- order and parcel updates
+- verification approval/rejection
+- important admin notifications
+
+All of the above MUST remain intact.
+
+====================================================
+1) CURRENT PROBLEM
+====================================================
+On the customer Ride screen (/customer with "Ride" selected):
+
+- The pickup/dropoff card renders.
+- But the LIVE MAP does not load.
+- Car selection (vehicle categories, ETA, fare estimate) does not appear.
+- For BD customers, this makes the ride booking feel incomplete.
+
+We need to restore a full Uber-style experience while preserving
+all backend logic and collections.
+
+====================================================
+2) GOAL
+====================================================
+Implement a fully functional Ride tab for customers (US + BD), with:
+
+1) Live map panel
+2) Car category selection (vehicle types)
+3) Quote / fare estimate
+4) Proper integration with the rides collection and status flow
+
+This must work on mobile and desktop and must respect BD vs US differences.
+
+====================================================
+3) UI & LAYOUT REQUIREMENTS
+====================================================
+Customer Ride screen (/customer, mode="ride") should show:
+
+A) LEFT SIDE (or top on mobile) — "Book a ride" card:
+   - Pickup & Dropoff fields (already exist — keep them)
+   - Swap button between pickup/dropoff
+   - "When" field if scheduled rides are supported (keep current behavior)
+   - Car category selector:
+       * Economy
+       * Premium
+       * XL / Large
+       * BD-specific options if already defined (e.g. CNG, Bike) — reuse existing config.
+   - Fare estimate display (based on distance + base price)
+   - CTA button: "Confirm ride" or existing label
+
+B) RIGHT SIDE (or bottom on mobile) — LIVE MAP:
+   - Centered on user's pickup location (or current location, if permission granted)
+   - Shows pickup pin
+   - Shows dropoff pin when selected
+   - Shows available drivers (mock / real) if that already exists
+   - Map must use the existing map provider (do NOT switch providers).
+   - If API key is missing, show a graceful placeholder state

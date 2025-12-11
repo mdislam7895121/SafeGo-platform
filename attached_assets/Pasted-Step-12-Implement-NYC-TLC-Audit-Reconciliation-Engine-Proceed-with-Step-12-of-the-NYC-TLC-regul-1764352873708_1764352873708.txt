@@ -1,0 +1,81 @@
+Step 12 — Implement NYC TLC Audit & Reconciliation Engine
+
+Proceed with Step 12 of the NYC TLC regulatory workflow. Build the full TLC Audit & Reconciliation Engine with the following requirements:
+
+1. Audit Scopes:
+   • Trip Record vs Fare Engine reconciliation
+   • Driver payout vs TLC minimum pay verification
+   • Toll engine vs actual mapped toll direction verification
+   • Airport fee eligibility check
+   • AVF/BCF/HVRF/State Surcharge validation
+   • Out-of-town + Long-trip + Cross-city fee combinations
+   • Missing or inconsistent trip records detection
+
+2. Core Audit Checks:
+   a. Fare Consistency:
+      - finalFare == sum(all fare components)
+      - commission excludes all TLC fees
+      - surge multipliers validated
+      - negative or zero-duration trips flagged
+
+   b. Driver Pay Consistency:
+      - driverPayout == perMinute + perMile + bonuses
+      - HVRF minimum pay guarantee fallback logic validated
+
+   c. Location & Zone Accuracy:
+      - verify pickup/dropoff borough mapping
+      - verify Manhattan congestion zone detection
+      - verify airport polygons and out-of-town zones
+
+   d. Time & Distance Integrity:
+      - recompute distance using haversine
+      - recompute duration using timestamps
+      - ensure no unrealistic spikes (e.g., 5 miles in 30 sec)
+
+3. Automatic Fix Engine:
+   • Auto-correct minor mismatches (rounding, float drift)
+   • Recompute totals where necessary
+   • Flag non-fixable cases for admin review
+
+4. Admin Dashboard (Audit Center):
+   • Tables for:
+       - Missing records
+       - Incorrect tolls
+       - Incorrect fees
+       - Suspicious earnings
+       - Zone mismatch
+       - Underpaid drivers
+   • Buttons:
+       - Auto-Reconcile
+       - Export Audit Log
+       - View Raw Trip
+       - Re-run Fare Engine
+   • Color codes:
+       - Red = critical
+       - Yellow = warning
+       - Green = valid
+
+5. Export Logs:
+   • JSON, CSV, PDF audit output
+   • Include timestamps, corrected values, old vs new
+   • Secure endpoint /api/tlc/audit
+
+6. Test Coverage:
+   Add 70+ test cases covering:
+     • Fare mismatch detection
+     • Driver pay mismatch detection
+     • Wrong toll direction
+     • Airport wrong fee application
+     • AVF/BCF/HVRF errors
+     • Long-trip surcharge timing/eligibility
+     • Out-of-town return fee validation
+     • Combined complex scenarios
+
+7. Documentation:
+   Update replit.md with:
+     • Audit engine architecture
+     • Example mismatch cases
+     • Auto-reconciliation logic
+     • Compliance notes for HVFHV licensing
+
+Complete Step 12 and confirm once the TLC Audit & Reconciliation Engine is fully implemented and validated.

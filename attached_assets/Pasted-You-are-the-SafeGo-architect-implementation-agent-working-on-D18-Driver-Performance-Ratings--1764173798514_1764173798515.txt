@@ -1,0 +1,208 @@
+You are the SafeGo architect + implementation agent working on **D18 – Driver Performance & Ratings Center**.
+
+Follow ALL SafeGo Master Rules (do not skip any):
+
+1. Always consider the four core roles together: **Customer, Driver, Restaurant, Admin**. Even if a feature is driver-focused, you must confirm it does not break flows or security for the other three roles.
+2. Global platform scope: SafeGo handles **rides, food (SafeGo Eats), and parcel deliveries**. Any logic involving trips, earnings, or ratings must respect these three service types.
+3. Country-specific KYC:
+   - **Bangladesh:** NID/Passport + business/license where applicable; mobile wallets like bKash, Nagad, Rocket.
+   - **USA:** SSN/EIN + routing verification; bank accounts, cards, Stripe-style payouts.
+   Reuse existing KYC flags (isVerified, verificationStatus, country, etc.). Do NOT invent parallel auth flags.
+4. Admin Panel expectations: Never break or bypass admin tools. All new driver-facing views must be consistent with existing admin reporting and audit logging (especially payouts, wallets, and support).
+5. Mandatory collections/domains that must remain consistent:
+   - rides/trips
+   - food_orders
+   - deliveries/parcels
+   - wallets + payouts
+   - support tickets + live chat
+6. Commission & payout logic:
+   - Commissions are already handled centrally; do NOT change the commission math or the **Frozen** unified payout system.
+   - Any new earnings or performance views must use the same underlying data used by Wallet & Payout features so numbers always match.
+7. Security rules:
+   - All new APIs must use existing middleware: **authenticateToken**, role checks (requireRole([...])) and SafeGuard/KYC checks.
+   - Enforce **driver-only** access where appropriate, and never leak other drivers’ data.
+   - Preserve and extend **audit logging** for any sensitive queries if needed.
+8. Status flows:
+   - Rides/orders/deliveries have clear status lifecycles; performance metrics must respect those (e.g., only completed rides count for completion rate).
+9. Onboarding & verification:
+   - Driver performance views that depend on real trips must be gated by verification status. Unverified drivers should see an “onboarding” style message, not errors.
+10. Notifications:
+   - If you introduce any “threshold breach” or “low rating” states, make them ready for reuse with existing notification systems, but do not actually wire new notification channels unless explicitly requested.
+11. Strict SafeGo stability rule:
+   - Do NOT modify or unfreeze the existing unified payout system (it is **Frozen in current state for individual withdrawals only**).
+   - Do NOT introduce breaking changes to Restaurant or Customer flows.
+   - Keep all new work **backwards compatible**; no hard renames of existing types/routes.
+
+Context of current state (you must re-verify from the codebase, but keep these constraints):
+- Restaurant Support Center (multi-channel: tickets, live chat, phone, articles) is production-ready with strong KYC/RBAC and audit logging.
+- Multi-role Support Center (Restaurant, Driver, Customer, Admin) backend exists with a generic support service.
+- Restaurant Payout Center + Unified Payout System are stable and **Frozen** for individual withdrawals; Driver wallet + payout methods/history have been implemented (D16).
+- Driver Settings & Preferences Center (D14), Driver Support Center (D15), and Driver Wallet Center (D16) are all implemented and architect-approved.
+- D17 integrated trip history and earnings with support metadata for drivers.
+
+Your task now is to implement **D18 – Driver Performance & Ratings Center** end-to-end for the DRIVER web app, without breaking any existing feature.
+
+High-level goal:
+Create a professional, Uber-style **Driver Performance & Ratings Center** where a driver can:
+- See a clear performance overview (for rides/food/parcels combined and separated).
+- Understand their ratings, cancellation rate, acceptance rate, on-time rate.
+- Review key trends over time (7 days / 30 days).
+- See how their performance affects incentives/eligibility (just informational for now; no bonus payout logic changes).
+
+The implementation must be:
+- Fully responsive (mobile-first), then good on tablet and desktop.
+- Integrated with existing driver navigation (sidebar / header).
+- Backed by efficient, secure APIs with proper KYC/RBAC.
+- Consistent with SafeGo branding and the rest of the driver dashboard.
+
+PHASE 1 – ANALYZE EXISTING DATA & MODELS (NO CHANGES YET)
+1. Search the backend for existing models and services related to:
+   - Trips/rides (including food_orders and deliveries if they share a unified “Trip” or “Ride” schema).
+   - Any existing rating entities (e.g., driver ratings, ride ratings, review models).
+   - Driver earnings summaries already used by the wallet.
+2. Identify:
+   - Which models store: trip status, timestamps (start/end), distance, service type, cancellation data, etc.
+   - Which fields capture ratings (star rating, comments, rater role).
+   - How earnings summaries are currently computed in D16 (wallet and payouts).
+3. Decide:
+   - If an existing “Performance” or “Stats” service exists, reuse/extend it.
+   - Otherwise, design a new **DriverPerformanceService** that aggregates from existing trip/earnings/rating tables.
+4. Confirm:
+   - No change is required to existing payout models (Payout, PayoutAccount, PayoutBatch).
+   - No modifications to unified /api/payout/* routes.
+
+PHASE 2 – DESIGN PERFORMANCE METRICS (BACKEND)
+Design the metrics that the Driver Performance Center will show. At minimum:
+
+A. Time ranges:
+   - Last 7 days
+   - Last 30 days
+   - All-time (simple, not heavily optimized)
+
+B. Core metrics (overall + per service type: RIDE, FOOD, PARCEL):
+   - Total completed trips
+   - Total online hours (if you have online session data; if not available, skip but document clearly)
+   - Average rating (1–5 stars)
+   - Number of ratings received (N)
+   - Acceptance rate (accepted requests / total requests) if you have that data
+   - Cancellation rate (driver or rider initiated; be explicit which one you show)
+   - On-time completion rate (if you track ETA vs actual)
+   - Earnings summary (gross and net after SafeGo commission, but only as read-only summaries – reuse existing wallet math)
+
+C. Rating details:
+   - Recent reviews list (limited to e.g. last 10–20, paginated).
+   - Breakdown by star rating (e.g., 5★, 4★, etc.) if feasible.
+
+D. Incentive context (informational only):
+   - A simple text block that says things like “Drivers with a rating below X or cancellation above Y may lose priority access.” You must not implement any enforcement logic, just display the policy placeholders.
+   - The thresholds should be configurable via constants or config (not hard-coded magic numbers scattered around).
+
+PHASE 3 – IMPLEMENT BACKEND SERVICE & ROUTES
+1. Implement a **DriverPerformanceService** (or similarly named) in the backend that:
+   - Exposes methods like:
+     - getSummary(driverId, range)
+     - getRatingBreakdown(driverId, range)
+     - getRecentReviews(driverId, pagination)
+     - getServiceTypeBreakdown(driverId, range)
+   - Uses efficient queries with existing indexes, avoiding full table scans for large datasets.
+2. Add new API routes under a dedicated router file (e.g. `server/routes/driver-performance.ts`) or integrate into an existing `driver` routes file, following project conventions.
+3. Routes (suggested):
+   - GET `/api/driver/performance/summary?range=7d|30d|all`
+   - GET `/api/driver/performance/ratings?range=7d|30d|all`
+   - GET `/api/driver/performance/reviews?range=7d|30d|all&page=1&pageSize=20`
+   - GET `/api/driver/performance/service-breakdown?range=7d|30d|all`
+4. Security:
+   - All routes MUST use the standard middlewares:
+     - `authenticateToken`
+     - `requireRole(["driver"])`
+     - The existing driver KYC guard (e.g., `isVerified && verificationStatus === "APPROVED"`).
+   - Ensure the driverId used in queries is derived from the authenticated token, not from request params.
+5. Logging & privacy:
+   - If there is existing audit logging for analytics/performance views, reuse it.
+   - Do NOT expose rider/customer personal information in reviews beyond what is already safely exposed elsewhere (e.g., maybe initials only).
+6. Return JSON payloads that are simple and optimized for the frontend:
+   - summary: totals, percentages, rangeLabel
+   - ratings: average, count, breakdown
+   - reviews: list of {rating, comment, createdAt, maybe masked customer label}
+   - serviceBreakdown: per-service stats
+
+PHASE 4 – FRONTEND: DRIVER PERFORMANCE CENTER UI
+1. Create a new page (or confirm existing stub) for:
+   - `/driver/performance` – main performance overview.
+2. Layout requirements:
+   - Mobile-first layout with stacked cards.
+   - On tablet/desktop, cards can display in 2–3 columns.
+   - Use typical SafeGo brand styling (as seen in driver wallet, support, and settings).
+3. Page content:
+   - A header: “Performance & Ratings” with subtitle like “Track your driving quality and earnings trends.”
+   - A range selector (Today/7 Days/30 Days or at least 7/30/All).
+   - Summary cards:
+     - Overall Rating (with star icon + N ratings)
+     - Total Trips (for the selected range)
+     - Cancellation Rate
+     - Acceptance Rate (if data exists; if not, show “N/A” elegantly)
+   - A section for **Service Type Breakdown**:
+     - Simple table or cards: RIDE / FOOD / PARCEL with trips + earnings + rating if available.
+   - A section for **Ratings & Reviews**:
+     - Average rating + star breakdown bar.
+     - List of recent reviews (scroll/pagination), each with rating, short comment, date.
+   - A small informational block for **Incentive & Quality Guidelines**:
+     - Read-only text pulled from configuration/constants.
+
+4. Navigation integration:
+   - Add a clear entry point to this page from the driver navigation (e.g., sidebar item “Performance” under Wallet or above Settings).
+   - Ensure navigation routing works on mobile, tablet, and desktop.
+
+5. Empty states:
+   - For **new/unverified drivers** or those with zero trips:
+     - Show a friendly empty state (illustration or icon) saying there’s not enough data yet.
+     - Do NOT show confusing zeros; clearly say “No trips completed yet.”
+   - For **no ratings**:
+     - Show “You haven’t received any ratings yet. Complete more trips to see your rating.”
+
+PHASE 5 – INTEGRATION WITH SUPPORT & SETTINGS (LIGHT TOUCH)
+1. Ensure the **Driver Support Center (D15)** can reference performance if needed:
+   - If there is a “related context” hook when opening a support ticket, enrich metadata with current performance summary (without heavy computations per request).
+   - This can be as simple as including `{ ratingAverage, totalTrips, country, primaryServiceType }` in metadata if there is already such a field.
+2. Confirm **Driver Settings (D14)** remains unchanged:
+   - No new settings toggles required for D18 unless a simple “Share performance summary with support automatically” flag can be easily added without schema changes. If that introduces complexity, document it as a future enhancement instead of implementing now.
+
+PHASE 6 – RESPONSIVENESS, TESTING, AND NON-REGRESSION
+1. Responsiveness:
+   - Manually verify `/driver/performance` on:
+     - ~320px mobile (no horizontal scroll, cards stacked cleanly).
+     - ~768px tablet (2-column layout where appropriate).
+     - ~1024px+ desktop (max-width container, 2–3 columns with good spacing).
+2. Functional tests:
+   - Test with:
+     - Driver with no trips.
+     - Driver with many trips and ratings (seed or fixtures if available).
+   - Confirm:
+     - Summary, breakdowns, and reviews load without errors.
+     - KYC-gated behavior: unverified driver gets a clear “Complete verification to access performance details” state.
+3. Regression checks:
+   - Re-verify:
+     - Driver Wallet Center (D16) pages still work (wallet, payout methods, history).
+     - Driver Support Center (D15) still works (help, contact, live-chat, phone, status).
+     - Driver Settings (D14) tabbed layout still loads.
+   - Ensure there are **no changes** to:
+     - /api/payout/* behavior.
+     - Restaurant or Customer performance or support flows.
+
+PHASE 7 – DOCUMENTATION & SUMMARY
+1. Update `replit.md` (or the main project documentation file) with:
+   - A new section: **D18 – Driver Performance & Ratings Center**.
+   - Routes added, data models/queries used, and any new service classes.
+   - Notes on security (KYC/RBAC), country-specific behavior, and limitations (e.g., if online time is not tracked yet).
+2. Provide a final summary in your Agent message including:
+   - The new routes and their purpose.
+   - Screenshots of the `/driver/performance` page in mobile and desktop.
+   - Any technical constraints or future enhancements you recommend (e.g., adding proper online-hours tracking later).
+
+Important constraints:
+- Do NOT introduce breaking schema changes. If you must extend a model, keep changes additive, backward compatible, and minimal.
+- Do NOT modify or unfreeze the existing unified payout system or admin batch payouts (they are explicitly frozen).
+- Do NOT expose sensitive customer information in performance or review data.
+- Keep the entire implementation **stable, secure, and production-ready** before marking D18 as complete.
+
+Begin now with PHASE 1 (analysis) and proceed through all phases until D18 is fully implemented, tested, documented, and architect-verified.

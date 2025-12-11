@@ -1,0 +1,400 @@
+Proceed with Phase 12.
+
+PHASE 12 – Restaurant Order Support & Issue Resolution System (SafeGo Eats, SafeGo-wide compliant)
+
+GOAL:
+Add a complete, additive support and issue-resolution layer that:
+- Lets customers report problems with food orders (primary), rides, and parcel deliveries.
+- Gives restaurants tools to handle food-order issues from their dashboard.
+- Gives admins full oversight, escalation, and refund/adjustment control.
+- Respects all existing SafeGo rules, collections, and commission logic WITHOUT breaking anything.
+
+====================================================
+1. GLOBAL RULES & SCOPE (DO NOT BREAK)
+====================================================
+
+You MUST NOT:
+- Remove, rename, or break any existing fields, APIs, routes, or client components.
+- Change core behavior of rides, food_orders, deliveries, payouts, menu, promotions, reviews, media, analytics, or operational settings.
+- Modify commission logic; only ADD issue/refund recording layers.
+
+You MUST:
+- Work additively.
+- Enforce RBAC for all 4 roles.
+- Enforce BD/US KYC rules.
+- Maintain security & privacy.
+- Keep the 3 major services intact:
+
+1) Ride-hailing → `rides` collection
+   Status flow (unchanged):
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+2) Food delivery → `food_orders` collection
+   Status flow (unchanged):
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+3) Parcel delivery → `deliveries` collection
+   Status flow (unchanged):
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+====================================================
+2. ROLES & ACCESS
+====================================================
+
+Customer:
+- Can open support issues for:
+  - food_orders belonging to them (after placed, mainly after delivered/cancelled).
+  - rides (global, read existing ride details, create issue).
+  - deliveries (parcel, same pattern).
+- Can view status of their issues.
+- Cannot see internal notes, other customers, or restaurant/admin identities beyond allowed masks.
+
+Driver:
+- Can see only issues assigned to their rides/deliveries/food_orders (if driver-related).
+- Can add a response note when requested (e.g., “I delivered to door X”).
+- Cannot see customer personal details beyond what they already see in current system.
+- Cannot access restaurant-side support dashboards.
+
+Restaurant (SafeGo Eats – OWNER/STAFF):
+- Works primarily with FOOD ORDER issues for their own restaurant_id.
+- OWNER:
+  - See all issues related to their orders.
+  - Add internal and customer-facing notes.
+  - Propose resolutions (e.g., remake order, partial refund request to admin, coupon compensation).
+  - Mark issues as “resolved_by_restaurant” (pending admin financial approval if needed).
+- STAFF:
+  - View issues.
+  - Depending on Phase 6 permissions (`can_manage_orders` and new flag `can_handle_support`):
+    - May add notes.
+    - May mark some issue states (e.g., “contacted customer”).
+- They cannot see issues of other restaurants.
+
+Admin:
+- Global view of all issues across rides, food_orders, deliveries.
+- Can change issue status to escalated, pending_refund, closed.
+- Can approve refunds / credits / fee adjustments.
+- Can override restaurant decisions if required.
+- Full audit access.
+
+====================================================
+3. COUNTRY-SPECIFIC KYC GATING
+====================================================
+
+BD (Bangladesh):
+- Customer/Restaurant must have valid KYC fields in their respective profiles (existing: father_name, NID, etc.).
+- Unverified restaurant:
+  - Cannot access support dashboard fully (read-only with banner “Support restricted until verification”).
+
+US (United States):
+- Customer/Restaurant must have valid KYC (government_id_type, government_id_last4, etc.).
+- Same gating rule: unverified restaurants have restricted support tools.
+
+KYC rules:
+- Do NOT replicate onboarding.
+- Respect existing flags `verification_status` and `is_verified`.
+
+====================================================
+4. DATA MODEL – NEW COLLECTION(S) (ADD ONLY)
+====================================================
+
+Introduce a new primary collection:
+
+`support_tickets` (generic for all three services)
+
+Fields (additive design):
+- id
+- ticket_code (human-friendly, e.g., SG-SUP-2025-000123)
+- service_type: "food_order" | "ride" | "delivery"
+- service_id: reference to food_orders.id OR rides.id OR deliveries.id
+- restaurant_id (nullable for rides without restaurant)
+- customer_id
+- driver_id (nullable depending on service_type)
+- country_code
+- issue_category (e.g., "missing_item", "cold_food", "late_delivery", "payment_issue", "driver_behavior", "app_issue")
+- issue_description (customer text)
+- customer_visible_status:
+  - "open" | "in_review" | "awaiting_customer" | "resolved" | "closed"
+- internal_status:
+  - "new" | "assigned_restaurant" | "assigned_admin" | "refund_pending" | "refund_approved" | "no_action" | "closed"
+- priority: "low" | "medium" | "high"
+- origin_channel: "app" | "web" | "auto_flag" | "admin_manual"
+- refund_requested_amount (optional, decimal)
+- refund_approved_amount (optional, decimal)
+- created_at, updated_at, resolved_at
+
+Secondary collection for comments:
+
+`support_ticket_messages`
+- id
+- ticket_id
+- actor_id
+- actor_role: "customer" | "restaurant_owner" | "restaurant_staff" | "driver" | "admin"
+- message_type: "public" | "internal"
+- message_body
+- created_at
+
+Add optional, ADDITIVE fields to:
+- `food_orders`: support_ticket_count, last_support_status
+- `rides`: support_ticket_count, last_support_status
+- `deliveries`: support_ticket_count, last_support_status
+
+These MUST be additive and not required for existing rows.
+
+====================================================
+5. RESTAURANT DASHBOARD – SUPPORT MODULE (SAFEGO EATS)
+====================================================
+
+Add a new section in restaurant navigation:
+
+Route group:
+- `/restaurant/support`
+  - `/restaurant/support/tickets`
+  - `/restaurant/support/tickets/:ticket_id`
+
+5.1 Tickets List Page – `/restaurant/support/tickets`
+- Only show tickets where service_type = "food_order" and restaurant_id matches.
+- Columns:
+  - ticket_code
+  - order_code (from food_orders)
+  - issue_category
+  - customer_masked_name
+  - customer_visible_status
+  - internal_status
+  - priority
+  - created_at
+  - last_update_at
+- Filters:
+  - status (open/in_review/resolved/closed)
+  - priority
+  - issue_category
+  - date range
+- OWNER:
+  - full access.
+- STAFF:
+  - access controlled via `can_handle_support`.
+
+5.2 Ticket Detail Page – `/restaurant/support/tickets/:ticket_id`
+- Sections:
+  - Summary (ticket_code, order snapshot, timestamps).
+  - Conversation (messages, public + internal separated).
+  - Actions:
+    - add public reply (visible to customer).
+    - add internal note.
+    - propose resolution type:
+      - "remake_order"
+      - "offer_coupon"
+      - "request_partial_refund"
+      - "request_full_refund"
+      - "no_issue_found"
+    - change internal_status (within allowed transitions, e.g., new → assigned_restaurant → resolved_by_restaurant).
+- OWNER:
+  - Can perform all actions.
+- STAFF:
+  - Scoped by permissions.
+
+====================================================
+6. CUSTOMER APP – ISSUE CREATION & TRACKING
+====================================================
+
+Customer routes (may reuse existing customer app patterns):
+
+1) "Report an issue" entry points:
+   - Order history list (food_orders)
+   - Ride history
+   - Delivery (parcel) history
+
+2) New screen/modal: `Report an issue`
+   - Select predefined categories depending on service_type:
+     - Food: missing_items, wrong_order, cold_food, late_delivery, driver_issue, payment_issue, other.
+     - Ride: unsafe_driving, rude_behavior, wrong_route, overcharge, other.
+     - Delivery: damaged_package, late_delivery, not_delivered, other.
+   - Free-text description area.
+   - Optional photos (for food/delivery).
+
+Endpoint (add-only):
+- POST `/api/customer/support/tickets`
+  - Validations:
+    - customer_id owns the service record.
+    - service is in a state where complaints make sense (e.g., delivered / completed / cancelled).
+    - rate-limiting so same order cannot open unlimited tickets.
+
+3) "My Issues" Page:
+   - GET `/api/customer/support/tickets/my`
+   - Show ticket list with statuses.
+   - View detail: summary + last restaurant/admin responses.
+   - Customer can add follow-up replies until status is "resolved" or "closed".
+
+====================================================
+7. ADMIN PANEL – SUPPORT & ESCALATION CENTER
+====================================================
+
+Add new Admin section:
+
+- `/admin/support`
+  - Global table of tickets across all services.
+
+Features:
+- Filters:
+  - service_type
+  - restaurant_id
+  - customer_id
+  - driver_id
+  - country_code
+  - priority
+  - internal_status
+  - issue_category
+- Bulk views: "high priority", "pending_refund", "aging_tickets".
+
+Ticket detail (admin):
+- Full view of:
+  - ticket fields
+  - linked food_order / ride / delivery
+  - conversation messages (public + internal).
+- Actions:
+  - Reassign internal_status:
+    - new → assigned_admin → refund_pending → refund_approved → closed
+  - Approve or deny refund (does NOT directly change commission logic; instead, creates an adjustment record described in next section).
+  - Add internal notes.
+  - Add public messages (careful: admin must be clearly labeled as “SafeGo Support”).
+
+Audit:
+- All admin actions must be logged into security_audit_log with:
+  - actor_id
+  - actor_role = "admin"
+  - ticket_id
+  - action_type (status_change / refund_approved / refund_denied / note_added)
+  - timestamp
+  - previous_state, new_state when applicable.
+
+====================================================
+8. COMMISSION & PAYOUT INTEGRATION (ADD-ONLY)
+====================================================
+
+You must NOT break existing commission logic. Instead, add an adjustment layer.
+
+Create new collection:
+
+`financial_adjustments`
+- id
+- ticket_id
+- service_type
+- service_id
+- restaurant_id
+- driver_id (optional)
+- adjustment_type: "customer_refund" | "restaurant_debit" | "driver_debit" | "safego_cost" | "goodwill_credit"
+- amount
+- currency
+- created_by_admin_id
+- created_at
+- notes
+
+Rules:
+- CASH orders:
+  - If refund approved and restaurant already received cash:
+    - create financial_adjustment with restaurant_debit for SafeGo to reclaim via wallet settlement (negative restaurant_wallet_balance adjustment).
+- ONLINE orders:
+  - If SafeGo holds funds:
+    - create financial_adjustment to lower restaurant payout.
+    - or mark as safego_cost (SafeGo bears the refund).
+- None of this replaces existing wallet logic; it only feeds into payout/settlement calculators in later phases (or as extended features).
+
+====================================================
+9. BACKEND ENDPOINTS (ADD-ONLY)
+====================================================
+
+Customer:
+- POST `/api/customer/support/tickets`
+- GET `/api/customer/support/tickets/my`
+- GET `/api/customer/support/tickets/:id`
+
+Restaurant:
+- GET `/api/restaurant/support/tickets`
+- GET `/api/restaurant/support/tickets/:id`
+- POST `/api/restaurant/support/tickets/:id/messages`
+- PATCH `/api/restaurant/support/tickets/:id/status` (allowed transitions only)
+- POST `/api/restaurant/support/tickets/:id/proposed-resolution`
+
+Admin:
+- GET `/api/admin/support/tickets`
+- GET `/api/admin/support/tickets/:id`
+- PATCH `/api/admin/support/tickets/:id/status`
+- POST `/api/admin/support/tickets/:id/messages`
+- POST `/api/admin/support/tickets/:id/financial-adjustment`
+
+All endpoints must:
+- Enforce RBAC role checks.
+- Enforce restaurant_id scoping.
+- Ensure customers access only their own tickets.
+- Prevent drivers from seeing sensitive customer info.
+
+====================================================
+10. SECURITY & AUDIT
+====================================================
+
+Security rules (must be explicit):
+
+- Customers cannot see internal messages (message_type = internal).
+- Restaurants cannot see other restaurants, other tickets, or internal admin notes flagged as hidden_from_restaurant.
+- Drivers cannot see customer PII or restaurant internal notes.
+- Only admin can see full ticket and all parties.
+
+Audit log requirements (existing `security_audit_log` extended additively):
+- log entry whenever:
+  - ticket is created.
+  - ticket status changes.
+  - financial_adjustment is created.
+  - admin overrides any state.
+- Each log:
+  - actor_id, actor_role
+  - ticket_id
+  - action_type
+  - timestamp
+  - prev_state, new_state (when relevant).
+
+====================================================
+11. UX & NOTIFICATIONS
+====================================================
+
+Notifications (add to existing system):
+
+- Customer:
+  - Ticket created.
+  - Restaurant responded.
+  - Admin responded.
+  - Ticket resolved/closed.
+
+- Restaurant:
+  - New ticket for their food_order.
+  - New customer reply.
+  - Admin decision (e.g., refund approved, no action).
+
+- Admin:
+  - High-priority ticket created.
+  - Tickets aging beyond SLA thresholds (e.g., >24h unresolved).
+
+UI/UX considerations:
+- Desktop: tabular ticket views + detail drawer or full page.
+- Mobile: stacked cards, clean status indicators, clear call-to-action buttons.
+- All issue flows must be accessible (ARIA, keyboard navigation).
+
+====================================================
+12. IMPLEMENTATION CHECKLIST
+====================================================
+
+1) Create support_tickets + support_ticket_messages + financial_adjustments collections/models (additive).
+2) Implement Customer endpoints and UI for:
+   - creating tickets,
+   - viewing “My Issues”,
+   - replying to an issue.
+3) Implement Restaurant support dashboard (list + detail).
+4) Implement Admin Support Center with full filtering and ticket management.
+5) Wire notifications for all role-relevant events.
+6) Integrate additive fields into food_orders, rides, deliveries (support_ticket_count, last_support_status) without making them required.
+7) Integrate financial_adjustments with existing payout/settlement logic in a read-only/additive way (only recorded, not re-writing old rules).
+8) Ensure all changes are fully backward-compatible and existing phases (1–11) continue to pass.
+
+Only mark Phase 12 complete when:
+- Full issue lifecycle works (customer → restaurant → admin → resolution).
+- All 4 roles respect RBAC.
+- No existing feature breaks.
+- Analytics and payouts still function, now with optional support context.

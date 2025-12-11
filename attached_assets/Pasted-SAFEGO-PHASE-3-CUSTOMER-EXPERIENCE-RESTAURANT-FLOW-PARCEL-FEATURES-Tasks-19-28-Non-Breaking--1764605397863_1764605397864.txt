@@ -1,0 +1,641 @@
+SAFEGO PHASE 3 – CUSTOMER EXPERIENCE, RESTAURANT FLOW & PARCEL FEATURES
+(Tasks 19–28, Non-Breaking, Global Rules Compliant)
+
+You are an expert full-stack engineer working on the global super-app “SafeGo”.
+
+In this prompt, you must implement **Phase 3** features in a fully non-breaking way:
+
+19. Finish Customer Profile Pages
+20. Add Payment Method CRUD for Customers
+21. Add Saved Places System
+22. Add Ride Preferences for Customers
+23. Add Real-Time Order Status from Restaurants
+24. Add Real-Time Restaurant → Driver Dispatch
+25. Add Restaurant Prep Time + Kitchen System
+26. Add Parcel Size/Weight Pricing
+27. Add Proof-of-Delivery Photo Capture
+28. Add Scheduled Pickup for Parcel
+
+All changes MUST be additive only and must preserve every existing SafeGo feature.
+
+==================================================
+A. GLOBAL SAFEGO MASTER RULES (ALWAYS ENFORCE)
+==================================================
+
+Before making any change, you MUST respect these core rules:
+
+1) ROLES (4 distinct roles, never mixed)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+Each role MUST have:
+   - Its own signup flow and multi-step onboarding
+   - Its own KYC rules (country-specific)
+   - Its own dashboard
+   - Its own permissions
+
+No role may access other roles’ restricted data.
+
+2) SERVICES (3 global services)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+All new Phase 3 features must be designed to work worldwide and to support these three services, even when UI is service-specific (e.g., ride preferences only for rides).
+
+3) COUNTRY-SPECIFIC KYC (BD vs US)
+
+Supported countries (so far):
+   - Bangladesh ("BD")
+   - United States ("US")
+
+Bangladesh – required fields (customers + drivers):
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID number + front/back images
+   - emergency contact details
+   - verification_status
+   - is_verified
+
+United States – customers:
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - verification_status
+   - is_verified
+
+United States – drivers:
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - driver_license_number
+   - driver_license_image
+   - driver_license_expiry
+   - optional ssn_last4
+   - verification_status
+   - is_verified
+
+Any Phase 3 feature that exposes profile or payment UI MUST:
+   - Show only non-sensitive fields to customers and drivers.
+   - Never expose raw government IDs, NID numbers, SSN, or document images to other roles.
+
+4) ADMIN PANEL (must remain central authority)
+
+Admin can:
+   - Verify customers, drivers, restaurants (approve/reject KYC with rejection_reason).
+   - Block/unblock any user (customer, driver, restaurant).
+   - Configure pricing, fees, commissions (per country + per service).
+   - Manage payouts and settlements.
+   - View driver negative balances.
+   - View restaurant negative balances.
+
+Phase 3 MUST:
+   - Add admin views/APIs for:
+       - inspecting customer saved places, ride preferences (read-only),
+       - viewing restaurant prep times and kitchen queues,
+       - monitoring parcel scheduled pickups and proof-of-delivery photos.
+   - Never allow non-admin users to change global rules or other users’ data.
+
+5) CORE COLLECTIONS (must not be renamed or removed)
+
+SafeGo uses:
+   - rides
+   - food_orders
+   - deliveries
+
+Each has or will have:
+   - customer_id, driver_id, restaurant_id, etc.
+   - pickup/dropoff addresses + lat/lng
+   - fare and fee fields
+   - commission / settlement fields
+   - payment details and status
+   - timestamps
+   - full status flow
+   - rating and feedback
+
+Phase 3 may only ADD new fields (e.g., preferences, photos, size/weight, scheduled_time) and new supporting tables; never rename or delete existing fields or collections.
+
+6) COMMISSION & PAYOUT RULES (do NOT change them)
+
+Already implemented in Phase 2A/2B; you must not alter the semantics:
+
+   - Cash ride: driver keeps all cash; SafeGo commission becomes negative driver_wallet_balance.
+   - Cash food order: restaurant keeps all cash; SafeGo commission becomes negative restaurant_wallet_balance.
+   - Online payment: SafeGo receives full amount; partner (driver/restaurant) is credited net earnings via wallet.
+   - Admin can settle balances and mark as paid.
+
+Phase 3 only consumes these outcomes (e.g., showing earnings in customer/restaurant views) and must never modify their rules.
+
+7) SECURITY RULES
+
+   - Customers cannot view driver legal documents (NID, license, SSN, etc.).
+   - Drivers cannot view customer NID or sensitive KYC.
+   - Restaurants cannot view data of other restaurants.
+   - Only admin can:
+       - change pricing, commission, verification, blocking,
+       - override wallet balances or settlements.
+   - Any user can update only their OWN profile and settings (saved places, preferences, payment methods).
+   - File uploads (e.g., proof-of-delivery photos) must:
+       - be scoped to a single delivery,
+       - be visible only to: that delivery’s customer, driver, and admins.
+
+8) STATUS FLOWS (must stay in sync)
+
+Rides:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcels:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+Phase 3 MUST:
+   - NOT break these flows.
+   - Attach new features (kitchen system, parcel scheduling, proof-of-delivery) as extensions to these states.
+
+9) ONBOARDING
+
+For each role:
+   - Multi-step onboarding remains:
+       - basic info
+       - address
+       - country-specific KYC upload
+       - emergency contact
+       - verification_status = "pending" initially
+   - Access to critical features (ordering, driving, restaurant dashboard, parcel sending) is blocked until verification_status = "approved" and is_verified = true.
+
+Phase 3 must respect these flags when exposing profile editing, payment methods, or parcel scheduling.
+
+10) NOTIFICATIONS
+
+   - WebSocket + FCM layer already exists from Phase 1 and 2.
+   - For Phase 3, you must emit structured events for:
+       - profile updated (for admin audit),
+       - food order status updates,
+       - restaurant prep completion,
+       - parcel scheduled reminder + pickup + delivered,
+       - proof-of-delivery uploaded.
+
+NotificationService and WebSocket gateway must receive new event types, but the existing interfaces must not break.
+
+11) NO LEGAL CASE / COMPLAINT MODULE
+
+   - Do NOT add any “case”, “ticket”, or “legal complaint” feature in any country (especially US) in this phase.
+   - Phase 3 is limited to UX, restaurant pipeline, parcel features, and admin monitoring.
+
+12) MIGRATION & BACKWARD COMPATIBILITY
+
+   - Only ADD new tables, columns, and routes.
+   - Existing entities (old rides/orders/deliveries) must still load without errors even if new Phase 3 fields are null.
+   - Feature flags/config must allow Phase 3 features to be toggled by environment.
+
+==================================================
+B. SCOPE OF PHASE 3 (TASKS 19–28)
+==================================================
+
+You must implement the following, end-to-end:
+
+Customer-side:
+   19. Customer profile pages (full, editable, responsive)
+   20. Payment method CRUD (tokenized cards etc.)
+   21. Saved places (Home, Work, Custom)
+   22. Ride preferences (service + vehicle + safety preferences)
+
+Restaurant-side:
+   23. Real-time order status from restaurants
+   24. Real-time restaurant → driver dispatch integration (reusing dispatch_sessions)
+   25. Restaurant prep time + kitchen queue system
+
+Parcel-side:
+   26. Parcel size/weight pricing configuration
+   27. Proof-of-delivery photo capture
+   28. Scheduled pickup for parcels
+
+All of this must use the existing SafeGo architecture: dispatch engine, wallet/commission, payment/notification systems.
+
+==================================================
+C. CUSTOMER PROFILE PAGES & SETTINGS (TASK 19)
+==================================================
+
+1) Data model – customers
+Extend the existing `customers` table/model (ADD ONLY fields if needed):
+
+   - first_name, last_name
+   - email, phone
+   - country_code
+   - date_of_birth
+   - address fields (home_address for US, present/permanent for BD)
+   - emergency_contact_name, emergency_contact_phone
+   - avatar_url (optional)
+   - language_preference (e.g., "en", "bn")
+   - notification_preferences (JSON):
+       - ride_updates: boolean
+       - food_updates: boolean
+       - parcel_updates: boolean
+       - marketing: boolean
+
+Do NOT expose KYC document numbers or images in the customer UI.
+
+2) Customer Profile UI (web + mobile)
+Implement a unified Customer “Account” area with sections:
+
+   - Profile
+   - Payment Methods
+   - Saved Places
+   - Ride Preferences
+   - Security & Privacy (e.g., logout, device list, delete account request)
+
+Requirements:
+   - Responsive layout (desktop + mobile).
+   - Uses existing auth and routing.
+   - Handles BD vs US fields:
+       - BD: show present_address, permanent_address.
+       - US: show home_address.
+   - Read-only fields:
+       - verification_status
+       - is_verified
+   - Editable fields:
+       - name, avatar, language_preference, notification_preferences (and addresses where allowed by policy).
+
+3) Security constraints
+   - Profile endpoints:
+       - GET /api/customer/profile
+       - PUT /api/customer/profile
+     MUST enforce:
+       - Only authenticated customer can access/modify their own profile.
+       - Admin has separate read-only/debug endpoints, not reused here.
+
+==================================================
+D. PAYMENT METHOD CRUD FOR CUSTOMERS (TASK 20)
+==================================================
+
+Assume Phase 2B created the `payment_methods` table and PaymentService integration. Now you must expose full CRUD to customers.
+
+1) Data model recap – `payment_methods`
+   - id
+   - customer_id
+   - provider
+   - provider_payment_method_id (token)
+   - last4
+   - brand
+   - expiry_month, expiry_year
+   - is_default (boolean)
+   - is_active (boolean)
+   - created_at, updated_at
+
+2) APIs (customer scope)
+   - POST   /api/customer/payment-methods
+   - GET    /api/customer/payment-methods
+   - PATCH  /api/customer/payment-methods/:id
+   - DELETE /api/customer/payment-methods/:id  (soft-delete: set is_active=false)
+
+Business rules:
+   - Customer can only manage their own payment methods.
+   - Underlying card data never touches SafeGo; PaymentService handles tokenization with provider.
+   - At most one method is_default = true per customer (enforced at DB or code level).
+   - When deleting the default method, either:
+       - auto-promote another method, or
+       - keep “no default” and require selection next time (configurable).
+
+3) UI integration
+   - In the Customer Account → Payment Methods section:
+       - List all active payment methods with brand, masked card, expiry.
+       - Allow:
+           - add new method (card form using provider’s JS if needed),
+           - set as default,
+           - remove method.
+   - Mark online-payment availability clearly per country (e.g., for BD vs US depending on gateway support).
+
+==================================================
+E. SAVED PLACES SYSTEM (TASK 21)
+==================================================
+
+1) New collection: `customer_saved_places`
+   - id
+   - customer_id
+   - label: "Home" | "Work" | "Other" (or free text)
+   - icon_type: "home" | "work" | "star" etc. (optional)
+   - address_text
+   - latitude
+   - longitude
+   - is_default_pickup (boolean)
+   - is_default_dropoff (boolean)
+   - created_at, updated_at
+
+Limits:
+   - At most 1 “Home” and 1 “Work” per customer (enforced).
+   - Configurable max total saved places per customer (e.g., 10).
+
+2) APIs
+   - GET    /api/customer/saved-places
+   - POST   /api/customer/saved-places
+   - PATCH  /api/customer/saved-places/:id
+   - DELETE /api/customer/saved-places/:id
+
+3) Ride-booking integration
+   - On the customer “Book a ride” screen:
+       - Show quick shortcuts for Home/Work/saved places in pickup and dropoff search.
+       - Clicking a saved place sets the pickup/dropoff coordinates and address.
+
+4) Admin read-only view
+   - Admin may list saved places for fraud analysis (read-only).
+   - No admin can modify them through this interface.
+
+==================================================
+F. RIDE PREFERENCES FOR CUSTOMERS (TASK 22)
+==================================================
+
+1) New table: `customer_ride_preferences`
+   - id
+   - customer_id
+   - preferred_service_types: array of "ride" | "food" | "parcel" (mostly for rides but keep generic)
+   - preferred_vehicle_types: array, e.g. "car", "bike", "cng", "premium"
+   - music_preference: "no_preference" | "quiet" | "loud_ok"
+   - air_conditioning: "no_preference" | "ac_on" | "ac_off"
+   - communication_preference: "no_preference" | "minimal_talk" | "friendly"
+   - accessibility_options (JSON): e.g., {wheelchair_support: true}
+   - safety_preferences (JSON): e.g., {share_trip_automatically_with_contacts: true}
+   - created_at, updated_at
+
+2) APIs
+   - GET  /api/customer/ride-preferences
+   - PUT  /api/customer/ride-preferences
+
+3) Dispatch integration (soft influence)
+   - When matching drivers in the dispatch engine:
+       - Optionally weight drivers that match preferences (vehicle type, etc.).
+       - This MUST be additive:
+           - If no driver matches preferences, fallback to existing proximity/rating logic.
+   - Do not leak any preference details to drivers except what is necessary (e.g., “accessibility requested”).
+
+==================================================
+G. RESTAURANT REAL-TIME STATUS & DISPATCH (TASKS 23–25)
+==================================================
+
+Goal: Make restaurant side behave like a professional food delivery system (Uber Eats-style) while reusing existing dispatch_sessions and WebSocket/FCM infrastructure.
+
+1) Data model – `restaurants`
+Add (if not already present):
+
+   - prep_time_default_minutes
+   - is_accepting_orders (boolean)
+   - kitchen_status: "open" | "busy" | "closed"
+
+2) Data model – `food_orders`
+Ensure or ADD non-breaking fields:
+
+   - restaurant_id
+   - customer_id
+   - driver_id
+   - status (as per flow)
+   - prep_time_minutes (calculated per order)
+   - ready_at (timestamp)
+   - kitchen_notes (text)
+   - dispatch_session_id (FK)
+   - order_items JSON (for display; full menu infra can exist elsewhere)
+
+3) Kitchen system (Task 25)
+New table: `kitchen_tickets`
+   - id
+   - food_order_id
+   - restaurant_id
+   - status: "queued" | "preparing" | "ready" | "handed_to_driver" | "cancelled"
+   - prep_time_estimate_minutes
+   - started_at
+   - completed_at
+   - created_at, updated_at
+
+Restaurant dashboard:
+   - Show “Kitchen” view listing all active `kitchen_tickets` in order:
+       - queued → preparing → ready.
+   - Actions:
+       - Start prep (status: preparing)
+       - Mark ready
+       - Mark handed to driver
+
+Events:
+   - When order accepted:
+       - Create kitchen_ticket with status "queued".
+   - When kitchen status changes:
+       - Emit WS/FCM events to customer and driver:
+           - "food:status_update" with high-level status (preparing, ready, etc.).
+
+4) Real-time order status (Task 23)
+   - Customers must see:
+       - order status (placed, accepted, preparing, ready_for_pickup, picked_up, on_the_way, delivered, cancelled_x)
+       - prep time estimate (countdown)
+   - Use WebSocket events and FCM from Phase 1/2:
+       - "food:status_update"
+       - "food:eta_update"
+       - "food:driver_assigned"
+
+5) Restaurant → driver dispatch (Task 24)
+Reuse the dispatch_sessions system from rides:
+
+   - On restaurant acceptance of an order:
+       - If delivery by driver is needed:
+           - Create a dispatch_sessions row (service_type="food", entity_id=food_orders.id).
+           - Call the existing driver selection and assignment engine.
+   - On driver assignment:
+       - Update `food_orders.driver_id`.
+       - Update `kitchen_tickets.status` as appropriate.
+       - Send WS/FCM to restaurant and customer.
+
+6) Admin monitoring
+   - Add admin view:
+       - List per-restaurant kitchen queues, average prep times.
+       - No ability to tamper with real-time state except for read-only analytics.
+
+==================================================
+H. PARCEL FEATURES – PRICING, POD PHOTO & SCHEDULED PICKUP (TASKS 26–28)
+==================================================
+
+1) Parcel size/weight pricing (Task 26)
+
+Config table: `parcel_pricing_configs`
+   - id
+   - country_code
+   - base_zone (city/region)
+   - size_category: "small" | "medium" | "large" | "oversized"
+   - max_weight_kg
+   - base_fare
+   - per_km_rate
+   - per_kg_surcharge (optional)
+   - active_from, active_to
+   - is_active
+
+Extend `deliveries`:
+   - parcel_size_category
+   - parcel_weight_kg
+   - pricing_config_id (FK)
+   - pricing_breakdown JSON (mirrors rides/fare_breakdown style)
+
+Pricing integration:
+   - At parcel creation:
+       - Use size/weight + distance to compute an estimated fare using `parcel_pricing_configs`.
+   - At completion:
+       - Use existing PricingService + WalletService to finalize and settle.
+
+Admin:
+   - Panel to manage parcel_pricing_configs per country/region.
+
+2) Proof-of-Delivery photo capture (Task 27)
+
+New table: `delivery_proof_photos`
+   - id
+   - delivery_id
+   - driver_id
+   - photo_url
+   - captured_at
+   - meta JSON (e.g., gps_lat, gps_lng, device)
+
+Driver app:
+   - On delivery screen for parcel:
+       - Require driver to take/upload at least one proof photo before completing delivery (configurable per country).
+   - After successful upload:
+       - Allow “Complete delivery” action.
+
+Customer app:
+   - On parcel tracking details:
+       - Show a small thumbnail or link to proof photo(s).
+       - Do NOT allow download of raw file URLs if that breaks privacy; use secured access endpoints.
+
+Security:
+   - Only:
+       - delivery’s customer,
+       - assigned driver,
+       - admins
+     can view the photos.
+   - Objects should be stored in secure bucket with signed URLs / access control.
+
+3) Scheduled pickup for parcel (Task 28)
+
+Extend `deliveries`:
+   - pickup_type: "immediate" | "scheduled"
+   - scheduled_pickup_at (timestamp, nullable)
+   - scheduled_window_minutes (e.g., 30/60)
+
+Booking flow:
+   - Customer can select:
+       - “Send now” → immediate request (same as existing flow).
+       - “Schedule for later” → choose date/time within allowed window.
+   - Validate:
+       - scheduled time is at least X minutes/hours in the future.
+       - within service hours for that region (per config).
+
+Dispatch integration:
+   - For pickup_type="scheduled":
+       - Do NOT start driver search immediately on creation.
+       - Use a scheduled job / cron process:
+           - At (scheduled_pickup_at - lead_time), create a dispatch_sessions record and start driver search.
+   - Lead time is configurable per country/region (e.g., 20–30 minutes).
+
+Notifications:
+   - Remind customer and driver ahead of scheduled pickup (using NotificationService).
+   - If dispatch fails (no driver found), notify customer with options (reschedule/cancel).
+
+Admin:
+   - Monitor upcoming scheduled deliveries (read-only listing).
+   - No manual force-assignment required in this phase (optional future enhancement).
+
+==================================================
+I. NOTIFICATIONS & EVENTS (PHASE 3 HOOKS)
+==================================================
+
+Add new notification types (without breaking existing ones):
+
+For customers:
+   - PROFILE_UPDATED (for security emails/logs, not FCM spam)
+   - FOOD_ORDER_STATUS_CHANGED
+   - PARCEL_SCHEDULED_CONFIRMATION
+   - PARCEL_PICKUP_REMINDER
+   - PARCEL_DELIVERED_WITH_POD
+
+For drivers:
+   - FOOD_ORDER_READY_FOR_PICKUP
+   - PARCEL_SCHEDULED_ASSIGNMENT
+   - PARCEL_PICKUP_REMINDER
+   - POD_REQUIRED_REMINDER (if driver tries to complete without photo where required)
+
+For restaurants:
+   - NEW_ORDER_RECEIVED (existing or new)
+   - DRIVER_ASSIGNED
+   - ORDER_PICKED_UP
+
+Each event:
+   - Uses WebSocket for live UI and FCM for background push.
+   - Passes minimal data: service_type, entity_id, status, high-level text.
+
+==================================================
+J. SECURITY PHASE LABEL – “USER SETTINGS & EVIDENCE PROTECTION”
+==================================================
+
+Phase 3 belongs to the SafeGo security roadmap phase:
+   - Protecting user settings (profile, payment methods, preferences) from unauthorized access.
+   - Protecting proof-of-delivery evidence (photos) from being accessed by unrelated users.
+   - Ensuring scheduled parcel data can’t be manipulated by other users.
+
+Key measures:
+   - Every profile/payment/preferences/saved-place API is scoped by authenticated user_id.
+   - Every POD photo request checks authorization (customer/driver/admin).
+   - All admin tools are read-only for sensitive user settings, except where explicitly required (pricing configs).
+
+==================================================
+K. NON-BREAKING GUARANTEES & DEMO READINESS
+==================================================
+
+When implementing this Phase 3 prompt:
+
+1) Non-breaking changes ONLY:
+   - Add new tables:
+       - customer_saved_places
+       - customer_ride_preferences
+       - kitchen_tickets
+       - parcel_pricing_configs
+       - delivery_proof_photos
+   - Add new fields (nullable with sensible defaults) to:
+       - customers
+       - rides
+       - food_orders
+       - deliveries
+       - restaurants
+   - Add new APIs and UI routes without removing existing ones.
+
+2) Existing data compatibility:
+   - Old rides/food_orders/deliveries without Phase 3 fields must still load fine.
+   - Feature flags (config) must allow:
+       - enabling/disabling saved places,
+       - enabling/disabling parcel scheduling,
+       - enforcing/not enforcing POD photos.
+
+3) Demo mode:
+   - Provide seed data / config examples:
+       - sample parcel_pricing_configs for BD + US,
+       - default kitchen prep_time_default_minutes,
+       - one or two sample customer_saved_places for demo accounts.
+   - Make sure the demo can show:
+       - customer editing profile / saved places / preferences,
+       - ordering food and seeing restaurant prep status,
+       - sending a parcel with scheduled pickup and viewing proof-of-delivery.
+
+4) Do NOT:
+   - Change any previously built wallet, commission, or payment logic.
+   - Modify the established dispatch_sessions core.
+   - Introduce any breaking changes to admin navigation or APIs.
+
+Implement all of the above in production-quality code, with clear separation between:
+   - Customer settings module,
+   - Restaurant kitchen & order status module,
+   - Parcel management module,
+   - Shared dispatch, wallet, and notification services.
+
+This completes SafeGo Phase 3 (Tasks 19–28) while fully preserving and extending all existing SafeGo features.

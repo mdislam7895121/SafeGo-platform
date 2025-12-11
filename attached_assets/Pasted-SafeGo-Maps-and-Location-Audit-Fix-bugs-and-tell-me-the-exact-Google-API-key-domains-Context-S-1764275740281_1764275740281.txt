@@ -1,0 +1,92 @@
+SafeGo Maps and Location Audit – Fix bugs and tell me the exact Google API key domains
+
+Context:
+- SafeGo is a rideshare-style app with a customer ride booking screen.
+- I am using Google Maps Platform (Places, Maps JavaScript, Directions, Distance Matrix, Geocoding).
+- I want a fully working location search and current location flow using Google APIs.
+- Right now, typing addresses like “170-21” or “JFK” shows “No results found”.
+- The preview is running on Replit (e.g., https://2vs80nbcek.worf.replit.dev).
+
+Your tasks:
+
+1) Full audit of the Maps & Location integration
+- Inspect the frontend and backend code for:
+  - Google Maps JavaScript SDK loading
+  - Places Autocomplete usage
+  - Any custom /api/maps/* or /api/maps/autocomplete routes
+  - Current location detection (navigator.geolocation)
+  - Distance/ETA and route calculations
+- Check browser console logs and server logs while using the customer ride page.
+- Identify ALL errors and misconfigurations related to:
+  - API key usage
+  - Referrer restrictions
+  - Wrong domains/origins
+  - Missing JS SDK
+  - Wrong Autocomplete initialization
+
+2) Fix Google Places Autocomplete properly (frontend first)
+- Implement Google Places Autocomplete using the client-side Google Maps JavaScript SDK (no backend autocomplete).
+- Load the SDK script in the frontend using my existing API key, with:
+    https://maps.googleapis.com/maps/api/js?key=MY_API_KEY&libraries=places
+- Initialize google.maps.places.Autocomplete on the customer ride pickup and dropoff input fields.
+- Add a place_changed listener that:
+  - Gets the selected place
+  - Extracts full address, latitude, longitude
+  - Updates the UI fields and internal state used for pricing and routing.
+- Make sure that when I type:
+  - “170-21”
+  - “JFK”
+  - “Times Square”
+  - “Brooklyn”
+  I get real Google suggestions and can select them.
+
+3) Keep or fix distance/ETA and routing
+- Ensure that route distance and travel time are still calculated correctly using Google APIs (Directions + Distance Matrix).
+- Do not change the pricing logic or payment options, only make sure they receive correct distance/ETA based on the selected pickup and dropoff coordinates.
+
+4) Fix current location detection
+- Ensure navigator.geolocation is used correctly with:
+  - enableHighAccuracy: true
+  - sensible timeout and maximumAge
+- On success:
+  - Reverse geocode the coordinates into an address
+  - Fill the pickup field with the resolved address
+- On error (permission denied, timeout, unavailable):
+  - Stop showing “Detecting location…”
+  - Let the user manually set the pickup address (no infinite spinner).
+
+5) Tell me exactly which domains to use in Google Maps API key restrictions
+- Programmatically read window.location.origin for the customer frontend.
+- Based on that, produce a short report in plain English that includes:
+  - The exact origins currently used by the SafeGo customer frontend (for example: https://2vs80nbcek.worf.replit.dev).
+  - The wildcard patterns I should put into the Google Cloud Console “Website restrictions” for this API key. 
+    For example, if appropriate:
+      https://*.replit.dev/*
+      https://*.repl.co/*
+      http://localhost/*
+  - Confirm that the APIs required by this project are:
+      Places API
+      Maps JavaScript API
+      Directions API
+      Distance Matrix API
+      Geocoding API
+- Make sure you explain clearly which origins must be added so that the browser-based JS SDK works without REQUEST_DENIED or referrer errors.
+
+6) Safety and scope
+- Do not remove or break any non-Maps features (rides, payments, profiles, etc.).
+- Only refactor code that is directly related to:
+  - Google Maps / Places
+  - Location search
+  - Routing and ETA
+  - Current location logic
+
+After you finish:
+- Restart the app.
+- Test the customer ride screen and confirm:
+  - Typing “JFK” / “170-21” / “Times Square” shows Google suggestions.
+  - Selecting a suggestion updates coordinates and allows me to see prices.
+  - Current location either resolves to an address or gracefully falls back if permission is denied.
+- Finally, print a clear summary:
+  - What was broken
+  - What you changed
+  - Which exact origins/domains I must configure in the Google Maps API key “Website restrictions”.

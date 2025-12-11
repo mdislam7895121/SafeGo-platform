@@ -1,0 +1,108 @@
+STEP 46 – PHASE 3  
+Implement FULL Driver UI for SafeGo Eats food delivery workflow.
+
+Backend dispatch engine is already complete.  
+Now build the DRIVER APP SCREENS that connect to the new delivery endpoints.
+
+You must follow ALL SafeGo Master Rules, keep everything backward-compatible,
+and DO NOT modify any backend logic already generated.
+
+============================
+REQUIRED DRIVER UI SCREENS
+============================
+
+1. DriverDeliveriesInboxScreen
+   - Tabs:
+     • New Requests
+     • Active
+     • Completed
+   - For each delivery card show:
+     • restaurant name
+     • pickup address
+     • dropoff address
+     • payout amount
+     • distance/ETA (if backend provides)
+     • Accept / Reject buttons for “New Requests”
+   - Connect buttons:
+     POST /driver/deliveries/accept
+     POST /driver/deliveries/reject
+
+2. DriverDeliveryRequestDetailScreen
+   - Shows:
+     • items summary
+     • total amount
+     • payment method (cash/online)
+     • customer delivery instructions
+     • map with pickup + dropoff markers
+   - Buttons:
+     • Accept Delivery
+     • Reject Delivery
+
+3. DriverActiveDeliveryScreen
+   - This is the workflow for an accepted order.
+   - Show:
+     • restaurant info
+     • customer info (masked)
+     • order summary
+     • delivery id + food order id
+     • live map showing driver → customer route
+   - Actions:
+     • “Picked Up Order”
+       → POST /driver/deliveries/status {status:"picked_up"}
+     • “On the Way”
+       → POST /driver/deliveries/status {status:"on_the_way"}
+     • “Delivered”
+       → POST /driver/deliveries/status {status:"delivered"}
+
+   - Update driver location:
+     Use POST /driver/deliveries/location periodically.
+
+4. DriverDeliveriesHistoryScreen
+   - Paginated list from GET /driver/deliveries/history
+   - Show:
+     • date
+     • earning
+     • status
+     • delivery id
+
+============================
+UI/UX RULES
+============================
+- Must match SafeGo’s design components used in Ride UI.
+- Mobile friendly.
+- Verified drivers only (is_verified = true).
+- Restrict access for:
+  blocked = true or verification_status ≠ "approved".
+
+============================
+INTEGRATION RULES
+============================
+- Driver sees ONLY deliveries assigned to them.
+- Driver cannot see customer government ID.
+- Driver cannot access any restaurant documents.
+- For cash deliveries:
+  Show: “Customer will pay cash.”
+  But DO NOT modify wallet/commission logic.
+
+============================
+DEMO MODE SUPPORT
+============================
+If enableFoodDeliveryDemo = true:
+- Provide a mock driver UI flow that auto-refreshes.
+- Auto-status simulation allowed only for demo orders.
+
+============================
+OUTPUT REQUIREMENTS
+============================
+Deliver:
+- All driver UI screens
+- Navigation links in Driver App sidebar/menu
+- Full connection to backend endpoints
+- Error handling & confirmation dialogs
+- Optional map or static placeholder if live map not available
+
+Do NOT modify:
+- Customer UI
+- Restaurant UI
+- Admin UI
+- Any backend logic

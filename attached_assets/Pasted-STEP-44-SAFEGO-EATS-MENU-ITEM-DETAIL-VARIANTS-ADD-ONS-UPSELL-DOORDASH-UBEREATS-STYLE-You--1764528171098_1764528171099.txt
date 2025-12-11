@@ -1,0 +1,442 @@
+STEP 44 – SAFEGO EATS MENU ITEM DETAIL, VARIANTS, ADD-ONS & UPSELL (DOORDASH/UBEREATS STYLE)
+
+You must follow ALL SafeGo Master Rules exactly.
+This step is additive-only and MUST NOT break any existing SafeGo functionality or schemas.
+
+========================================
+MASTER SAFEGO CONSTRAINTS (ALWAYS ON)
+========================================
+
+ROLES (4 distinct roles, no mixed access):
+1. Customer
+2. Driver
+3. Restaurant (Merchant)
+4. Admin
+
+Each role must keep its own:
+- signup requirements
+- country-specific KYC requirements
+- dashboard UI
+- permissions and data visibility
+- status flows
+
+GLOBAL SERVICES (must remain supported):
+1. Ride-hailing
+2. Food delivery (SafeGo Eats)
+3. Parcel delivery
+
+COUNTRY-SPECIFIC KYC REQUIREMENTS:
+
+Bangladesh (BD) mandatory for all users:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status ("pending", "approved", "rejected")
+- is_verified (boolean)
+
+United States (US) mandatory:
+For all:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+US DRIVERS extra:
+- driver_license_number
+- driver_license_image
+- driver_license_expiry
+- ssn_last4 (optional but supported)
+- driver_background_check_status (admin-only editable)
+
+ADMIN PANEL – REQUIRED CAPABILITIES:
+Admin must still be able to:
+- view and verify customers, drivers, restaurants (BD + US)
+- approve/reject KYC with rejection_reason
+- configure pricing, fees, commissions for rides, food_orders, deliveries
+- block/unblock any user with blocked_reason and blocked_at
+- manage payouts and settlements
+- view driver_negative_balance, restaurant_negative_balance
+- update settlement status (mark paid)
+- view audit logs for sensitive actions
+
+CORE COLLECTIONS (CANNOT BE REMOVED OR RENAMED):
+1. rides
+2. food_orders
+3. deliveries
+
+Each must keep:
+- identity: customer_id, driver_id (where applicable), restaurant_id (for food_orders), admin_id (for overrides)
+- location: addresses + lat/lng
+- financials: base_price, distance_fee, service_fee, platform_commission_amount, driver_earnings_amount, restaurant_earnings_amount, total_amount_charged_to_customer, payment_method, payment_status
+- timestamps: created_at, updated_at, accepted_at, completed_at, cancelled_at
+- status: must follow allowed lifecycle for that service
+- feedback: customer_rating, customer_feedback, driver_rating, restaurant_rating, internal_tags
+
+COMMISSION & PAYOUT RULES (MUST REMAIN TRUE):
+
+1. CASH ride:
+   - Driver receives full cash.
+   - SafeGo commission becomes driver_negative_balance in driver_wallet_balance.
+   - Driver settles weekly (or configured).
+
+2. CASH food order:
+   - Restaurant receives all cash.
+   - SafeGo commission becomes restaurant_negative_balance in restaurant_wallet_balance.
+   - Restaurant settles later.
+
+3. ONLINE payment:
+   - SafeGo receives full payment.
+   - SafeGo keeps commission automatically.
+   - Payouts to driver/restaurant are net of commissions/fees.
+
+4. Admin may mark balances as settled, adjust wallet balances, with audit logging.
+
+SECURITY RULES (ALWAYS):
+- Customers cannot see driver or restaurant KYC documents.
+- Drivers cannot see customer KYC or government IDs.
+- Restaurants cannot see other restaurants’ data or balances.
+- Only Admin can see full KYC data and change verification, blocking, pricing, commissions.
+- Users can only update their own non-admin profile fields.
+- Sensitive numbers only stored/displayed in masked/last4 form.
+
+STATUS FLOWS (CANNOT BE BROKEN):
+
+rides.status:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+food_orders.status:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+deliveries.status:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+ONBOARDING (ALL ROLES):
+- multi-step: basic info → address → KYC → emergency contact
+- verification_status = "pending", is_verified = false
+- Admin approval required before full access (drivers can’t accept jobs, restaurants can’t receive orders, etc.)
+
+NOTIFICATIONS (MUST CONTINUE TO WORK):
+- new ride requests for drivers
+- new food orders for restaurants
+- parcel updates
+- verification approval/rejection
+- important admin alerts (e.g. high negative balances)
+
+IMPLEMENTATION RULES:
+- Do NOT rename or delete any existing field, route, or component.
+- Only ADD new fields/endpoints/components/views.
+- All changes must be backward-compatible.
+
+SECURITY ROADMAP FOCUS FOR STEP 44:
+- Strict role-based access to new menu configuration UIs.
+- Data minimization: customers see only necessary item/menu info, not internal restaurant costs or margins.
+- Input validation for new menu configuration fields to prevent injection or tampering.
+- Basic audit logging for Admin/Restaurant changes to variants and add-ons (if logging layer exists).
+
+====================================================
+STEP 44 – GOAL (HIGH LEVEL)
+====================================================
+
+Design and implement a professional SafeGo Eats menu item system, similar to DoorDash/UberEats, including:
+
+1) Item detail view for customers.
+2) Support for item variants (sizes/options).
+3) Support for add-ons (extras/toppings).
+4) Upsell recommendations (e.g. “People also added”).
+5) Restaurant-side configuration UI for variants, add-ons, upsell groups.
+6) Admin-side oversight (view and moderate configuration, but not daily editing).
+7) No changes to commission/payout logic, rides, or parcel modules.
+
+All work must be safe, additive, and compatible with mobile-first UI introduced in Step 43.
+
+====================================================
+PHASE 1 – DATA MODEL EXTENSIONS (ADD-ONLY)
+====================================================
+
+Extend the menu data model ADDITIVELY (no renames) to support:
+
+Entity: menu_items (or equivalent existing structure)
+New additive fields:
+- has_variants (boolean)
+- has_add_ons (boolean)
+- default_variant_id (nullable)
+- upsell_group_id (nullable, references a new entity described below)
+
+New entity: menu_item_variants
+Fields:
+- id
+- restaurant_id
+- menu_item_id
+- name (e.g. "Small", "Medium", "Large", "Combo")
+- description (optional)
+- price_delta (numeric; added to base item price OR full price field – choose approach but keep backward compatible)
+- is_default (boolean)
+- is_active (boolean)
+- created_at, updated_at
+
+New entity: menu_item_add_ons
+Fields:
+- id
+- restaurant_id
+- name (e.g. "Extra cheese", "Coke 250ml")
+- description (optional)
+- price (numeric)
+- is_active (boolean)
+- created_at, updated_at
+
+New entity: menu_item_add_on_links (many-to-many join between items and add-ons)
+Fields:
+- id
+- restaurant_id
+- menu_item_id
+- add_on_id
+- is_required (boolean)
+- max_quantity_per_order (integer, nullable)
+- created_at, updated_at
+
+New entity: menu_item_upsell_groups
+Fields:
+- id
+- restaurant_id
+- name (e.g. "Popular add-ons", "Recommended sides")
+- created_at, updated_at
+
+New entity: menu_item_upsell_links
+Fields:
+- id
+- upsell_group_id
+- from_menu_item_id
+- to_menu_item_id
+- priority (integer for ordering)
+- created_at, updated_at
+
+Update food_orders items representation ADDITIVELY (without breaking existing shape):
+- For each ordered item, store:
+  - selected_variant_id (nullable)
+  - selected_add_ons: array of { add_on_id, quantity, price_at_order_time }
+- Do NOT change existing required fields; only add optional ones.
+
+====================================================
+PHASE 2 – CUSTOMER-SIDE ITEM DETAIL UI
+====================================================
+
+For the Customer app (SafeGo Eats):
+
+Create/upgrade an Item Detail view (modal or full screen) accessible from:
+- menu item cards in restaurant detail page
+- order history “reorder” if item still exists
+
+Item Detail must show:
+- item image (or placeholder)
+- item name
+- description
+- base price
+- variants selector (if has_variants = true)
+- add-ons selector(s) (if has_add_ons = true)
+- cart quantity selector
+- live-updating total price (base + variant + add-ons x quantity)
+- Add to Cart button
+
+Variants behavior:
+- If has_variants = false, hide variant selector.
+- If has_variants = true:
+  - show a selector (buttons, radio, or dropdown) listing all active variants.
+  - ensure default variant is pre-selected.
+  - price should reflect base + price_delta or variant price, according to chosen implementation.
+
+Add-ons behavior:
+- Show add-ons grouped if needed (e.g. sauces, drinks).
+- Each add-on shows:
+  - name
+  - price
+  - optional max quantity control
+- Enforce max_quantity_per_order in UI and validation.
+- If is_required = true, force at least one selection before allowing “Add to Cart”.
+
+Upsell display:
+- When appropriate (e.g. after adding to cart, or near Add to Cart button), show “You might also like” items based on menu_item_upsell_links.
+- Clicking an upsell item opens its item detail view.
+
+Security:
+- No internal cost fields or margin calculations exposed.
+- Only public menu info is shown.
+
+====================================================
+PHASE 3 – CART & CHECKOUT INTEGRATION
+====================================================
+
+Integrate variants and add-ons into existing cart & checkout logic:
+
+Cart:
+- For each line item, display:
+  - item name
+  - variant name (if any)
+  - list of selected add-ons with quantities
+  - line total (including variant + add-ons)
+- Ensure quantity controls update totals correctly.
+
+Checkout:
+- Make sure the total amount already includes variants and add-ons.
+- Keep using existing payment_method, commission, and fee logic unchanged.
+- Persist selected_variant_id and add-ons in the food_orders item payload using the additive fields defined above.
+
+Order History:
+- For past orders, display selected variant and add-ons in a readable way.
+- Reorder:
+  - Attempt to rebuild cart with same variant and add-ons if they are still active.
+  - If something is no longer available, show a clear message and allow partial re-add.
+
+====================================================
+PHASE 4 – RESTAURANT DASHBOARD CONFIGURATION UI
+====================================================
+
+Extend Restaurant (Merchant) dashboard (SafeGo Eats) with a menu management section to configure:
+
+1) Variants per item:
+   - Create/read/update/delete variants for a given menu item.
+   - Mark one variant as default.
+   - Set price_delta or full price.
+   - Toggle is_active without deleting (soft-off).
+
+2) Add-ons:
+   - Create/read/update/delete add-on definitions (name, description, price, is_active).
+   - Link add-ons to specific menu items via UI:
+     - is_required toggle
+     - max_quantity_per_order
+
+3) Upsell groups:
+   - Create upsell groups (e.g. “Recommended sides”).
+   - Add links between items (from_item → to_item) with priority ordering.
+
+Constraints:
+- Only Restaurant role can manage its own menu and related variants/add-ons/upsell groups.
+- Restaurant cannot see or edit other restaurants’ menu configuration.
+- All writes must respect country-specific KYC verification:
+  - Restaurants that are not is_verified = true must NOT be able to publish or modify live menus (read-only or blocked with message).
+- Follow existing restaurant_negative_balance logic unchanged.
+
+====================================================
+PHASE 5 – ADMIN OVERSIGHT (READ-HEAVY, WRITE-LIGHT)
+====================================================
+
+In the Admin panel:
+
+- Add ability to:
+  - View each restaurant’s menu, variants, add-ons, and upsell groups.
+  - Flag or disable specific variants/add-ons/links if needed (e.g., for policy violation).
+- Admin actions:
+  - Should only toggle availability or mark items as flagged; do NOT change prices for restaurants here (unless existing business rules already allow).
+  - Should be logged in the existing audit log system (if present).
+
+Admin must NOT:
+- Break restaurant ownership model.
+- Modify customer pricing logic directly for a single order.
+- Touch commission calculations in this step.
+
+====================================================
+PHASE 6 – COUNTRY DIFFERENCES (BD vs US)
+====================================================
+
+BD restaurants:
+- Support typical BD patterns:
+  - Rice size variants (e.g. half/full)
+  - Extra gravy, salad, drinks as add-ons
+- Localize labels where necessary according to existing localization strategy.
+
+US restaurants:
+- Common US variants:
+  - Small/Medium/Large
+  - Combo meals
+- Common add-ons:
+  - Sides, dips, extra toppings
+
+Country behavior must be driven by configuration/metadata, not hard-coded branching scattered across the app.
+
+====================================================
+PHASE 7 – SECURITY & VALIDATION (STEP 44 FOCUS)
+====================================================
+
+Apply security roadmap focus:
+
+- Role-based access:
+  - Only Restaurant role can modify its menu configuration.
+  - Only Admin can globally disable items/variants/add-ons.
+  - Customers can only read menu data and create orders.
+
+- Data minimization:
+  - Do not expose internal IDs or sensitive restaurant configurations in a way that invites tampering from the client; use safe IDs or validate all writes server-side.
+
+- Input validation:
+  - Validate all new fields (names, prices, max quantities) on the server.
+  - Prevent negative prices or unreasonable quantities.
+
+- Audit logging:
+  - Log Admin and Restaurant menu configuration changes (if audit system exists).
+
+====================================================
+PHASE 8 – IMPLEMENTATION SCOPE AND FILES
+====================================================
+
+Add or update (ADD-ONLY) the following:
+
+Customer app:
+- customer-app/screens/EatsItemDetailScreen.*
+- customer-app/components/eats/ItemDetailModal.*
+- customer-app/components/eats/VariantSelector.*
+- customer-app/components/eats/AddOnSelector.*
+- customer-app/components/eats/UpsellSection.*
+- Integrations into:
+  - EatsRestaurantDetailScreen.*
+  - EatsCartScreen.*
+  - EatsCheckoutScreen.*
+  - EatsOrderHistoryScreen.*
+
+Restaurant dashboard:
+- restaurant-app/screens/MenuManagementScreen.*
+- restaurant-app/screens/ItemVariantsScreen.*
+- restaurant-app/screens/ItemAddOnsScreen.*
+- restaurant-app/screens/ItemUpsellScreen.*
+- restaurant-app/components/menu/* (variant rows, add-on forms, etc.)
+
+Admin panel:
+- admin-app/screens/RestaurantMenuReviewScreen.*
+- admin-app/components/menu/MenuModerationPanel.*
+
+APIs (ADD-ONLY):
+- api/restaurant/menu/variants/*
+- api/restaurant/menu/add_ons/*
+- api/restaurant/menu/upsell/*
+- api/customer/eats/item_detail/*
+- api/customer/eats/menu_with_variants_add_ons/*
+- admin/api/restaurant/menu_review/*
+
+All endpoints must be additive and backward-compatible.
+
+====================================================
+FINAL REQUIREMENT
+====================================================
+
+Deliver Step 44 as a complete, production-ready implementation of:
+- Menu item detail
+- Variants
+- Add-ons
+- Upsell recommendations
+- Restaurant configuration UI
+- Admin oversight
+
+with:
+- No breaking changes to existing rides, food_orders, deliveries, payouts, commissions, or authentication.
+- Full respect for SafeGo’s global roles, KYC rules, security rules, and status flows.

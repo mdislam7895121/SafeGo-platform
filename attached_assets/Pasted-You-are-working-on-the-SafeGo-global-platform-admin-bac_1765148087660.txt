@@ -1,0 +1,368 @@
+You are working on the SafeGo global platform (admin + backend + partner onboarding).  
+Your task in this prompt: FULLY audit and fix the **driver partner onboarding status page and navigation**, without breaking any existing SafeGo features.
+
+======================================================
+A. CORE SAFEGO MASTER RULES (DO NOT BREAK)
+======================================================
+
+1) ROLES — MUST always exist and stay separate
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   For each role:
+   - Separate signup/onboarding flows
+   - Separate dashboards
+   - Separate permissions and status flows
+   - Never mix role access or reuse restricted fields between roles
+
+2) GLOBAL APP LOGIC — 3 services (must be supported end-to-end)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+   The driver role can serve ride, food, and parcel (depending on configuration), but the flows and collections must reflect all three.
+
+3) COUNTRY-SPECIFIC KYC (MUST use branching logic)
+   Supported countries: Bangladesh (BD) and United States (US).  
+   Country must be stored on the driver profile and used to control what fields are collected and validated.
+
+   BANGLADESH (BD) – mandatory driver KYC fields:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID_number
+   - NID_front_image
+   - NID_back_image
+   - emergency_contact_name
+   - emergency_contact_phone
+   - emergency_contact_relation
+   - verification_status (e.g. "pending", "approved", "rejected", "needs_more_info")
+   - is_verified (boolean)
+
+   UNITED STATES (US) – mandatory driver KYC fields:
+   - date_of_birth
+   - home_address (US-style, with street, city, state, zip)
+   - emergency_contact_name
+   - emergency_contact_phone
+   - emergency_contact_relation
+   - government_id_type (e.g. "passport", "state_id")
+   - government_id_last4
+   - driver_license_number
+   - driver_license_image_front
+   - driver_license_image_back
+   - driver_license_expiry
+   - ssn_last4 (optional, never required)
+   - any city-specific items (e.g. NYC TLC license images if required)
+   - verification_status
+   - is_verified
+
+   IMPORTANT:  
+   - For NYC: do NOT require an “FHV Number” field; the TLC license images are enough. If there is an FHV Number input still present, REMOVE that input from the driver UI and schema validation (but do not delete underlying DB fields if they already exist – just stop requiring it in the UI and validation).  
+   - KYC -> Admin verification -> Driver status page must all use the same `verification_status` and `is_verified` flags.
+
+4) ADMIN PANEL — must be able to:
+   - View and verify all customers
+   - View and verify all drivers
+   - View and verify all restaurants
+   - Approve or reject KYC with a `rejection_reason`
+   - Update pricing, fees, and commissions (global and per country/city)
+   - Block or unblock any user (customer, driver, restaurant)
+   - Manage payouts and settlements
+   - View driver negative balances
+   - View restaurant negative balances
+
+5) REQUIRED COLLECTIONS (DO NOT REMOVE)
+   Collections: `rides`, `food_orders`, `deliveries`
+
+   Each must always include:
+   - Identity fields:
+     - customer_id
+     - driver_id (for rides and deliveries; optional for some food cases until assigned)
+     - restaurant_id (for food_orders)
+   - Addresses + geolocation:
+     - pickup_address / dropoff_address or restaurant_address / delivery_address
+     - pickup_lat, pickup_lng, dropoff_lat, dropoff_lng (or equivalent)
+   - Fees + commission:
+     - base_fare, distance_fare, time_fare
+     - service_fee
+     - safego_commission_amount
+     - driver_earnings
+     - restaurant_earnings (for food_orders)
+   - Payment details:
+     - payment_method (cash, card, wallet, etc.)
+     - payment_status
+     - transaction_id (if online)
+   - Timestamps:
+     - created_at, updated_at
+     - requested_at, accepted_at, picked_up_at, completed_at, cancelled_at (as applicable)
+   - Status flow:
+     - rides: `requested` → `searching_driver` → `accepted` → `driver_arriving` → `in_progress` → (`completed` or `cancelled_x`)
+     - food_orders: `placed` → `accepted` → `preparing` → `ready_for_pickup` → `picked_up` → `on_the_way` → (`delivered` or `cancelled_x`)
+     - deliveries (parcel): `requested` → `searching_driver` → `accepted` → `picked_up` → `on_the_way` → (`delivered` or `cancelled_x`)
+   - Rating and feedback:
+     - rating_from_customer, feedback_from_customer
+     - rating_from_driver, feedback_from_driver
+     - for restaurants: rating_from_customer_on_food, etc.
+
+6) COMMISSION & PAYOUT RULES — ALWAYS enforced
+   - If customer pays CASH for a ride:
+     - Driver receives the full cash amount from the customer.
+     - SafeGo’s commission becomes a negative balance in `driver_wallet_balance`.
+     - Driver must settle this negative balance weekly.
+   - If food order payment is CASH:
+     - Restaurant gets all cash.
+     - SafeGo commission becomes negative balance in `restaurant_wallet`.
+   - If payment is ONLINE:
+     - SafeGo keeps its commission automatically and credits net earnings to driver/restaurant wallets.
+   - Admin can settle balances and mark them as paid.
+
+7) SECURITY RULES — NEVER violate
+   - Customers cannot view driver documents (NID, driver license, TLC docs).
+   - Drivers cannot view customer NID or other sensitive identity documents.
+   - Restaurants cannot view other restaurants’ data or wallets.
+   - Only Admin can:
+     - change pricing and commission
+     - approve/reject verification
+     - block/unblock accounts
+   - Users can update only their own profile (respect role-based authorization).
+
+8) ONBOARDING — required for ALL roles
+   Each user type has multi-step onboarding:
+   - Step 1: Basic info
+   - Step 2: Address (country-specific rules)
+   - Step 3: ID/KYC upload (country-specific)
+   - Step 4: Emergency contact
+   - After submission:
+     - verification_status = "pending"
+     - is_verified = false
+   - Access to live operations (taking rides, receiving food orders, delivering parcels) is BLOCKED until admin approval.
+
+   For drivers:  
+   - They must be able to see a clear status page: “Pending review / Under review / Approved / Rejected / Blocked” and what to do next.
+
+9) NOTIFICATIONS — must exist
+   - New ride alert for drivers
+   - Order updates for customers and drivers
+   - Parcel updates
+   - Verification approval / rejection notifications
+   - Important admin notifications (e.g. changes to commission, new policy updates)
+
+10) NON-BREAKING CHANGE RULES
+    - Do NOT remove or rename existing fields, APIs, or routes.
+    - Only ADD new fields, routes, and components, or UPDATE internal logic in a backward-compatible way.
+    - If there is any doubt that a change could break current production behavior, choose the safer additive option.
+
+======================================================
+B. CURRENT BUG CONTEXT (FROM USER)
+======================================================
+
+- Environment: SafeGo partner driver onboarding flow previewed on Replit.
+- Screen: Driver status page at URL similar to `/partner/driver/status`.
+- UI shows: “Your Application is Under Review / Pending Review” along with “Back to Home” text at the bottom.
+- PROBLEM: “Back to Home” appears as text but is NOT clickable; it does not navigate to the home page.
+- User also indicated previously:
+  - We should NOT require an “FHV Number” field for drivers; uploading required license images is enough.
+  - There may be multiple versions (v1, v2) of driver status or onboarding screens – we must clean this up so only the correct version is used.
+
+Your job:  
+1) Fix the “Back to Home” navigation.  
+2) Fully audit the driver onboarding status screen and all related navigation so everything is publish-ready and consistent with SafeGo rules.
+
+======================================================
+C. TASK: FULL DRIVER ONBOARDING STATUS PAGE + NAVIGATION AUDIT
+======================================================
+
+Implement all of the following. Do NOT skip any step.
+
+1) Identify the active driver status component and route
+   - Find the component currently rendered at `/partner/driver/status` (or equivalent).
+   - Confirm if there are multiple versions (e.g. `DriverStatusV1`, `DriverStatusV2`, etc.).
+   - Decide ONE canonical status component to use and keep it.
+   - If multiple components exist, deprecate the old one by:
+     - Stopping its usage in routing.
+     - Marking it clearly as legacy (but do NOT delete it).
+     - Ensuring only the canonical component is referenced from the router.
+
+2) Fix the “Back to Home” button behavior
+   - Replace the plain text “Back to Home” with an accessible, clickable element.
+   - If using Next.js App Router:
+     - Use `useRouter` from `next/navigation`:
+       ```tsx
+       const router = useRouter();
+       ...
+       <button
+         type="button"
+         onClick={() => router.push('/')}
+         className="text-primary underline font-medium cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+       >
+         Back to Home
+       </button>
+       ```
+   - If there is a dedicated driver home route, like `/partner/driver/home` or `/partner/home`, then:
+     - Use that route instead of `/`.
+     - Make sure the route exists and is wired correctly.
+   - Keep the design consistent with the rest of the UI, but ensure:
+     - `cursor: pointer` on hover
+     - Keyboard accessible (Enter/Space)
+     - Proper focus styles
+
+3) Define a clear driver verification status state machine
+   Implement a small, explicit state machine for driver verification states, driven by backend fields:
+
+   - `verification_status` values:
+     - `pending` (documents submitted; waiting for review)
+     - `under_review` (optional alias for pending)
+     - `approved`
+     - `rejected`
+     - `needs_more_info`
+     - `blocked` (if admin blocks the driver)
+   - `is_verified`:
+     - `true` only when `verification_status === 'approved'`.
+     - `false` for all other statuses.
+
+   The status page must render clearly different UIs for each state:
+
+   a) PENDING / UNDER_REVIEW:
+      - Title: “Your Application Is Under Review”
+      - Body: “Our team is reviewing your documents. This usually takes 24–48 hours. We’ll notify you once the review is complete.”
+      - Actions:
+        - “Back to Home” (fixed as described above)
+        - Optional: “View submitted details” (read-only, no editing)
+
+   b) APPROVED:
+      - Title: “You’re Approved!”
+      - Body: “Your driver account has been approved. You can now go online and start receiving ride, food, and parcel requests (depending on your configuration).”
+      - Actions:
+        - “Open Driver Dashboard” → navigate to driver live dashboard (e.g. `/driver` or `/partner/driver/dashboard`).
+        - “Back to Home” if needed.
+
+   c) REJECTED:
+      - Title: “Application Rejected”
+      - Show `rejection_reason` from admin.
+      - Body: “Please review the reason above and update your documents if allowed.”
+      - Actions:
+        - If allowed: “Update Documents” → go to the KYC step.
+        - “Back to Home”.
+
+   d) NEEDS_MORE_INFO:
+      - Title: “More Information Required”
+      - Show the specific missing items (e.g. license image, address proof).
+      - Actions:
+        - “Upload Missing Documents” → go to the relevant onboarding step.
+        - “Back to Home”.
+
+   e) BLOCKED:
+      - Title: “Account Blocked”
+      - Body: “Your account has been blocked by SafeGo. Please contact support if you believe this is a mistake.”
+      - Actions:
+        - “Contact Support” (open support page or mailto link).
+        - “Back to Home”.
+
+4) Remove FHV Number field from driver UI (NYC rule)
+   - In the driver KYC form for US → NYC drivers:
+     - If there is a field like `fhv_number` or “FHV Number”, hide it and stop requiring it.
+   - Keep TLC license images as the required fields:
+     - `tlc_license_image_front`
+     - `tlc_license_image_back`
+   - Make sure validation rules, error messages, and the status page are aligned with this change.
+   - DO NOT delete `fhv_number` from the schema if it exists; just:
+     - Stop showing it in the React forms.
+     - Stop treating it as required.
+
+5) Enforce correct access control for driver status page
+   - If a driver is logged in but has not completed onboarding:
+     - Redirect them to the correct next onboarding step (e.g. `/partner/driver/onboarding/documents`).
+   - If a driver has completed onboarding but is not yet verified:
+     - Route them to the status page (`/partner/driver/status`).
+   - If a driver is fully approved (`is_verified === true`):
+     - If they hit `/partner/driver/status`, show the APPROVED screen but also give them a clear button to go to the live dashboard.
+   - If someone not logged in tries to access `/partner/driver/status`:
+     - Redirect them to login, with a redirect back to status page after auth, OR
+     - Show a proper unauthorized message.
+
+6) Connect driver status page to Admin panel fields (non-breaking)
+   - Ensure the driver status component reads `verification_status`, `is_verified`, and `rejection_reason` from the existing backend/API.
+   - Do NOT change the existing API signatures; if needed, only add optional fields.
+   - Confirm that when Admin:
+     - Approves a driver → the driver sees the APPROVED state.
+     - Rejects a driver with a `rejection_reason` → the driver sees REJECTED state with that reason.
+     - Marks `needs_more_info` → driver status shows the correct state.
+
+7) Ensure multi-device responsiveness
+   - Test the status page on:
+     - Desktop (wide viewport)
+     - Tablet
+     - Mobile
+   - Fix any layout issues such as:
+     - Text cut off
+     - Buttons off-screen
+     - Scroll not working
+   - The “Back to Home” button MUST be visible and usable on all screen sizes without extra scrolling.
+
+8) Add or confirm notifications
+   - When driver verification_status changes from:
+     - `pending` → `approved`
+     - `pending` → `rejected`
+     - `pending` → `needs_more_info`
+   - Ensure a notification is triggered (could be email, in-app banner, or both).
+   - Do not remove any existing notification logic; only extend or hook into it.
+
+9) Testing checklist (must pass all)
+   - T1: New driver (BD) completes onboarding:
+     - Sees “Under Review” status page.
+     - “Back to Home” works and routes correctly.
+   - T2: New driver (US, NYC) completes onboarding:
+     - FHV Number is NOT requested in the form.
+     - TLC license images are required.
+     - Sees “Under Review” status and working “Back to Home”.
+   - T3: Admin approves driver:
+     - Driver reloads status page and sees APPROVED state.
+     - “Open Driver Dashboard” opens the correct page.
+   - T4: Admin rejects driver with reason:
+     - Driver sees REJECTED state with `rejection_reason`.
+     - “Update Documents” button goes to KYC step.
+   - T5: Admin sets `needs_more_info`:
+     - Driver sees NEEDS_MORE_INFO state and can upload missing docs.
+   - T6: Admin blocks driver:
+     - Driver sees BLOCKED state and cannot go online.
+   - T7: Unauthenticated user visits `/partner/driver/status`:
+     - Properly redirected or blocked.
+   - T8: Mobile + desktop:
+     - “Back to Home” works smoothly on both.
+     - No dead buttons, no console errors.
+
+======================================================
+D. FILES / MODULES LIKELY TO CHANGE (NON-BREAKING)
+======================================================
+
+When implementing this, you may need to touch (names are examples, adapt to the actual codebase):
+
+1) `apps/web/app/partner/driver/status/page.tsx`
+   - Make this the canonical driver status page.
+   - Add proper navigation for “Back to Home”.
+   - Implement state-based UI for the driver verification states.
+
+2) `apps/web/components/partner/driver/DriverStatusCard.tsx` (or similar)
+   - Centralize status rendering logic.
+   - Read `verification_status`, `is_verified`, and `rejection_reason` from props or hooks.
+
+3) `apps/web/app/partner/driver/onboarding/*`
+   - Adjust forms so that:
+     - BD vs US KYC fields are separated correctly.
+     - FHV Number is not required for US/NYC.
+   - Keep all schema/API changes backward-compatible (only add optional fields).
+
+4) `apps/web/lib/api/driver.ts` or equivalent API client
+   - Ensure it exposes the fields needed by the status page without changing existing signatures.
+
+5) `apps/admin/*` (only if absolutely necessary)
+   - Confirm admin can set `verification_status`, `rejection_reason`, and block/unblock drivers.
+   - Do not break existing admin routes; only add helpers if needed.
+
+Guarantee:  
+All changes must be additive and backward-compatible:
+- No removal or renaming of existing DB columns, API fields, or routes.
+- Only add navigation, UI states, and optional fields.
+- Driver status and navigation must be fully working and ready for a production publish after this task.

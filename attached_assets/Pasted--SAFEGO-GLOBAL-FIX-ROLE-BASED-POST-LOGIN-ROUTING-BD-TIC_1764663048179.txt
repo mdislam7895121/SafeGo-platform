@@ -1,0 +1,311 @@
+# SAFEGO GLOBAL — FIX ROLE-BASED POST-LOGIN ROUTING (BD TICKET & SHOP PARTNER)
+# You MUST follow ALL SafeGo master rules.
+# This change must be strictly additive and non-breaking.
+
+========================================================
+0) SAFEGO MASTER RULES (DO NOT BREAK)
+========================================================
+Core roles (must remain distinct):
+1) customer
+2) driver
+3) restaurant
+4) admin
+
+New BD-only business roles (already implemented, must be preserved):
+5) shop_partner
+6) ticket_operator
+
+Global services (must continue to work exactly as before):
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+Country-specific KYC (no changes allowed):
+
+Bangladesh (BD) KYC:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number + front/back images
+- emergency_contact details
+- verification_status
+- is_verified
+
+United States (US) KYC:
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status
+- is_verified
+
+Admin panel (must keep all existing capabilities):
+- verify customers, drivers, restaurants, shop partners, ticket operators
+- approve/reject KYC with rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view negative balances for drivers, restaurants, BD shop partners, BD ticket operators
+
+Collections that MUST NOT be broken:
+- rides
+- food_orders
+- deliveries
+
+Commission and payout rules (must remain valid):
+
+1) CASH ride:
+   - Driver receives full cash.
+   - SafeGo commission becomes negative balance in driver_wallet_balance.
+   - Driver settles weekly.
+
+2) CASH food order:
+   - Restaurant receives full cash.
+   - SafeGo commission becomes negative balance in restaurant_wallet.
+
+3) CASH ticket (BD ticket_operator):
+   - Ticket operator receives full cash.
+   - SafeGo commission becomes negative balance in operator_wallet_balance.
+   - Operator settles weekly.
+
+4) ONLINE payments:
+   - SafeGo keeps commission automatically, partners receive net payout.
+
+5) Admin can settle balances and mark them as paid.
+
+Security rules:
+- Customers cannot view driver, shop partner, or ticket operator documents.
+- Drivers cannot view customer NID or sensitive info.
+- Shop partners cannot view restaurants or ticket operators internal data.
+- Ticket operators cannot view other operators’ internals.
+- Only admin can change pricing, commissions, verification, blocking.
+- Each user may update only their own profile.
+
+Status flows (must NOT be changed):
+
+Ride:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+Onboarding rules (all roles):
+- Multi-step onboarding
+- verification_status starts as "pending"
+- Access to full dashboard only after admin approval.
+- Pending users see limited, onboarding-only experience.
+
+Notifications (must continue, you may extend):
+- New ride alert for driver
+- Order and parcel status updates
+- Verification approval/rejection
+- Important admin notifications
+
+All of the above must remain intact.
+
+========================================================
+1) PROBLEM TO FIX
+========================================================
+Right now, after login, ALL non-admin users are being redirected
+to the `/customer` route.
+
+For BD ticket_operator and shop_partner, this is WRONG:
+- They land on `/customer` which expects a customer role.
+- Result: blank screen, because the customer layout does not
+  recognize their role and renders nothing.
+
+We must implement proper, role-based post-login routing and guards,
+WITHOUT breaking any existing route for existing roles.
+
+========================================================
+2) TASK SUMMARY
+========================================================
+Implement a clean role-based routing system for post-login:
+
+- customer        → /customer
+- driver          → /driver
+- restaurant      → /restaurant
+- ticket_operator → 
+    - if verification_status === "pending"   → /ticket-operator/onboarding
+    - if verification_status === "rejected"  → /ticket-operator/onboarding?status=rejected
+    - if verification_status === "approved"  → /ticket-operator/dashboard
+
+- shop_partner    →
+    - if verification_status === "pending"   → /shop-partner/onboarding
+    - if verification_status === "rejected"  → /shop-partner/onboarding?status=rejected
+    - if verification_status === "approved"  → /shop-partner/dashboard
+
+Admin:
+- admin → /admin (unchanged)
+
+This routing must be applied:
+- Immediately after successful login
+- Whenever a protected page is loaded with a mismatched role
+
+========================================================
+3) IMPLEMENTATION DETAILS
+========================================================
+3.1) Create a small helper for role-based redirect
+
+Add a utility (non-breaking) in a shared auth utils file, e.g.:
+
+  client/src/lib/roleRedirect.ts
+
+Function signature example:
+
+  getPostLoginPath(user: {
+    role: string;
+    countryCode?: string;
+    verification_status?: string;
+  }): string
+
+Logic:
+
+- If role === "admin":
+    return "/admin";
+
+- If role === "customer":
+    return "/customer";
+
+- If role === "driver":
+    return "/driver";
+
+- If role === "restaurant":
+    return "/restaurant";
+
+- If role === "ticket_operator":
+    - if user.countryCode !== "BD": 
+         (for safety) fall back to "/customer"
+      else:
+         if verification_status === "approved":
+             return "/ticket-operator/dashboard";
+         else:
+             return "/ticket-operator/onboarding";
+
+- If role === "shop_partner":
+    - if user.countryCode !== "BD":
+         fall back to "/customer"
+      else:
+         if verification_status === "approved":
+             return "/shop-partner/dashboard";
+         else:
+             return "/shop-partner/onboarding";
+
+- Default fallback:
+    return "/customer";
+
+3.2) Use this helper in the login flow
+
+Wherever we currently do something like:
+
+  router.push("/customer");
+
+Replace with:
+
+  const targetPath = getPostLoginPath(currentUser);
+  router.push(targetPath);
+
+Do NOT change how `currentUser` is fetched or stored;
+just change the final path using the helper.
+
+3.3) Add guards on each main route shell
+
+For `/customer` route component:
+- If currentUser.role !== "customer":
+    - compute targetPath = getPostLoginPath(currentUser);
+    - redirect to targetPath, do NOT render blank page.
+
+Similarly:
+
+For `/ticket-operator/*` shell:
+- if role !== "ticket_operator":
+    redirect to getPostLoginPath(currentUser);
+
+For `/shop-partner/*` shell:
+- if role !== "shop_partner":
+    redirect to getPostLoginPath(currentUser);
+
+For `/driver/*` and `/restaurant/*`, ensure similar checks already exist;
+if not, add them without changing behavior.
+
+3.4) Handle BD-only visibility
+
+- ticket_operator and shop_partner routes MUST only be accessible
+  when countryCode === "BD".
+
+If a US user somehow has ticket_operator role (edge case),
+fallback should be:
+- route to `/customer`
+- log a safe warning in console (no user-facing error).
+
+========================================================
+4) ONBOARDING & VERIFICATION FLOWS
+========================================================
+Respect existing onboarding logic:
+
+ticket_operator:
+- pending  → can access onboarding wizard only.
+- approved → full dashboard, ticket & rental tools.
+- rejected → show resubmission option and rejection_reason.
+
+shop_partner:
+- pending  → basic setup only (shop info, products disabled).
+- approved → full shop dashboard (products, orders, earnings).
+- rejected → resubmission flow with rejection_reason.
+
+Do NOT change backend verification_status semantics;
+only use them to choose correct redirect.
+
+========================================================
+5) SECURITY & PRIVACY
+========================================================
+- Ensure a ticket_operator cannot reach /customer internal data.
+- Ensure a shop_partner cannot reach /restaurant internal data.
+- Ensure these guards are enforced at route level in the frontend.
+- Do NOT expose any sensitive KYC info to non-admins.
+
+========================================================
+6) NON-BREAKING & FILES TO TOUCH
+========================================================
+You MUST keep all existing APIs and schemas unchanged.
+
+Safe areas to modify:
+
+- Login flow component (e.g. client/src/modules/auth/Login.tsx)
+  → replace hard-coded "/customer" with role-aware helper.
+
+- Route shells / layout components:
+  - client/src/modules/customer/index.tsx (or equivalent)
+  - client/src/modules/ticket-operator/index.tsx
+  - client/src/modules/shop-partner/index.tsx
+  - plus any shared ProtectedRoute / RequireAuth component.
+
+- New helper file:
+  - client/src/lib/roleRedirect.ts
+
+Do NOT rename existing routes or layouts.
+Do NOT modify backend code here.
+
+========================================================
+7) NOTIFICATIONS (OPTIONAL BUT RECOMMENDED)
+========================================================
+Add small in-app notifications when redirecting:
+
+- If a ticket_operator lands on /customer and is redirected, optionally show:
+  "আপনাকে টিকিট অপারেটর ড্যাশবোর্ডে নিয়ে যাওয়া হয়েছে।"
+
+- If a shop_partner lands on /customer and is redirected:
+  "আপনাকে দোকানের ড্যাশবোর্ডে নিয়ে যাওয়া হয়েছে।"
+
+Messages must be in Bangla for BD users.
+
+========================================================
+END OF TASK
+========================================================

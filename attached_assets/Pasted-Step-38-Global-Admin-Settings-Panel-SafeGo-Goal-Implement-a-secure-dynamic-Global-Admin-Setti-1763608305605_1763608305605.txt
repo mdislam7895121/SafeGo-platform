@@ -1,0 +1,425 @@
+Step 38 – Global Admin Settings Panel (SafeGo)
+
+Goal:
+Implement a secure, dynamic Global Admin Settings system for SafeGo that centralizes all platform-wide configuration (KYC rules, commission defaults, settlement cycles, notification thresholds, and security options) without breaking any existing flows.
+
+Important constraints:
+- Do NOT break existing driver/customer/restaurant/parcel/wallet behavior.
+- Keep all current defaults working even if settings are missing or invalid.
+- Reuse existing RBAC, audit logging, and notification systems.
+- No emojis in any new UI text.
+- All changes must be backwards compatible with existing database schema and data.
+- Settings must be admin-only and only editable by roles with explicit capabilities.
+
+1. Data Model – PlatformSettings
+
+Follow the existing ORM and migration style to introduce a minimal, flexible settings model:
+
+Table: PlatformSettings (or Settings)
+Fields:
+- id (primary key, existing style)
+- key (string, unique, indexed)
+- valueJson (JSON/text field to store structured configuration)
+- createdAt (timestamp)
+- updatedAt (timestamp)
+- updatedByAdminId (admin id, nullable but preferred)
+
+Requirements:
+- Use a key-based approach instead of adding many columns.
+- Keys should be namespaced and stable, for example:
+  - "general"
+  - "kyc"
+  - "commission"
+  - "settlement"
+  - "notifications"
+  - "security"
+- Each key’s valueJson should follow a typed structure (see sections below).
+- Provide a migration that initializes rows with sensible defaults that match the existing hard-coded behavior.
+
+Implement a SettingsService (or similar) in the backend with:
+
+- getSettings(): returns a merged object of all settings with defaults.
+- getSection(sectionKey: string): returns settings for one section with defaults.
+- updateSection(sectionKey: string, payload): validates and saves that section only.
+- internal cache (in-memory) with short TTL or per-request cache to avoid repetitive DB hits.
+- Safe parsing: if valueJson is missing or invalid, fall back to code defaults.
+
+2. Settings Structure and Defaults
+
+2.1 General Settings ("general")
+
+Structure:
+{
+  "supportEmail": string,
+  "supportPhone": string,
+  "defaultCountry": "BD" | "US"
+}
+
+Defaults:
+- supportEmail: "support@safego.test"
+- supportPhone: ""
+- defaultCountry: "BD"
+
+2.2 KYC & Identity Settings ("kyc")
+
+We need per-role and per-country configuration for required identity fields.
+
+Structure:
+{
+  "driver": {
+    "BD": {
+      "requireProfilePhoto": true,
+      "requireNid": true,
+      "requirePostalCode": true,
+      "requireVehicleDocuments": true
+    },
+    "US": {
+      "requireProfilePhoto": true,
+      "requireDmvLicenseDocs": true,
+      "requireTlcLicenseDocsForNY": true,
+      "requireSsn": true
+    }
+  },
+  "customer": {
+    "BD": {
+      "requireNid": true
+    },
+    "US": {
+      "requireSsn": false
+    }
+  },
+  "restaurant": {
+    "BD": {
+      "requireBusinessLicense": true
+    },
+    "US": {
+      "requireBusinessLicense": true
+    }
+  },
+  "documentExpiry": {
+    "warningDays": 30,
+    "hardBlockOnExpiry": false
+  }
+}
+
+Rules:
+- warningDays applies globally to all document expiry notifications (BD + US, drivers + restaurants + parcels) and must reuse the existing document expiry notification mechanism.
+- hardBlockOnExpiry: when true, KYC approval and certain actions (e.g., going online, accepting trips) can be blocked by existing validation hooks. For now, you should only:
+  - Use it in KYC approval and document review flows where safe.
+  - Never silently break ride/food/parcel flows. If in doubt, log and allow.
+
+Validation:
+- warningDays: integer between 1 and 365.
+- Booleans: must default to existing behavior if missing.
+
+2.3 Commission Settings ("commission")
+
+Structure:
+{
+  "driver": {
+    "ride": {
+      "defaultCommissionPercent": number
+    },
+    "parcel": {
+      "defaultCommissionPercent": number
+    }
+  },
+  "restaurant": {
+    "food": {
+      "defaultCommissionPercent": number
+    }
+  },
+  "countryOverrides": {
+    "BD": {
+      "driverRideCommissionPercent": number | null,
+      "restaurantFoodCommissionPercent": number | null,
+      "driverParcelCommissionPercent": number | null
+    },
+    "US": {
+      "driverRideCommissionPercent": number | null,
+      "restaurantFoodCommissionPercent": number | null,
+      "driverParcelCommissionPercent": number | null
+    }
+  }
+}
+
+Behavior:
+- If a country override is non-null, use that.
+- Otherwise, fall back to the corresponding defaultCommissionPercent.
+- Do not retroactively recalculate settled commissions; only new trips/orders should use the updated rates.
+- Commission analytics and settlement screens should read from this configuration for display, but must still handle historical data gracefully.
+
+2.4 Settlement Settings ("settlement")
+
+Structure:
+{
+  "driver": {
+    "cycle": "DAILY" | "WEEKLY" | "MONTHLY",
+    "minPayoutAmount": number
+  },
+  "restaurant": {
+    "cycle": "DAILY" | "WEEKLY" | "MONTHLY",
+    "minPayoutAmount": number
+  }
+}
+
+Behavior:
+- Existing settlement logic should read these values instead of hard-coded constants.
+- If settings are missing or invalid, use the current defaults.
+- No breaking changes to the wallet settlement system; existing settlement tests must still pass.
+
+2.5 Notification Settings ("notifications")
+
+Structure:
+{
+  "documentExpiry": {
+    "enabled": true,
+    "warningDays": number   // mirrors kyc.documentExpiry.warningDays
+  },
+  "lowWalletBalance": {
+    "enabled": false,
+    "threshold": number
+  },
+  "fraudAlerts": {
+    "enabled": false
+  }
+}
+
+Notes:
+- Reuse the existing document expiry notification pipeline, but replace its hard-coded threshold with this value.
+- For now, you may stub lowWalletBalance and fraudAlerts as configuration only; do not implement complex fraud logic in this step, just ensure the settings are stored and returned to the frontend.
+
+2.6 Security Settings ("security")
+
+Structure:
+{
+  "sessionTimeoutMinutes": number,
+  "forceMfaForSuperAdmin": boolean
+}
+
+Behavior:
+- If sessionTimeoutMinutes is set, integrate it with existing admin auth/session middleware to control token/session lifetime where possible.
+- MFA integration should not be implemented from scratch in this step; you can expose the flag and ensure it is available to future features.
+
+3. Backend API
+
+Create admin-only endpoints, using existing auth and RBAC:
+
+3.1 Get all settings
+
+GET /api/admin/settings
+
+- Returns a combined object:
+{
+  "general": { ... },
+  "kyc": { ... },
+  "commission": { ... },
+  "settlement": { ... },
+  "notifications": { ... },
+  "security": { ... }
+}
+
+Rules:
+- Use the SettingsService to merge DB values with code defaults.
+- Enforce admin auth.
+- Enforce RBAC capability, for example: MANAGE_SETTINGS or VIEW_SETTINGS.
+
+3.2 Update a specific section
+
+PUT /api/admin/settings/:sectionKey
+
+- sectionKey ∈ ["general", "kyc", "commission", "settlement", "notifications", "security"].
+- Body: JSON payload for that section only.
+- Validation:
+  - Strong schema validation (types, ranges).
+  - Reject invalid payload with clear error messages.
+- Behavior:
+  - Load existing section.
+  - Merge or replace, depending on your design (simple replace is fine if the UI always sends the full object).
+  - Save to PlatformSettings table.
+  - Invalidate cache.
+- Security:
+  - Admin-only.
+  - RBAC: require MANAGE_SETTINGS.
+- Audit:
+  - Use the existing logAuditEvent helper to log a SETTINGS_UPDATED event with:
+    - actionType: "SETTINGS_UPDATED"
+    - entityType: "settings"
+    - entityId: sectionKey
+    - metadata: include high-level deltas only (old vs new high-level values), not any secret tokens.
+
+4. Integration with Existing Logic
+
+4.1 KYC Validation
+
+Update driver/customer/restaurant KYC validation so that required fields are driven by the KYC settings:
+
+- For BD driver:
+  - requireProfilePhoto, requireNid, requirePostalCode, requireVehicleDocuments.
+- For US driver:
+  - requireProfilePhoto, requireDmvLicenseDocs, requireTlcLicenseDocsForNY when state == NY, requireSsn.
+
+Rules:
+- Use SettingsService.getSection("kyc") inside existing validation services.
+- If settings are unavailable or invalid, fall back to current behavior.
+- Do not change database schema for KYC here.
+
+4.2 Commission Calculation
+
+Update the commission calculation code for:
+- rides
+- food orders
+- parcels
+
+so that it:
+- Reads percent from commission settings (with country override).
+- If no setting is found, uses existing hard-coded default to avoid crashes.
+
+4.3 Settlement System
+
+Ensure that:
+- The settlement scheduler and wallet settlement flows read cycle and minPayoutAmount from "settlement".
+- If settings are invalid, use current behavior.
+
+4.4 Document Expiry Notifications
+
+Update the document expiry checker:
+- Use kyc.documentExpiry.warningDays (or notifications.documentExpiry.warningDays if that is the canonical value).
+- Ensure the existing deduplication fix remains intact.
+- Do not generate multiple alerts per document type beyond the current design.
+
+5. Admin UI – Global Settings Page
+
+Create a new page at:
+
+Route:
+- /admin/settings
+
+Navigation:
+- Add "Settings" or "Global Settings" under the Management or Security section in the sidebar.
+- Only visible to admins who have MANAGE_SETTINGS or VIEW_SETTINGS capability from the RBAC system.
+
+Layout:
+
+Page title: "Global Settings"
+Subtitle: "Manage platform-wide configuration for SafeGo."
+
+Use a tabbed or sectioned layout:
+
+Tabs/sections:
+1) General
+2) KYC Rules
+3) Commission
+4) Settlement
+5) Notifications
+6) Security
+
+For each section:
+
+General:
+- Inputs for supportEmail, supportPhone, defaultCountry (dropdown BD/US).
+- Save button, cancel/reset.
+
+KYC Rules:
+- Driver KYC:
+  - BD: checkboxes for requireProfilePhoto, requireNid, requirePostalCode, requireVehicleDocuments.
+  - US: checkboxes requireProfilePhoto, requireDmvLicenseDocs, requireTlcLicenseDocsForNY, requireSsn.
+- Customer KYC:
+  - BD: requireNid.
+  - US: requireSsn (checkbox).
+- Restaurant KYC:
+  - BD/US: requireBusinessLicense.
+- Document expiry:
+  - warningDays (number input)
+  - hardBlockOnExpiry (checkbox, with warning text explaining impact).
+
+Commission:
+- Driver ride/parcel defaults (number inputs).
+- Restaurant food default commission.
+- Country overrides per BD/US.
+
+Settlement:
+- Driver cycle (select: DAILY/WEEKLY/MONTHLY).
+- Driver minPayoutAmount.
+- Restaurant cycle and minPayoutAmount.
+
+Notifications:
+- Document expiry enabled + warningDays display (read-only if tied to KYC).
+- Low wallet balance enabled + threshold.
+- Fraud alerts enabled (toggle only, informational).
+
+Security:
+- Session timeout in minutes (number).
+- Force MFA for super admins (checkbox, informational note that enforcement may be implemented later).
+
+UI rules:
+- No emojis.
+- Follow existing admin styles (typography, buttons, spacing).
+- Show validation errors inline.
+- Disable Save button while request is in progress.
+- On successful save, show a non-intrusive success message.
+
+6. Security and RBAC
+
+- Only admins with MANAGE_SETTINGS capability may update settings.
+- Admins with VIEW_SETTINGS but not MANAGE_SETTINGS may see but not change settings (disable inputs).
+- All settings API endpoints must:
+  - Use existing auth middleware.
+  - Check RBAC capabilities.
+- All successful updates must:
+  - Log an audit event SETTINGS_UPDATED.
+- No secrets (keys, passwords, tokens) should be present in these settings.
+
+7. Testing Plan
+
+Implement a comprehensive test checklist:
+
+1) Migration and defaults:
+   - Run migrations on existing data.
+   - Verify default settings match current behavior (no change in KYC validation, commissions, settlement).
+
+2) API tests:
+   - GET /api/admin/settings returns all sections with defaults.
+   - PUT /api/admin/settings/general with valid payload updates and persists correctly.
+   - Invalid payloads are rejected with clear error messages.
+   - Non-admin or admins without MANAGE_SETTINGS cannot update settings.
+
+3) KYC behavior:
+   - Toggle requireProfilePhoto for BD driver and verify KYC validation behavior changes accordingly.
+   - Toggle requireTlcLicenseDocsForNY and verify US NY drivers are validated correctly.
+   - warningDays change affects document expiry scheduler behavior (use or extend existing tests).
+
+4) Commission behavior:
+   - Change default driver ride commission and verify new rides use the updated rate.
+   - Set BD override and ensure BD rides use override while US rides use global default.
+
+5) Settlement:
+   - Change driver cycle and minPayoutAmount and verify the settlement scheduler respects the new values without breaking old behavior.
+
+6) Notifications:
+   - Change documentExpiry warningDays and verify that new expiry notifications use the new threshold.
+
+7) Security:
+   - Confirm that only appropriate roles can view/update settings.
+   - Confirm that all updates are logged in the audit log with SETTINGS_UPDATED and no sensitive data.
+   - Confirm that no full SSN or NID appears anywhere in settings or logs.
+
+8) UI:
+   - /admin/settings loads correctly for authorized admins.
+   - Tabs/sections work.
+   - Save, cancel, and error states behave correctly.
+
+8. Final Deliverables
+
+- New PlatformSettings model and migration.
+- SettingsService with caching and defaults.
+- Updated KYC, commission, settlement, and notification logic to read from settings.
+- Admin settings API endpoints with validation and RBAC.
+- New /admin/settings page with full UI as described.
+- Updated documentation (replit.md) explaining:
+  - Settings schema
+  - Defaults
+  - Security considerations
+  - How other developers should use settings in future features.
+
+The final implementation must be production-ready, architect-reviewed, and must not break any existing Admin, Driver, Customer, Restaurant, Parcel, or Wallet behavior.

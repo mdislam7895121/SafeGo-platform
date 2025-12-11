@@ -1,0 +1,212 @@
+You must now implement SafeGo Master Serial Tasks 1–15 in ONE complete, non-breaking update.  
+This update MUST strictly follow all SafeGo Master Rules, must not break any existing logic (rides, food_orders, deliveries, KYC, payouts, taxes), and must be fully backward compatible.
+
+=====================================================================
+SECTION 0 — SAFEGO MASTER RULES (ALWAYS ENFORCED)
+=====================================================================
+You MUST continue respecting all SafeGo Master Rules:
+1. 4 core roles (Customer, Driver, Restaurant, Admin) + partner roles (shop, ticket, rental).  
+2. All country-specific KYC rules (BD & US).  
+3. All collections (rides, food_orders, deliveries) MUST remain unchanged.  
+4. Commission logic (cash → negative balance, online → SafeGo keeps) MUST remain untouched.  
+5. Security rules cannot be weakened.  
+6. Status flows must remain intact.  
+7. Onboarding stays multi-step, pending until Admin approves.  
+8. Notifications must remain functional.
+
+These rules override everything else and must not be violated.
+
+=====================================================================
+SECTION 1 — TASK SET (1–15)
+=====================================================================
+You must now implement ALL 15 tasks below in the order described but deploy them together as ONE module:
+
+---------------------------------------------------------------------
+TASK 1 — Terms & Conditions System (UI + Enforcement)
+---------------------------------------------------------------------
+• Create a T&C versioning system (similar to privacy policy versions).
+• UI screen for all roles: show text, require acceptance.
+• Users must accept ONLY after verification_status = "verified", and before first real usage.
+• Store acceptance → terms_accepted, policy_accepted_at.
+• Log to consent_logs.
+
+---------------------------------------------------------------------
+TASK 2 — Refund Policy Framework
+---------------------------------------------------------------------
+• Admin Panel → create Refund Policy page (editable text, versioning).
+• Customer app → display Refund Policy in Help/Support.
+• No enforcement yet; only policy storage + display.
+
+---------------------------------------------------------------------
+TASK 3 — Cancellation Policy Framework
+---------------------------------------------------------------------
+• Store cancellation rules in admin settings.
+• Display inside customer & driver apps.
+• Must support separate rules for:
+   – Driver cancellation  
+   – Customer cancellation  
+   – Merchant cancellation  
+• No financial enforcement yet (that comes later).
+
+---------------------------------------------------------------------
+TASK 4 — Customer Community Guidelines
+---------------------------------------------------------------------
+• Admin can publish guidelines.
+• Customer app → show guidelines during onboarding & in settings.
+• No enforcement yet.
+
+---------------------------------------------------------------------
+TASK 5 — Driver Code of Conduct
+---------------------------------------------------------------------
+• Activate similar to community guidelines but for drivers.
+• Display in driver onboarding.
+• Add “View Code of Conduct” page in Driver Dashboard.
+
+---------------------------------------------------------------------
+TASK 6 — Merchant/Partner Code of Conduct
+---------------------------------------------------------------------
+• Same structure as Driver Code → for:
+   – restaurant_partner  
+   – shop_partner  
+   – ticket_partner  
+   – rental_partner  
+• Show in partner dashboard and onboarding.
+
+---------------------------------------------------------------------
+TASK 7 — Safety Policy Document
+---------------------------------------------------------------------
+• Global Safety Policy with versioning.
+• Admin can update.
+• Customer/Driver/Partner dashboards must show it.
+
+---------------------------------------------------------------------
+TASK 8 — Partner Agreement + E-Signature System
+---------------------------------------------------------------------
+• Add table: partner_agreements
+   – partner_id  
+   – partner_type  
+   – version  
+   – signed_at  
+   – signature_image / digital signature  
+• Partner must sign AFTER verification but BEFORE operating.
+
+---------------------------------------------------------------------
+TASK 9 — Emergency SOS Button (Customer + Driver)
+---------------------------------------------------------------------
+• Customer & Driver apps must have SOS button accessible during active ride.
+• SOS triggers:
+   – log entry in sos_logs table  
+   – notify admin safety team  
+   – send push notification to designated “safety officers”  
+• No external services needed yet; keep internal.
+
+---------------------------------------------------------------------
+TASK 10 — Ride Safety Monitoring (Speeding, Route Deviation)
+---------------------------------------------------------------------
+• Add server-side monitoring:
+   – If driver speed > threshold (admin configurable) → log event.  
+   – If driver route deviates significantly → log event.  
+• Logs saved in safety_events table.
+
+---------------------------------------------------------------------
+TASK 11 — Encrypted Ride Audio Recording (Optional)
+---------------------------------------------------------------------
+• Add system ability to let user “start encrypted audio recording”.
+• Files stored encrypted.
+• Only Admin with special permission can decrypt.
+
+NOTE: Do NOT activate recording by default. Add toggle only.
+
+---------------------------------------------------------------------
+TASK 12 — Driver Background Verification Enforcement
+---------------------------------------------------------------------
+• After KYC approval:
+   – driver.must_pass_background_check (boolean)
+• Admin Panel → mark driver background check “passed/failed”.
+• Driver cannot go online until background_check_status = “passed”.
+
+---------------------------------------------------------------------
+TASK 13 — Report System (Driver ↔ Customer)
+---------------------------------------------------------------------
+• Add “Report User” feature for:
+   customer → driver  
+   driver → customer  
+• Create table: reports
+   – reporter_id  
+   – target_id  
+   – role_of_target  
+   – ride_id (optional)  
+   – report_reason  
+   – description  
+   – created_at  
+• Show in Admin Panel for review.
+
+---------------------------------------------------------------------
+TASK 14 — Auto-Restriction System for Safety Issues
+---------------------------------------------------------------------
+• If a user accumulates:
+   – multiple reports  
+   – multiple safety events  
+   – background check fail  
+• System must auto-apply restrictions:
+   – temporary block  
+   – require admin review  
+• Create role_status field: “active”, “restricted”, “blocked”.
+
+---------------------------------------------------------------------
+TASK 15 — Safety Center (Customer + Driver)
+---------------------------------------------------------------------
+• Build new section “Safety Center” containing:
+   – Safety Policy  
+   – Emergency Contacts  
+   – Report Issues  
+   – Recent safety alerts (if any)  
+• Accessible from profile menus.
+
+=====================================================================
+SECTION 2 — DATABASE STRUCTURES REQUIRED
+=====================================================================
+ADD new tables (non-breaking):
+• terms_versions  
+• refund_policy_versions  
+• cancellation_policy_versions  
+• community_guidelines  
+• code_of_conduct_drivers  
+• code_of_conduct_partners  
+• safety_policy_versions  
+• partner_agreements  
+• sos_logs  
+• safety_events  
+• reports  
+
+Do NOT modify or delete existing tables.
+
+=====================================================================
+SECTION 3 — ENFORCEMENT RULES
+=====================================================================
+You MUST enforce these:
+
+1. Users DO NOT accept policies before verification.  
+2. AFTER verification → first business action requires acceptance.  
+3. Partner cannot operate until e-sign is completed.  
+4. Driver cannot go online unless:
+   – verification complete  
+   – background check passed  
+   – all required policies accepted  
+
+5. Reported or unsafe users may be auto-restricted.
+
+=====================================================================
+SECTION 4 — NON-BREAKING VALIDATION
+=====================================================================
+Before completing, verify:
+• No KYC fields changed.  
+• No ride/food/parcel flows altered.  
+• No commission logic changed.  
+• No schema renamed/removed.  
+• All new tables added safely.  
+• All new UI pages added without interfering with existing navigation.  
+
+Finally respond:
+
+“Tasks 1–15 fully implemented — Non-breaking, SafeGo Rule Compliant.”

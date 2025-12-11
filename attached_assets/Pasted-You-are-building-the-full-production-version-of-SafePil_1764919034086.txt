@@ -1,0 +1,205 @@
+You are building the full production version of **SafePilot**, the AI engine inside the SafeGo Admin Console.
+Your goal is to make SafePilot the world’s strongest, most reliable, most intelligent safety–fraud–compliance assistant for a ride–delivery–parcel platform.
+
+You must complete ALL tasks below WITHOUT asking any follow-up questions.  
+Make reasonable assumptions and finish the implementation end-to-end.  
+No TODOs. No placeholders. No partial steps.  
+Make SafePilot fully functional and ready for public release.
+
+====================================================
+PHASE 1 — Integrate SafePilot Across All Admin Pages
+====================================================
+
+1. Add the SafePilot floating launcher button to ALL admin screens.
+   - Desktop: bottom-right floating button
+   - Tablet/Mobile: bottom-center or bottom-right
+   - Must never cover important UI elements such as Approve/Reject buttons.
+   - Launcher must follow current theme (dark/light/system).
+
+2. Implement a universal SafePilot container:
+   - Desktop: right-side sliding panel (40% width)
+   - Tablet/Mobile: full-height bottom sheet
+   - Smooth open/close animations
+   - Scrollable, responsive layout
+
+3. Make SafePilot aware of the current admin page:
+   - People/KYC
+   - Drivers
+   - Customers
+   - Safety Center
+   - Fraud Center
+   - Intelligence Dashboard
+   - Legal & Compliance
+   - Payouts & Wallets
+   - System Health
+   - Notifications
+   - Feature Flags
+   - All ride/food/delivery logs
+
+====================================================
+PHASE 2 — Build the 15 Core SafePilot Intelligence Modules
+====================================================
+
+Implement ALL modules below:
+
+1. Safety Incident Detection Module  
+   - Detect repeated complaints  
+   - Route deviation  
+   - Unsafe driver behavior  
+   - Night-time risk  
+   - Female passenger risk  
+   - Output: Risk score, action recommendations, alert generation
+
+2. Fraud Prevention Module  
+   - Ghost rides  
+   - Fake deliveries  
+   - Customer–driver collusion  
+   - Promo/refund abuse  
+   - Negative wallet fraud  
+   - Device/IP matching  
+   - Output: Fraud score + auto-flag
+
+3. Financial Loss Protection Module  
+   - Wrong payout  
+   - Excess refund  
+   - Merchant mismatch  
+   - Daily loss summary  
+   - Output: Loss report + risk warnings
+
+4. Identity Verification Enforcement  
+   - BD NID OCR mismatch  
+   - USA Driver License expiry  
+   - Duplicate accounts  
+   - Suspicious document patterns  
+   - Output: Auto KYC fail + admin alert
+
+5. Location Integrity Module  
+   - GPS spoofing  
+   - Abnormal trip pattern  
+   - Deliberate long route  
+   - Suspicious stop  
+   - Output: Safety + Fraud alert
+
+6. Customer Trust Monitoring  
+   - Complaint pattern  
+   - Driver low-rating clusters  
+   - Repeated cancellation  
+   - Output: Customer trust score
+
+7. Merchant Food Safety Module  
+   - Food complaints  
+   - Delay clusters  
+   - Hygiene risk  
+   - Menu item accuracy  
+   - Output: Merchant risk rating
+
+8. Parcel & Address Safety Module  
+   - Fake addresses  
+   - High-risk zones  
+   - Failed delivery loops  
+   - Output: Delivery risk rating
+
+9. System Health Monitoring  
+   - API latency  
+   - DB errors  
+   - Location engine failures  
+   - Payment gateway issues  
+   - Output: Real-time system warnings
+
+10. Admin Insider Threat Detection  
+    - Suspicious admin activity  
+    - Sensitive data over-access  
+    - Off-hours login  
+    - Large data export  
+    - Output: Insider threat alert
+
+11. Country-Based Legal Compliance Engine  
+    - BD rule enforcement  
+    - USA compliance  
+    - Privacy + tax checks  
+    - Output: Compliance alerts
+
+12. Global Risk Score Generator  
+    Combine all modules to compute:
+    - Safety Score  
+    - Fraud Score  
+    - Financial Score  
+    - System Score  
+    - Trust Score  
+
+13. Predictive Analytics Engine  
+    - Safety spike forecast  
+    - Fraud pattern prediction  
+    - Driver churn forecasting  
+    - Delivery failures prediction  
+
+14. Auto-Decision Engine  
+    SafePilot must suggest:
+    - Which accounts to block  
+    - Which drivers need review  
+    - Which merchants unsafe  
+    - Which payouts to hold  
+
+15. SafePilot Voice/Command Interface  
+    Queries like:
+    - “Show today’s risks”
+    - “Which drivers are unsafe?”
+    - “List high-fraud customers”
+    - “Why did KYC fail?”
+    - “Show system errors”
+    - “Predict tomorrow’s safety issues”
+
+====================================================
+PHASE 3 — Connect SafePilot to Real Data Models
+====================================================
+
+Use existing backend services ONLY.  
+No schema changes allowed unless adding non-breaking fields.
+
+Connect SafePilot to:
+- rides, food_orders, deliveries  
+- driver profiles  
+- customer profiles  
+- merchant profiles  
+- safety reports  
+- fraud logs  
+- payouts, earnings  
+- cancellations  
+- ratings  
+- system logs  
+- KYC documents  
+
+====================================================
+PHASE 4 — Production Safety & Optimization
+====================================================
+
+1. Must not expose private data outside allowed RBAC.
+2. Must log SafePilot decisions into the audit system.
+3. Must sanitize all outputs.
+4. Must work smoothly on mobile/tablet/desktop.
+5. Must not break current admin layout.
+6. Must auto-recover if a connected service fails.
+7. Must show fallback messages if needed.
+
+====================================================
+PHASE 5 — Final Delivery Expectations
+====================================================
+
+When finished, SafePilot must:
+
+- Work everywhere in admin panel  
+- Perform every intelligence function end-to-end  
+- Produce real, actionable insights  
+- Reduce company losses  
+- Improve safety  
+- Predict future risks  
+- Operate as a true AI control center  
+
+Deliverables:
+- Full SafePilot UI/UX  
+- All intelligence modules implemented  
+- All connectors working  
+- SafePilot ready for public deployment  
+- Update README with integration details
+
+Finish everything WITHOUT asking for clarification.

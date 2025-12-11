@@ -1,0 +1,198 @@
+You are working in my SafeGo monolithic app called **ReplitBackend**.  
+This is the ONLY production project – it already contains the full backend and the internal customer/driver apps (/ride, /drive, etc.).  
+
+Goal now:
+Redesign ONLY the root marketing landing page in ReplitBackend so that it visually matches my existing public site design at safegoglobal.com (the HTML Codebase version shown in my screenshots). The content structure is already correct, but the current ReplitBackend landing page looks like a generic template. I want the same polished look and layout as the earlier HTML landing page that you (ChatGPT) previously wrote for me.
+
+Very important global SafeGo rules (do NOT break these):
+
+1. Do NOT touch backend APIs, Prisma schema, environment variables, or any /api routes.
+2. Do NOT change any ride/food/parcel/business app screens (like /ride, /drive, /customer, /admin).
+3. Do NOT change authentication, KYC, or payment logic.
+4. Do NOT modify any route paths or backend contracts. Only change React components and styling for the **public marketing pages**.
+5. All CTAs from the landing page must link into the existing internal app routes (no new routes, no broken links).
+
+====================================
+PART 1 – Locate the correct landing page
+====================================
+
+1. In this ReplitBackend project, find the React/Next entry page that renders the root marketing URL `/`.  
+   - Look for files like:
+     - `client/src/pages/index.tsx`
+     - or `client/src/pages/landing/index.tsx`
+     - or any component that contains the copy “Move, eat, and deliver with SafeGo”.
+2. Confirm in the logs/notes which file is the real root landing page for `/` in this project.
+3. Only work inside this landing page and its dedicated components (Hero, Services, Partner, How It Works, Safety, FAQ, final CTA, footer, etc.).  
+   - Do not touch app shells for the logged-in app or the ride booking UI.
+
+====================================
+PART 2 – Recreate the old safegoglobal.com layout
+====================================
+
+Rebuild the landing page layout so it visually matches my earlier HTML Codebase design (see my screenshots). Follow this structure section by section:
+
+A. Top navigation bar
+---------------------
+
+1. Full-width nav bar on a light background with subtle bottom border.
+2. Left side: SafeGo logo / wordmark.
+3. Center/left: primary nav links – `Ride`, `Drive`, `Business`, `About`.
+   - These are simple text links.
+4. Right side: `Log in` (text button) and `Sign up` (primary pill button).
+5. Keep spacing and font weights similar to the existing HTML Codebase version (clean, modern, not oversized).
+6. Nav links must point to existing routes:
+   - `Ride` → `/ride`
+   - `Drive` → `/drive`
+   - `Business` → `/business`
+   - `About` → for now `/about` if it exists, otherwise keep it as `#` placeholder.
+   - `Log in` → `/login`
+   - `Sign up` → `/signup`
+
+B. Country toggle + Hero section
+--------------------------------
+
+Create a hero that looks like my old site:
+
+1. At the top of the hero, add the 3-segment country toggle pill:
+   - Labels: **Bangladesh**, **United States**, **Global**.
+   - Bangladesh is selected by default with a filled pill; the others are outlined or muted.
+   - For now this can be a purely visual toggle that updates a small “badge” and copy; do NOT add complicated routing or backend logic.
+2. Main headline exactly like before:
+   - Line 1: `Move, eat, and`
+   - Line 2: `deliver with SafeGo` (highlight “SafeGo” with brand blue).
+3. Subtext: one or two lines explaining:
+   - “One platform for rides, food delivery, and parcel delivery — launching first in Bangladesh.”
+4. Primary CTA buttons:
+   - `Explore services` (primary, filled) → link to `/ride`.
+   - `Become a partner` (secondary, outline) → link to `/drive` or the partner onboarding home.
+5. On the right side of the hero, show a card titled **“SafeGo Services – All-in-one platform”** with a vertical list of services:
+   - Rides
+   - Food
+   - Parcel
+   - Shops
+   Each item has a small colored icon and one-line description, like in my old design.
+6. Use a soft background gradient or subtle pattern similar to the previous HTML Codebase design (nothing heavy, just a very light grey/blue).
+
+C. “SafeGo Services” cards section
+----------------------------------
+
+Below the hero, recreate the multi-card section:
+
+1. Title: **“SafeGo Services”** with a small label like “Our Services”.
+2. Subtitle: “Everything you need, all in one app. Choose a service to get started.”
+3. Show 5 cards in a responsive grid:
+   - Rides
+   - Food delivery
+   - Parcel delivery
+   - Local shops
+   - Tickets & Travel
+4. Each card has:
+   - Icon at the top (simple emoji/icon placeholder is fine if we don’t have SVGs).
+   - Title.
+   - Short description (reuse text from the old HTML site whenever possible).
+5. On mobile, cards stack nicely one per row; on desktop, they show as a row/grid similar to my screenshots.
+
+D. “Become a partner” section
+-----------------------------
+
+Recreate the partner section with two big cards:
+
+1. Section heading: **“Become a partner”**.
+2. Subtext: one short line about joining as drivers, couriers, restaurants, and shops.
+3. Two side-by-side cards (stacked on mobile):
+   - `For drivers & couriers`
+   - `For restaurants & shops`
+4. Each card contains:
+   - Short paragraph about benefits.
+   - Bullet list (3–4 bullets) like: flexible hours, weekly payouts, clear commission, etc.
+   - CTA buttons:
+     - Drivers card → `Start driving` → link to `/driver/signup` (or the existing driver signup route).
+     - Restaurant card → `Register your business` → link to `/restaurant/signup` (or the existing restaurant/partner onboarding route).
+
+E. “How SafeGo works” section
+-----------------------------
+
+Rebuild the “How SafeGo works” section:
+
+1. Heading: **“How SafeGo works”**.
+2. Subheading explaining it’s a step-by-step flow for rides, food, and parcel.
+3. Below, show 3 columns (stacked on mobile):
+   - `Rides`
+   - `Food delivery`
+   - `Parcel delivery`
+4. Each column has steps 1–5, similar to the text from the old HTML page:
+   - Example for Rides: enter pickup/dropoff, see fare estimate, driver accepts, track in real time, rate and tip.
+   - Reuse the copy structure from the previous design as closely as possible.
+
+F. “Safety & Security” section
+------------------------------
+
+Recreate the trust section:
+
+1. Heading: **“Safety & Security”**.
+2. Underneath, three cards/columns:
+   - `Your safety comes first` (for customers).
+   - `Safety while you work` (for drivers & couriers).
+   - `Protecting your data` (cybersecurity).
+3. Each card has 3–4 bullet points, matching the earlier HTML version:
+   - Verified drivers and couriers.
+   - Live GPS tracking.
+   - Encrypted data, no sensitive data stored on devices, etc.
+
+G. FAQ section
+--------------
+
+1. Heading: **“Support & FAQ”** or just “Frequently Asked Questions”.
+2. Use whatever accordion / disclosure component is already used in this project, or build a simple accessible accordion.
+3. Include the main 5–6 questions from the older design:
+   - How do I request a SafeGo ride?
+   - When is SafeGo launching in Bangladesh?
+   - How do I become a driver or courier?
+   - What payment methods are accepted?
+   - How is my safety ensured?
+   - Can I schedule rides in advance?
+4. Content can be the same text as on the HTML Codebase landing page.
+
+H. Final CTA + footer
+---------------------
+
+1. Recreate the bottom blue CTA band:
+   - Title: **“Ready to move with SafeGo?”**
+   - Short subtitle about trusting SafeGo for daily transportation and delivery.
+   - Buttons:
+     - `Download the app` (primary).
+     - `Become a partner` (secondary).
+   - For now, set `Download the app` to `#` or to a placeholder app-store link, and `Become a partner` → `/drive` or partner onboarding.
+2. Keep the footer section like the old design:
+   - Columns: Company, Services, Partners, Support.
+   - Links are simple `<a>` tags; point them to our existing internal routes where they exist, otherwise keep `#` placeholders (no 404s).
+   - Include Terms of Service, Privacy Policy, Cookie Policy links at the bottom (these can stay as `#` if the real pages don’t exist yet).
+
+====================================
+PART 3 – Implementation details
+====================================
+
+1. Use the existing styling system in this project (Tailwind + any shared components). Do NOT add a new CSS framework.
+2. Keep the color palette consistent with the SafeGo brand used elsewhere:
+   - Primary blue for buttons and accent text.
+   - Soft neutrals for backgrounds and card surfaces.
+3. Make the whole page responsive:
+   - On mobile, sections stack and have comfortable padding.
+   - On desktop, match the spacious layout seen in my screenshots (hero split left/right, cards in rows, etc.).
+4. Keep all text content in English for now (same as the current safegoglobal.com). Don’t add Bangla text on the landing page in this pass.
+5. Do NOT add any new network calls from the landing page. It should remain a static marketing page that just links into the existing app routes.
+
+====================================
+PART 4 – Verification and summary
+====================================
+
+After you finish:
+
+1. Run the app and show me a full-page screenshot of the updated root landing page on desktop.
+2. Confirm:
+   - Which file(s) you changed for the landing page.
+   - That no backend routes, schemas, or auth logic were modified.
+   - That all CTAs link to existing routes without 404s.
+3. Briefly explain any small differences you had to keep vs my old HTML Codebase design (if any) due to this project’s layout system.
+
+Please start now and fully redesign the landing page in this project to match the original safegoglobal.com HTML Codebase design as closely as possible, following all the rules above.

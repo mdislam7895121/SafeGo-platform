@@ -1,0 +1,267 @@
+You are the senior full-stack engineer and product owner for the SafeGo platform. You must stop doing one small fix at a time and instead run a full system audit and make the app production-ready in a single coherent pass. Do not ask the user questions or offer choices. Infer the correct behavior from the existing codebase and the rules below, then implement and verify it end-to-end.
+
+====================
+GLOBAL CONTEXT: SAFEG0
+====================
+
+1. Core product
+- SafeGo is a multi-service mobility and delivery platform similar to Uber + Uber Eats + parcel delivery + local marketplace.
+- There are four roles and four apps:
+  1) Customer app (web + mobile responsive)
+  2) Driver / Courier app
+  3) Restaurant / Merchant / Shop dashboard
+  4) Admin dashboard
+
+2. Services and verticals
+The platform supports:
+- Rides (point-to-point, on-demand)
+- Food delivery (SafeGo Eats)
+- Parcel / courier deliveries
+- Local stores / shops for Bangladesh
+- For Bangladesh customer app there are special sections:
+  - /customer/bd-tickets  → “টিকিট ও রেন্টাল” (tickets & rentals)
+  - /customer/bd-rentals  → গাড়ি রেন্টাল (car rentals)
+  - /customer/bd-shops    → দোকান (local shops marketplace)
+
+3. Countries and KYC
+- Country codes:
+  - USA: US
+  - Bangladesh: BD
+- For production:
+  - Every user (customer, driver, merchant) must have a clear country field.
+  - KYC rules may differ by country, but do not implement new KYC flows now. Just respect existing validations and do not weaken security.
+
+4. Collections / entities (minimum)
+These collections must exist and be used consistently:
+- rides
+- food_orders
+- deliveries
+- merchants / restaurants / shops (whatever naming is already used, keep consistent)
+- vehicles / driver_vehicles (for rentals, tickets if applicable)
+- tickets / bd_tickets / rental_products / shop_products as already modeled
+- users (customers)
+- drivers
+- payouts / commissions (leave logic as is, but do not break it)
+
+Do NOT invent new collection names if existing ones already represent the same thing. Reuse and standardize.
+
+5. Security & access rules
+- Never expose other users’ data across tenants or roles.
+- Customer app may only read “active, published, visible” items for the correct country.
+- Admin app can see everything.
+- Respect authentication guards and role checks. Do not remove them; only fix them if they are incorrect.
+
+===========================
+CURRENT BUGS (FROM USER)
+===========================
+
+Customer app, Bangladesh:
+
+1) /customer/bd-tickets
+- Screen shows search bar and tabs, but below that the page is completely empty.
+- There is no list, no empty-state message, no error message.
+- This suggests either:
+  - the query returns nothing because of wrong filters/collection; or
+  - the query is failing silently; or
+  - the UI is not wired to render results.
+
+2) /customer/bd-rentals
+- Shows the standard search bar, category chips (সব গাড়ি, কার, সেডান, এসইউভি, মাইক্রো, ট্যুরিস্ট বাস, etc.).
+- Instead of a list, there is a card with:
+  - car icon
+  - text (in Bangla) equivalent to “Problem loading data. Please try again.”
+- So the code is treating this as a load error, not an empty list.
+
+3) /customer/bd-shops
+- Similar: search bar and category chips (সব দোকান, মুদি দোকান, ইলেকট্রনিক্স, ফার্মেসি, ফ্যাশন, etc.).
+- Shows the “Problem loading data” error card instead of shop cards.
+
+Also: in previous changes, when one section got fixed, another section stopped working. This means shared components / queries / collection names / filters are not designed and tested systematically.
+
+===========================
+YOUR MISSION
+===========================
+
+Your job now is to:
+
+1) Run a full audit of the SafeGo customer app (including Bangladesh sections) plus any shared backend logic, and
+2) Fix ALL issues that prevent:
+   - tickets
+   - rentals
+   - shops
+   - rides/food/parcel
+from loading and working correctly on both mobile and desktop, without breaking anything else, and
+3) Prepare the whole system to be “publish-ready”.
+
+You must produce a working implementation, not just a plan.
+
+===========================
+DETAILED TASKS
+===========================
+
+A. High-level audit pass
+1. Scan the codebase for everything related to:
+   - /customer/bd-tickets
+   - /customer/bd-rentals
+   - /customer/bd-shops
+   - shared components / hooks / services used by these pages
+   - underlying database collections and API endpoints.
+2. Identify:
+   - where data is fetched
+   - which collection(s) and filters are used
+   - how errors vs empty lists are handled
+   - how country, city, and status are applied.
+3. Document for yourself (in code comments or internal notes) the standard pattern you will enforce for **all listing pages** in the customer app.
+
+B. Standardize the “listing pattern”
+For any page that shows a list of tickets, vehicles, rentals, or shops in the customer app, enforce the following pattern:
+
+1. Query rules:
+   - Filter by:
+     - country = BD for Bangladesh sections,
+     - status in [“ACTIVE”, “PUBLISHED”, “AVAILABLE”] (whatever exact enum is already used),
+     - not deleted,
+     - `isVisible = true` or similar flag if it exists.
+   - Do not hardcode wrong country codes or old field names.
+   - Use stable collection names; do not mix up tickets with rentals or shops.
+
+2. UI states:
+   - Loading state: show skeleton / spinner, not a permanent blank screen.
+   - Error state: show an error card only when the request truly fails (network / server error).
+   - Empty state: when the request succeeds but returns 0 items, show a clear “No items available” message relevant to that section (e.g., “কোন টিকিট পাওয়া যায়নি”).
+   - List state: render cards in a responsive grid/list, with proper spacing on mobile.
+
+3. Search and filters:
+   - Search bar should filter by name, location, and any relevant fields in memory after data is loaded, or server-side via a query param if that is the existing pattern.
+   - Category chips (e.g., car types, shop categories) must:
+     - either filter locally, or
+     - re-fetch with a category filter.
+   - Make sure toggling between chips does not reset the list to an error state.
+
+C. Fix /customer/bd-tickets
+1. Ensure there is a backend endpoint (or query) that returns the list of ticket products for Bangladesh:
+   - Use the correct collection (e.g., `bd_tickets` or similar that the app already uses).
+   - Filters: country = BD, active/published only.
+2. Wire this data into the tickets page component:
+   - Remove any early returns or conditionals that cause the page to render nothing.
+   - Implement loading, error, empty states as described above.
+3. Implement or fix the tabs on this page:
+   - If one tab is “Trips” and another is “Rentals” (or similar), each tab must:
+     - call the correct query, or
+     - filter from a shared dataset.
+   - Make sure switching tabs does not break the list or cause silent failures.
+4. Test:
+   - On mobile viewport and desktop viewport.
+   - With and without sample data.
+   - With slow network (if possible) to ensure loading state works.
+
+D. Fix /customer/bd-rentals
+1. Find why the page is showing the “Problem loading data” error:
+   - Is the API throwing an exception?
+   - Is the query using the wrong collection or country code?
+   - Is a schema mismatch causing parsing errors?
+2. Fix the underlying issue:
+   - Correct the collection and field names.
+   - Adjust the query to use correct filters (country = BD, active vehicles only).
+   - If there is a type mismatch between backend and frontend, normalize the data in the API layer instead of breaking the UI.
+3. Standardize UI states:
+   - Show error state only when the API truly fails.
+   - If the API returns an empty array, show an “empty” message, not an error.
+4. Ensure category chips work:
+   - সব গাড়ি, কার, সেডান, এসইউভি, মাইক্রো, ট্যুরিস্ট বাস etc. should filter correctly.
+   - If category is not present in the data model, map it to an existing field (e.g., vehicleType).
+5. Test on mobile and desktop.
+
+E. Fix /customer/bd-shops
+1. Do the same root-cause analysis for the shops page:
+   - Verify that the shops collection exists and has sample records for BD.
+   - Ensure the API for shops uses the proper filters and field names.
+2. Fix the error handling:
+   - Do not show the generic “Problem loading data” card on any successful request with 0 items.
+   - Instead, show a friendly “No shops found” message.
+3. Implement correct filtering and search:
+   - Search bar should filter by shop name and maybe city/area.
+   - Category chips (মুদি দোকান, ইলেকট্রনিক্স, ফার্মেসি, ফ্যাশন, etc.) must filter correctly.
+4. Test thoroughly.
+
+F. Global regression audit (no more “fix one, break another”)
+After fixing these three screens, **you must audit the rest of the SafeGo system and ensure nothing is broken**, especially:
+
+1. Customer app
+   - Home / landing page
+   - Ride booking flow (pickup/dropoff, vehicle selection, fare estimate if exists)
+   - Food delivery flows
+   - Parcel delivery flows
+   - Profile, login, logout
+   - Country switch / region routing if applicable.
+
+2. Driver app
+   - Login, go online/offline
+   - Accept / start / complete ride or delivery.
+   - No crashes due to the new changes.
+
+3. Restaurant / Merchant / Shop dashboard
+   - Listing of their own items (menus, products, or rentals)
+   - Ability to create/update products for BD marketplace.
+
+4. Admin dashboard
+   - Overview cards must still load.
+   - BD tickets, rentals, shops entities must all appear in admin where expected.
+   - No permission issues introduced.
+
+For every shared component or service you modify:
+- Confirm all other screens using it still work.
+- If you change the shape of any API response, update all consumers.
+- Prefer adding compatibility layers instead of breaking existing contracts.
+
+G. Seed demo data for Bangladesh
+To make the product publish-ready and demo-ready:
+
+1. Insert reasonable sample data into the relevant collections for BD:
+   - A few ticket products (e.g., inter-city bus, launch, train if modeled).
+   - Several rental vehicle options across categories (sedan, SUV, micro, tourist bus).
+   - Several shops across categories (grocery, electronics, pharmacy, fashion).
+2. Ensure all sample items:
+   - are marked as active/published/visible,
+   - have proper city/area and pricing fields,
+   - show correctly in the customer app, driver/merchant dashboards, and admin.
+
+H. Performance & UX polishing
+1. Make sure list queries are paginated or limited to a reasonable number of items.
+2. Avoid unnecessary re-fetches when switching tabs or filters.
+3. Ensure the mobile layout does not overflow horizontally and that content is visible without weird white gaps.
+4. Fix any console errors and warnings visible during navigation.
+
+I. Security and stability checks
+1. Confirm:
+   - Only authenticated customers can see the BD marketplace pages if that is the current rule.
+   - No sensitive internal fields (internal IDs, commissions, owner emails) are leaked to public customers.
+2. Keep all role checks intact:
+   - Customer cannot access admin or merchant endpoints.
+   - Drivers and merchants can only see their own resources.
+
+===========================
+DELIVERABLES
+===========================
+
+When you finish, the codebase must be in a state where:
+
+1. /customer/bd-tickets shows:
+   - proper loading state,
+   - real ticket/rental options for BD or a clean empty state if none exist,
+   - working search and tab behavior.
+
+2. /customer/bd-rentals shows:
+   - a working list of rental vehicles with filters,
+   - no “problem loading data” error for successful requests.
+
+3. /customer/bd-shops shows:
+   - a working list of shops with category filters and search,
+   - proper empty state instead of a false error.
+
+4. All other core flows (rides, food, parcel, driver app, merchant dashboard, admin dashboard) still work correctly with no regressions.
+
+Finally, produce a short, clear summary inside the repository or as a final message that lists:
+- what was broken,
+- what you changed (by feature area),
+- any remaining TODO items that are optional for later phases (but do NOT leave critical bugs for later).

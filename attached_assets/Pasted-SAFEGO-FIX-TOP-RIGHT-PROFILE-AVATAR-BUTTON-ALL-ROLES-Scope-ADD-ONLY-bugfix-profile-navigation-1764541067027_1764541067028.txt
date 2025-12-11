@@ -1,0 +1,226 @@
+SAFEGO – FIX TOP-RIGHT PROFILE AVATAR BUTTON (ALL ROLES)
+Scope: ADD-ONLY bugfix + profile navigation wiring. Do NOT break any existing SafeGo features, status flows, or commission logic.
+
+You must respect ALL SafeGo Master Rules, KYC, Security & Wallet rules already implemented in Steps 42–48.
+
+====================================================
+A. MASTER RULES (RECAP – DO NOT BREAK)
+====================================================
+
+Roles (4, strictly separated):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must keep:
+- separate onboarding & KYC (BD/US),
+- own dashboard & navigation,
+- own permissions,
+- own status flows.
+
+No cross-role data leakage is allowed.
+
+KYC rules, admin powers, collections (rides, food_orders, deliveries), commissionConfig (BD: 12% restaurant, 10% driver; US: 15% restaurant, 10% driver) and wallet engine from Step 47 must remain unchanged.
+
+Security:
+- No user can see other users’ sensitive data.
+- Only Admin can change verification, blocking, pricing, commission.
+- Users only edit their own profile.
+
+All changes below must be ADD-ONLY.
+
+====================================================
+B. BUG: TOP-RIGHT PROFILE AVATAR DOES NOTHING
+====================================================
+
+Current behavior:
+- In the top navigation bar (header), the circular profile avatar icon (user photo/initials) is visible on ride/customer/driver pages (including the driver map screen shown in the screenshot).
+- When clicking/tapping the avatar, nothing happens: no profile page, no menu, no redirect.
+- This is a UX/security issue because users cannot reach their own profile & KYC screen from the main app.
+
+Goal:
+- Make the top-right profile avatar a working entry point to the current role’s Profile area:
+  - Customer avatar → Customer Profile
+  - Driver avatar → Driver Profile
+  - Restaurant avatar → Restaurant Profile
+  - Admin avatar → Admin Profile / Account settings
+
+The implementation must be:
+- responsive (works on desktop + mobile),
+- role-aware (uses current authenticated role),
+- secure (never shows wrong role’s profile).
+
+====================================================
+C. IMPLEMENTATION – ROUTING & COMPONENTS
+====================================================
+
+1) Create/confirm profile routes (ADD-ONLY):
+
+If not already present, define the following routes/pages:
+
+- /customer/profile
+- /driver/profile
+- /restaurant/profile
+- /admin/profile
+
+Each should map to its existing profile screen or a new profile shell that:
+- Shows basic account info (name, email, phone, country),
+- Shows KYC status (pending/approved/rejected),
+- Has links to:
+  - KYC documents section (view-only where appropriate),
+  - Emergency contact (view/edit allowed),
+  - Logout button (if already implemented in another place, just link or reuse).
+
+DO NOT move or rename any existing profile components. If a profile screen already exists elsewhere:
+- Wrap or re-export it so that these new routes simply render the existing screen.
+
+2) Add a small role-aware helper:
+
+Create a utility function or hook, e.g.:
+
+- getProfileRouteForRole(currentRole):
+  - "customer"   → "/customer/profile"
+  - "driver"     → "/driver/profile"
+  - "restaurant" → "/restaurant/profile"
+  - "admin"      → "/admin/profile"
+
+Use existing auth/session context to determine currentRole. No new auth model changes.
+
+3) Wire the header avatar button:
+
+Locate the top navigation/header component used on the map screen shown in the screenshot (and ideally shared across other pages):
+
+- For example: components/layout/AppHeader.tsx (or equivalent).
+
+Ensure the avatar icon (top-right profile circle) becomes a clickable button:
+
+- On desktop: click
+- On mobile: tap
+
+On click:
+- Read current authenticated role from session context.
+- Compute profileRoute = getProfileRouteForRole(currentRole).
+- Navigate to that route using the existing router.
+
+If no role or profileRoute cannot be determined:
+- Fallback to a safe default:
+  - customer → "/customer/profile"
+  - others → show a small toast: "Profile not available. Please log in again."
+  - Optionally redirect to login.
+
+4) Mobile-specific improvements (optional but recommended):
+
+On small screens (< 768px):
+
+- Instead of redirecting to a full-page immediately, you may open:
+  - a profile dropdown or side drawer that contains:
+    - "Profile"
+    - "Wallet" (if available for driver/restaurant)
+    - "Settings"
+    - "Logout"
+
+Clicking "Profile" should then navigate to the same /role/profile route.
+
+Ensure:
+- The dropdown/drawer is fully keyboard accessible.
+- Tapping outside closes the menu.
+
+====================================================
+D. ROLE-BASED CONTENT & SECURITY
+====================================================
+
+For each profile route:
+
+Customer Profile:
+- Show only customer-specific info (name, email, phone, language, home address, verification_status).
+- No access to driver or restaurant fields.
+- Hide internal IDs (government_id_last4, etc.) or mask them if required.
+
+Driver Profile:
+- Show driver’s basic info and KYC status.
+- DO NOT show any customer or restaurant-sensitive data.
+- Show only masked forms of government IDs (e.g. last 4 digits with ****).
+
+Restaurant Profile:
+- Show restaurant name, address, contact info, KYC status.
+- No access to other restaurants.
+- No raw customer or driver data.
+
+Admin Profile:
+- Show admin account info.
+- Do NOT mix with any other roles.
+
+Important:
+- If a user somehow accesses a mismatched profile route (e.g. driver tries /customer/profile):
+  - Either redirect to correct profile route or show an authorization error.
+  - Never show another role’s profile to a logged-in user.
+
+====================================================
+E. DEMO & CUSTOMIZATION
+====================================================
+
+Add a small config object to central config (ADD-ONLY):
+
+profileNavConfig = {
+  enableHeaderAvatarProfileNavigation: true,
+  mobileOpensDrawer: true,
+  desktopDirectNavigate: true
+}
+
+Behavior:
+- If enableHeaderAvatarProfileNavigation = true:
+  - Avatar behaves as described above.
+- If mobileOpensDrawer = true:
+  - On narrow screens, open a small profile drawer first instead of direct navigation.
+- If desktopDirectNavigate = true:
+  - On larger screens, avatar click directly opens /role/profile.
+
+Default values must be as above so that in demo mode everything works out-of-the-box.
+
+====================================================
+F. TESTING REQUIREMENTS
+====================================================
+
+Add manual/automated checks for at least:
+
+1) Driver on ride map screen:
+   - Click top-right avatar.
+   - Should open Driver Profile screen (/driver/profile).
+   - Security: driver cannot see any customer or restaurant profile fields.
+
+2) Customer on customer home or map:
+   - Click avatar.
+   - Opens Customer Profile screen (/customer/profile).
+
+3) Restaurant dashboard:
+   - Click avatar.
+   - Opens Restaurant Profile.
+
+4) Admin dashboard:
+   - Click avatar.
+   - Opens Admin Profile / settings.
+
+5) Mobile vs desktop:
+   - On mobile viewport, header avatar tap opens drawer then Profile.
+   - On desktop, it directly navigates.
+
+6) Logged-out state (if header is visible):
+   - Avatar should either:
+     - not show, OR
+     - navigate to login page.
+   - Never throw an error.
+
+====================================================
+G. NON-BREAKING GUARANTEE
+====================================================
+
+You MUST:
+- Keep all existing SafeGo routes, APIs, schemas intact.
+- Implement profile avatar behavior purely as an ADD-ONLY enhancement.
+- Preserve all ride/food/parcel flows and wallet/commission logic.
+
+Final outcome:
+- The top-right profile avatar is now fully functional for all roles (particularly the driver map screen shown in the screenshot).
+- Clicking it always takes the user safely to the correct profile/ drawer.
+- No existing SafeGo features are broken.

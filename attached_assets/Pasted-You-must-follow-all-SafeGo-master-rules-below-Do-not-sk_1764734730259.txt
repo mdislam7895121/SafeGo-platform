@@ -1,0 +1,216 @@
+You must follow all SafeGo master rules below. Do not skip or relax any rule.
+
+========================
+SAFEGO GLOBAL RULES (DO NOT EDIT)
+========================
+
+1) Core Roles (must always remain consistent)
+- customer: uses rides, food, parcel, tickets, rentals, e-shops.
+- driver: handles ride & parcel for both BD and US (no ticket/e-shop role here).
+- restaurant: manages SafeGo Eats orders and menus.
+- shop_partner: manages Bangladesh E-Shop stores and products.
+- ticket_operator: manages tickets and BD rentals.
+- admin: manages approvals, payouts, configs, KYC, and auditing.
+
+2) Global products & collections (must exist and stay consistent)
+- rides, ride_orders
+- food_restaurants, food_menu_items, food_orders
+- parcel_deliveries
+- bd_tickets, bd_rentals, ticket_orders, rental_orders
+- bd_shops, bd_shop_products, bd_shop_orders, bd_shop_order_items
+- users, kyc_requests, payouts, commissions, notifications, audit_logs
+
+3) KYC / onboarding rules (BD vs US)
+- BD: always require NID number, owner name, father name, date of birth, present & permanent address, emergency contact name + phone for any operator/partner role (driver, restaurant, shop_partner, ticket_operator).
+- US: no “case” option or similar legal service; KYC limited to name, DoB, address, SSN last-4 (if used), and must follow US privacy rules.
+- Admin can approve/reject KYC but cannot bypass required fields.
+
+4) Authentication & authorization
+- JWT is the source of truth for role and country (no trusting client-side flags).
+- All partner/shop/ticket APIs must:
+  - verify authenticated user
+  - verify role is allowed for the endpoint
+  - verify country (BD vs US) if the route is country-specific
+- Never trust client “isPartner” style booleans; always re-check in backend.
+
+5) Security phase (for this task)
+- This task is **Application Hardening – Phase 2**:
+  - Fix broken validations and inconsistent state.
+  - Prevent silent failures and ghost roles (user marked partner without full data).
+  - Ensure backend validation is the single source of truth.
+  - Ensure no partial onboarding can lead to an active partner.
+
+6) UX rules
+- Demo content must load for guests and logged-in users where specified.
+- For Bangladesh modules (BD rides, BD E-Shop, BD tickets/rentals), demo data must appear with clear “demo” badges if user is not fully verified.
+- Error messages must be human readable (Bangla for BD flows) and should map to concrete fields where possible.
+
+========================
+TASK: FIX BD SHOP PARTNER ONBOARDING VALIDATION & FINAL SUBMIT
+========================
+
+Context from latest tests:
+- URL: `/shop-partner/onboarding` (Bangladesh shop partner onboarding).
+- User: `c2c@gmail.com` (BD, role = shop_partner after onboarding).
+- All three steps show as completed, with green check marks:
+  1) Shop details (name, type, address)
+  2) Delivery settings (radius, prep time, home delivery toggle)
+  3) Photos & confirmation (logo, banner, final submit)
+- At step 3 the banner “সব তথ্য সম্পূর্ণ!” appears, but when pressing the final submit button, backend returns:
+  - `400 Validation failed` with details showing:
+    - invalid_type / expected string / received undefined for:
+      - `shopName`
+      - `shopType`
+      - `shopAddress`
+      - `ownerName`
+      - `fatherName`
+      - `dateOfBirth`
+      - `presentAddress`
+      - `permanentAddress`
+      - `nidNumber`
+      - `emergencyContactName`
+      - `emergencyContactPhone`
+- So frontend thinks everything is complete, but backend never receives populated values for the core KYC + shop fields in the final payload.
+
+Your job: fully audit and repair the **BD shop partner onboarding pipeline**, so that:
+- All mandatory fields are required exactly once.
+- The final POST sends a complete, correct payload.
+- Validation errors are shown properly near the fields.
+- No user can be marked as shop_partner without a fully valid onboarding.
+
+Do this in **ONE complete pass** – do not leave TODOs.
+
+========================
+BACKEND REQUIREMENTS
+========================
+
+1) Find the BD shop partner onboarding endpoint and schema
+- Locate the backend handler that receives the final onboarding data for BD shop partners.
+  - Likely something like: `POST /api/shop-partners/bd/onboard` or similar.
+- Locate the validation schema (probably Zod or similar) that produces the error list shown in the screenshot:
+  - It currently expects flat fields:
+    - `shopName`, `shopType`, `shopAddress`
+    - `ownerName`, `fatherName`, `dateOfBirth`
+    - `presentAddress`, `permanentAddress`
+    - `nidNumber`
+    - `emergencyContactName`, `emergencyContactPhone`
+- Confirm the **exact field names** and types expected by the backend.
+
+2) Log and inspect the incoming payload
+- Add temporary debug logging (or use existing logs) to print:
+  - the raw request body
+  - the parsed body just before validation
+  - the user id and role from auth
+- Reproduce the error by submitting the full form from `/shop-partner/onboarding` as `c2c@gmail.com`.
+- Confirm:
+  - Which fields are missing or `undefined`.
+  - Whether values are nested (e.g. `owner.name`) while schema expects flat (`ownerName`), or vice versa.
+
+3) Fix payload mapping and input normalization
+- Based on what you see:
+  - If the frontend sends nested objects (e.g. `owner: { name, fatherName, dateOfBirth }`), but the schema expects flat strings:
+    - Either:
+      - Normalize in backend (convert nested structure into the expected flat fields), **or**
+      - Update the schema to match the current, correct data structure.
+  - If fields are simply missing from the request:
+    - Confirm that the controller merges all step data into one object.
+    - Add logic to gather:
+      - Shop info from step 1
+      - Owner/KYC info from step 2
+      - Media info from step 3
+    - Ensure the final object passed to validation includes all required properties.
+
+- Required backend invariants:
+  - All required KYC fields for BD must be non-empty strings:
+    - `ownerName`, `fatherName`, `dateOfBirth`, `presentAddress`, `permanentAddress`, `nidNumber`, `emergencyContactName`, `emergencyContactPhone`.
+  - `shopType` must be one of the allowed values in the error message:
+    - `grocery | electronics | fashion | pharmacy | general_store | hardware | beauty | books | sports | other`
+  - `shopName` and `shopAddress` must be non-empty strings.
+  - Ensure proper trimming of whitespace and normalization of Bangla text (avoid values that are only spaces).
+
+4) Ensure transactional onboarding & role assignment
+- On successful validation:
+  - Upsert (or create) the `bd_shops` record linked to the user.
+  - Store KYC fields in a secure table (e.g. `kyc_requests` or a dedicated `shop_owner_kyc` collection) with a status of `pending` until admin approval.
+  - Ensure marking the user as `shop_partner` is either:
+    - already done safely, OR
+    - done now in the same transaction when onboarding is valid.
+
+- If validation fails:
+  - Do **not** create or update the partner role.
+  - Return a structured error response like:
+    ```json
+    {
+      "error": "Validation failed",
+      "fieldErrors": {
+        "shopName": "দোকানের নাম দিন",
+        "shopType": "দোকানের ধরন নির্বাচন করুন",
+        "shopAddress": "দোকানের ঠিকানা দিন",
+        "ownerName": "মালিকের নাম দিন",
+        "fatherName": "পিতার নাম দিন",
+        "dateOfBirth": "জন্ম তারিখ দিন",
+        "presentAddress": "বর্তমান ঠিকানা দিন",
+        "permanentAddress": "স্থায়ী ঠিকানা দিন",
+        "nidNumber": "জাতীয় পরিচয়পত্র নম্বর দিন",
+        "emergencyContactName": "জরুরি যোগাযোগের নাম দিন",
+        "emergencyContactPhone": "জরুরি যোগাযোগের ফোন নম্বর দিন"
+      }
+    }
+    ```
+  - Use Bangla messages for BD flows, as above or close to it.
+
+5) Security checks
+- Ensure the onboarding endpoint:
+  - Checks that the authenticated user truly belongs to BD (country = BD).
+  - Checks they are allowed to become a shop partner (no conflicting roles, unless we explicitly support multiple roles).
+- Never accept `role` or `country` from the client request body; always derive from auth/JWT.
+- Log failures to an `audit_logs` collection with:
+  - user id
+  - endpoint
+  - reason (validation_failed, unauthorized_role, etc.)
+  - timestamp
+
+========================
+FRONTEND REQUIREMENTS (BD SHOP PARTNER ONBOARDING)
+========================
+
+1) Fix state handling across steps
+- Open the `/shop-partner/onboarding` page/component.
+- Identify how step data is stored:
+  - local component state only?
+  - React context?
+  - URL params or query state?
+- Ensure that:
+  - Step 1: Shop details (name, type, address) save their values into a shared onboarding state object.
+  - Step 2: KYC + delivery settings store their values into the same shared state.
+  - Step 3: Logo + banner and confirmation store into the same shared state.
+
+- When the user presses the final button (“আবেদন জমা দিন”):
+  - Build the payload from this unified onboarding state.
+  - Include **all** the backend-required fields, with the exact key names expected by the backend schema.
+  - Also include any delivery settings (radius, preparation time, homeDelivery flag) and image URLs (logo, banner) if applicable.
+
+2) Align field names with backend schema
+- Ensure the front-end field names map correctly:
+  - `shopName` ← দোকানের নাম
+  - `shopType` ← দোকানের ধরন (enum button group)
+  - `shopAddress` ← দোকানের ঠিকানা
+  - `ownerName` ← মালিকের নাম
+  - `fatherName` ← পিতার নাম
+  - `dateOfBirth` ← জন্ম তারিখ (ISO string or agreed format)
+  - `presentAddress` ← বর্তমান ঠিকানা
+  - `permanentAddress` ← স্থায়ী ঠিকানা
+  - `nidNumber` ← জাতীয় পরিচয়পত্র নম্বর
+  - `emergencyContactName` ← জরুরি যোগাযোগের নাম
+  - `emergencyContactPhone` ← জরুরি যোগাযোগের ফোন
+- If the UI currently uses different keys (for example `owner.name` or `ownerNameBn`), add a mapping layer before sending to the API.
+
+3) Fix the “সব তথ্য সম্পূর্ণ!” banner logic
+- Currently, the green banner “সব তথ্য সম্পূর্ণ!” is shown even when backend validation fails.
+- Change this logic so that:
+  - The banner is only shown when:
+    - All required fields in the onboarding state are non-empty.
+    - There is no pending client-side validation error.
+- Additionally, on API error:
+  - Hide or downgrade the “সব তথ্য সম্পূর্ণ!” banner.
+  - Show validation errors from `fieldErrors` next

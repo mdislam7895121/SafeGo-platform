@@ -1,0 +1,64 @@
+Redesign the "You're receiving orders" control in the restaurant dashboard header to match a capsule-style power button like the reference image:
+
+DESIRED DESIGN
+
+1) General style
+   - Single capsule button (no separate label + toggle)
+   - Background: solid black (#000000 or near-black)
+   - Border-radius: 9999px (fully rounded pill)
+   - Horizontal layout: [power icon] [label text]
+   - Good padding: e.g. px-4 py-2 on desktop, smaller on mobile
+   - Text color: white
+   - Works on desktop, tablet, and mobile
+
+2) ONLINE STATE ("Go Online" style like the image)
+   - Capsule background: black
+   - Left icon:
+       • Circular outline with green stroke (#22c55e)
+       • Power symbol inside the circle, also green
+   - Label text (right side): "Online" or "Receiving orders"
+       • Use medium/bold font
+   - Optional subtle glow or shadow around the green icon
+   - Hover state: slightly brighter green and subtle scale/opacity transition
+
+3) OFFLINE STATE
+   - Capsule background: black (same)
+   - Left icon:
+       • Circular outline with RED stroke (#ef4444)
+       • Power symbol inside the circle, also red
+   - Label text: "Offline" or "Not receiving orders"
+   - Hover state: slightly brighter red
+
+4) BEHAVIOR
+   - Clicking the button toggles online/offline state (preserve existing business logic; only change the UI).
+   - Keep using the existing field that indicates whether the restaurant is receiving orders.
+   - When state changes, button updates color + label immediately.
+   - Add smooth transition (200–250ms) for color and icon changes.
+
+5) ACCESSIBILITY
+   - Add aria-label reflecting current state, e.g.:
+       • "Restaurant is online. Tap to go offline."
+       • "Restaurant is offline. Tap to go online."
+   - Ensure good contrast for text and icon over black background.
+
+6) IMPLEMENTATION DETAILS
+   - Create or update a dedicated component, e.g.:
+       • client/src/components/restaurant/ReceivingOrdersButton.tsx
+   - Use the new capsule button in the restaurant header where "You're receiving orders" toggle currently appears.
+   - Do NOT change any backend API, Prisma schema, KYC, RBAC, or existing business logic.
+   - Keep the rest of the 3-row header layout as it is (top brand bar, identity row, search row).
+
+7) TESTING
+   - Verify ONLINE and OFFLINE states on:
+       • Desktop
+       • Tablet
+       • Mobile
+   - Confirm:
+       • No layout break in the header
+       • Button is clearly visible and clickable
+       • Color and text always match the actual state.
+
+After implementing, summarize:
+- Which component/file you changed
+- Final labels used for online/offline
+- Screenshots or description of the button in both states (green and red).

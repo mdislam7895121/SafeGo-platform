@@ -1,0 +1,45 @@
+I need you to FIX the layout of the SafeGo Eats restaurant Online/Offline toggle button.
+
+Right now the toggle appears twice and the layout looks messy.  
+Please follow these exact layout rules:
+
+1. SINGLE TOGGLE ONLY
+   - There must be ONLY ONE Online/Offline toggle on the restaurant dashboard.
+   - Place it in the HEADER AREA ONLY, not inside the content cards.
+   - Remove any extra toggle from the "Performance Overview" section or other cards.
+
+2. EXACT POSITION IN HEADER
+   - Order of elements in the header should be:
+     a) SafeGo Eats brand (top)
+     b) Restaurant name + verification badge + status icons + location row
+     c) Online/Offline toggle (CENTERED under the identity row)
+   - The toggle should NOT appear again below the "Performance Overview" title.
+   - Keep the search bar and rest of the dashboard exactly where they were before.
+
+3. VISUAL STYLE (do NOT change, just keep what you already implemented)
+   - Keep the new pill design you already built:
+     • Height ~46px, pill radius 9999px
+     • SafeGo Green for ONLINE, neutral gray for OFFLINE
+     • Icon + “Online/Offline” label, medium/semibold text
+   - Keep role="switch", aria-checked, focus ring, keyboard support, and transitions exactly as implemented.
+
+4. RESPONSIVE & LAYOUT RULES
+   - The header may wrap on small screens, but:
+     • The toggle must always stay directly under the restaurant name block.
+     • It must NOT overlap or push into the cards below.
+   - Make sure the button stays centered on mobile, tablet, and desktop.
+   - No extra top/bottom margin that makes the header look too tall.
+
+5. DO NOT CHANGE
+   - Do NOT change any backend logic, APIs, routing, or online/offline state logic.
+   - Do NOT touch KYC / RBAC / SafeGuard rules.
+   - Do NOT rename components or move files.
+   - Do NOT modify any card content under “Performance Overview”.
+
+6. AFTER CHANGES
+   - Confirm there is only one toggle on the /restaurant dashboard.
+   - Confirm the header looks clean: brand → name row → single centered toggle → search bar → content.
+   - Run responsive tests on mobile, tablet, desktop to ensure no layout shifting.
+   - Confirm no regressions on other restaurant pages that reuse this header.
+
+This is strictly a layout cleanup for the toggle placement, keeping your existing redesign and all SafeGuard rules unchanged.

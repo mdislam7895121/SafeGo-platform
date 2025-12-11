@@ -1,0 +1,168 @@
+Apply the following premium “Glow-Edge Reflection Card System” to the ENTIRE SafeGo Admin Dashboard. 
+This must apply to:
+- Real-Time Analytics
+- Quick Actions
+- Overview cards (Users, Drivers, Restaurants, Parcels etc.)
+- Driver Statistics cards
+- Parcel Statistics cards
+- Management cards (Onboarding, Notification, Safety, KYC, Document Center etc.)
+- All information blocks across Dashboard, People & KYC, Users, Drivers, Restaurants, Parcels, Wallets, Approvals, Settings.
+
+No card or block may keep old styling. The entire dashboard must use the same unified premium glow system.
+
+========================================================
+1. GLOBAL CARD BASE (apply to every UI block)
+========================================================
+background: #FFFFFF;
+border-radius: 16px;
+padding: 24px;
+position: relative;
+
+box-shadow:
+    0 2px 4px rgba(0,0,0,0.04),
+    0 8px 20px rgba(0,0,0,0.06),
+    0 0 18px rgba(140, 92, 255, 0.25);  // SafeGo purple glow
+
+This creates the floating card effect.
+
+========================================================
+2. EDGE REFLECTION LIGHT RING (the premium “wow effect”)
+========================================================
+Apply this to ALL cards:
+
+&:before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+     120deg,
+     rgba(255,255,255,0.0),
+     rgba(255,255,255,0.55),
+     rgba(255,255,255,0.0)
+  );
+  z-index: 0;
+}
+
+This is the luxury reflective glow around card edges that makes the UI look futuristic and high-end.
+
+========================================================
+3. INNER SOFT BORDER + FROSTING
+========================================================
+border: 1px solid rgba(255,255,255,0.35);
+backdrop-filter: blur(8px);
+
+Adds premium glass-card refinement.
+
+========================================================
+4. UNIFIED TYPOGRAPHY SYSTEM (ALL CARDS MUST MATCH)
+========================================================
+Label:
+- 14px medium
+- color: #6B7280
+
+Primary Value:
+- 32px semibold
+- color: #111827
+
+Subtext / Metrics:
+- 12px regular
+- color: #9CA3AF
+
+Icon:
+- watermark style
+- size 36–40px
+- opacity 12%
+- always top-right
+
+All cards must follow this exact hierarchy.
+
+========================================================
+5. RESPONSIVE SPACING GRID
+========================================================
+Use strict spacing:
+- Vertical spacing: multiples of 8px
+- Horizontal spacing: multiples of 8px
+- Cards must align perfectly in rows and columns
+- All cards must be equal height within a section
+
+========================================================
+6. HOVER & INTERACTION EFFECTS (ALL CARDS)
+========================================================
+transition: all 0.25s ease;
+
+&:hover {
+  transform: translateY(-3px);
+  box-shadow:
+      0 4px 12px rgba(0,0,0,0.05),
+      0 12px 30px rgba(140,92,255,0.35),
+      0 0 22px rgba(140,92,255,0.45);
+}
+
+Every card must animate identically.
+
+========================================================
+7. APPLY TO ALL DASHBOARD MODULES
+========================================================
+A. Real-Time Analytics
+- Active Users
+- Partner Growth
+- Total Orders
+- Active Rides
+- Failure Rate
+
+B. Overview Section Cards
+- Total Users
+- Active Drivers
+- Restaurants
+- Total Parcels
+- Complaints Stats
+- KYC Pending
+- Suspended
+- Blocked
+- Risk Scores
+
+C. Driver Stats Cards
+D. Parcel Stats Cards
+E. Management Cards:
+   - Onboarding
+   - Notifications
+   - People & KYC Center
+   - Safety & Risk Center
+   - KYC Approvals
+   - Document Center
+
+F. Any section that currently uses:
+   - gray background blocks
+   - flat boxes
+   - list-style statistic containers
+
+Replace ALL with glow-edge premium cards.
+
+========================================================
+8. COLOR SYSTEM (GLOBAL)
+========================================================
+Primary text: #111827
+Secondary: #6B7280
+Subtle: #9CA3AF
+Success: #22C55E
+Danger: #EF4444
+Neutral border/frame: rgba(255,255,255,0.35)
+Card glow: rgba(140, 92, 255, 0.25)
+
+No other colors allowed.
+
+========================================================
+9. VISUAL CONSISTENCY RULES
+========================================================
+- Every card must share identical radius, padding, shadow, glow, typography.
+- No card may use old style borders or flat shading.
+- No mismatched icon sizes.
+- No inconsistent spacing between similar cards.
+- All dashboard sections must visually "belong" to the same design family.
+
+========================================================
+10. FINAL GOAL
+========================================================
+Transform the entire SafeGo Admin Dashboard into a world-class, futuristic, premium UI with reflective glow edges, floating cards, soft shadows, precise alignment, and flawless consistency — so visually impressive that anyone who sees it asks:
+“Who designed this? This looks like a top-tier professional studio built it.”

@@ -1,0 +1,187 @@
+Act as a senior product designer and front-end architect for the SafeGo Driver Web App.
+
+Goal: Rebuild the Driver Profile page into an Uber-style profile and loyalty view, without touching the Driver Account Center or ride logic.
+
+Follow all existing SafeGo master rules:
+- Four roles: customer, driver, restaurant, admin (do not break cross-role logic).
+- Keep all existing KYC, payouts, tax, and wallet systems untouched.
+- Do not change any ride, food, or parcel matching logic.
+- Do not break any existing URLs or API contracts.
+- Respect the SafeGo Points tier system (Blue, Gold, Premium) that is already implemented.
+- No emojis in any UI text.
+
+========================
+1) NAVIGATION BEHAVIOR
+========================
+
+1. When the driver taps the profile header in the left sidebar (avatar + name + rating + location) on any driver route, open the main driver profile page.
+
+2. Use this route for the main profile page:
+   - Path: /driver/profile
+   - This page is the DRIVER PROFILE + LOYALTY view.
+   - Do NOT move or change any existing /driver/account/... routes (those are for account settings).
+
+3. Keep the existing sidebar and top app bar as they are. Only change the content area of /driver/profile.
+
+========================
+2) PROFILE HEADER LAYOUT
+========================
+
+Rebuild the top of /driver/profile to match Uber’s profile layout, but in SafeGo’s light theme:
+
+- Page title: "Profile" at the top left of the content area.
+- Main profile card centered at the top with:
+  - Large circular avatar (reuse the driver profile photo).
+  - Full driver name in large bold text next to the avatar.
+  - Directly attached to the avatar frame, show a SafeGo tier pill:
+    - Text: current tier name from existing tier logic (for example: "Blue", "Gold", "Premium").
+    - Background: subtle pill style, no emoji, no loud colors.
+  - Under the name, show:
+    - Primary email
+    - Primary city and country (for example: "New York, US").
+  - Secondary button on the right: "View public profile"
+    - For now, this can just navigate to a placeholder route or do nothing, but keep the UI element.
+
+Design requirements:
+- Keep spacing, typography, and card edges consistent with the current SafeGo driver UI.
+- White background, light grey dividers, and soft shadows like the existing cards in the app.
+
+================================
+3) SAFEGO POINTS AND TIER CARD
+================================
+
+Under the profile header, add a "SafeGo Points" card that uses the existing points and tier logic:
+
+- Card title: "SafeGo Points and tier"
+- Show:
+  - Current tier (Blue, Gold, or Premium) pulled from the existing tier logic.
+  - Current points value (for example: "1,420 points").
+  - A progress bar showing progress to the next tier.
+    - Label under the bar: 
+      - If not at top tier: "Next tier at [X] points"
+      - If at top tier: "You are at the highest tier"
+- Add a small inline tier summary using the current implementation, for example:
+  - Blue: entry tier
+  - Gold: mid tier with additional benefits
+  - Premium: highest tier with full benefits
+
+Important:
+- Do NOT reimplement the tier math here. Read the current tier and points from the same place the SafeGo Points page uses.
+- Do NOT add any new business rules; just display what already exists.
+
+=================================
+4) PERFORMANCE STATS (RIDES AREA)
+=================================
+
+Below the SafeGo Points card, add a "Driving performance" section using 4 stat tiles, similar to Uber:
+
+Section title: "Driving performance"
+
+Four tiles in a responsive grid (2x2 on mobile, 4 in a row on desktop):
+
+1) Acceptance rate
+   - Large number (for example "84%").
+   - Subtitle: "Acceptance rate"
+   - Pull this value from existing stats if available, otherwise use placeholder data and mark as "Sample data" in code comments only.
+
+2) Cancellation rate
+   - Large number (for example "7%").
+   - Subtitle: "Cancellation rate"
+
+3) Star rating
+   - Large number (for example "4.96").
+   - Subtitle: "Star rating"
+   - This must use the same rating value already shown in the sidebar (to avoid inconsistency).
+
+4) Driving score
+   - Large number (for example "94").
+   - Subtitle: "Driving insights score" or similar internal metric.
+   - If there is no real metric yet, use a placeholder but keep the UI ready.
+
+Design details:
+- Each tile is a card with:
+  - Left-aligned text.
+  - No emojis, clean typography.
+  - Consistent heights and padding.
+
+=================================
+5) LIFETIME HIGHLIGHTS SECTION
+=================================
+
+Add a "Lifetime highlights" section under the performance tiles, similar to Uber:
+
+Section title: "Lifetime highlights"
+
+Two large cards in a row on desktop (stacked on mobile):
+
+1) Total trips card:
+   - Large icon area (vector illustration placeholder like a generic map pin).
+   - Text:
+     - Big number, for example "14,878"
+     - Label: "Total trips"
+   - Pull the real trip count if available; otherwise use a placeholder and clearly mark as sample data in comments.
+
+2) Journey with SafeGo card:
+   - Big text like "4 yr 10 mo"
+   - Label: "Journey with SafeGo"
+   - Calculate based on the driver account created date if available; otherwise use placeholder and comments.
+
+=================================
+6) BADGES AND ACHIEVEMENTS
+=================================
+
+Add a "Badges" section at the bottom of the profile page:
+
+Section title: "Badges"
+
+- Show a horizontal list of badge chips or circle badges (for example: 
+  - "100 five-star trips"
+  - "1 year with SafeGo"
+  - "Weekend hero"
+- For now, use static seed badges, but structure the UI and data model so we can attach real badge data later:
+  - Each badge has:
+    - Icon placeholder
+    - Title
+    - Optional short description tooltip
+
+Important:
+- Do not change or break any existing badge logic if something is already implemented elsewhere.
+- If there is no badge system yet, keep all badge content in a separate component so it can be wired later.
+
+=================================
+7) INTERACTION AND ROUTING RULES
+=================================
+
+1. Tapping the profile header in the left sidebar always opens /driver/profile with this new layout.
+2. All actions on this page must be read-only for now:
+   - Do not allow editing of name, photo, or KYC from this page.
+   - Editing continues to live in the Driver Account Center (/driver/account/...), which you must not change in this task.
+3. The "View public profile" button can:
+   - Either navigate to a placeholder route like /driver/profile/public
+   - Or open a modal with "Coming soon" text.
+   - Choose the simplest option without breaking anything.
+
+=================================
+8) RESPONSIVE AND TECHNICAL REQUIREMENTS
+=================================
+
+- Use the same design system and component library already used in the driver web app (shadcn/ui or equivalent).
+- Keep the page mobile-first and responsive:
+  - Single column on small screens.
+  - Multi-column layout for tiles and cards on larger screens.
+- Do not introduce any new global CSS resets.
+- Reuse existing typography, colors, and spacing tokens so the page feels native to SafeGo.
+- Add data-testid attributes where appropriate to support future automated tests.
+
+=================================
+9) SAFETY AND PRIVACY
+=================================
+
+- Do not expose any sensitive identifiers (NID, SSN, full tax IDs, bank details) on this profile page.
+- This profile page is for performance and loyalty only.
+- All sensitive KYC and tax views remain in the Account Center and Tax Info sections, which you must not modify in this task.
+
+After implementing, review the entire /driver/profile page and:
+- Confirm sidebar header click opens this page correctly.
+- Confirm no online/offline or job controls appear here.
+- Confirm all existing routes and account pages continue to work without change.

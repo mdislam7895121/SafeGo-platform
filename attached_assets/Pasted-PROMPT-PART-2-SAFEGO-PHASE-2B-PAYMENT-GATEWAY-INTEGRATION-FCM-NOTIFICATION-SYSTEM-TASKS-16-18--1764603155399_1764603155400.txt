@@ -1,0 +1,305 @@
+PROMPT PART 2 — SAFEGO PHASE 2B: PAYMENT GATEWAY INTEGRATION & FCM NOTIFICATION SYSTEM (TASKS 16–18)
+
+You are continuing work on SafeGo Phase 2.  
+Assume Phase 1 (dispatch) and Phase 2A (wallet, commission, tips, incentives, cancellation fees) are fully implemented and stable.
+
+Your mission in THIS prompt is to implement:
+
+   16. Real Payment Processing Integration (online payments)  
+   17. Driver Notification System (FCM)  
+   18. Customer Notification System (FCM)  
+
+All implementations must:
+   - Be fully compatible with existing wallet/commission logic.
+   - Be non-breaking for any existing features (including cash-only flows).
+   - Respect all SafeGo Master Rules (roles, services, KYC, security, status flows, admin authority, etc.).
+   - NOT introduce any “case” or “legal complaint” features.
+
+==================================================
+A. GLOBAL RULE REMINDER (ABRIDGED)
+==================================================
+
+1) Roles: Customer, Driver, Restaurant, Admin — each with separate dashboards and permissions.
+2) Services: ride, food, parcel — all must be supported.
+3) KYC: BD vs US country-specific rules; only verified, non-blocked users can do financial actions.
+4) Admin: only admin can change pricing, commission, verification, blocking, and payouts.
+5) Collections: `rides`, `food_orders`, `deliveries` must remain; only additive changes.
+6) Commission rules:
+   - Cash: partner gets cash; SafeGo commission → negative driver/restaurant wallet (already handled by Phase 2A).
+   - Online: SafeGo receives full; partner gets net via wallet.
+7) Security: strict data segregation, no sensitive KYC exposure; no direct client control over wallet balances.
+8) Status flows: financial actions must align with completed/cancelled states.
+9) No legal case/complaint features in this prompt.
+
+==================================================
+B. ONLINE PAYMENT ARCHITECTURE (TASK 16)
+==================================================
+
+Goal: Integrate a generic payment gateway (e.g., Stripe-like) in an **abstracted** way so providers can be swapped.
+
+1) Data model: `payments` table
+Create a new table:
+
+   payments:
+       - id
+       - service_type: "ride" | "food" | "parcel"
+       - entity_id: ride_id / food_order_id / delivery_id
+       - customer_id
+       - amount
+       - currency
+       - provider: "stripe" | "braintree" | "bkash_gateway" | "mock" etc. (configurable)
+       - provider_payment_id (string)
+       - status: "created" | "authorized" | "captured" | "failed" | "cancelled" | "refunded"
+       - payment_method_description (masked card or digital wallet label)
+       - country_code
+       - created_at
+       - updated_at
+       - error_code (nullable)
+       - error_message (nullable)
+       - meta JSON
+
+2) Payment flow abstraction: `PaymentService`
+Implement:
+
+   PaymentService.createPaymentIntent({
+       customer_id,
+       service_type,
+       entity_id,
+       amount,
+       currency,
+       country_code
+   }) → { payment_id, client_secret_or_token }
+
+   PaymentService.capturePayment(payment_id) → { success, error? }
+
+   PaymentService.cancelPayment(payment_id) → { success, error? }
+
+   PaymentService.handleWebhook(provider_payload) → updates `payments` rows.
+
+Use environment configuration to select provider per country and per service.  
+All provider-specific logic must live behind an adapter interface (e.g., `StripeProvider`, `MockProvider`).
+
+3) Integrating with rides/food_orders/deliveries
+For **online** payment_method:
+
+   - At booking/placement time:
+       - Create a `payments` row with status "created".
+       - Generate a provider-specific payment intent (if required).
+       - Store a link between entity and payment_id (`rides.payment_id`, etc. — added non-breaking fields).
+
+   - When provider confirms capture (via webhook or API call):
+       - Update `payments.status` = "captured".
+       - Update entity.payment_status = "paid".
+       - Trigger WalletService settlement functions:
+           - e.g., on completed ride + payment_status = "paid":
+               - call WalletService.settleCompletedRide(ride_id).
+
+   - On failure:
+       - Set `payments.status` = "failed".
+       - Set entity.payment_status = "failed".
+       - Notify customer via FCM / WS (Phase 2B notifications).
+
+4) Partial and failure handling
+   - Ensure that:
+       - Settlement is only called when payments.status = "captured".
+       - Idempotency is guaranteed: multiple webhooks/web requests cannot cause double settlement.
+   - If a ride/order is cancelled before capture:
+       - Cancel payment intent via PaymentService.cancelPayment.
+       - Mark payment/status accordingly.
+
+5) Demo mode & test environment
+   - Provide a `mock` provider that:
+       - immediately sets status to "captured" (for demos),
+       - or can simulate "failed" cases via config/test endpoints.
+
+==================================================
+C. PAYMENT METHOD MANAGEMENT FOR CUSTOMERS (EXTENSION OF TASK 20)
+==================================================
+
+Though Task 20 is later, you must design **non-breaking** hooks now:
+
+   - Add or confirm a `payment_methods` table:
+       - id
+       - customer_id
+       - provider
+       - provider_payment_method_id (tokenized)
+       - last4
+       - brand
+       - expiry_month, expiry_year
+       - is_default (boolean)
+       - is_active
+
+   - PaymentService must be able to:
+       - create payment methods (tokenization),
+       - list existing payment methods (masked),
+       - select a method while creating PaymentIntent.
+
+No sensitive card data is stored directly; only tokens + masked details.
+
+==================================================
+D. FCM NOTIFICATION SYSTEM (TASKS 17–18)
+==================================================
+
+Goal: Deliver reliable push notifications to **drivers** and **customers** using FCM, without breaking existing WS behavior.
+
+1) Data model: device tokens
+Add two new tables or extend existing:
+
+   user_devices:
+       - id
+       - user_id
+       - role: "customer" | "driver" | "restaurant" | "admin"
+       - platform: "ios" | "android" | "web"
+       - fcm_token
+       - last_seen_at
+       - is_active
+
+   - When a user logs in from a mobile/web app, client registers its FCM token via:
+       - POST /api/devices/register
+         body: { role, fcm_token, platform }
+
+2) NotificationService abstraction
+Implement:
+
+   NotificationService.sendToUser({
+       user_id,
+       role,
+       title,
+       body,
+       data (JSON)
+   })
+
+   NotificationService.sendToMany({ user_ids[], role, title, body, data })
+
+Internally:
+   - Looks up active device tokens for that user/role.
+   - Calls FCM HTTP API.
+   - Logs success/failure to a `notification_logs` table:
+       - id, user_id, role, type, payload, status, error_code, created_at.
+
+3) Driver notifications (Task 17)
+Define standard notification types for drivers:
+
+   - NEW_RIDE_OFFER
+   - RIDE_ASSIGNED
+   - RIDE_CANCELLED
+   - RIDE_COMPLETED_SUMMARY
+   - NEW_FOOD_ORDER_ASSIGNMENT
+   - NEW_PARCEL_ASSIGNMENT
+   - WALLET_NEGATIVE_BALANCE_REMINDER
+   - INCENTIVE_AWARDED
+
+Tie them to events:
+
+   - When a new ride offer is created (from dispatch):
+       - Use both WS event ("ride:offer") and FCM push:
+           - title: "New ride request"
+           - body: "Pickup at [area], estimated fare [X]."
+           - data: { type: "NEW_RIDE_OFFER", ride_id, dispatch_session_id }
+
+   - When wallet balance falls below zero or below configured threshold:
+       - Send periodic summary push:
+           - "Your SafeGo balance is negative. Please settle to continue receiving some incentives."
+
+   - When incentive_awards are created:
+       - Notify driver: "You earned a bonus of [amount]."
+
+4) Customer notifications (Task 18)
+Notification types for customers:
+
+   - RIDE_DRIVER_ASSIGNED
+   - DRIVER_ARRIVING
+   - TRIP_STARTED
+   - TRIP_COMPLETED_RECEIPT
+   - PAYMENT_SUCCESS
+   - PAYMENT_FAILED
+   - ORDER_STATUS_UPDATE (food)
+   - PARCEL_STATUS_UPDATE
+
+For example:
+
+   - On `ride:driver_assigned` event:
+       - push: "Your driver is on the way."
+   - On payment capture success:
+       - push: "Your payment of [amount] for ride #[id] was successful."
+   - On payment failure:
+       - push: "Payment failed. Please update your payment method."
+
+All pushes must include `data` payload with:
+   - `type`, `service_type`, `entity_id`, and any necessary navigation hints.
+
+5) Admin notifications (limited)
+Optionally, implement admin FCM notifications for critical financial anomalies:
+
+   - e.g., "High failure rate on payments in BD", "Abnormal negative balance on driver X".
+   - These are configuration-based and must be read-only.
+
+==================================================
+E. LINKING PAYMENTS, WALLETS & NOTIFICATIONS
+==================================================
+
+The core integration points:
+
+1) When an online payment is captured:
+   - PaymentService updates payments.status = "captured".
+   - Calls WalletService.settleCompletedRide/Order/Delivery.
+   - NotificationService sends:
+       - PAYMENT_SUCCESS to customer.
+       - TRIP_COMPLETED or ORDER_DELIVERED receipts.
+   - No double-settlement allowed.
+
+2) When payment fails:
+   - Entity.payment_status = "failed".
+   - Do NOT call WalletService.
+   - NotificationService sends PAYMENT_FAILED to customer.
+
+3) After settlement for online payments:
+   - NotificationService sends a summary push to driver/restaurant:
+       - "You earned [net_amount] for your recent [ride/order]. Check your wallet."
+
+4) After cancellation/no-show fee (online):
+   - When fee is successfully charged:
+       - Notify customer (fee applied).
+       - Notify driver/restaurant if they receive any portion.
+
+==================================================
+F. SECURITY & PRIVACY (PAYMENT PHASE)
+==================================================
+
+This Phase 2B is the **Payment Security & Notification** security phase:
+
+   - Never log full card numbers or CVV.
+   - Only use provider tokens and masked last4.
+   - Protect FCM tokens as PII:
+       - Not exposed to other users.
+       - Only used server-side for sending notifications.
+   - Ensure that:
+       - Only authenticated, authorized users can register devices for their own accounts.
+       - No one can send arbitrary notifications to someone else (NotificationService is server-internal).
+
+==================================================
+G. NON-BREAKING GUARANTEES & IMPLEMENTATION NOTES
+==================================================
+
+When applying this prompt:
+
+   - Only ADD:
+       - new tables: payments, user_devices, notification_logs (or similar).
+       - new fields on `rides`, `food_orders`, `deliveries` for payment_id/payment_status.
+       - new services: PaymentService, NotificationService, provider adapters.
+       - new admin endpoints to view payments and notification stats.
+   - Do NOT:
+       - modify previously defined wallet/commission rules.
+       - change the meaning of `driver_wallet_balance` or `restaurant_wallet_balance`.
+       - remove any existing endpoints for ride/food/parcel booking.
+
+Ensure:
+
+   - If online payments are disabled (via config), existing cash-only flows still work exactly as before.
+   - If FCM is misconfigured, core WS + HTTP flows remain functional (no hard dependency).
+   - All provider keys (payment + FCM) are read from secure environment variables, not hard-coded.
+
+Provide production-quality implementation with:
+   - clear interfaces between Dispatch, Wallet/Commission, Payment, and Notification subsystems,
+   - thorough error handling and logging for payment/notification failures,
+   - sufficient comments to allow future prompts to extend fraud detection and revenue analytics safely.

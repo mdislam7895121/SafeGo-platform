@@ -1,0 +1,233 @@
+SAFEGO ARCHITECT – FIX RESTAURANT “CITY” FIELD (BD + US LOCATION RULES)
+
+You must fix the Restaurant registration form so that the **City** field is no longer a hardcoded demo list  
+(New York, Los Angeles, Chicago, Houston, Miami) and instead follows SafeGo’s country-specific location rules.
+
+Right now on `/partner/restaurant/register`, the “City” select shows a fixed set of US cities.  
+This is NOT acceptable for a global SafeGo deployment and breaks our BD/US branching logic.
+
+=====================================================
+A) SAFEGO MASTER RULES (DO NOT BREAK)
+
+1) Roles (4 distinct):
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+
+   Each has its own:
+   - signup/onboarding
+   - KYC/verification
+   - dashboard
+   - permissions & status flows
+
+2) Global services (3):
+   - ride-hailing
+   - food delivery
+   - parcel delivery
+
+3) Country-specific KYC (must remain intact):
+
+   BANGLADESH (BD) drivers:
+   - father_name, date_of_birth
+   - present_address, permanent_address
+   - nid_number + nid_front_image + nid_back_image
+   - emergency_contact_name + emergency_contact_phone
+   - driving_license_number + images
+   - vehicle_registration
+   - insurance_document (optional)
+   - verification_status + is_verified
+
+   UNITED STATES (US) drivers:
+   - date_of_birth
+   - home_address
+   - emergency_contact_name + emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - government_id_front_image + back_image
+   - driver_license + image + expiry (for car)
+   - ssn_last4 (optional)
+   - verification_status + is_verified
+
+4) Collections:
+   - rides
+   - food_orders
+   - deliveries
+   Must keep identity fields, addresses+geo, fees+commission, payment details, timestamps, full status flow, rating+feedback.
+
+5) Commission & payout rules:
+   - Cash ride: driver keeps all cash, commission → negative driver_wallet_balance, weekly settlement.
+   - Cash food: restaurant keeps all cash, commission → negative restaurant_wallet.
+   - Online payment: SafeGo keeps commission.
+   - Admin can settle balances and mark paid.
+
+6) Security:
+   - Customers cannot see driver documents.
+   - Drivers cannot see customer IDs.
+   - Restaurants cannot see other restaurants’ data.
+   - Only admin can change pricing, commissions, verification, blocking.
+   - Users can update only their own profile.
+
+7) Status flows (must stay):
+
+   Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x  
+   Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x  
+   Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x  
+
+8) Onboarding:
+   - multi-step, verification_status="pending" until admin approves.
+   - access blocked until approved.
+
+9) Notifications:
+   - ride/order/parcel updates
+   - verification decisions
+   - admin important notifications
+
+All changes must be BACKWARD-COMPATIBLE:  
+DO NOT rename/remove DB fields or change existing API signatures.  
+Only adjust the restaurant registration **city/state** input behavior.
+
+=====================================================
+B) CURRENT PROBLEM
+
+On `/partner/restaurant/register`:
+
+- The Restaurant Information form shows:
+  - Restaurant Name
+  - Cuisine Type
+  - Restaurant Address (free text)
+  - City (dropdown with: New York, Los Angeles, Chicago, Houston, Miami)
+  - Restaurant Phone
+  - Description (optional)
+
+Issues:
+- City is a fixed hardcoded list of demo cities.
+- There is no State field for US restaurants.
+- There is no BD-versus-US branching for location.
+- This is not scalable or correct for real SafeGo deployment.
+
+=====================================================
+C) EXPECTED BEHAVIOR – COUNTRY-SPECIFIC LOCATION INPUT
+
+You must refactor the Restaurant registration form to follow this model:
+
+1) There MUST be a **country source** for the restaurant:
+   - If a global “country” selection already exists for the restaurant, use that.
+   - If not, assume for now:
+       - BD restaurants in Bangladesh route/context
+       - US restaurants in US context
+     (but design the code so adding an explicit country field later is easy).
+
+2) For UNITED STATES restaurants:
+
+   - Fields:
+     - restaurant_address: free text (e.g. “188 Sutter Ave Apt 10C”)
+     - city: free text input (NOT limited to a fixed dropdown list)
+     - state: dropdown of all US states using standard 2-letter codes (NY, CA, TX, etc.)
+     - zip_code (if not present yet, you may ADD it as a new field)
+
+   - The existing “City” dropdown with [New York, Los Angeles, Chicago, Houston, Miami] must be completely removed and replaced with:
+     - a text input for `city`
+     - a separate `state` select component listing all 50 states + DC.
+
+3) For BANGLADESH restaurants:
+
+   - Fields:
+     - restaurant_address: free text
+     - city_or_town: text input (or)
+     - district: dropdown of BD districts (Dhaka, Chattogram, etc.)
+     - postal_code (optional or required, depending on existing schema)
+
+   - BD path must NOT show US cities or US states.
+
+4) The form component must switch its behavior based on country:
+   - If country = US → show US layout (city text + state dropdown).
+   - If country = BD → show BD layout (district etc.).
+   - No hardcoded demo city list anywhere.
+
+=====================================================
+D) IMPLEMENTATION DETAILS (NON-BREAKING)
+
+1) FRONTEND:
+
+   - Find the Restaurant registration component used at `/partner/restaurant/register`.
+   - Replace the existing City select with:
+     - For US:
+       - `<Input {...register("city")}>`
+       - `<Select {...register("state")}>` with a full US state list.
+     - For BD:
+       - appropriate district/city fields.
+
+   - Make sure the new fields use meaningful names:
+     - `city`
+     - `state` (US)
+     - `district` (BD, if added)
+     - `zip_code` (if added)
+
+   - Do NOT reuse driver keys like `home_address` etc.; use restaurant-specific keys.
+
+2) BACKEND:
+
+   - Update the restaurant creation/registration schema (Zod/Yup/TS type) to accept the new fields:
+     - city (string)
+     - state (string, US only)
+     - district (string, BD only, optional if you cannot add full branching yet)
+     - zip/postal code if present.
+
+   - IMPORTANT:
+     - ADD new fields if needed, but DO NOT rename or delete existing fields.
+     - Existing restaurants in the database must continue to be valid.
+
+=====================================================
+E) VALIDATION RULES
+
+For US:
+- restaurant_address: required, min length 3
+- city: required, min length 2
+- state: required, must be one of the US state codes
+- zip_code: required, basic length/format check (5 or 9 digits acceptable)
+
+For BD:
+- restaurant_address: required
+- city_or_town OR district: required
+- postal_code: optional/required per existing design
+
+=====================================================
+F) TEST CASES (YOU MUST RUN)
+
+Test 1 – US Restaurant:
+- Open `/partner/restaurant/register` in the US context.
+- Enter:
+  - Name: “Kalarpata”
+  - Cuisine: “American”
+  - Restaurant Address: “188 Sutter Ave Apt 10C”
+  - City: “Brooklyn”
+  - State: “NY”
+  - ZIP Code: “11212”
+  - Phone: “9293369016”
+- Expected:
+  - No hardcoded dropdown of New York / LA / Chicago.
+  - City accepts “Brooklyn”.
+  - State dropdown works.
+  - Form submits successfully and persists all values.
+
+Test 2 – BD Restaurant:
+- Open the BD path (if available).
+- Confirm that:
+  - City/state fields match BD model (no US city list).
+  - Form submits successfully.
+
+=====================================================
+G) NON-BREAKING GUARANTEE
+
+- Do NOT change any existing rides/food_orders/deliveries logic.
+- Do NOT modify commission, wallets, or driver flows.
+- Restrict your changes to:
+  - Restaurant registration frontend component(s)
+  - Restaurant registration validation schema/types
+  - Restaurant persistence model (ADD fields only).
+
+After completion, summarize:
+- Which components/files were updated.
+- How US vs BD restaurant address fields now behave.
+- Confirmation that the “City” field no longer shows the fixed list (New York, Los Angeles, Chicago, Houston, Miami) and now supports proper city/state handling.

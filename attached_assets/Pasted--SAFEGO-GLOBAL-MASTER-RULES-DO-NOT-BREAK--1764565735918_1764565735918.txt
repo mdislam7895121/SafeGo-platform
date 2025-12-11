@@ -1,0 +1,198 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK)
+====================================
+
+ROLES (4 distinct roles)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role:
+- Own signup + KYC flow
+- Own dashboard
+- Own permissions
+- No cross-role private data access
+
+SERVICES (must always exist)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+====================================
+KYC RULES (COUNTRY SPECIFIC)
+====================================
+
+BANGLADESH (BD) – required fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified (boolean)
+
+UNITED STATES (US) – required fields:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (for drivers)
+- driver_license_image_url
+- driver_license_expiry
+- ssn_last4 (optional, drivers)
+- verification_status
+- is_verified (boolean)
+
+====================================
+ONBOARDING (ALL ROLES)
+====================================
+- Multi-step: basic info → address → ID/KYC upload → emergency contact
+- After completion: verification_status = "pending"
+- Block access to ride/food/parcel until Admin sets verification_status = "approved"
+
+====================================
+ADMIN PANEL CAPABILITIES
+====================================
+Admin can:
+- Verify customers/drivers/restaurants (approve/reject + rejection_reason)
+- Block/unblock any user or restaurant
+- Configure pricing, fees, commissions (per country & per service)
+- Manage payouts and settlements:
+  - view driver negative balance
+  - view restaurant negative balance
+  - settle and mark paid
+
+====================================
+CORE COLLECTIONS (KEEP EXISTING)
+====================================
+
+1) rides
+   - customer_id, driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng, dropoff_lat, dropoff_lng
+   - service_type
+   - fare_amount, tax_amount
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address (+geo), delivery_address (+geo)
+   - items, subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount, restaurant_payout_amount
+   - payment_method
+   - status:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+3) deliveries
+   - customer_id, driver_id
+   - pickup_address (+geo), dropoff_address (+geo)
+   - package_description, package_size
+   - delivery_fee
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+====================================
+COMMISSION & PAYOUT RULES
+====================================
+1) Ride – CASH:
+   - Driver keeps all cash from customer.
+   - SafeGo commission → negative driver_wallet_balance.
+   - Weekly settlement; admin marks as paid.
+
+2) Food – CASH:
+   - Restaurant keeps all cash.
+   - SafeGo commission → negative restaurant_wallet_balance.
+
+3) ONLINE payments:
+   - SafeGo collects payment.
+   - safego_commission_amount is kept by SafeGo.
+   - Drivers/restaurants receive net payout only.
+
+4) Admin can settle and mark balances paid.
+
+====================================
+SECURITY RULES
+====================================
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer KYC / sensitive info.
+- Restaurants cannot view other restaurants’ private data.
+- Only Admin can:
+  - change pricing, commissions
+  - approve/reject KYC
+  - block/unblock users and restaurants
+- Users can update only their own profile fields.
+
+====================================
+STATUS FLOWS (UNCHANGED)
+====================================
+Rides:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+Food:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+
+Parcel:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+====================================
+NOTIFICATIONS
+====================================
+- New ride/order/parcel alerts
+- Status updates
+- Verification changes
+- Payouts and admin announcements
+
+====================================
+TASK: FIX DRIVER “RECENTER” BUTTON TO ALWAYS JUMP TO CURRENT LOCATION
+====================================
+
+Screen: `/driver/map` (driver app map screen)
+
+Problem:
+- The bottom-right recenter/navigation FAB (arrow icon) is visible.
+- When the driver taps it, the map does NOT move to the driver’s current GPS location.
+- Our goal is to make this work like Uber: tapping recenter should always jump to the latest driver position.
+
+Scope:
+- Only change the behavior of the recenter button and the location state on the driver map.
+- Do NOT modify KYC, admin panel, commission logic, or collections.
+
+------------------------------------
+1) Ensure we store the latest driver location in state
+------------------------------------
+In the driver map frontend logic:
+
+- There must be a single source of truth for the driver’s current position, e.g.:
+
+```ts
+type DriverLocation = {
+  lat: number;
+  lng: number;
+  heading?: number | null;
+};
+
+const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);

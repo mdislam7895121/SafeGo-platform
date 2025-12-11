@@ -1,0 +1,49 @@
+You have already completed and tested the Multi-Category Vehicle System and dispatch simulation. 
+Now add a Driver Category Preferences layer on top of the existing logic, without changing any TLC or pricing rules.
+
+Requirements:
+
+1. Data model
+- Extend the Driver (or Vehicle) model to store `allowedCategories: string[]`.
+- `allowedCategories` must always be a subset of `eligibleCategories`.
+- On initial vehicle approval, set `allowedCategories = eligibleCategories` by default.
+
+2. Driver app UI
+- In the driver app, add a "Ride Preferences" section under the profile/settings screen.
+- For each item in `eligibleCategories`, show a toggle switch (SAFEGO_X, SAFEGO_COMFORT, COMFORT_XL, SAFEGO_XL, SAFEGO_BLACK, SAFEGO_BLACK_SUV, SAFEGO_WAV).
+- For WAV drivers:
+  - The SAFEGO_WAV toggle must be locked ON (cannot be disabled) with an info tooltip about accessibility requirements.
+- Do not allow a state where `allowedCategories` becomes empty. If the last category would be turned off, show a small error and keep it ON.
+
+3. Admin panel
+- On the driver detail page, show:
+  - `eligibleCategories` (read-only, from vehicle verification)
+  - `allowedCategories` (read-only, chosen by the driver)
+- Add an admin button "Reset ride preferences" that sets 
+  `allowedCategories = eligibleCategories` and writes an audit log entry (who reset, when).
+
+4. Dispatch engine changes
+- When matching a trip with category C:
+  - Filter candidate drivers by:
+    - driver is online and available,
+    - driver is within the search radius,
+    - C is in `eligibleCategories`,
+    - C is in `allowedCategories`.
+- Keep the existing hierarchy and rules (BLACK, BLACK_SUV, XL, WAV, etc.) exactly as they are.
+- Do NOT modify any TLC fee logic, fare engine, or commission logic. This feature only affects which drivers are considered for a request.
+
+5. Tests
+- Add tests for:
+  - Cadillac example: a vehicle eligible for [SAFEGO_X, SAFEGO_COMFORT, SAFEGO_BLACK, SAFEGO_BLACK_SUV] but with `allowedCategories = [SAFEGO_BLACK, SAFEGO_BLACK_SUV]`. Verify that SAFEGO_X and SAFEGO_COMFORT trips never dispatch to this driver.
+  - An X-only vehicle cannot opt into BLACK or other premium categories.
+  - A WAV driver cannot disable SAFEGO_WAV, and WAV trips still dispatch correctly.
+  - A scenario that combines AI suggestions, admin approval, and driver preferences to ensure all three layers work together.
+
+6. Documentation
+- Update replit.md with a "Driver Category Preferences" section explaining:
+  - the difference between eligibility and preferences,
+  - default behavior,
+  - WAV exception,
+  - how this interacts with the AI Marketplace Balancer and does not change TLC or fare logic.
+
+Keep all existing tests green and do not introduce experimental features beyond this preferences layer.

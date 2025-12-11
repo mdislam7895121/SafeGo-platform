@@ -1,0 +1,155 @@
+Your task is to fully complete, stabilize, and production-ready the entire
+SafeGo Shop Partner (e-Shop) system.  
+Follow this end-to-end plan and complete everything in one continuous workflow.
+
+========================================
+PHASE 1 — SHOP PARTNER ONBOARDING FIX
+========================================
+1. Fix and verify the complete shop partner sign-up flow:
+   - Form validation
+   - Country-specific rules for BD & USA
+   - ID submission where required
+   - Logo + cover upload (with proper secure upload handling)
+   - Auto-create shop profile in database
+
+2. Ensure admin onboarding approval works:
+   - Shop appears in onboarding dashboard
+   - Admin can view full details
+   - Approve / Reject works correctly
+   - After approval, shop becomes fully active and visible
+
+========================================
+PHASE 2 — PRODUCT MANAGEMENT SYSTEM
+========================================
+3. Complete and verify Product Upload System:
+   - Image upload (thumbnail + multiple images)
+   - Title, description, category, stock, price
+   - Variation support (size/color)
+   - File size validation and error messages
+   - Ensure product is saved correctly in DB
+
+4. Fix Product Edit/Delete:
+   - Editing should update DB + images
+   - Deleting a product should remove all related images and data safely
+
+5. Admin Product Management:
+   - Admin should view all products for any shop
+   - Admin can disable/enable products
+
+========================================
+PHASE 3 — SHOP CATALOG & SEARCH
+========================================
+6. Complete Customer-side product viewing:
+   - Product list
+   - Category filter
+   - Search (name/category)
+   - Price sort (low to high, high to low)
+   - Pagination + performance optimization
+
+7. Confirm Shop Info Card is correct:
+   - Logo
+   - Cover image
+   - Ratings
+   - Delivery time (static or auto-calculated)
+
+========================================
+PHASE 4 — ORDER → DELIVERY FLOW
+========================================
+8. Complete and test full ordering flow:
+   - Add to cart
+   - Checkout
+   - Payment selection (COD for now)
+   - Order created → visible to shop partner
+
+9. Shop Partner Order Dashboard:
+   - Accept order
+   - Mark as “Preparing”
+   - Mark as “Ready for Pickup”
+
+10. Driver Assignment:
+   - Delivery driver receives request
+   - Driver accepts
+   - Pickup → route → delivered
+
+11. Customer order tracking:
+   - Status updates live
+   - Driver location map (if available)
+   - Delivery complete message
+
+12. Admin Order Management:
+   - View all orders for all shops
+   - Order status timeline
+   - Manual override for disputes
+
+========================================
+PHASE 5 — SHOP WALLET + COMMISSION + PAYOUT
+========================================
+13. Create Shop Wallet System:
+   - Wallet auto-created on approval
+   - Track earnings per order
+   - Apply commission rules:
+     USA → 12%
+     Bangladesh → 15%
+   - Commission deducted and stored in platform wallet
+
+14. Payout Requests:
+   - Shop can request payout
+   - Admin can approve/deny
+   - Wallet balance updates correctly
+
+========================================
+PHASE 6 — REVIEWS & NOTIFICATIONS
+========================================
+15. Reviews System:
+   - Customer can leave rating + review
+   - Shop partner can view reviews
+   - Admin can moderate reviews
+
+16. Notifications:
+   - Order placed
+   - Order accepted
+   - Order ready
+   - Driver assigned
+   - Delivery completed
+   - All notifications must work for Customer, Shop, and Driver
+
+========================================
+PHASE 7 — UI / UX POLISH
+========================================
+17. Fix all UI issues for:
+   - Shop signup
+   - Product upload
+   - Order dashboard
+   - Customer shop browsing pages
+   - Responsive mobile layout
+
+18. Error Message Improvements:
+   - Clear messages instead of generic failures
+   - Success indicators for uploads and saves
+
+========================================
+PHASE 8 — FINAL TEST + REPORT
+========================================
+19. Perform a complete E2E Test:
+   - Create a new shop partner
+   - Admin approves
+   - Upload products
+   - Customer places order
+   - Shop prepares order
+   - Driver completes delivery
+   - Wallet commissions applied
+   - Payout requested & approved
+
+20. Generate a FINAL SHOP COMPLETION REPORT:
+   - What was fixed
+   - What was added
+   - All DB changes
+   - All UI fixes
+   - Final status: “Shop System 100% Production-Ready”
+
+========================================
+
+Complete all steps above in one continuous flow.
+Do not pause or ask for confirmation.
+Fix everything required to make the SafeGo Shop Partner system fully
+operational, stable, and ready for public launch.

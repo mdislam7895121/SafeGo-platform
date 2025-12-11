@@ -1,0 +1,291 @@
+You are updating the SafeGo NYC ride-hailing app.
+
+GOAL
+Add full multi-category vehicle support and set per-vehicle-type fare multipliers on top of the existing NYC TLC-compliant fare engine.
+
+We now support EXACTLY these 7 vehicle categories:
+
+1) SafeGo X
+2) SafeGo Comfort
+3) SafeGo Comfort XL
+4) SafeGo XL
+5) SafeGo Black
+6) SafeGo Black SUV
+7) SafeGo WAV (Accessible)
+
+All existing NYC TLC rules (base time+distance, congestion fee, airport fee, AVF, BCF, HVRF, state surcharge, long-trip fee, out-of-town fee, tolls, etc.) MUST stay intact and in the same order.
+
+========================================
+1. VEHICLE CATEGORY CONFIG (BACKEND)
+========================================
+
+1.1. Create / update a canonical vehicle category config, for example:
+
+- id: string (e.g. "X", "COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV", "WAV")
+- displayName
+- description
+- seatCount
+- baseMultiplier
+- perMileMultiplier
+- perMinuteMultiplier
+- minimumFare
+- isActive
+
+Define the 7 categories with these values (Uber-style but slightly cheaper to keep SafeGo more attractive; TLC minimums still apply afterwards):
+
+1) SafeGo X
+   - id: "X"
+   - displayName: "SafeGo X"
+   - description: "Standard everyday rides"
+   - seatCount: 4
+   - baseMultiplier: 1.00
+   - perMileMultiplier: 1.00
+   - perMinuteMultiplier: 1.00
+   - minimumFare: 7.00   // TLC base minimum already around here; this is category floor
+
+2) SafeGo Comfort
+   - id: "COMFORT"
+   - displayName: "SafeGo Comfort"
+   - description: "Newer, more comfortable cars with extra legroom"
+   - seatCount: 4
+   - baseMultiplier: 1.20
+   - perMileMultiplier: 1.20
+   - perMinuteMultiplier: 1.20
+   - minimumFare: 9.00
+
+3) SafeGo Comfort XL
+   - id: "COMFORT_XL"
+   - displayName: "SafeGo Comfort XL"
+   - description: "Larger vehicles with Comfort-level ride quality"
+   - seatCount: 6
+   - baseMultiplier: 1.50
+   - perMileMultiplier: 1.50
+   - perMinuteMultiplier: 1.50
+   - minimumFare: 11.00
+
+4) SafeGo XL
+   - id: "XL"
+   - displayName: "SafeGo XL"
+   - description: "Bigger vehicles for groups and luggage"
+   - seatCount: 6
+   - baseMultiplier: 1.70
+   - perMileMultiplier: 1.70
+   - perMinuteMultiplier: 1.70
+   - minimumFare: 12.00
+
+5) SafeGo Black
+   - id: "BLACK"
+   - displayName: "SafeGo Black"
+   - description: "Premium black cars with professional drivers"
+   - seatCount: 4
+   - baseMultiplier: 2.50
+   - perMileMultiplier: 2.50
+   - perMinuteMultiplier: 2.50
+   - minimumFare: 15.00
+
+6) SafeGo Black SUV
+   - id: "BLACK_SUV"
+   - displayName: "SafeGo Black SUV"
+   - description: "Large luxury SUVs for VIP groups"
+   - seatCount: 6
+   - baseMultiplier: 3.20
+   - perMileMultiplier: 3.20
+   - perMinuteMultiplier: 3.20
+   - minimumFare: 18.00
+
+7) SafeGo WAV (Accessible)
+   - id: "WAV"
+   - displayName: "SafeGo WAV (Accessible)"
+   - description: "Wheelchair accessible vehicles"
+   - seatCount: 4
+   - baseMultiplier: 1.00
+   - perMileMultiplier: 1.00
+   - perMinuteMultiplier: 1.00
+   - minimumFare: 7.00   // accessible rides should not be more expensive
+
+1.2. BACKWARD COMPATIBILITY
+- If any legacy category exists (like “STANDARD”, “ECONOMY” etc.), map it to "X" (SafeGo X) or mark it deprecated so it is no longer selectable.
+- Ensure no broken references in the codebase.
+
+========================================
+2. FARE ENGINE INTEGRATION (VERY IMPORTANT)
+========================================
+
+2.1. INPUT
+- Ensure that every fare calculation and booking request includes:
+  - vehicleCategoryId: one of
+    ["X", "COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV", "WAV"]
+
+2.2. APPLY VEHICLE MULTIPLIERS
+- In the existing fare engine, after you compute the TLC base distance/time components but BEFORE TLC surcharges and BEFORE service fee / commission, apply vehicle multipliers:
+
+Pseudo-code:
+
+  const vehicle = getVehicleCategory(vehicleCategoryId);
+
+  baseFare     = baseFare     * vehicle.baseMultiplier;
+  distanceFare = distanceFare * vehicle.perMileMultiplier;
+  timeFare     = timeFare     * vehicle.perMinuteMultiplier;
+
+  let tripSubtotal = baseFare + distanceFare + timeFare;
+
+  // Category-specific minimum fare
+  if (tripSubtotal < vehicle.minimumFare) {
+      tripSubtotal = vehicle.minimumFare;
+  }
+
+- Then feed `tripSubtotal` into the existing TLC pipeline (congestion, airport, AVF, BCF, HVRF, state surcharge, long-trip, out-of-town, tolls, etc.).
+
+2.3. TLC PRIORITY
+- TLC minimum pay enforcement and TLC rules MUST remain the highest priority.
+- If TLC minimum fare or driver pay formulas produce a higher required total, that must override category minimums as needed.
+- Do NOT apply vehicle multipliers to TLC regulatory fees. Those remain flat, as now.
+
+2.4. COMMISSION AND SERVICE FEE
+- Confirm commission is calculated only on commissionable fare components (not on TLC fees, not on tolls), and that vehicle multipliers only affect the base/time/distance parts.
+
+========================================
+3. RIDER UI – VEHICLE SELECTION
+========================================
+
+3.1. RIDE REQUEST SCREEN
+- On the customer booking page, show a horizontal or vertical list of the 7 vehicle types with:
+
+   For each:
+   - Name: displayName
+   - Short description
+   - Seats: “Up to X riders”
+   - Estimated fare range for this category (based on same route)
+   - Estimated pickup time (ETA)
+
+- Examples:
+
+   SafeGo X
+   - “Most affordable everyday rides”
+   - “Up to 4 riders”
+
+   SafeGo Comfort
+   - “Newer cars with extra comfort”
+   - “Up to 4 riders”
+
+   SafeGo Comfort XL
+   - “Comfort ride for bigger groups”
+   - “Up to 6 riders”
+
+   SafeGo XL
+   - “Spacious rides for groups”
+   - “Up to 6 riders”
+
+   SafeGo Black
+   - “Premium black cars”
+   - “Up to 4 riders”
+
+   SafeGo Black SUV
+   - “Luxury SUVs for groups”
+   - “Up to 6 riders”
+
+   SafeGo WAV (Accessible)
+   - “Wheelchair accessible vehicles”
+   - “Accessible support”
+
+3.2. SELECTION BEHAVIOR
+- Only one vehicle can be selected at a time.
+- The selected category must be clearly highlighted.
+- On confirm, send `vehicleCategoryId` to backend and store it with the trip.
+
+3.3. RIDER FARE BREAKDOWN UI
+- On the fare breakdown / receipt:
+  - Show the selected vehicle category.
+  - Ensure the fare breakdown clearly separates:
+    - Base / time / distance (affected by vehicle)
+    - TLC fees (congestion, airport, AVF, BCF, HVRF, state surcharge, long trip, out-of-town)
+    - Tolls
+    - Service fee
+    - Commission not exposed to rider.
+
+========================================
+4. DRIVER ONBOARDING & VEHICLE RULES
+========================================
+
+4.1. DRIVER VEHICLE CLASS REQUIREMENTS
+- At minimum, enforce the following:
+
+   SafeGo X:
+   - 4-door sedan, 2012+ model year (or local requirement)
+   - Clean interior, standard comfort
+
+   SafeGo Comfort:
+   - Newer car (e.g. 2016+)
+   - Better interior, more legroom
+
+   SafeGo Comfort XL:
+   - 3-row vehicles with extra space, 2016+
+   - 6 passengers
+
+   SafeGo XL:
+   - 6-passenger minivans/SUVs, 2012+
+
+   SafeGo Black:
+   - Premium-brand sedan (e.g. BMW, Mercedes, Audi, Lexus), black exterior + interior, 2018+
+
+   SafeGo Black SUV:
+   - Premium 3-row SUV (e.g. Escalade, Suburban, Navigator), 2018+
+
+   SafeGo WAV:
+   - TLC-compliant wheelchair accessible vehicles
+
+- Add fields to the driver/vehicle profile that link each vehicle to one or more supported categories.
+
+4.2. MATCHING LOGIC
+- When dispatching a trip, only show to drivers whose vehicle supports the requested category.
+- If multiple categories are supported by the same vehicle (e.g. a Black SUV may also support XL), ensure the category used in fare calculation matches the one requested by the rider.
+
+========================================
+5. API & DB ADJUSTMENTS
+========================================
+
+5.1. TRIP RECORD
+- Ensure trip records store:
+  - vehicleCategoryId
+  - vehicleCategoryDisplayName (optional denormalization)
+- Make sure TLC reporting already includes this, or add new fields to TRR / DPR if useful for later analytics.
+
+5.2. ESTIMATE ENDPOINTS
+- Fare estimate and ETA estimate endpoints must accept `vehicleCategoryId` and return category-specific estimates.
+
+========================================
+6. TESTING
+========================================
+
+6.1. UNIT & INTEGRATION TESTS
+Add test cases for:
+
+- Same route, different categories:
+  - X < Comfort < Comfort XL < XL < Black < Black SUV
+  - WAV = X for base/time/distance (regulatory differences only)
+
+- NYC TLC scenarios:
+  - Manhattan congestion + Comfort vs XL vs Black
+  - Airport trips (JFK/LGA/EWR) for each category
+  - Long-trip fee + vehicle multipliers
+  - Out-of-town + vehicle multipliers
+  - Tolls + vehicle multipliers
+
+- TLC minimum pay cases:
+  - Very short trip with Black SUV (ensure TLC minimums and category minimums reconcile correctly).
+
+6.2. REGRESSION
+- Ensure existing NYC TLC tests still pass (no order changes in the TLC pipeline).
+- Ensure no changes to TLC fee calculations themselves.
+
+========================================
+7. DOCUMENTATION
+========================================
+
+7.1. Update replit.md / docs
+- Add a "Vehicle Categories & Multipliers" section listing:
+  - All 7 categories and their multipliers + minimum fares
+  - How they apply in the fare pipeline
+  - A short explanation for product/ops teams.
+
+This completes adding 7 vehicle categories (SafeGo X, Comfort, Comfort XL, XL, Black, Black SUV, WAV) with per-category pricing while keeping the NYC TLC engine fully intact.

@@ -1,0 +1,85 @@
+TASK: Fix the driver map UI exactly as described. DO NOT change the map, map engine, map zoom buttons, or any map-related logic.
+
+========================
+1) REMOVE WRONG NOTIFICATION ICON OVERLAY
+========================
+- Remove the notification bell that appears inside or attached to the driver status card (the red-marked area in the screenshot).
+- The driver status card must show ONLY:
+    • icon (signal)
+    • “You’re Online” / “You’re Offline”
+    • subtitle line
+- No bell, no badge, no extra icon on the right side of the status card.
+
+========================
+2) FIX FOOTER BAR SIZE + POSITION
+========================
+Goal: Footer must NOT cover the left side drawer.
+
+Fix:
+- Reduce footer height to 60–70px maximum.
+- Footer must FLOAT above the map only — not full overlay width touching the left side.
+- Footer must not extend so far up that it overlaps with any drawer or slide menu.
+- When side drawer (left or right) is opened, footer must remain below it, not covering it.
+
+Position:
+- Footer is pinned at the bottom of the screen.
+- Footer stays inside safe area.
+- Drawer overlays appear ABOVE the map, not above the footer.
+
+========================
+3) FOOTER LAYOUT (3 SECTIONS)
+========================
+LEFT SECTION:
+- Icon: grid/hamburger icon which opens the “Trip Type Selector Drawer”.
+- Must stay completely visible and clickable even when drawer slides.
+
+CENTER SECTION:
+- Black pill button:
+    • Go Online → offline state
+    • Go Offline → online state
+- This must toggle driver_online_status (existing backend logic)
+- Do NOT change its design.
+
+RIGHT SECTION:
+- Three-hyphen icon for “Current Trip Info Panel”.
+- Must not overlap with footer border.
+
+========================
+4) TRIP TYPE SELECTOR DRAWER (LEFT)
+========================
+- Must slide from the left.
+- Footer must NOT cover the drawer.
+- Drawer must remain fully visible.
+- Must include Uber-style service selection grid (already implemented logic stays).
+
+========================
+5) CURRENT TRIP PANEL (RIGHT)
+========================
+- Must slide from the right.
+- Footer must NOT overlap it.
+
+========================
+6) ONLINE/OFFLINE TOGGLE LOGIC
+========================
+- Tapping the black pill button = toggle driver_online_status.
+- Must continue working with rides, food_orders, deliveries.
+- No reconfirmation popups.
+
+States:
+- driver_online_status = offline → show “Go Online”
+- driver_online_status = online → show “Go Offline”
+
+========================
+7) DO NOT CHANGE ANYTHING ELSE
+========================
+- Do NOT modify map UI.
+- Do NOT move zoom buttons.
+- Do NOT change markers.
+- Do NOT touch admin logic.
+- Do NOT modify KYC flows.
+- Do NOT edit service preferences logic from previous builds.
+- Only fix: notification overlay removal + footer size + footer positioning.
+
+========================
+NO QUESTIONS.
+Apply all changes in one build exactly as written.

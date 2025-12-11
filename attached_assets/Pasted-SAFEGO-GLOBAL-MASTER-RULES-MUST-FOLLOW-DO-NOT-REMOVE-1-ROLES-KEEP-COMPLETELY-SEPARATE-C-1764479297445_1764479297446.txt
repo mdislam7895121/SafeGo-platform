@@ -1,0 +1,624 @@
+SAFEGO GLOBAL MASTER RULES (MUST FOLLOW – DO NOT REMOVE)
+
+1. ROLES (KEEP COMPLETELY SEPARATE)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   For every role you implement or touch, you MUST have:
+   - Separate signup requirements
+   - Country-specific KYC rules (BD vs US)
+   - Separate dashboard / home screen
+   - Explicit permissions and what they can/cannot see or do
+   - Separate status flows where relevant
+
+   Never let one role access another role’s dashboards or private data.
+
+2. GLOBAL SERVICES (ALWAYS ON)
+   SafeGo always supports all 3 services in the platform:
+   - Ride-hailing
+   - Food delivery (SafeGo Eats)
+   - Parcel delivery
+
+   Any new implementation or fix must NOT break other services, and must keep them compatible.
+
+3. COUNTRY-SPECIFIC KYC RULES (MANDATORY)
+
+   3.1. Bangladesh (country_code = "BD")
+   - For ALL roles (customer, driver, restaurant owner, admin user account):
+     - father_name (string)
+     - date_of_birth (date)
+     - present_address (string)
+     - permanent_address (string)
+     - NID_number (string)
+     - NID_front_image_url (string)
+     - NID_back_image_url (string)
+     - emergency_contact_name (string)
+     - emergency_contact_phone (string)
+     - verification_status in ["pending", "approved", "rejected"]
+     - is_verified (boolean)
+
+   3.2. United States (country_code = "US")
+   - For customers:
+     - date_of_birth
+     - home_address
+     - emergency_contact_name
+     - emergency_contact_phone
+     - government_id_type in ["state_id","passport","other"]
+     - government_id_last4
+     - verification_status, is_verified
+
+   - For drivers:
+     - date_of_birth
+     - home_address
+     - emergency_contact_name
+     - emergency_contact_phone
+     - government_id_type
+     - government_id_last4
+     - driver_license_number
+     - driver_license_image_url
+     - driver_license_expiry_date
+     - ssn_last4 (optional)
+     - verification_status, is_verified
+
+   - For restaurant owners (US):
+     - business_legal_name
+     - business_address
+     - ein_last4 (optional)
+     - representative_government_id_type
+     - representative_government_id_last4
+     - emergency_contact_name, emergency_contact_phone
+     - verification_status, is_verified
+
+4. ADMIN PANEL (MUST EXIST AND REMAIN MASTER AUTHORITY)
+   Admin panel responsibilities (must be supported and not broken):
+   - View and verify customers (BD + US)
+   - View and verify drivers (BD + US)
+   - View and verify restaurants (BD + US)
+   - Approve / reject KYC for all roles
+   - Store rejection_reason when rejected
+   - Update pricing, fees, and commissions for:
+     - rides
+     - food_orders
+     - deliveries
+   - Block / unblock any user (customer, driver, restaurant)
+   - Manage payouts and settlements
+   - View driver negative balance
+   - View restaurant negative balance
+   - Mark negative balances as paid / settled
+
+5. CORE COLLECTIONS (MUST KEEP, DO NOT RENAME)
+   You MUST use these collections (tables) and only EXTEND them without renaming:
+
+   5.1. rides
+   Required fields (if not yet present, add them):
+   - id
+   - customer_id
+   - driver_id (nullable until assigned)
+   - pickup_address
+   - pickup_geolocation (lat, lng)
+   - dropoff_address
+   - dropoff_geolocation (lat, lng)
+   - distance_km
+   - estimated_time_min
+   - base_fare
+   - surge_multiplier
+   - total_fare
+   - safego_commission_amount
+   - driver_earnings_amount
+   - payment_method in ["cash","card","wallet"]
+   - payment_status in ["pending","paid","refunded","failed"]
+   - status in ["requested","searching_driver","accepted","driver_arriving","in_progress","completed",
+                "cancelled_by_customer","cancelled_by_driver","cancelled_by_admin"]
+   - created_at
+   - updated_at
+   - completed_at (nullable)
+   - customer_rating (nullable)
+   - customer_feedback (nullable)
+   - driver_rating (nullable)
+   - driver_feedback (nullable)
+
+   5.2. food_orders
+   Required fields:
+   - id
+   - customer_id
+   - restaurant_id
+   - driver_id (nullable for pickup/delivery)
+   - items (array of {menu_item_id, name, quantity, unit_price})
+   - subtotal_amount
+   - tax_amount
+   - delivery_fee
+   - service_fee
+   - safego_commission_amount
+   - restaurant_payout_amount
+   - driver_earnings_amount (for delivery)
+   - payment_method in ["cash","card","wallet"]
+   - payment_status in ["pending","paid","refunded","failed"]
+   - pickup_address (restaurant)
+   - pickup_geolocation
+   - delivery_address (customer)
+   - delivery_geolocation
+   - status in ["placed","accepted","preparing","ready_for_pickup","picked_up",
+                "on_the_way","delivered",
+                "cancelled_by_customer","cancelled_by_restaurant","cancelled_by_driver","cancelled_by_admin"]
+   - created_at
+   - updated_at
+   - delivered_at (nullable)
+   - customer_rating (nullable)
+   - customer_feedback (nullable)
+   - restaurant_rating_of_driver (nullable)
+   - restaurant_feedback_of_driver (nullable)
+
+   5.3. deliveries (parcel)
+   Required fields:
+   - id
+   - customer_id
+   - driver_id (nullable)
+   - parcel_description
+   - parcel_weight_kg
+   - pickup_address
+   - pickup_geolocation
+   - dropoff_address
+   - dropoff_geolocation
+   - base_fee
+   - distance_km
+   - safego_commission_amount
+   - driver_earnings_amount
+   - payment_method in ["cash","card","wallet"]
+   - payment_status in ["pending","paid","refunded","failed"]
+   - status in ["requested","searching_driver","accepted","picked_up","on_the_way","delivered",
+                "cancelled_by_customer","cancelled_by_driver","cancelled_by_admin"]
+   - created_at
+   - updated_at
+   - delivered_at (nullable)
+   - customer_rating (nullable)
+   - customer_feedback (nullable)
+   - driver_rating (nullable)
+   - driver_feedback (nullable)
+
+6. COMMISSION & PAYOUT RULES (DO NOT CHANGE, ONLY IMPLEMENT)
+
+   6.1. If customer pays CASH for rides:
+   - Driver receives the full cash from customer.
+   - SafeGo commission for that ride becomes a negative balance
+     in driver_wallet_balance.
+   - Driver must settle this negative balance weekly.
+   - Admin panel must show driver negative balances and allow marking as settled.
+
+   6.2. If food order is CASH:
+   - Restaurant receives full cash from customer.
+   - SafeGo commission becomes negative balance in restaurant_wallet_balance.
+   - Admin can settle and mark as paid from admin panel.
+
+   6.3. If payment is ONLINE (card/wallet):
+   - SafeGo automatically retains its commission.
+   - Driver and restaurant balances are credited with net payouts.
+   - No negative commission balance is created in this case.
+
+7. SECURITY RULES (MANDATORY ACCESS-CONTROL)
+
+   - Customers must NEVER be able to view:
+     - driver documents (NID, license, government IDs)
+     - restaurant KYC documents or internal bank/payout details
+   - Drivers must NEVER be able to view:
+     - customer NID or government IDs
+     - full sensitive home address history beyond what is necessary for a trip
+   - Restaurants must NEVER be able to view:
+     - data of other restaurants
+     - their KYC documents or balances
+   - Only Admin can:
+     - change pricing, commissions, fees
+     - approve/reject verification
+     - block/unblock users
+     - mark balances as settled
+   - Every user can update ONLY their own profile and documents, not others.
+
+8. STATUS FLOWS (DO NOT REMOVE OR SHORTEN)
+
+   8.1. Ride status flow:
+   - requested → searching_driver → accepted → driver_arriving → in_progress → completed
+   - Or terminal cancel states:
+     - cancelled_by_customer
+     - cancelled_by_driver
+     - cancelled_by_admin
+
+   8.2. Food order status flow:
+   - placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+   - Or any of:
+     - cancelled_by_customer
+     - cancelled_by_restaurant
+     - cancelled_by_driver
+     - cancelled_by_admin
+
+   8.3. Parcel delivery status flow:
+   - requested → searching_driver → accepted → picked_up → on_the_way → delivered
+   - Or:
+     - cancelled_by_customer
+     - cancelled_by_driver
+     - cancelled_by_admin
+
+9. ONBOARDING FLOW (ALL ROLES, COUNTRY-AWARE)
+
+   For customer, driver, and restaurant (owner account):
+   - Step 1: Basic info (name, email, phone, country_code)
+   - Step 2: Address details (home / business address)
+   - Step 3: ID/KYC upload (country-specific as defined above)
+   - Step 4: Emergency contact
+   - After KYC submission:
+     - verification_status = "pending"
+     - is_verified = false
+   - Access to core services is blocked or heavily limited until admin approves.
+   - Admin changes verification_status to "approved" and sets is_verified = true
+     to unlock full functionality.
+
+10. NOTIFICATIONS (MINIMUM REQUIRED)
+
+   - New ride request → notify eligible drivers.
+   - Status changes on rides → notify customer and driver.
+   - New food order → notify restaurant + (later) driver.
+   - Food order status updates → notify customer, restaurant, and driver.
+   - New parcel request → notify drivers.
+   - Parcel status updates → notify customer and driver.
+   - Verification approval / rejection → notify the user who submitted KYC, with rejection_reason if any.
+   - Important admin notifications (e.g., account blocked, payout issues).
+
+11. NON-BREAKING CHANGE RULE
+   - Do NOT rename existing fields, APIs, or routes.
+   - Do NOT remove any field, API, or route.
+   - You may only ADD new fields, endpoints, and components.
+   - If a field you need already exists, reuse it instead of creating a duplicate.
+   - If there is any doubt that a change might break something, choose an additive approach.
+
+12. SECURITY PHASE FOR THIS TASK
+   - Apply “Access Control & Data Exposure Hardening” phase:
+     - Ensure restaurant list API only exposes non-sensitive data to customers.
+     - Enforce role checks on restaurant listing and KYC endpoints.
+     - Ensure admin-only operations remain protected.
+
+===========================================================
+TASK: FIX SAFEGO EATS RESTAURANT LOADING + COMPLETE RESTAURANT DATA PIPELINE (NON-BREAKING)
+===========================================================
+
+Goal:
+- Fix the “Error: Failed to load restaurants” issue on the Customer → Eats screen.
+- Implement a complete, secure, and non-breaking restaurant data flow:
+  - Restaurant onboarding and KYC (BD + US)
+  - Admin verification and control
+  - Restaurant listing API for customers
+  - Proper permissions and data exposure rules
+  - Integration with food_orders collection and status flow
+
+ASSUMPTIONS:
+- Existing routes like /customer and the Eats tab already exist and must NOT be removed.
+- Existing collections rides, food_orders, deliveries already exist; we only extend them if needed.
+- There is already some form of role-based auth; we only configure / extend it.
+
+--------------------------------
+A) DATA MODEL: RESTAURANTS & MENU (ADD ONLY)
+--------------------------------
+
+1. Create or extend a collection named restaurants (do NOT rename if it already exists).
+   Required fields (add any that are missing; reuse existing where possible):
+   - id
+   - owner_user_id (links to restaurant owner account)
+   - country_code in ["BD","US"]
+   - restaurant_name
+   - display_name (optional; used for customer-side listing)
+   - logo_image_url
+   - cover_image_url
+   - cuisine_type (string)
+   - average_prep_time_min (integer)
+   - min_order_amount
+   - is_open (boolean)
+   - open_hours (structure describing open/close times by weekday)
+   - address
+   - geolocation_lat
+   - geolocation_lng
+   - phone_contact
+   - delivery_radius_km
+   - verification_status in ["pending","approved","rejected"]
+   - is_verified (boolean)
+   - rejection_reason (nullable)
+   - rating_average (default 0)
+   - rating_count (default 0)
+   - created_at
+   - updated_at
+
+   Sensitive / internal-only fields (never expose to customers):
+   - payout_bank_account_last4
+   - payout_method_type
+   - tax_id_last4 (US EIN or BD business tax)
+   - kyc_documents (paths/ids only)
+   These must be available to Admin only.
+
+2. Create or extend a collection menu_items (if not present), linked to restaurants:
+   - id
+   - restaurant_id
+   - name
+   - description
+   - price
+   - currency
+   - is_available (boolean)
+   - category_name
+   - image_url
+   - created_at
+   - updated_at
+
+3. Ensure food_orders already references restaurant_id and items as described in master rules. If needed, EXTEND ONLY:
+   - Add missing fields like restaurant_payout_amount, safego_commission_amount, delivery_fee, etc.
+
+--------------------------------
+B) ONBOARDING & KYC FOR RESTAURANT OWNERS (BD + US)
+--------------------------------
+
+4. Extend Restaurant signup/onboarding flow (multi-step, non-breaking):
+
+   Step 1: Basic account (common)
+   - Collect: email, password, phone, country_code.
+   - Role is fixed to restaurant.
+   - verification_status = "pending", is_verified = false.
+
+   Step 2: Business information (country aware)
+   - For BD:
+     - restaurant_name
+     - business_address (present_address + permanent_address if needed)
+     - father_name
+     - date_of_birth (owner)
+     - present_address
+     - permanent_address
+     - NID_number
+     - NID_front_image_url
+     - NID_back_image_url
+     - emergency_contact_name
+     - emergency_contact_phone
+
+   - For US:
+     - restaurant_name
+     - business_legal_name
+     - business_address (home_address or commercial)
+     - date_of_birth (representative)
+     - government_id_type
+     - government_id_last4
+     - emergency_contact_name
+     - emergency_contact_phone
+     - ein_last4 (optional)
+
+   Step 3: Restaurant profile
+   - cuisine_type, logo_image_url, cover_image_url
+   - address + geolocation
+   - delivery_radius_km
+   - phone_contact
+   - open_hours
+   - is_open default false until approved.
+
+   Step 4: Payout details
+   - payout_method_type
+   - payout_bank_account_last4 or other payout identifier
+   - Store as sensitive and admin-only.
+
+   After submission:
+   - verification_status stays "pending"
+   - is_verified = false
+   - Restaurant can log into their dashboard but sees a “Waiting for verification” banner and has restricted actions.
+
+--------------------------------
+C) ADMIN PANEL: RESTAURANT VERIFICATION & CONTROL
+--------------------------------
+
+5. In the Admin panel, ensure a “Restaurants” section exists or is extended with:
+
+   - Filters:
+     - by country_code (BD or US)
+     - by verification_status
+     - by is_open
+   - Columns:
+     - restaurant_name
+     - owner_user_id
+     - country_code
+     - verification_status
+     - is_verified
+     - created_at
+
+   - Detail view:
+     - Full restaurant profile
+     - KYC info based on country
+     - Sensitive payout info
+     - Buttons:
+       - Approve → sets verification_status = "approved", is_verified = true, is_open can be toggled true by admin.
+       - Reject → sets verification_status = "rejected", is_verified = false, requires rejection_reason text.
+       - Block/Unblock → sets a field account_status in ["active","blocked"].
+
+6. On approve/reject/block/unblock:
+   - Trigger notifications:
+     - To restaurant owner user:
+       - “Your restaurant has been approved”
+       - or “Your restaurant verification was rejected: {rejection_reason}”
+       - or “Your account is blocked/unblocked”.
+   - Do NOT notify customers.
+
+7. Make sure Admin remains the ONLY role that can:
+   - Change verification_status and is_verified
+   - Toggle account_status for restaurants
+   - Edit commission rates and fees used when computing restaurant_payout_amount and safego_commission_amount.
+
+--------------------------------
+D) CUSTOMER → EATS: RESTAURANT LIST API & UI (FIX THE ERROR)
+--------------------------------
+
+Security Phase focus: customers can see only safe restaurant info; no KYC or payout data.
+
+8. Implement a backend endpoint (or data source) for listing restaurants for customers:
+   Endpoint example (non-breaking, additive):
+   - GET /api/eats/restaurants
+   - Optional query params:
+     - customer_lat
+     - customer_lng
+     - search (text)
+     - cuisine_type
+   Rules for this endpoint:
+   - Only returns restaurants where:
+     - is_verified = true
+     - verification_status = "approved"
+     - account_status != "blocked"
+     - is_open = true (or open at current time according to open_hours)
+   - Apply distance filter:
+     - If customer_lat/lng provided, filter restaurants within delivery_radius_km of customer.
+   - Sort by:
+     - Distance ascending, then rating_average desc.
+
+   Response MUST include only non-sensitive fields:
+   - id
+   - display_name or restaurant_name
+   - logo_image_url
+   - cover_image_url
+   - cuisine_type
+   - rating_average
+   - rating_count
+   - estimated_delivery_time_min (derived from average_prep_time_min + distance)
+   - delivery_fee
+   - min_order_amount
+   - is_open
+
+   Response MUST NOT include:
+   - NID, government_id, tax_id_last4, payout accounts, kyc_documents, or any internal admin fields.
+
+9. Connect Customer → Eats screen to this endpoint.
+
+   UI/logic for the customer app:
+   - On opening Eats tab at /customer with selected service "Eats":
+     1) Detect customer location (lat/lng) if permission granted.
+     2) Call GET /api/eats/restaurants with customer_lat, customer_lng.
+     3) Show:
+        - Loading skeleton while fetching.
+        - If API returns an empty list, show “No restaurants available in your area yet” (NOT an error).
+        - If API fails (server error), show a retry button and log error.
+
+   - The existing “Failed to load restaurants” message must be replaced with:
+     - Proper error handling that differentiates:
+       - truly empty list (no error)
+       - network/server failure (error with retry).
+
+   - Do NOT remove the existing route /customer or the Eats tab; only change the data source and error handling.
+
+10. Search and filters on the Eats page (non-breaking):
+   - Add search box that calls the same endpoint with search parameter.
+   - Add cuisine_type filter using query param.
+   - All search/filter actions must still respect:
+     - is_verified = true
+     - account_status != "blocked"
+     - is_open = true.
+
+--------------------------------
+E) RESTAURANT DASHBOARD: SEE ORDERS, NO CROSS-ACCESS
+--------------------------------
+
+11. On the restaurant dashboard, ensure a view for food_orders:
+   - Query food_orders where food_orders.restaurant_id = current_restaurant_id.
+   - Restaurant must NOT see orders of other restaurants.
+   - Show status flow according to:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered (or cancelled_*).
+
+12. Restaurant dashboard actions:
+   - Accept/Reject new orders (if status = placed).
+   - Move order through:
+     - accepted → preparing → ready_for_pickup.
+   - For delivery orders:
+     - After ready_for_pickup, driver logic will handle picked_up, on_the_way, delivered.
+   - For pickup-only orders:
+     - ready_for_pickup → delivered when customer collects.
+
+13. Enforce that restaurant cannot edit:
+   - commissions, fees, or payouts.
+   - customer personal documents.
+   - driver documents.
+
+--------------------------------
+F) DRIVER INTEGRATION FOR FOOD DELIVERY (UNCHANGED BUT SUPPORTED)
+--------------------------------
+
+14. Ensure drivers see only:
+   - Orders assigned to them (food_orders.driver_id = current_driver_id).
+   - Relevant fields:
+     - pickup_address (restaurant)
+     - delivery_address (customer)
+     - contact phone (masked if required)
+     - order items summary for verification at handoff.
+
+15. Driver status transitions:
+   - For an assigned food order:
+     - ready_for_pickup → picked_up → on_the_way → delivered.
+   - Driver cannot modify restaurant verification or commissions.
+
+--------------------------------
+G) COMMISSION & WALLET INTEGRATION (FOOD ORDERS)
+--------------------------------
+
+16. For each food_orders record:
+   - Compute:
+     - safego_commission_amount from subtotal_amount (and/or fees) using admin-configured rate.
+     - restaurant_payout_amount = subtotal_amount + tax_amount + (restaurant share of delivery_fee, if applicable) - safego_commission_amount.
+     - driver_earnings_amount = delivery_fee share for the driver.
+
+17. If payment_method = "cash":
+   - Customer pays full order amount in cash:
+     - If cash is collected by restaurant (typical):
+       - restaurant_wallet_balance decreases by safego_commission_amount (negative balance).
+       - SafeGo will later collect this from restaurant; store in restaurant_wallet with status "unsettled".
+     - If cash is collected by driver:
+       - adjust driver_wallet_balance and restaurant_wallet_balance according to existing payout model,
+         but ALWAYS ensure SafeGo commission is recorded as negative balance in the correct wallet.
+
+18. If payment_method = "card" or "wallet":
+   - SafeGo retains safego_commission_amount immediately.
+   - Net payouts are recorded as positive balances for restaurant and driver.
+   - No negative commission balance is created.
+
+19. Admin panel must show:
+   - Restaurant wallet:
+     - current_balance
+     - negative_commission_balance
+     - list of unsettled commissions.
+   - Ability to mark certain amounts as “settled”, which updates balances but does not break any existing schema.
+
+--------------------------------
+H) NOTIFICATIONS FOR EATS
+--------------------------------
+
+20. Implement or confirm notifications:
+   - When a new food order is placed:
+     - Notify restaurant.
+   - When restaurant changes status:
+     - accepted, preparing, ready_for_pickup → notify customer.
+   - When driver picks up or delivers:
+     - picked_up, on_the_way, delivered → notify customer.
+   - When order is cancelled:
+     - Notify all involved parties (customer, restaurant, driver) with reason.
+
+--------------------------------
+I) TESTING & ERROR HANDLING (FIX THE ORIGINAL ISSUE)
+--------------------------------
+
+21. After implementing the above:
+
+   - Scenario 1: There are approved, verified, open restaurants in the user’s delivery radius.
+     - Customer → Eats should show a list of restaurants.
+     - No yellow “Failed to load restaurants” banner should appear.
+
+   - Scenario 2: There are no restaurants that match filters (e.g., new city, no verified restaurants yet).
+     - The API returns an empty array.
+     - UI shows a friendly “No restaurants available in your area yet” message.
+     - No error banner.
+
+   - Scenario 3: Backend/API is down or returns an error.
+     - UI shows a clear error message with a Retry button.
+     - Internal logs capture the error for debugging.
+
+   - Scenario 4: Customer not logged in or not verified.
+     - If policy requires only verified customers to place orders:
+       - Show appropriate message and prompt to complete KYC / wait for approval.
+     - Still, do NOT leak any internal restaurant KYC data.
+
+===========================================================
+END OF TASK
+===========================================================

@@ -1,0 +1,78 @@
+Continue C7. You already completed the visibility rules.  
+Now finish the remaining required C7 tasks.
+
+Do NOT change any backend logic (pricing, commission, promo, dispatch, routing).  
+Only update the UI presentation for the rider side.
+
+Your tasks:
+
+1. Add the new vehicle images under:
+   client/src/assets/vehicles/
+
+   Add these files (use clean Uber-style white background images):
+   - safego-x-sedan.png
+   - safego-comfort-sedan.png
+   - safego-comfort-xl-suv.png
+   - safego-xl-minivan.png
+   - safego-black-sedan.png
+   - safego-black-suv.png
+   - safego-wav-van.png
+
+2. Create an image mapping helper:
+   File: client/src/utils/getVehicleImage.ts (or existing ride util)
+
+   Map as follows:
+     SAFEGO_X → safego-x-sedan.png
+     SAFEGO_COMFORT → safego-comfort-sedan.png
+     SAFEGO_COMFORT_XL → safego-comfort-xl-suv.png
+     SAFEGO_XL → safego-xl-minivan.png
+     SAFEGO_BLACK → safego-black-sedan.png
+     SAFEGO_BLACK_SUV → safego-black-suv.png
+     SAFEGO_WAV → safego-wav-van.png
+
+   Export this function.
+
+3. Apply this mapping to:
+   - Ride Type Cards (carousel)
+   - Selected Ride Summary Panel
+
+   So the image changes automatically based on the chosen ride type.
+
+4. Update the image container UI (Uber style):
+   - width: 92%
+   - object-fit: contain
+   - horizontal + vertical center
+   - soft shadow: drop-shadow(0px 4px 14px rgba(0,0,0,0.15))
+   - background gradient:
+       linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)
+   - rounded corners
+
+5. Apply SafeGo-branded category titles:
+     SafeGo X
+     SafeGo Comfort
+     SafeGo Comfort XL
+     SafeGo XL
+     SafeGo Black
+     SafeGo Black SUV
+     SafeGo WAV
+
+   Title must be:
+   - bold
+   - centered
+   - single line (no wrapping)
+
+6. Polish the full card layout:
+   - padding: 16px
+   - border: 1px solid #E5E7EB
+   - border radius: 14px
+   - price section bold + original price gray strikethrough
+   - “You save $X.XX” in SafeGo green (#16A34A)
+
+7. Keep all logic untouched.
+   Only UI changes.
+
+After completing:
+- Show screenshot of updated rider carousel
+- Show screenshot of selected ride summary
+- Confirm no backend logic was modified
+- Save a checkpoint

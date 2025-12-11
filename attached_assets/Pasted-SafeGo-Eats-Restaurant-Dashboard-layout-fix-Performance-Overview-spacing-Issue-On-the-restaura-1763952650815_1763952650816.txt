@@ -1,0 +1,75 @@
+SafeGo Eats – Restaurant Dashboard layout fix (Performance Overview spacing)
+
+Issue:
+On the restaurant dashboard routes, the "Performance Overview" section title is visually colliding with the search bar on mobile. The heading appears inside/under the search bar area instead of clearly starting a new section. This makes the layout feel cramped and hurts readability.
+
+Scope:
+• Affects restaurant dashboard layout only.
+• Pure layout/spacing fix – do NOT change any business logic, API calls, routing, or KYC/permissions.
+• Must comply with all existing SafeGuard rules and responsive guidelines already in the project.
+
+Targets:
+• Route: /restaurant
+• Route: /restaurant/dashboard (if separate)
+• Any shared component that renders the Performance Overview header + period filter tabs (Today / 7 Days / 30 Days).
+
+Required behavior:
+1. Section separation
+   • The "Performance Overview" heading must be a clearly separated section below the search bar.
+   • On all viewports (mobile, tablet, desktop), there must be visible vertical space between:
+     – the bottom of the search bar container, and
+     – the "Performance Overview" heading row.
+
+2. Spacing specification
+   • Add vertical spacing BELOW the search bar container:
+     – Mobile (≤ 768px width): margin-bottom or padding-bottom of 24–32px.
+     – Tablet (769–1024px): 20–28px.
+     – Desktop (> 1024px): 16–24px.
+   • The goal is that on a small mobile screen (e.g., 375x812 or similar), the full text "Performance Overview" is fully visible without being clipped by the search bar container.
+
+3. Heading & tabs layout
+   • "Performance Overview" should appear as a standalone heading row.
+   • The filter tabs (Today / 7 Days / 30 Days) should sit directly under the heading with 8–12px vertical gap.
+   • Do NOT place the heading or tabs inside the search bar container.
+   • Keep left alignment consistent with the main content area (same left padding as the cards below).
+
+4. No visual overlap
+   • Ensure there is NO overlap or clipping between:
+     – Search bar,
+     – Performance Overview heading,
+     – Filter tabs.
+   • When scrolling, the layout should feel natural: header → search bar → heading → tabs → cards.
+
+Constraints – do NOT:
+• Do NOT change any state logic, online/offline toggle behavior, or data queries.
+• Do NOT modify KYC, auth, or permission logic.
+• Do NOT rename components or routes.
+• Do NOT change typography (font sizes, weights) of the heading or tabs.
+• Do NOT introduce horizontal scrolling.
+
+Accessibility & responsiveness:
+• Maintain WCAG-friendly contrast and tap areas already defined.
+• On mobile:
+  – Verify in a narrow viewport that the heading "Performance Overview" is completely visible above the tabs.
+  – No part of the text should sit behind or inside the search bar container.
+• On desktop and tablet:
+  – Spacing should look balanced but slightly tighter than mobile (as specified above).
+
+Verification steps (please perform and self-check):
+1. Test on at least:
+   – Mobile viewport (around 375x812),
+   – Tablet viewport (~768–1024 width),
+   – Desktop viewport (>1280 width).
+2. On each viewport, confirm:
+   – The search bar ends, then there is a clear vertical gap,
+   – "Performance Overview" is fully readable and not touching or clipping into the search bar,
+   – Tabs (Today / 7 Days / 30 Days) are clearly below the heading with a small gap,
+   – The order cards (Today’s Orders, Today’s Earnings, Active Orders, etc.) start below the tabs with consistent spacing.
+3. Take a final screenshot of /restaurant (or /restaurant/dashboard) on mobile viewport showing:
+   – Search bar,
+   – Full "Performance Overview" text,
+   – Tabs row,
+   – Top of the first metric card.
+
+Reminder:
+This task is only a visual layout/spacing adjustment for the Performance Overview section on the restaurant dashboard. Do not touch backend logic, APIs, routing, authentication, or KYC/SafeGuard protections.

@@ -1,0 +1,172 @@
+You are working on the SafeGo project. Focus ONLY on completing and fixing **Step 46 – Admin Financial Suite**. Do NOT change any other SafeGo features, security phases, or dashboard cards.
+
+Context:
+- Security Phases 1–4 are complete and must stay intact (Real-Time Threat Monitoring, Fraud Engine, DevOps Security, Automated Incident Response).
+- Admin dashboard cards are now correct and visible (Wallets, Payouts, Earnings Analytics, System Monitoring, Security Threat Center, Support Chat, etc.).
+- Architect review for Step 46 FAILED because backend financial logic, RBAC, audit logging, and decimal handling were not fully validated or implemented.
+
+Your goal:
+Fully implement and validate the **Admin Financial Suite** for the admin, including:
+- Wallets view
+- Payouts management
+- Earnings analytics
+…with correct security, audit logging, owner context, and numeric handling.
+
+SafeGo business rules (must respect these):
+1. Global roles: **Customer, Driver, Restaurant, Admin**.
+2. Core financial objects:
+   - Driver and Restaurant wallets (credit/debit history).
+   - Payout requests (pending/approved/rejected).
+   - Platform earnings from:
+     - Rides collection
+     - Food_orders collection
+     - Deliveries collection
+3. Commission model (already established in earlier steps):
+   - Platform keeps its commission.
+   - Remaining amount is payable to Driver/Restaurant.
+   - All financial calculations must use integer minor units (e.g. cents) and be reversible.
+
+Step 46 – Required Work
+
+A. Backend verification and fixes
+1. Locate all Admin Financial Suite endpoints (backend):
+   - Wallets:
+     - `/api/admin/wallets`
+     - `/api/admin/wallets/:id` (or equivalent detail route)
+   - Payouts:
+     - `/api/admin/payouts`
+     - `/api/admin/payouts/:id`
+     - `/api/admin/payouts/approve`
+     - `/api/admin/payouts/reject`
+   - Earnings analytics:
+     - `/api/admin/earnings` (and any sub-routes, e.g. per-role, per-day)
+2. For each endpoint:
+   - Confirm it exists and is wired in the router.
+   - Confirm it uses the correct controller/service functions.
+   - Confirm all queries filter by valid roles (driver, restaurant) and valid wallet IDs.
+
+B. RBAC enforcement
+Apply and verify **strict RBAC** on all financial routes:
+- Wallets endpoints require: `VIEW_WALLETS`.
+- Payouts endpoints require: `MANAGE_PAYOUTS`.
+- Earnings analytics endpoints require: `VIEW_EARNINGS_DASHBOARD`.
+Tasks:
+1. Ensure these permissions are checked BOTH:
+   - In the backend middleware (auth/permissions).
+   - In any frontend route guards/hooks that fetch these APIs.
+2. Confirm that regular admins without those capabilities CANNOT:
+   - View wallets data.
+   - Approve/reject payouts.
+   - View platform earnings.
+
+C. Audit logging (mandatory)
+Every sensitive financial action must generate an **audit event**:
+- Approving a payout.
+- Rejecting a payout.
+- Any manual wallet adjustment (if such an action exists).
+Requirements:
+1. Use the existing audit logging pattern used elsewhere in SafeGo (same table/collection/structure).
+2. Log at minimum:
+   - Acting admin ID + role.
+   - Target user/wallet ID.
+   - Action type (`PAYOUT_APPROVE`, `PAYOUT_REJECT`, `WALLET_ADJUST` etc.).
+   - Before and after balance (if applicable).
+   - Timestamp and request origin (IP/agent if available).
+3. Verify audit events are visible in the existing admin security/audit views (e.g. Activity Log or Security components) without changing their structure.
+
+D. Decimal and currency handling
+Fix and validate currency handling so there are **no floating point bugs**:
+1. All financial amounts in the backend should be stored and calculated as **integer minor units** (e.g. cents or smallest currency unit).
+2. Where necessary:
+   - Convert incoming decimal values from the API into integer minor units.
+   - Convert stored integers back to readable decimals ONLY at the API response or UI layer.
+3. Recalculate:
+   - Wallet balances.
+   - Payout amounts.
+   - Platform earnings.
+4. Add safeguards:
+   - Never allow a payout to exceed the available wallet balance.
+   - If there is any rounding adjustment, keep the difference in the platform’s favor (do NOT overpay).
+
+E. Owner enrichment for admin views
+Make wallet and payout data useful for admins:
+1. For wallet lists and payout lists, join or enrich with:
+   - Owner name.
+   - Owner role (Driver or Restaurant).
+   - For Drivers: `driverId` / phone.
+   - For Restaurants: `restaurantId` / name.
+2. Make sure enrichment is done efficiently (avoid N+1 queries: use joins or batched lookups).
+3. Do NOT expose sensitive personal fields that violate SafeGo privacy rules (e.g. full SSN).
+
+F. Earnings analytics integrity
+1. Verify that earnings analytics:
+   - Correctly aggregates commissions and payouts from:
+     - Rides collection.
+     - Food_orders collection.
+     - Deliveries collection.
+   - Separates:
+     - Gross order value.
+     - Platform commission.
+     - Driver/Restaurant share.
+2. Ensure date filters, role filters (driver/restaurant), and basic breakdowns (daily/weekly) work.
+3. Confirm that this analytics data is **read-only** and cannot be manipulated from the UI.
+
+G. Security and stability checks
+1. Confirm:
+   - All financial routes are behind authentication and RBAC.
+   - Inputs are validated (IDs, amounts, statuses).
+   - No direct client-controlled fields can override amounts or status logic (e.g. never trust `amount` from client if it can be recomputed server-side).
+2. Ensure there is no way to:
+   - Approve a payout twice.
+   - Change payout status from APPROVED back to PENDING without a strict rule.
+3. Keep all existing security phases **intact**:
+   - Do NOT modify or disable:
+     - Fraud Detection Engine (Step 43)
+     - DevOps Security (Step 44)
+     - Automated Incident Response (Step 45)
+     - Real-Time Threat Monitoring (Step 42)
+
+H. Frontend integration (admin)
+Verify that the existing admin financial cards work end-to-end:
+- `/admin/wallets`
+- `/admin/payouts`
+- `/admin/earnings`
+Tasks:
+1. Confirm pages call the updated APIs and display:
+   - Correct balances and amounts.
+   - Owner names and roles.
+   - Payout statuses with correct transitions.
+2. Make sure buttons for approve/reject payouts:
+   - Call the correct endpoints.
+   - Show success/error toast or banner.
+   - Trigger UI refresh.
+3. Do NOT change the look-and-feel or layout of the cards. Only wire up logic and data correctly.
+
+I. Tests and documentation
+1. Add or update tests (unit/integration) for:
+   - Payout approval/rejection flow.
+   - Wallet balance updates.
+   - Earnings aggregation.
+   - RBAC on financial endpoints.
+2. Update `replit.md`:
+   - Describe all financial endpoints.
+   - Document RBAC permissions for wallets, payouts, and earnings.
+   - Summarize audit events added for financial actions.
+   - Explain how integer minor units are used for currency.
+
+Guardrails:
+- Do NOT rename or remove any existing routes.
+- Do NOT modify collections schema unless absolutely required; if you must, keep it backward-compatible.
+- Do NOT touch non-financial modules (rides/food/parcel matching, chat, KYC etc.) beyond read-only aggregation for earnings.
+- Keep all work within the files directly related to Step 46 (admin financial backend + corresponding frontend pages + docs).
+
+When you’re done:
+- Run the app and manually verify:
+  - Admin with full permissions can view wallets, payouts, earnings, and perform payout actions.
+  - Admin without financial permissions cannot access those routes (they should be blocked by RBAC).
+- Provide a concise summary:
+  - What routes were fixed.
+  - What RBAC updates were applied.
+  - What audit logs were added.
+  - How decimals/currency are now handled.
+  - Any tests and documentation updates.

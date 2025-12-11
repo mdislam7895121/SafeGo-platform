@@ -1,0 +1,134 @@
+You must complete the remaining Admin Dashboard features (Tasks 11–20). 
+Follow SafeGo architecture rules, RBAC, security phases, and existing code patterns. 
+Implement everything fully with mobile optimization, enterprise-grade UI, null-safe backend logic, 
+and complete frontend–backend integration. 
+
+===============================
+11. Ratings Center (Admin → Ratings)
+===============================
+Build /admin/ratings with:
+- Driver rating list + filters (1–5 stars, date range, low-rated first)
+- Rider rating list
+- Rating disputes module with PATCH mutations (resolve, reject, request-info)
+- Rating trend graph (7-day, 30-day)
+- Rating distribution analytics
+- RBAC: supervisors + safety team
+- Skeleton loaders, empty states, error states
+- Full mobile/responsive layout
+- Add audit logging for all admin actions
+
+===============================
+12. Driver Violations Center
+===============================
+Build /admin/violations:
+- Violation types: safety breach, misconduct, harassment, fraud, service quality
+- Status flow: Open → Under Review → Action Taken → Closed
+- Severity levels with badges (low, medium, high, critical)
+- Admin action module: suspend driver, warning issue, restrict features
+- Pagination + filtering by driver, severity, date
+- Evidence viewer with image/video preview
+- All mutations must use PATCH and type-safe schema
+- Real-time updates via WebSocket
+
+===============================
+13. Earnings Disputes Center
+===============================
+Add /admin/earnings-disputes:
+- Dispute fields: tripId, fare, reason, evidenceURLs, submittedBy
+- Resolution workflow: Approve Adjustment / Deny / Request-More-Info
+- Auto recalculation of payouts when approved
+- Finance-team-only RBAC
+- Add export to CSV
+- Skeleton/loading states
+- Clear backend error logging + retry mechanism
+
+===============================
+14. Ride Timeline Viewer
+===============================
+Create /admin/ride-timeline:
+- Full trip event timeline (requested → driver accepted → arrived → picked → dropped → completed)
+- GPS polyline map preview
+- Fare calculation breakdown
+- Detect anomalies (route deviations, long idle time)
+- Export as PDF
+- Add incident markers if any
+- Ensure null-safe guard for missing GPS points
+
+===============================
+15. Notification Rules Engine
+===============================
+Implement /admin/notification-rules:
+- Trigger types: low-rating (<3), payout-failed, fraud-signal, dispute-submitted
+- Channels: Email, SMS, Push, Admin Alert
+- Create/Disable rules
+- Real-time preview panel
+- Connect to Feature Flags
+- RBAC: notification-admin role
+- Add validation, sanitization, logging
+
+===============================
+16. Payment Integrity Center
+===============================
+Build /admin/payment-integrity:
+- Detect abnormal payments: duplicates, mismatches, suspicious surges
+- Fraud-risk scoring engine
+- Transaction verification viewer
+- Connect to disputes system
+- CSV export + timeline analytics
+- Badge indicators (verified, at-risk, critical)
+
+===============================
+17. Global Admin Search (Command Palette)
+===============================
+Add global search panel (Cmd/Ctrl + K):
+- Search users, drivers, trips, payments, disputes, ratings
+- Show result categories with icons
+- Keyboard navigation
+- Debounced querying + caching
+- Open item detail page on selection
+- Must work on all screen sizes
+
+===============================
+18. Admin Navigation Redesign
+===============================
+Redesign sidebar to include:
+- Intelligence
+- Ratings
+- Violations
+- Payment Integrity
+- Search shortcut
+- Collapsible groups
+- Mobile bottom-tab version
+Ensure consistent icons, weights, accessibility contrast.
+
+===============================
+19. Animated Transitions System
+===============================
+Implement page transition engine:
+- Fade, slide, scale transitions between pages
+- Skeleton → content transition for heavy pages
+- No performance drops; maintain 60fps
+- Dark/light theme compatible
+- Add motion-reduced mode for accessibility
+
+===============================
+20. Interactive Admin Tutorials
+===============================
+Build built-in tutorial system:
+- Step-by-step overlay tips for new features
+- Highlight components with arrows
+- “Try it now” interactive steps
+- Auto-detect when user completes a step
+- Save progress in localStorage
+- RBAC: only super-admin can manage tutorials
+
+===============================
+REQUIRED DELIVERABLES
+===============================
+- Full frontend + backend implementation
+- All endpoints validated and tested
+- WebSocket fallback polling logic preserved
+- Strict RBAC enforcement
+- Update docs/PHASE4_REPORT.md and CHANGELOG
+- Restart application and verify no console errors
+- Provide screenshots after finishing

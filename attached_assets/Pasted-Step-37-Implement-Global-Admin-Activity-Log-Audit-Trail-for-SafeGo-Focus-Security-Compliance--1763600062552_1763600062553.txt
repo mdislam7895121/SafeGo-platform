@@ -1,0 +1,178 @@
+Step 37 – Implement Global Admin Activity Log (Audit Trail) for SafeGo
+Focus: Security & Compliance – track all important admin actions without breaking any existing behavior.
+
+High-level goals
+1. Add a backend-safe audit log system that records critical admin actions (create/update/approve/block/etc.).
+2. Expose a read-only “Activity Log” page in the admin panel with filters and pagination.
+3. Enforce strict security:
+   - Admin-only access
+   - No sensitive fields (passwords, SSN full value, NID full value, secrets, tokens) stored in logs
+   - Logs are append-only (no edits or deletes from the UI)
+
+Important constraints
+- Do NOT break or change existing flows for drivers, customers, restaurants, parcels, or wallet settlement.
+- Do NOT modify database schema in a way that breaks older data. Follow existing migration style.
+- Keep NID and SSN masked everywhere (never store full value in the audit log).
+- No emojis in any new UI text.
+- Keep performance in mind: queries must be efficient and paginated.
+
+1. Audit Log Data Model (Backend)
+Follow the existing backend stack and style (ORM/migrations you are already using) and add an Audit Log model/table similar to:
+
+- id (UUID or existing primary key style)
+- createdAt (timestamp)
+- actorId (admin user id)
+- actorEmail
+- actorRole (e.g., "admin")
+- ipAddress (if already available in context; if not, keep nullable)
+- actionType (string enum, examples below)
+- entityType (string enum: "driver", "customer", "restaurant", "parcel", "wallet", "kyc", "document", "settings", "auth")
+- entityId (id of the affected entity, as string)
+- description (short human-readable summary)
+- metadata (JSON field, optional, for safe non-sensitive extra info)
+- success (boolean)
+
+ActionType examples (just reuse as strings or existing enum style):
+- "LOGIN_SUCCESS", "LOGIN_FAILED"
+- "DRIVER_STATUS_CHANGE" (suspend/block/unblock)
+- "DRIVER_KYC_APPROVED", "DRIVER_KYC_REJECTED"
+- "CUSTOMER_KYC_APPROVED", "CUSTOMER_KYC_REJECTED"
+- "DOCUMENT_REVIEW_APPROVED", "DOCUMENT_REVIEW_REJECTED"
+- "WALLET_SETTLEMENT_PROCESSED"
+- "RESTAURANT_COMMISSION_UPDATED"
+- "PARCEL_STATUS_UPDATED"
+- "SETTINGS_UPDATED"
+
+Security rules for metadata
+- Never store full SSN, NID, password, secrets, tokens, or raw document URLs inside metadata.
+- Only store safe fields such as status changes, ids, and non-sensitive labels.
+- If you need to mention SSN/NID, store only masked forms (existing masking helper if available).
+
+2. Where to log events (Backend Integration)
+Integrate audit logging into these key flows, using existing services/controllers:
+
+a) Authentication & Admin Session
+- On successful admin login: log "LOGIN_SUCCESS" (actorEmail, success=true).
+- On failed admin login attempt (if detectable): log "LOGIN_FAILED" with success=false and generic reason (do not log passwords).
+
+b) Driver Management
+- When an admin suspends, blocks, or unblocks a driver.
+- When driver KYC is approved or rejected.
+- When DMV/TLC document review status changes.
+
+c) Customer Management
+- When customer KYC is approved or rejected.
+- When customer status is changed (active/blocked).
+
+d) Restaurant Management
+- When restaurant status is changed (active/suspended).
+- When commission rate or commission-related settings are changed for a restaurant.
+
+e) Parcel & Wallet
+- When parcel status is changed (especially delivered/cancelled).
+- When a wallet settlement is processed (driver or restaurant).
+
+f) Global Settings / Configuration
+- If there are any admin settings pages already (e.g., settlement rules, commission config), log updates there as "SETTINGS_UPDATED".
+
+Implementation detail:
+- Create a reusable helper (e.g., logAuditEvent({...})) following existing backend conventions.
+- Call this helper from the relevant service/controller functions after the main operation succeeds.
+- If an operation fails, either log success=false or skip, but never crash the main workflow because of logging.
+
+3. API Endpoints for Activity Logs (Admin-only)
+Add read-only API endpoints for fetching logs with filters:
+
+Endpoint example (adjust to your existing routing style):
+- GET /api/admin/audit-logs
+
+Query parameters:
+- page, pageSize (for pagination)
+- actorEmail (optional filter)
+- actionType (optional)
+- entityType (optional)
+- dateFrom, dateTo (optional date range)
+- success (optional, true/false)
+
+Behavior:
+- Return paginated data and total count.
+- Order by createdAt DESC (newest first).
+- Enforce admin-only access (reuse existing admin auth middleware / ProtectedRoute equivalent on backend).
+- Make sure no sensitive data is returned (metadata must not contain secrets or full SSN/NID).
+
+4. Admin UI – Activity Log Page
+Create a new admin page using the existing frontend stack and design system:
+
+Route:
+- /admin/activity-log
+
+Navigation:
+- Add a link under “Management” or “Settings” section in the sidebar: "Activity Log".
+
+Layout:
+- Page title: "Activity Log"
+- Short description: "View recent admin actions and system events."
+
+Filters section:
+- Date range (from / to)
+- Actor email (search text input)
+- Action Type (dropdown with key values)
+- Entity Type (dropdown)
+- Success (All / Success only / Failed only)
+- Apply / Reset buttons with existing button components.
+
+Table columns:
+- Time (formatted in a readable form)
+- Actor (email)
+- Action (actionType, but show readable labels)
+- Entity (entityType + entityId)
+- Description
+- Result (Success / Failed)
+
+Row interaction:
+- Clicking a row opens a side panel or modal with:
+  - All fields from the log entry
+  - metadata displayed in a readable JSON or key-value format, but still without sensitive data
+
+UI rules:
+- No emojis.
+- Keep design consistent with existing admin pages (colors, typography, spacing).
+- Make sure long text is truncated with tooltip or expands only in the detail modal.
+
+5. Security & Compliance Checks
+Before finalizing:
+
+- Confirm audit log endpoints are protected with admin-only access control.
+- Verify that no full SSN or NID ever appears in the Activity Log (use existing mask helpers).
+- Ensure logs are append-only:
+  - No delete/edit actions in the UI.
+  - If backend already has soft-delete, do not expose it for audit logs.
+- Make sure there are no breaking changes to:
+  - Driver, customer, restaurant, parcel, or wallet schemas
+  - Existing KYC flows
+  - Existing commission and settlement flows
+
+6. Testing Plan
+Implement and execute an end-to-end test checklist:
+
+1) Login as admin and perform these actions:
+   - Approve one pending BD driver KYC.
+   - Reject one BD driver KYC.
+   - Change a driver status (e.g., suspend then unsuspend).
+   - Approve one USA driver document (DMV/TLC).
+   - Approve or reject a customer KYC.
+   - Change a restaurant’s commission or status.
+   - Trigger at least one wallet settlement (if test flow exists).
+2) Navigate to /admin/activity-log and confirm:
+   - All above actions appear as separate entries.
+   - Filtering by actorEmail works.
+   - Filtering by entityType (driver, customer, restaurant, wallet) works.
+   - Date filter works.
+3) Inspect each entry:
+   - No full SSN or NID values.
+   - Descriptions are clear and useful.
+   - metadata does not contain any secrets or sensitive information.
+
+Final note
+- Summarize all changes you made (models, services, routes, frontend pages).
+- Confirm that the solution is "production-ready" from a security and performance perspective, and that no existing SafeGo admin, driver, restaurant, or customer behavior has been broken.

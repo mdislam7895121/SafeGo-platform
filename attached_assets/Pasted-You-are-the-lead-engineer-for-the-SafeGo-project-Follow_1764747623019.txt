@@ -1,0 +1,145 @@
+You are the lead engineer for the SafeGo project.
+Follow ALL SafeGo master rules strictly:
+
+1) Core roles (always present)
+   - Customer
+   - Driver
+   - Restaurant Partner
+   - Shop Partner
+   - Admin (manages all roles from the panel)
+
+2) Global platform logic
+   - Ride, food, parcel, and e-shop flows must be internally consistent.
+   - Country-aware behavior: BD vs US have different labels and KYC rules.
+   - Any feature you touch must be production-ready in one loop (backend + frontend + validation + basic tests).
+
+3) Auth & onboarding rules
+   - Customers: simple but secure signup (email + strong password) plus profile completion later.
+   - Partners (driver, restaurant, shop, ticket): must become partner THROUGH a separate onboarding flow after logging in as a customer, with proper KYC for BD and appropriate checks for US.
+   - No user should ever be “partially” registered or stuck between old and new signup flows.
+
+4) Security rules
+   - Strong password validation on both frontend and backend.
+   - Rate-limit signup attempts at the API level (existing pattern, don’t invent a new system).
+   - Never auto-assign partner roles at signup; role must stay “customer” until explicit onboarding for a partner role.
+   - JWT auth and sessions must remain consistent and compatible with existing code.
+
+5) Implementation principle
+   - Replace, don’t layer hacks:
+     - Old broken signup UIs/routes must be removed or fully disconnected.
+     - Only the new customer signup flow should be accessible from the login page.
+   - You must test the full flow as a real BD customer from `/login` → `Sign up` → successful login.
+
+------------------------------------------------
+TASK: Replace the old “lineup” / signup flow with the new SafeGo customer signup, and ensure the app is actually using it (old flow must not be reachable).
+
+User context:
+- Current login page is at `/login` (see screenshot with “Welcome back” and a “Sign up” link).
+- The product owner has already defined a new, simpler customer lineup/sign-up design.
+- Right now, clicking the Sign up / লাইনআপ link does not seem to show the new flow; it either does nothing or uses the old, complex flow in the background.
+
+Your job is to:
+
+A) FRONTEND – Signup & login UI
+
+1. New customer signup screen
+   - Create a single, clean signup page (e.g. route `/signup`), fully localized for BD (Bangla text) but also usable globally.
+   - Form fields:
+     - Email (required, proper email format)
+     - Password (required, strong password rules: minimum length, mix of characters as defined in existing auth logic)
+     - Confirm password (must match)
+   - Optional fields like full name can be added as non-required, but DO NOT add any partner-specific fields here.
+   - Copy and styling must match the new minimal lineup design already discussed with the product owner (simple, mobile-friendly, same visual style as current login).
+
+2. Wire login → signup properly
+   - On `/login`, the “Sign up” / “Don’t have an account? Sign up” link MUST navigate to the new `/signup` page.
+   - Remove or disable any old routes like `/lineup`, `/register-old`, or any legacy signup pages so that:
+     - No navigation points to them
+     - They are not accidentally used.
+
+3. Role behavior on signup
+   - When this form is submitted successfully:
+     - Create a new user with role = `customer` by default.
+     - DO NOT attach driver, restaurant, shop, or ticket roles here.
+   - After signup, automatically log the user in (if that matches existing logic) or redirect them to `/login` with a clear success message in Bangla/English.
+
+4. Error and validation messages
+   - Show inline error messages for:
+     - invalid email format
+     - weak password
+     - password mismatch
+     - email already in use
+   - Messages must be Bangla-first for BD locale, but keep the code generic enough for US locale to supply English strings.
+   - Make sure submit button shows a loading state and is disabled while the request is in progress.
+
+B) BACKEND – Auth & data
+
+1. Registration endpoint
+   - Confirm the existing registration endpoint (e.g. `POST /api/auth/register` or similar).
+   - Ensure it:
+     - Validates email and password securely.
+     - Creates a user with:
+       - role: `customer`
+       - status: active or pending verification (as per existing logic)
+       - country inferred from request or defaults, but DO NOT introduce new breaking fields.
+   - If there is an older legacy registration endpoint, deprecate it by:
+     - Disconnecting any frontend calls to it.
+     - Keeping it only if other internal systems still depend on it (but not used by SafeGo web).
+
+2. Duplicate and migration logic
+   - Make sure that:
+     - If an email already exists, the API returns a clear “email already registered” error.
+   - You do NOT need to migrate old signup data now, but you must not break existing users.
+
+C) CLEANUP – Remove old “lineup” flows
+
+1. Code cleanup
+   - Search the codebase for:
+     - old signup components
+     - old “lineup” or multi-role register screens
+   - Remove their usage from:
+     - routes
+     - navigation menus
+     - buttons/links
+   - It is fine to keep the components in the codebase temporarily if they are referenced elsewhere, but they MUST NOT be reachable from any live route or clickable element.
+
+2. Navigation audit
+   - Check:
+     - header menus
+     - mobile menus
+     - any “Create account” or “লাইনআপ” buttons on landing pages
+   - All of them must point to the new `/signup` route only.
+
+D) TEST PLAN (you must actually perform these steps)
+
+1. As a brand-new BD customer:
+   - Visit `/login`.
+   - Click Sign up / লাইনআপ link.
+   - Confirm you see the new minimal signup form (not any old, complex multi-role form).
+   - Register with a fresh email and strong password.
+   - Confirm:
+     - You see either automatic login or a clear success message and can log in immediately.
+     - Your dashboard behaves like a normal customer, not as any partner.
+
+2. As Admin:
+   - Open the Admin panel Users list.
+   - Verify the new user appears with:
+     - role: customer
+     - country: BD (or as determined by the existing logic)
+   - Confirm no accidental partner roles are attached.
+
+3. As product owner:
+   - Confirm there is no way to reach the old lineup / signup pages from the UI.
+
+E) CONSTRAINTS
+
+- Do NOT change partner onboarding flows (Shop Partner, Ticket Operator, etc.) except where they hooked into old broken signup.
+- Do NOT weaken security: password rules and rate limiting must remain strong or be improved.
+- Do NOT leave multiple signup experiences active; there should be exactly one customer signup flow for the web app.
+
+When you are done:
+- Summarize:
+  - which files you changed
+  - which routes were updated
+  - how the new `/signup` behaves
+  - how you verified that the old lineup/signup is no longer reachable.

@@ -1,0 +1,39 @@
+You are working inside my original SafeGo project in my personal Replit account.
+
+Your ONLY job in this session is:
+
+1) Push this existing project to a new GitHub repository.
+2) Do NOT redesign, refactor, or reorganize any code.
+3) Do NOT split files, rename files, or change any business logic.
+4) Only run the minimum git commands required to connect and push to GitHub.
+
+Concrete steps:
+
+1. Check whether this directory is already a git repo:
+   - Run: `git status`
+2. If it is NOT a git repo, then:
+   - Run: `git init`
+   - Create or update a proper `.gitignore` so that `node_modules`, build output, and Replit cache files are NOT tracked.
+3. Prepare a single initial commit that contains the current state of the project WITHOUT modifying any app code, configs, or folder structure.
+4. If you can automatically create a GitHub repository using Replit’s GitHub integration, create one named `safego-platform` under my GitHub account. 
+   - If you cannot create it automatically, STOP and clearly tell me: 
+     "Please create an empty GitHub repo named `safego-platform` and give me the HTTPS URL. I will continue after you provide it."
+5. Once the remote repository exists, configure git:
+   - Set the default branch to `main` if needed.
+   - Add the remote origin using the GitHub HTTPS URL.
+   - Commit all existing files with a message like: `Initial SafeGo project import from Replit`.
+   - Push the code to the `main` branch.
+6. At the end, print a very clear summary with:
+   - The exact GitHub repository URL.
+   - The current git remote configuration (`git remote -v`).
+   - The current branch name.
+   - Confirmation that NO source code files were changed.
+
+Important rules:
+
+- Do NOT touch the application code, routing, landing page layout, or any backend logic.
+- Do NOT try to "optimize" memory, split the landing page, or change architecture.
+- If any operation would modify existing source files, STOP and ask for my permission first.
+- If authentication with GitHub is required, clearly tell me what I need to click or approve in the UI.
+
+After the repository has been pushed successfully and you have shown me the GitHub URL and summary, STOP. Do not continue with any extra improvements or new features.

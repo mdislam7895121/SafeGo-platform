@@ -1,0 +1,196 @@
+Act as a senior full-stack product engineer for the SafeGo web app.
+
+Goal: Turn the current SafeGo live chat into a fully professional, role-based support system where:
+– A smart bot answers first
+– If the bot cannot solve the issue OR the user asks, they can immediately talk to a human support agent
+– Drivers, riders, restaurant owners, and parcel partners all can use it easily
+
+Follow ALL existing SafeGo conventions:
+1) Four roles must be supported everywhere: driver, rider, restaurant (merchant), parcel/delivery partner.
+2) Keep all existing security: auth middleware, role checks, Prisma schema, Zod validation, and server-side verification.
+3) Do NOT break any existing URLs, layouts or working features. Only improve the current support experience.
+4) Preserve current support routes:
+   – Driver: /driver/support
+   – Rider, Restaurant, Parcel: keep the same base patterns already in the app (only enhance them).
+
+====================
+A. HIGH-LEVEL BEHAVIOR
+====================
+1) Chat access rules
+   – User must be authenticated and verified for their role before chat starts.
+   – Use the existing verification data (email mask, role, id) and show it in a small “Verified” card.
+   – If verification fails, show “Verification required” and block chat (403 from API).
+
+2) Bot-first, agent-second model
+   – When a new conversation starts, messages go to the bot layer first.
+   – The bot uses quick topics + free text to reply with helpful answers.
+   – If any of these happen, escalate to human agent:
+     a) User selects “Contact live support” button
+     b) User types “agent”, “human”, “support”, “live chat” or similar keywords
+     c) Bot has replied 3 times in this conversation with “I cannot solve this” style answers
+   – After escalation, the header clearly shows “Live Support” and all new messages go to human agent only (no more bot replies in that thread).
+
+3) Single open conversation per user per role
+   – Each driver/rider/restaurant/parcel user has at most one “active” conversation.
+   – If they come back later to /support, they see the last conversation and can continue it or end it.
+   – If conversation is ended, a new session will be created next time they start chat.
+
+4) End chat flow
+   – An “End Chat” button in the header of the chat panel:
+     – Opens a confirmation modal: “End this chat?” with Confirm / Cancel.
+     – On Confirm: mark conversation as closed in DB (with end timestamp).
+     – Optional: ask for 1–5 star rating + short feedback comment and store with the conversation.
+
+====================
+B. UI / LAYOUT REQUIREMENTS
+====================
+Make the layout look like a professional support console but simple to use.
+
+1) Two-column layout (for all roles)
+   – LEFT column (fixed width ~280px):
+     – “Verified” panel:
+       • Masked email (e.g., m***@gmail.com)
+       • Role badge: Driver / Rider / Restaurant / Delivery
+       • Status: “Verified”
+     – “Quick Topics” section with buttons:
+       • For DRIVER:
+         – Payments & Wallet
+         – Payout methods or cash-out
+         – Trips & riders issues
+         – Documents & vehicle
+         – Tax information
+         – Account & login
+       • For RIDER:
+         – Trip charges & refunds
+         – Lost item
+         – Safety & incident
+         – Payments & receipts
+         – Account & login
+       • For RESTAURANT:
+         – Orders & delivery
+         – Menu & pricing
+         – Payouts & invoices
+         – Account & login
+       • For PARCEL/DELIVERY PARTNER:
+         – Pickup & drop-off issues
+         – Parcel verification
+         – Payments & earnings
+         – Account & login
+       – Selecting a topic should send a bot message (“You selected: …”) and trigger an appropriate bot reply.
+
+   – RIGHT column (main chat panel):
+     – Header:
+       • Left: “Live Support” title
+       • Center: small status (Bot Only / Bot + Agent / Agent Connected)
+       • Right: “End Chat” button (outlined)
+     – Message area:
+       • Scrollable, fixed max width, centered vertically for a clean look (avoid full-screen stretched chat).
+       • Message bubbles with:
+         – User messages: right aligned, primary color background, white text.
+         – Bot messages: left aligned, light gray background.
+         – Human agent messages: left aligned, slightly different color (e.g., accent border).
+         – Timestamps in small text below each bubble.
+     – Input area:
+       – Plain text box with “Type your message…” placeholder.
+       – Send button with icon.
+       – Under the input, small text: “SafeGo Support is available 24/7. Typical response time under 2 minutes.”
+
+2) Responsiveness
+   – On mobile, LEFT column should collapse to a top sheet or slide-in panel (quick topics + verified info).
+   – Chat panel must remain readable on small screens.
+
+====================
+C. BOT LOGIC & ESCALATION
+====================
+1) Quick topic selection
+   – When user clicks a quick topic from the LEFT column:
+     – Create/continue the conversation for that user.
+     – Add a system event like: topic = “Payments & Wallet”.
+     – Bot responds with a short, helpful answer customized for that topic.
+   – Bot must clearly reference the user’s role (driver/rider/restaurant/parcel) when giving answers.
+
+2) Free-text bot replies
+   – For now, bot responses can be rule-based templates, not real AI.
+   – Use simple keyword matching + topic context (example: “payout”, “bank”, “wallet” → Payments & Wallet template).
+   – Always end a bot reply with either:
+     – A suggested next step, or
+     – A “Contact live support” button in the chat bubble.
+
+3) Escalation rules
+   – Keep a small counter per conversation of how many bot replies were marked as “unresolved”.
+   – Mark as unresolved when:
+     – User clicks “This didn’t help” (button under the bot reply), OR
+     – User types “not solved”, “didn’t work”, etc. (basic keyword check).
+   – If unresolved count ≥ 3 in a single conversation → automatically escalate to human agent.
+   – When escalation happens:
+     – Add system message: “You’re now connected to a SafeGo support specialist.”
+     – Update header status to “Agent Connected”.
+     – Write to DB that `isEscalated = true`.
+
+4) Manual escalation
+   – At any time, if user types “agent”, “human”, “support”, or presses a “Contact live support” button:
+     – Immediately escalate using the same logic above.
+
+====================
+D. BACKEND & SECURITY
+====================
+1) Use existing Prisma models for conversations/messages if already present.
+   – If models exist, extend them carefully to add:
+     – role (driver/rider/restaurant/parcel)
+     – topic
+     – isEscalated (boolean)
+     – closedAt
+     – rating (1–5)
+     – feedback (optional string)
+   – If models don’t exist, create minimal ones but DO NOT break any existing auth or user tables.
+
+2) All APIs must:
+   – Require an authenticated user.
+   – Check role matches the route (driver cannot open rider support, etc.).
+   – Use Zod schemas and safeParse for input validation, returning clear errors.
+   – Log audit events for:
+     – conversation created
+     – escalation triggered
+     – conversation ended.
+
+3) Privacy
+   – One user cannot see anyone else’s conversation.
+   – All conversation queries filtered by `userId` + `role`.
+   – Never expose internal agent IDs or other users’ emails in the API responses.
+
+====================
+E. IMPLEMENTATION ORDER
+====================
+Implement everything in this order to keep system stable:
+
+1) Data and backend:
+   – Ensure/extend Prisma models for conversations and messages.
+   – Implement APIs:
+     – GET currentConversation (create if none open)
+     – POST sendMessage (bot or user)
+     – POST escalateConversation
+     – POST endConversation (with rating/feedback)
+   – Keep all existing support routes and security intact.
+
+2) UI/UX:
+   – Build the new two-column layout for /driver/support and other roles.
+   – Add Verified card + quick topics on the left.
+   – Add professional chat UI with header, bubbles, timestamps, End Chat.
+   – Make layout responsive.
+
+3) Bot behavior & escalation:
+   – Implement quick topic templates for all four roles.
+   – Implement keyword-based free-text replies.
+   – Implement unresolved count + auto-escalation.
+   – Implement manual escalation via button/keywords.
+
+4) Finishing touches:
+   – Add rating + feedback modal on End Chat.
+   – Add small “Chat ended” banner when user comes back to a closed conversation.
+   – Run a full test for all roles (driver, rider, restaurant, parcel).
+
+When you’re done, summarize:
+– What changed in UI
+– What APIs and models were created/updated
+– How escalation and verification work
+– Any follow-up recommendations

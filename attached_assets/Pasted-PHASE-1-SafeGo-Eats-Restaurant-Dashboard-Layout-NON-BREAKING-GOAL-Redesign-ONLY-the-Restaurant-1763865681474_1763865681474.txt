@@ -1,0 +1,67 @@
+PHASE 1 – SafeGo Eats Restaurant Dashboard Layout (NON-BREAKING)
+
+GOAL:
+Redesign ONLY the Restaurant Dashboard home page into a professional SafeGo Eats layout (Uber Eats–style) with header and KPI summary. Do NOT touch other roles or modules.
+
+SCOPE:
+- Only restaurant dashboard route (current "/restaurant" or equivalent)
+- No DB schema changes
+- No changes to driver/rider/parcel flows
+- Reuse existing design system (SafeGo styles, colors, buttons)
+
+REQUIREMENTS:
+
+1) TOP HEADER (SafeGo Eats Branding)
+- Show:
+  - Restaurant name
+  - City (if available) or “Location pending”
+  - Restaurant ID (small text)
+  - Status chip: "Verified & Active" / "Pending Verification" / "Inactive"
+  - ONLINE/OFFLINE toggle:
+    - Online label: “You’re receiving orders”
+    - Offline label: “Not receiving orders right now”
+- Keep "Logout" button as is.
+- Use existing status from backend; do NOT invent new fields.
+
+2) KPI SUMMARY ROW (4 CARDS)
+Add a 4-card row directly under header:
+  1) Today’s Orders
+     - Count of orders for today for this restaurant
+  2) Today’s Earnings
+     - Restaurant earnings AFTER SafeGo service fee (reuse existing fields)
+  3) Active Orders
+     - Current orders with a non-terminal status (e.g., NEW/PREPARING/READY)
+  4) Restaurant Rating
+     - Average rating + total rating count (if exists; else show “No ratings yet”)
+
+Empty state rule:
+- If any metric missing (no data yet), show “—” and a small hint text instead of breaking the UI.
+
+3) TWO-COLUMN LAYOUT SHELL
+Prepare the base layout structure:
+- Left column placeholder: “Live Orders” area (for Phase 2)
+- Right column placeholder: Info + Wallet + Quick actions (for later phases)
+
+For now:
+- Left column: simple card “Live Orders will appear here once implemented (Phase 2).”
+- Right column:
+  - Card: “Restaurant Information” (current info)
+  - Card: “Wallet Snapshot (coming soon)” placeholder
+  - Card: “Quick Actions (coming soon)” placeholder
+
+4) RESPONSIVE DESIGN
+- Ensure layout works on desktop, tablet, mobile.
+- On mobile, stack KPIs and columns vertically without horizontal scroll.
+
+5) SAFETY & NON-BREAKING RULES
+- Do NOT change APIs.
+- Do NOT remove existing components that other pages depend on.
+- Only refactor the restaurant dashboard view and its local components.
+- Keep all authentication/authorization logic exactly as is.
+
+DELIVERABLE:
+- Updated restaurant dashboard page with:
+  - New header
+  - KPI summary row
+  - Two-column shell with placeholders
+- Show me in the UI and in a short summary which files were changed.

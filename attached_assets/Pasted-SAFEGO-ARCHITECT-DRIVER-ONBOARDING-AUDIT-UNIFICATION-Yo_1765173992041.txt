@@ -1,0 +1,186 @@
+SAFEGO ARCHITECT – DRIVER ONBOARDING AUDIT & UNIFICATION
+
+You must STOP creating new parallel onboarding flows and instead AUDIT + UNIFY everything we already have.
+
+The current behavior suggests that an older Delivery Driver onboarding implementation (V1) is still active on the /partner/delivery-driver/wizard route, while you may have created a newer version (V2) elsewhere. Step 3 (Address) is still showing Step 2 values (full_name, date_of_birth), which indicates that the route is using an older or mixed flow.
+
+Your job now is:
+
+=====================================================
+A) RESPECT SAFEGO MASTER RULES (DO NOT BREAK ANYTHING)
+
+Keep all existing SafeGo platform rules intact:
+
+1) Roles:
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+
+2) Services:
+   - ride-hailing
+   - food delivery
+   - parcel delivery
+
+3) Country-specific KYC:
+
+   BD drivers:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - nid_number + nid_front_image + nid_back_image
+   - emergency_contact_name + emergency_contact_phone
+   - driving_license_number + images
+   - vehicle_registration
+   - insurance_document (optional)
+   - verification_status + is_verified
+
+   US drivers:
+   - date_of_birth
+   - home_address
+   - emergency_contact_name + emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - government_id_front_image + back_image
+   - driver_license + image + expiry (for car drivers)
+   - ssn_last4 (optional)
+   - verification_status + is_verified
+
+4) Collections:
+   - rides
+   - food_orders
+   - deliveries
+   All keep identity fields, addresses+geo, fees+commission, payment details, timestamps, full status flow, rating+feedback.
+
+5) Commission rules:
+   - Cash → driver/restaurant keeps cash, SafeGo commission → negative wallet balance, weekly settlement.
+   - Online → SafeGo keeps commission.
+   - Admin can settle balances.
+
+6) Security and onboarding rules stay exactly as before.
+
+You MUST NOT:
+- rename or remove existing DB fields
+- delete or break existing API routes
+- break any current service flows
+
+You MAY:
+- deprecate unused UI components
+- stop using old onboarding screens
+- redirect old flows to the canonical one
+
+=====================================================
+B) STEP 1 – AUDIT ALL DRIVER ONBOARDING FLOWS
+
+1) Search the codebase for ALL delivery/driver onboarding implementations and routes, including:
+   - /partner/delivery-driver/wizard
+   - any legacy “driver onboarding” pages
+   - any components named like:
+       * DeliveryDriverWizard
+       * DriverOnboarding
+       * DriverSignupWizard
+       * V1 / V2 versions
+
+2) List them clearly in a short internal report:
+   - Component name
+   - File path
+   - Route/path where they are used
+   - Whether they are old (V1) or new (V2 SafeGo-compliant 7-step)
+
+DO NOT create any new wizard. Just discover what already exists.
+
+=====================================================
+C) STEP 2 – CHOOSE ONE CANONICAL SAFEGO WIZARD
+
+We only want ONE canonical Delivery Driver onboarding wizard that is fully SafeGo-compliant:
+
+- 7-step flow
+- BD/US branching
+- driver KYC fields as defined above
+- used by the main route: /partner/delivery-driver/wizard
+
+Requirements:
+
+1) Pick the best, most recent, 7-step implementation (V2).
+2) Make THIS the canonical wizard used at:
+   /partner/delivery-driver/wizard
+
+3) If other wizards exist (old V1, prototypes, etc.):
+   - Mark them clearly as deprecated in comments
+   - Remove them from any active routes/navigation
+   - Do NOT delete DB fields or APIs
+   - Ensure no user can accidentally hit the old onboarding via UI
+
+The result: Only ONE onboarding flow is actually used in the product. No duplicates.
+
+=====================================================
+D) STEP 3 – FIX STEP 3 ADDRESS BINDINGS IN THE CANONICAL WIZARD
+
+For UNITED STATES drivers, the canonical wizard MUST use:
+
+Step 2 – Personal Info (US):
+- full_name
+- date_of_birth
+- phone_number
+
+Step 3 – Address Info (US):
+- street_address
+- apt_unit (optional)
+- city
+- state
+- zip_code
+
+You MUST ensure:
+
+1) The Step 3 inputs are bound ONLY to:
+   - "street_address"
+   - "apt_unit"
+   - "city"
+   - "state"
+   - "zip_code"
+
+2) They are NOT bound in any way to:
+   - "full_name"
+   - "date_of_birth"
+   - "phone_number"
+
+3) Check:
+   - react-hook-form register/Controller usage
+   - defaultValues passed into Step 3
+   - any mapping code that populates Step 3 from Step 2
+
+Remove any logic that sets:
+   street_address = full_name
+   apt_unit = date_of_birth
+
+4) When a NEW US driver runs the wizard:
+   - Step 2: fill name, DOB, phone
+   - Step 3: all address fields SHOULD BE EMPTY by default
+   - After typing a proper address:
+       * it must remain visible and saved
+       * it must not revert to name/DOB
+
+=====================================================
+E) STEP 4 – ENSURE ONLY CANONICAL FLOW IS USED
+
+After fixing:
+
+1) Confirm that /partner/delivery-driver/wizard uses ONLY the canonical V2 7-step wizard.
+2) Confirm that no legacy onboarding components are mounted from that route.
+3) Confirm that:
+   - Changing country BD/US uses the correct address fields per country
+   - Back/Next navigation does NOT overwrite address with personal info
+
+=====================================================
+F) STEP 5 – FINAL REPORT
+
+At the end, provide a short summary:
+
+1) How many onboarding flows existed originally? (list names/paths)
+2) Which one is now the canonical Delivery Driver onboarding?
+3) Which legacy components/routes were deprecated (but not DB breaking)?
+4) Confirmation that:
+   - Step 3 Street Address no longer shows the driver's name
+   - Step 3 Apt/Unit no longer shows the date of birth
+   - The wizard is fully SafeGo Master Rules compliant

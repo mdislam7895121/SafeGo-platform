@@ -1,0 +1,48 @@
+Test the Smart Category Search and Auto-Suggest features for the SafeGo Eats restaurant portal.
+
+A. Scope
+1. Only test the restaurant role UI:
+   - /restaurant/menu
+   - /restaurant/menu/new (create item)
+   - /restaurant/menu/[id]/edit (edit item)
+2. Do NOT change database schema, seed data, or API contracts.
+3. Do NOT touch Driver, Customer, or Admin UIs in this task.
+
+B. Functional checks
+1. Category dropdown:
+   - Main category search works (type part of the name, see filtered list).
+   - Subcategories appear grouped under the correct main category.
+   - Selecting a subcategory automatically links it to the correct main category.
+2. Auto-suggest:
+   - When the restaurant types an item name (e.g., "Chicken Burger", "Latte", "Pizza"),
+     suggested categories and subcategories appear.
+   - Only relevant suggestions are shown (no wrong cuisine or random categories).
+   - One-click apply: choosing a suggestion fills both category and subcategory on the form.
+3. Validation:
+   - Cannot save a menu item without a valid category + subcategory.
+   - Error messages are clear on mobile and desktop.
+   - Existing items keep their old category mapping after edit and save.
+
+C. UX and responsiveness
+1. Mobile (320px+):
+   - Dropdown and auto-suggest are fully visible, no cut-off behind keyboard.
+   - Scrolling is smooth, no horizontal scroll.
+2. Tablet and Desktop:
+   - Category and subcategory fields are aligned with other form fields.
+   - Long category names wrap nicely without breaking layout.
+
+D. Safety and performance
+1. No extra API calls are made while idle; search only fires when the user types.
+2. Large category lists (50+ main, 500+ subcategories) remain responsive.
+3. No errors or warnings in console or server logs related to the new category system.
+
+E. Final confirmation
+After testing, confirm:
+1. All three flows work:
+   - Create menu item with smart search.
+   - Edit existing item and change category.
+   - Filter menu items by category.
+2. No regressions in other restaurant pages (/restaurant/dashboard, /restaurant/orders, /restaurant/staff).
+3. No breaking changes to KYC, RBAC, or payout logic.
+
+If everything passes, mark the Smart Category Search and Auto-Suggest features as PRODUCTION-READY for the restaurant role.

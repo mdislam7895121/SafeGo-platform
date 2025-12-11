@@ -1,0 +1,177 @@
+Step 36 – Restaurant & Parcel Commission Overview (SafeGo Admin + Wallet System)
+
+Context
+- SafeGo admin panel is already live with:
+  - Driver Management (country/state filters, KYC, USA/BD identity, documents, vehicle info).
+  - Customer Management.
+  - Restaurant Management.
+  - Parcel Management.
+  - Wallet Settlement System with commission and wallet summary for drivers (Step 35).
+- Security is critical: we must not break any existing flows (login, KYC, document upload, settlements, or driver analytics).
+- We must NOT remove or change any behavior from Steps 26–35. Step 36 must be additive and backward-compatible.
+
+Goal of Step 36
+Extend the commission and wallet analytics so that admins can also see:
+1) Restaurant commission and wallet summary.
+2) Parcel-related commission summary.
+All of this should be READ-ONLY analytics for admins, built on top of the existing wallet/commission data model.
+
+High-level requirements
+1. No breaking changes to driver logic or schemas from Steps 31–35.
+2. No changes to authentication, authorization, or KYC logic.
+3. No sensitive PII should be exposed beyond what is already visible today.
+4. All new views must be restricted to admin users only (ProtectedRoute / RBAC).
+
+A. Backend – Analytics & Queries
+Please implement the following WITHOUT changing the core transaction/commission schema, if possible. Prefer derived queries and views.
+
+1) Restaurant commission summary
+- Add backend queries/endpoints that compute, for each restaurant:
+  - totalEarnings: total gross order value completed.
+  - totalCommission: total commission charged by SafeGo.
+  - commissionPaid: total amount that has been settled/paid out.
+  - commissionPending: totalCommission - commissionPaid.
+  - walletBalance: current wallet balance (amount that still needs to be paid out to the restaurant).
+- Provide filters:
+  - by country (Bangladesh, United States, or All).
+  - by date range (last 7 days, last 30 days, all time).
+
+2) Parcel commission summary
+- Add backend queries/endpoints that compute parcel-only commission metrics:
+  - totalParcelRevenue: total revenue from parcel deliveries.
+  - totalParcelCommission: total commission owed to SafeGo from parcel rides.
+  - commissionCollected: amount already collected/settled.
+  - commissionPending: totalParcelCommission - commissionCollected.
+- Provide filters:
+  - by country (Bangladesh, United States, or All).
+  - by date range.
+
+3) Reuse existing wallet/settlement model
+- Reuse the existing wallet and settlement tables introduced in previous steps.
+- If you must add new fields, they must be:
+  - nullable
+  - additive only (no renames, no deletions)
+  - fully backward compatible with old data.
+
+4) Security & performance (backend)
+- All new endpoints must:
+  - enforce admin-only access via existing auth/role system.
+  - validate input parameters (dates, country codes, pagination).
+  - use efficient aggregate queries with proper indexes.
+- Do not log full PII or raw card details in any debug logs.
+
+B. Frontend – Admin UI
+
+1) Wallet Settlement System Dashboard (/admin/wallet-settlement)
+Extend the existing Wallet Settlement System to show three high-level cards:
+
+- Total Pending Commission
+  - Already exists, keep as-is.
+
+- Driver Settlements
+  - Already exists from Step 35, keep as-is.
+
+- Restaurant Settlements (NEW)
+  - Show: total restaurant commissionPending and number of restaurant wallets with pending settlements.
+
+- Parcel Settlements (NEW)
+  - Show: total parcel commissionPending and number of parcel-related wallets with pending settlements.
+
+2) New analytics section: Restaurant & Parcel Summary
+Below the existing "Pending Settlements" section, add a new analytics block with two tabs:
+
+Tab 1: Restaurants
+- Show a table like:
+  - Restaurant Name
+  - Country
+  - Total Earnings
+  - Total Commission
+  - Commission Paid
+  - Commission Pending
+  - Wallet Balance
+- Add filters at the top:
+  - Country: All / Bangladesh / United States
+  - Date Range: Last 7 days / Last 30 days / All time
+- Rows are read-only, but each row can have a "View Wallet" or "View Details" link that navigates to the existing restaurant details page.
+
+Tab 2: Parcels
+- Show high-level metrics for parcel commissions:
+  - Total Parcel Revenue
+  - Total Parcel Commission
+  - Commission Collected
+  - Commission Pending
+- If possible, also show a small table grouped by:
+  - Country
+  - Service type (parcel only)
+  - Commission Pending
+- Filters:
+  - Country and Date Range (same as restaurants).
+- This section is analytics only, no actions (no approve/deny here).
+
+3) Restaurant Management Page (/admin/restaurants)
+Enhance the existing restaurant list table:
+- Add the following read-only columns (using the new backend metrics):
+  - Commission Pending
+  - Wallet Balance
+- These columns should show a short formatted value (for example: $123.45).
+- Clicking a restaurant row should still navigate to the same existing restaurant detail page (no change to routing).
+- Make sure this page still works even if analytics fields are null (legacy / seed data).
+
+4) Parcel Management Page (/admin/parcels)
+- Add a small summary block at the top for admins:
+  - Total Parcels (all time, or within selected date range)
+  - Parcel Commission Pending
+  - Parcel Commission Collected
+- Below that, keep the existing parcel list, but do NOT add any destructive actions.
+- All links and filters must continue to behave as before.
+
+C. UX & Safety Rules
+
+1) Read-only nature
+- Step 36 is analytics-only:
+  - No new actions that change balances.
+  - No new APIs that modify wallets or transactions.
+- All settlement actions must still happen through the existing Wallet Settlement flow from previous steps.
+
+2) Empty states
+- When there is no data, show friendly "No data available" messages.
+- The dashboard must not throw errors if there are no restaurants or no parcel transactions.
+
+3) Localization ready
+- All labels should be written in English, but keep the text organized so that we can later add i18n (for Bangla/English toggle).
+
+D. Security Roadmap Phase
+
+For Step 36, explicitly apply the following security measures:
+- RBAC/Least privilege:
+  - Only admin-role users can access the new analytics endpoints and UI sections.
+- Data minimization:
+  - Do NOT show NID, SSN, or other identity documents in these analytics views.
+  - Show only financial aggregates and restaurant/parcel identifiers.
+- Audit-friendly:
+  - Reuse or extend existing audit logging for settlement actions only; no new logs for just viewing analytics.
+- No breaking migrations:
+  - If migrations are needed, they must be additive and safe to run on existing production data.
+
+E. Testing & Verification
+
+Add or update tests to cover:
+- Restaurant commission and wallet summary calculations for:
+  - Bangladesh and US restaurants.
+  - Different date ranges.
+- Parcel commission summary for:
+  - At least two countries.
+- Wallet Settlement dashboard:
+  - Cards display the correct pending amounts and wallet counts.
+  - Tabs and filters work and do not break on reload (URL/state handling).
+- Permission tests:
+  - Admin can access new endpoints and pages.
+  - Non-admin (driver/restaurant/customer) cannot access them (return 401/403 or redirect to login).
+
+Final acceptance criteria
+- All previous steps (26–35) continue to work exactly as before.
+- Drivers’ commission and wallet views are unchanged and still correct.
+- New restaurant and parcel analytics panels work, show correct numbers, and are fully admin-only.
+- No new security warnings, no console errors, and no broken navigation.
+
+Please implement Step 36 exactly as described above and stop after all tests pass and the dashboard is updated. Do not start Step 37 yet.

@@ -1,0 +1,112 @@
+You are working on the SafeGo multi-role platform (Customer, Driver, Restaurant, Admin) with global support for rides, food delivery, and parcel delivery across Bangladesh and the USA.
+
+SAFEGO MASTER RULES (DO NOT BREAK):
+1) Roles & domains
+   - Four core roles: customer, driver, restaurant, admin.
+   - Three core services: rides, food, parcel.
+   - All features must respect role-based access (RBAC) and service scoping.
+
+2) KYC & Compliance
+   - Country-specific KYC:
+     • Bangladesh: NID/Passport + business docs where needed.
+     • USA: SSN/EIN + license/permit validation.
+   - Never bypass KYC gates for protected features (payouts, earnings, performance, support, etc.).
+   - Keep all existing KYC checks exactly as implemented.
+
+3) Data & Collections (must NOT be broken)
+   - Core collections already in the system (examples, not to be renamed): drivers, restaurants, customers, trips/rides, food_orders, deliveries, wallets/earnings, payouts, support tickets, live chats, notifications, audit logs, ratings/reviews, incentives/milestones.
+   - Do NOT change existing schemas, models, or API contracts.
+   - You may ONLY use existing models and relations.
+
+4) Admin & Finance
+   - Commission logic and payout logic are already implemented and FROZEN for now.
+   - Unified payout system is production-ready for individual withdrawals for Restaurant and Driver roles.
+   - Do NOT modify payout logic, commission rules, or batch-processing infrastructure.
+   - Admin panel routes and capabilities must remain backward compatible.
+
+5) Security & Safety
+   - All routes must stay behind:
+     • authenticateToken,
+     • role-based guards (requireRole / checkSupportAccess),
+     • KYC checks (isVerified + verificationStatus),
+     • country rules where applicable.
+   - Keep AES-256-GCM encryption, audit logging, and negative balance handling intact.
+   - No public or unauthenticated debug endpoints.
+   - No test or demo code in production paths.
+
+6) UX & Flows
+   - No breaking UI changes to existing pages and navigation.
+   - Only minimal, non-breaking adjustments are allowed when absolutely required.
+   - Maintain current URLs and route structure for all driver pages:
+     /driver/earnings, /driver/performance, /driver/incentives, /driver/wallet, /driver/support/* etc.
+
+7) Implementation Discipline
+   - No new core tables/models for this task.
+   - No breaking changes to API request/response shapes.
+   - Any scripts must be development-only and safe to re-run.
+   - Run architect review at the end and keep replit.md documentation updated.
+
+------------------------------------------------
+TASK: Run the existing driver demo data seeding script and verify that all driver dashboards (especially /driver/performance) work correctly, without changing any schemas or APIs.
+------------------------------------------------
+
+Goal:
+The D18 Driver Performance & Ratings Dashboard and related driver dashboards should load successfully using demo data in DEVELOPMENT mode only, so that the error “Unable to load performance data” disappears. Use the existing script `server/scripts/seedDriverDemoData.ts` that you already created; do NOT redesign the system.
+
+Detailed steps:
+
+1) Inspect current script
+   - Open `server/scripts/seedDriverDemoData.ts`.
+   - Confirm:
+     • It only runs when `NODE_ENV === "development"` (or equivalent guard).
+     • It uses existing models only (e.g., Driver, Trip/Ride, DriverEarnings, Ratings/Reviews, Incentives/Milestones, Wallet/Transactions).
+     • It is safe to re-run (either idempotent or cleans its own demo data by a clear filter such as a specific demo driver ID or flag).
+
+2) Run the demo seeding script (development only)
+   - From the project root, run exactly:
+     `NODE_ENV=development npx tsx server/scripts/seedDriverDemoData.ts`
+   - Wait for the script to finish.
+   - Verify in logs that:
+     • demo drivers / trips / earnings / performance stats were created,
+     • no errors or unhandled rejections occurred.
+
+3) Restart and verify the application
+   - Restart the “Start application” process so the client can see the new data.
+   - As an authenticated DRIVER (with KYC completed, if required by the code), test the following routes in the browser:
+     • `/driver/performance`
+     • `/driver/earnings`
+     • `/driver/incentives`
+     • `/driver/wallet`
+   - Confirm:
+     • No red error banners such as “Unable to load performance data”.
+     • Charts, tables, and KPIs load using the seeded demo data for the correct driver.
+     • Date filters, summary metrics (trips, acceptance rate, cancellation rate, on-time %, etc.), and ratings all show consistent values.
+
+4) Integrity and safety checks
+   - Make sure:
+     • No real payout, commission, or external payment operations are triggered by the demo data.
+     • KYC gating remains active where required (do NOT bypass).
+     • Audit logging still tracks any API calls related to performance/earnings views as before.
+     • No new routes, controllers, or models were added for this task.
+
+5) Documentation update
+   - Update `replit.md` in a short “Driver Demo Data” section with:
+     • The exact command to run:
+       `NODE_ENV=development npx tsx server/scripts/seedDriverDemoData.ts`
+     • A note that this is DEVELOPMENT-ONLY and is safe to re-run to refresh demo metrics.
+     • A short summary of which dashboards use this demo data (Driver Earnings, Performance, Incentives/Milestones).
+
+6) Architect review
+   - Run the existing architect review / analysis tooling you have been using.
+   - Confirm:
+     • No schema changes.
+     • No new production routes.
+     • D18/D19 features are now fully testable with demo data.
+   - Summarize in the Agent report:
+     • What data was seeded (at a high level),
+     • Which pages were verified,
+     • Confirmation that everything is development-only and production-safe.
+
+Finally, report back with:
+- Confirmation that `/driver/performance` now loads successfully with demo data.
+- Any commands the user should run in the future (only the seeding command and any required restart command).

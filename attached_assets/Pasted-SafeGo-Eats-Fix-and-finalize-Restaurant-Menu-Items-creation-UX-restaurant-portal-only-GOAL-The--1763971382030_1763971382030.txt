@@ -1,0 +1,148 @@
+SafeGo Eats – Fix and finalize Restaurant Menu Items creation UX (restaurant portal only)
+
+GOAL
+The “Menu Items” section at `/restaurant/menu` is not usable. The “Add First Item” button is visible but nothing happens when tapping it, so the restaurant cannot add any menu item. Your task is to fully repair and polish the Menu Items creation UX for the restaurant portal, without breaking any existing backend logic, KYC/RBAC rules, or database schema.
+
+Scope is ONLY the SafeGo Eats restaurant web portal (Food service). Do NOT touch payouts, support center, ride/parcel modules, or mobile apps.
+
+A. Current behaviour to fix
+1. On `/restaurant/menu`:
+   - “Menu Items” card shows “No menu items yet” and a blue “Add First Item” button.
+   - Tapping the button does not open any modal or form and no network request is made.
+2. There are no visible errors, but the page is effectively read-only.
+
+Your first step:
+- Locate the existing menu item create/edit components, hooks, and API calls (e.g., MenuItemForm, useMenuItems, `/api/restaurant/menu*` routes).
+- Confirm what the intended behaviour was (modal vs separate page) using existing code patterns. Reuse the existing architecture; do not invent a completely new flow if a partial one already exists.
+
+B. Functional requirements (Restaurant Menu UX)
+Implement a clean, production-ready menu management experience with these minimum features:
+
+1. Add First Item / Add Item
+   - Clicking “Add First Item” (empty state) must:
+     - Open a modal or side-panel with a menu item form.
+     - Populate required fields:
+       * Item Name (required)
+       * Category (dropdown or type-ahead; reuse existing category model if present)
+       * Price (required, numeric; respect existing currency handling)
+       * Description (optional)
+       * Availability toggle (In stock / Unavailable) hooked to existing availability logic
+       * Preparation time or other existing fields (only if already present in the data model).
+   - On submit:
+     - Validate required fields on the client.
+     - Submit to the existing menu creation endpoint (e.g., POST `/api/restaurant/menu/items` or similar).
+     - Handle backend errors gracefully (toast / inline error).
+     - On success:
+       * Close the modal.
+       * Refresh the list.
+       * Show a success toast.
+
+2. Add Item when list is not empty
+   - If there is already at least 1 item:
+     - Show an “Add Item” primary button in the Menu Items header (next to “Select All”).
+     - This button must open the same create-item modal as “Add First Item”.
+
+3. Edit / Delete / Availability
+   - Use existing patterns for editing:
+     - Each item row/card should have an edit icon or clickable row that opens the same form pre-filled.
+     - On save, call the existing update endpoint (e.g., PATCH/PUT).
+   - If delete is already supported in the backend:
+     - Keep or add a delete control with confirmation and call the existing delete route.
+   - The availability toggle for an item must:
+     - Reflect the current availability state from the API.
+     - Update the backend via existing endpoint.
+     - Give immediate visual feedback (spinner while updating, then updated state).
+
+4. KYC/RBAC and SafeGuard rules
+   - Restaurant menu management must remain protected by the same middlewares and checks:
+     - `authenticateToken`
+     - `requireRole(["restaurant"])` and any existing `restaurant_staff` permission checks.
+     - KYC: `isVerified === true` AND `verificationStatus === "APPROVED"`.
+   - If a user does NOT pass these checks:
+     - Do NOT show the menu creation UI (show a safe message like “Verification required” if such pattern already exists elsewhere).
+   - Do NOT loosen or remove any SafeGuard validation or audit logging.
+
+C. UX & Layout requirements
+1. General layout
+   - Keep the existing SafeGo card structure:
+     - “Menu Items” card title.
+     - Optional “Select All” checkbox on the right, if already supported.
+   - Insert the “Add Item” button inside the Menu Items card header, right after the title.
+   - Maintain current typography and spacing to match Wallet Snapshot and Performance Insights cards.
+
+2. Empty state (no items yet)
+   - Preserve the current empty illustration/icon if present.
+   - Text: “No menu items yet” + “Start by adding your first menu item” (or reuse existing copy).
+   - Primary action: the blue “Add First Item” button (same component styles as other primary buttons).
+   - Button must be keyboard accessible (Enter/Space) and announce proper ARIA label.
+
+3. Modal / Form UX
+   - Consistent with other forms in SafeGo Eats (e.g., staff add form, payout forms):
+     - Proper labels and placeholders.
+     - Form validation messages near the relevant field.
+     - “Cancel” and “Save” buttons at the bottom; Save is primary.
+   - Make sure:
+     - The modal centers well on desktop.
+     - On mobile, it adapts to vertical space without overflowing off-screen (scrollable body if needed).
+
+4. Responsiveness
+   - Test menu page at:
+     - Mobile: 320–414px width.
+     - Tablet: 768px width.
+     - Desktop: 1024px+ width.
+   - Requirements:
+     - No horizontal scrolling.
+     - The Add Item button never overlaps “Select All”.
+     - Modal is fully visible and usable on all breakpoints.
+     - List layout (rows or cards) stacks nicely on small screens.
+
+D. Technical constraints (VERY IMPORTANT)
+1. Do NOT:
+   - Change database schema or add new tables.
+   - Alter existing API contract shapes (request/response of menu endpoints).
+   - Modify payout, support center, or earnings logic.
+   - Touch non-restaurant roles (driver/customer/admin) for this task.
+2. You MAY:
+   - Create small frontend utility functions/components if needed.
+   - Refactor existing menu-page React components for clarity, as long as behaviour remains fully backward-compatible and tests (if any) still pass.
+
+E. Implementation steps (guidance)
+1. Find:
+   - Menu routes in the server (e.g., `restaurant-menu` routes).
+   - Frontend components for `/restaurant/menu`.
+2. Restore wiring:
+   - Connect “Add First Item” and “Add Item” buttons to open the create-item modal.
+   - Wire form submit handlers to the correct API functions/hooks.
+3. Error handling:
+   - Log errors to the existing logging system (if any).
+   - Show user-friendly error messages instead of silent failures.
+4. Tests / manual checks:
+   - Create item -> list refreshes and totals/optimizations update correctly.
+   - Edit item -> updated values show in the UI and API.
+   - Toggle availability -> state syncs with backend.
+   - Delete item (if supported) -> item disappears from list and no 500 errors.
+
+F. Regression checks
+1. Confirm existing pages still work:
+   - `/restaurant/dashboard`
+   - `/restaurant/orders`
+   - `/restaurant/menu`
+   - `/restaurant/staff`
+2. Ensure:
+   - No new 404 routes.
+   - No broken imports or TS errors.
+   - No layout shift in header, search bar, or Wallet Snapshot / Performance Insights cards.
+
+G. Final confirmation report
+After implementing and testing, please:
+1. List the exact files you changed in frontend and backend.
+2. Summarize:
+   - Which handlers were broken and how you fixed them.
+   - Which endpoints are used for create/update/delete/toggle.
+3. Confirm:
+   - Menu item creation is fully usable on mobile, tablet, desktop.
+   - KYC/RBAC rules and SafeGuard security are unchanged.
+   - No database/schema changes were made.
+   - No regressions were introduced on other restaurant pages.
+
+This task is focused on making the Restaurant Menu Items page truly usable and production-ready, with a professional UX similar to Uber Eats, while strictly respecting all existing SafeGo security and backend constraints.

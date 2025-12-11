@@ -1,0 +1,220 @@
+Implement the full SafeGo AI Marketplace Balancer System.
+This system must act as the “brain” of SafeGo, similar to Uber Marketplace AI.
+
+It must monitor supply, demand, locations, routes, driver activity, weather, events, and 
+pricing in real time and adjust the marketplace automatically.
+
+========================================================
+A. CORE INPUTS (REAL-TIME DATA FEED)
+========================================================
+The AI engine must continuously read:
+
+1. Rider demand data:
+   - rideRequestsPerMinute
+   - locationHeatmap
+   - cancellationRates
+   - requestConversionRate
+
+2. Driver supply data:
+   - activeDrivers
+   - idleDrivers
+   - driverDistanceFromDemandZones
+   - driverAcceptanceRate
+   - driverCompletionRate
+
+3. Pricing & traffic data:
+   - current surge multipliers
+   - traffic congestion level
+   - ETA distribution
+   - travel time predictions
+
+4. Weather/event data:
+   - real-time weather status
+   - event calendar (stadiums, concerts, festivals)
+   - flight arrival peaks (airports)
+
+========================================================
+B. AI DEMAND PREDICTION ENGINE
+========================================================
+Use ML-style logic to predict:
+
+1. Demand in the next:
+   - 10 minutes
+   - 30 minutes
+   - 60 minutes
+
+2. Predict spikes caused by:
+   - office hours
+   - weekend nightlife
+   - stadium events
+   - weather
+   - flight arrivals
+
+Output:
+- predictedDemandLevel ("low", "normal", "high", "extreme")
+- demandConfidenceScore (0–1.0)
+- predictedHotZones (geo areas)
+
+========================================================
+C. AI SUPPLY PREDICTION ENGINE
+========================================================
+Predict:
+
+1. Driver shortage likelihood
+2. How many drivers will go offline soon
+3. How many drivers needed per zone
+4. Driver arrival rate to each hot zone
+5. Idle driver clustering problem
+
+Output:
+- supplyLevel
+- supplyGap
+- requiredDriversPerZone
+
+========================================================
+D. AI AUTO-SURGE ADJUSTMENT
+========================================================
+Automatically adjust surge:
+
+Rules:
+1. If predictedDemand > predictedSupply:
+      increase surge gradually (never exceed SafeGo surge cap)
+2. If predictedSupply > demand:
+      reduce surge to minimumSurge
+3. Surge must maintain SafeGo advantage:
+      SafeGo surge < Uber surge at all times
+4. Surge applies only in necessary micro-zones
+
+Output:
+- surgeMultiplier
+- surgeReason
+- surgeZoneMap
+
+========================================================
+E. AI DYNAMIC COMMISSION ADJUSTMENT
+========================================================
+Adjust SafeGo commission automatically but safely.
+
+Rules:
+1. Low demand → apply lower commission  
+2. High demand → increase commission slightly  
+3. Hard cap: 18% commission  
+4. Must protect minimum driver payout  
+5. Must protect SafeGo profit margin
+
+Output:
+- commissionRate
+- commissionReason
+
+========================================================
+F. AI DRIVER INCENTIVE OPTIMIZER
+========================================================
+AI must decide:
+- where to activate Boost Zones  
+- when to activate Weather Bonus  
+- when to activate Late Night Bonus  
+- when to increase Airport bonuses  
+- when to trigger “Supply Boost” (temporary)
+
+Rules:
+1. Activate incentives only where shortage exists  
+2. Keep incentives profitable  
+3. Do not reduce SafeGo commission  
+4. Incentives must raise supply quickly
+
+Output:
+- incentiveType
+- incentiveZone
+- incentiveAmount
+
+========================================================
+G. AI SMART DISPATCH SYSTEM
+========================================================
+AI should automatically:
+
+1. Choose the best driver by:
+   - shortest arrival time
+   - highest acceptance rate
+   - best rating
+   - low cancellation history
+   - low fatigue score
+   - proximity to predicted demand zone
+
+2. Reduce cancellations:
+   - avoid dispatching long-distance unwanted pickups
+   - avoid slow drivers during peak times
+
+3. Prioritize:
+   - Airport drivers for airport queues
+   - High-rated drivers for premium trips
+
+Output:
+- selectedDriverId
+- dispatchScore
+- driverPriorityReason
+
+========================================================
+H. AI HEATMAP AND VISUALIZATION
+========================================================
+Generate:
+- live demand heatmap
+- live supply heatmap
+- predicted 30-minute heatmap
+- predicted 60-minute heatmap
+- real-time surge zones
+- incentive zones
+
+========================================================
+I. SAFETY GUARDS (VERY IMPORTANT)
+========================================================
+AI must NEVER violate:
+
+1. Minimum driver payout rule
+2. Maximum surge cap (1.90x)
+3. Maximum commission cap (18%)
+4. Rider price fairness rule
+5. Marketplace stability rules
+
+If AI tries to violate, force correction.
+
+========================================================
+J. INTEGRATION WITH EXISTING SYSTEMS
+========================================================
+AI must integrate with:
+
+- Pricing Engine
+- Dynamic Commission Engine
+- Surge Engine
+- Incentive Engine
+- Driver Dispatch Engine
+- Fare Breakdown engine
+- Admin Dashboard (for monitoring)
+- Notifications system
+
+========================================================
+K. OUTPUT REQUIREMENTS
+========================================================
+AI must output:
+
+1. updatedSurgeMultiplier
+2. updatedCommissionRate
+3. recommendedIncentives
+4. recommendedBoostZones
+5. recommendedDriverDispatch
+6. predictedDemandMap
+7. predictedSupplyMap
+8. liveHeatmap
+9. fareAdjustmentReason
+10. surgeAdjustmentReason
+11. supplyDemandBalanceScore
+
+========================================================
+L. FINAL DELIVERABLES
+========================================================
+- Full AI Marketplace Balancer backend module
+- Automated prediction loops running every 60 seconds
+- Micro-services for surge, commission, incentives, dispatch
+- Admin UI panels for monitoring predictions
+- Heatmap visualization UI
+- 100% automated system with manual override
+- Test coverage for 100+ scenarios

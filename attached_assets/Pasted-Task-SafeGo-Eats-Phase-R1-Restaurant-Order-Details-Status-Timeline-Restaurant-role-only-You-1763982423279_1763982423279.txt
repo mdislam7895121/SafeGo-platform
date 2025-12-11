@@ -1,0 +1,179 @@
+Task: SafeGo Eats – Phase R1: Restaurant Order Details & Status Timeline (Restaurant role only)
+
+You are working on the SafeGo multi-role platform (Restaurant, Driver, Customer, Admin) with existing KYC, RBAC, payout, wallet, and support center already in production-ready state. In this task, you MUST only work inside the Restaurant module order experience and must not break any existing flows.
+
+Goal
+Design and implement a professional Uber Eats–style “Order Details & Timeline” experience for the Restaurant portal with full security, KYC/RBAC enforcement, and mobile-first UI – without changing the database schema or payout logic.
+
+Scope of this task
+1) Restaurant web portal only (SafeGo Eats)
+2) Restaurant role only (owner + allowed staff)
+3) Order list + single order detail + status timeline + actions
+4) No changes to payouts, wallet, KYC, support center, or other roles
+5) No new DB tables and no breaking changes to existing APIs
+
+Do NOT touch
+- Unified payout system (/api/payout/*, wallet, restaurant/driver payouts)
+- Multi-role Support Center (tickets, live chat, callbacks, articles)
+- KYC/RBAC core logic (isVerified, verificationStatus, role checks)
+- Menu category system (main categories, subcategories, smart search)
+- Driver, Customer, Admin UIs outside of what is explicitly required
+- Any “FROZEN IN CURRENT STATE” components documented in replit.md
+
+A. Discovery & safety checks
+1. Inspect existing Restaurant order list and APIs:
+   - Frontend routes: locate current restaurant order list view(s)
+   - Backend routes/services: list APIs used to load restaurant orders and update order status
+   - Find current order status model / enum (e.g., PLACED, ACCEPTED, PREPARING, READY_FOR_PICKUP, COMPLETED, CANCELLED)
+2. Confirm what timestamps already exist on orders (createdAt, acceptedAt, preparedAt, readyAt, completedAt, cancelledAt, etc.).
+3. IMPORTANT: Do NOT introduce new DB tables or columns. Reuse existing fields to build a read-only timeline. If no explicit per-status timestamps exist, derive a timeline using available timestamps (createdAt, updatedAt, etc.) and status history if it already exists.
+
+B. UX: Order List → Order Details flow (Restaurant)
+1. Keep the existing order list UX intact (do not redesign it globally).
+2. Enhance the list so that:
+   - Each order row/card is tappable (mobile-friendly).
+   - Clicking an order opens a dedicated Order Details page at a route like:
+     - /restaurant/orders/:orderId
+   - Preserve any existing filters/search/pagination.
+3. On the list view, DO NOT change:
+   - Header layout (Online toggle, search bar, restaurant identity)
+   - Global navigation, wallet snapshot, support links, or performance widgets
+
+C. New Restaurant Order Details page
+Create a new dedicated order details view for restaurant users. It must be fully responsive (mobile/tablet/desktop) and follow SafeGo’s existing visual style.
+
+The Order Details page should include:
+
+1) Header section
+   - Order ID (e.g., “Order #RST-2025-000123” – use existing format)
+   - Current status pill (color-coded, e.g., Accepted, Preparing, Ready, Completed, Cancelled)
+   - Placed time (e.g., “Placed at 3:14 PM”)
+
+2) Customer & delivery info (masked)
+   - Customer name: show first name or masked version, following existing privacy rules
+   - Delivery method (delivery vs pickup, if available)
+   - Delivery area / approximate address (NO exact address if current privacy rules hide it)
+   - Order notes / special instructions
+
+3) Items & pricing
+   - Itemized list:
+     - Item name
+     - Quantity
+     - Unit price
+     - Line total
+   - Show any add-ons/variants if they already exist; if not, make the design ready to display them when the add-on system is implemented in a later phase.
+   - Subtotal, delivery fee (if available), SafeGo fee, final payout amount to restaurant.
+   - Respect existing payout and commission logic; do NOT recalculate amounts client-side in a way that contradicts the backend.
+
+4) Status timeline (core of this phase)
+   - A vertical timeline showing the lifecycle of the order, e.g.:
+     - Order placed
+     - Accepted by restaurant
+     - Preparing
+     - Ready for pickup / ready for delivery
+     - Completed or Cancelled
+   - Use existing timestamps from the order model; if some timestamps don’t exist, use best available data:
+     - Example: createdAt → “Order placed”
+     - acceptedAt → “Accepted”
+     - readyAt → “Ready for pickup”
+     - completedAt → “Completed”
+   - Make it clear which steps are completed (with time) and which are upcoming (greyed).
+
+5) Action buttons (restaurant side)
+   - Provide safe, clear actions for allowed transitions only, using existing backend endpoints:
+     - Accept order (if in PLACED state)
+     - Reject order (with reason – use existing flow if present, else simple reason field)
+     - Mark as Preparing
+     - Mark as Ready for pickup
+     - Mark as Completed (if allowed on restaurant side in current design)
+   - Disable or hide actions that are not valid in the current status (no illegal transitions).
+   - All actions must:
+     - Call existing order status endpoints (DO NOT invent new status APIs if existing ones are available).
+     - Show loading state and success/error toasts.
+     - Update the timeline/status immediately after success.
+
+6) Layout & responsiveness
+   - Mobile (primary): Single-column layout, no horizontal scroll.
+   - Tablet/desktop: Two-column layout allowed, for example:
+     - Left: Timeline + actions
+     - Right: Items + pricing + customer info
+   - Keep typography, buttons, spacing, and colors consistent with existing Restaurant UI.
+
+D. Security, KYC, RBAC and privacy
+For every new/updated route, strictly enforce:
+
+1) Authentication & role checks
+   - Use existing authenticateToken middleware.
+   - Require restaurant role (owner or staff) for all order detail views and actions.
+   - Use RBAC to ensure:
+     - OWNER: full access to all actions.
+     - STAFF: permission-based access (if a canManageOrders flag or similar already exists, respect it).
+   - Never allow drivers, customers, or admins to hit these restaurant-specific pages.
+
+2) Restaurant scoping
+   - The restaurant should only ever see orders for its own restaurantId.
+   - All API queries for an order must filter by both:
+     - orderId AND restaurantId from the authenticated session.
+   - Protect against IDOR: it must be impossible to open another restaurant’s order via URL manipulation.
+
+3) KYC gating
+   - Use existing KYC checks:
+     - isVerified + verificationStatus === "APPROVED"
+   - If KYC is incomplete, show a non-blocking but visible warning, or follow existing behavior (e.g., no access to certain actions).
+
+4) Audit logging
+   - Ensure that important actions are logged using existing audit log system:
+     - ACCEPT, REJECT, MARK_PREPARING, MARK_READY, COMPLETE, CANCEL
+   - Logs must include:
+     - actor role (restaurant_owner vs restaurant_staff)
+     - restaurantId, orderId
+     - oldStatus → newStatus
+     - timestamp
+
+E. Integration with existing Restaurant Order Management
+1) Use existing order status update logic; do not create a parallel system.
+2) If the order list already subscribes to real-time updates (polling or websockets), make sure:
+   - Changing status in the Order Details page immediately reflects in:
+     - The Order Details view itself
+     - The order list view when the user navigates back
+3) Avoid duplicating business logic in the frontend. Reuse existing helpers or services if present.
+
+F. Regression & verification
+After implementing the new Order Details & Timeline, run a full check and summarize results in the Agent report:
+
+1) Pages tested
+   - /restaurant/orders (list view)
+   - /restaurant/orders/:orderId (new details page)
+2) Devices
+   - Mobile (≈ 320–414px width)
+   - Tablet (≈ 768px)
+   - Desktop (≥ 1024px)
+3) Confirm:
+   - No layout shift or broken header/toggle/search bar on restaurant pages.
+   - No horizontal scrolling on mobile.
+   - All buttons and links are reachable and readable.
+   - KYC/RBAC gating still behaves correctly.
+   - No impact on payouts, wallet, support center, menu categories, or other roles.
+
+G. Documentation
+1) Update replit.md (or the relevant project docs) with:
+   - “Phase R1 – Restaurant Order Details & Timeline” section.
+   - Brief description of:
+     - New route(s) / page(s) added
+     - Any new React components or hooks
+     - How the status timeline is derived from existing fields
+     - Security checks (KYC, RBAC, restaurantId scoping, audit logging)
+2) Clearly state that:
+   - No DB schema changes were made.
+   - No payout/support/KYC core logic was modified.
+
+Final acceptance criteria
+- Restaurant users can open any of their orders from the list and see a full, professional Order Details page with:
+  - Items, pricing, masked customer info, notes
+  - Clear status timeline with timestamps
+  - Valid, safe status actions (Accept / Reject / Preparing / Ready / Complete as allowed)
+- All security (KYC, RBAC, scoping, audit logging) remains intact.
+- No other module (Driver, Customer, Admin, payouts, support, menu categories) is broken or changed functionally.
+- The solution is architect-approved as PRODUCTION-READY for the Restaurant role.
+
+When done, summarize exactly what was implemented, confirm no schema changes and no impact to frozen systems, and indicate that Phase R1 for Restaurant is complete.

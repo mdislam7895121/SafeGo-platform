@@ -1,0 +1,264 @@
+AGENT:
+
+Your task is to make the ENTIRE SafeGo platform fully functional, demo-ready, and publish-ready in ONE complete update, following ALL SafeGo Master Rules with ZERO breaking changes.
+
+You must ensure that:
+✓ All partner roles work end-to-end  
+✓ All onboarding flows work  
+✓ All KYC flows work (BD + US)  
+✓ All uploads work  
+✓ All rides, food orders, parcel deliveries work  
+✓ All dashboards work  
+✓ All admin actions work  
+✓ All status flows work  
+✓ All commissions and payouts work  
+✓ All customer → partner → driver → merchant flows work without errors  
+
+This is a FULL SYSTEM COMPLETION TASK.
+
+==================================================
+A) SAFEGO MASTER RULES (MANDATORY FOR THIS UPDATE)
+==================================================
+
+1. Roles (4 strict roles, never mixed)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+2. Services
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+3. Country-specific KYC (BD vs US)
+   BD requires:
+     father_name, date_of_birth, present_address, permanent_address,
+     NID_number, NID_front_image, NID_back_image,
+     emergency_contact, verification_status, is_verified
+
+   US requires:
+     date_of_birth, home_address, emergency_contact,
+     government_id_type, government_id_last4,
+     driver_license (number + image + expiry),
+     ssn_last4 (optional),
+     verification_status, is_verified
+
+4. Admin Panel Functions
+   - verify all KYC
+   - approve/reject partners
+   - manage commissions, fees
+   - block/unblock accounts
+   - manage payouts + negative balances
+   - nothing else can modify verification
+
+5. Mandatory Collections
+   - rides
+   - food_orders
+   - deliveries  
+   Each includes identity fields, geolocation, fees, timestamps, status flow, rating.
+
+6. Commission Rules
+   - Cash ride → driver keeps cash → commission becomes driver negative balance
+   - Cash food → restaurant keeps cash → commission becomes restaurant negative balance
+   - Online payment → SafeGo keeps commission directly
+
+7. Status Flow (cannot change)
+   Rides: requested → searching → accepted → arriving → in_progress → completed  
+   Food: placed → accepted → preparing → ready → picked_up → on_way → delivered  
+   Parcel: requested → searching → accepted → picked_up → on_way → delivered  
+
+8. Security Rules
+   - No role can see another role’s documents
+   - Only admin can verify, block, set commissions
+   - Users can update only their own profile
+
+9. Onboarding Rule
+   - Signup creates ONLY customer account
+   - All other partner roles created through onboarding after login
+
+10. Notifications
+   - Driver ride alert
+   - Order status updates
+   - Delivery updates
+   - Verification updates
+   - Admin notices
+
+==================================================
+B) FULL SYSTEM COMPLETION — WHAT YOU MUST FIX
+==================================================
+
+You must audit and fix EVERYTHING below in one update:
+
+----------------------------------
+1) CUSTOMER EXPERIENCE
+----------------------------------
+✓ Customer signup & login  
+✓ Customer profile  
+✓ Customer can:
+   - Book ride  
+   - Order food  
+   - Send parcel  
+✓ Real-time status updates  
+✓ Payment (cash/online) selection  
+✓ Customer sees driver live location  
+✓ Customer sees restaurant menu  
+✓ Customer sees parcel pickup/delivery status  
+
+----------------------------------
+2) PARTNER PROGRAMS (BD = 5 cards, US = 3 cards)
+----------------------------------
+
+BD (Bangladesh):
+  1) Ride Driver
+  2) Delivery Driver
+  3) Restaurant Partner
+  4) Shop Partner
+  5) Tickets Partner
+
+US (United States):
+  1) Ride Driver
+  2) Food + Parcel Delivery Driver
+  3) Restaurant Partner
+
+Each card must open correct onboarding flow.
+
+----------------------------------
+3) ONBOARDING — MUST BE FULLY WORKING
+----------------------------------
+
+For DRIVERS (ride/delivery):
+   Step 1 — Basic info  
+   Step 2 — Address  
+   Step 3 — KYC (BD: NID; US: License)  
+   Step 4 — Vehicle details  
+   Step 5 — Upload photos  
+   Step 6 — Submit for verification  
+
+For RESTAURANTS:
+   Step 1 — Restaurant info  
+   Step 2 — Menu setup  
+   Step 3 — Logo & banner upload  
+   Step 4 — Business docs upload  
+   Step 5 — Bank payout setup  
+   Step 6 — KYC  
+   Step 7 — Submit for verification  
+
+For SHOP PARTNERS (BD only):
+   Step 1 — Shop info  
+   Step 2 — Categories/products  
+   Step 3 — Logo/banner upload  
+   Step 4 — Docs  
+   Step 5 — Submit verification  
+
+For TICKETS PARTNER (BD only):
+   Step 1 — Company info  
+   Step 2 — Route/schedule upload  
+   Step 3 — Branding  
+   Step 4 — Docs  
+   Step 5 — Verify  
+
+Admin must be able to approve/reject each.
+
+----------------------------------
+4) FILE & IMAGE UPLOAD — FIX EVERY SINGLE LOCATION
+----------------------------------
+
+Fix upload for:
+   - Customer profile
+   - Driver profile
+   - Driver vehicle photos
+   - Driver license images
+   - NID uploads (BD)
+   - Restaurant logo
+   - Restaurant banner
+   - Menu item photos
+   - Shop logo/banner
+   - Product images
+   - Ticket operator branding
+   - Business documents
+   - Admin uploads
+
+All must:
+   - Use Auth header
+   - Use uploadWithAuth()
+   - Validate ownership
+   - Give FRIENDLY error messages
+   - Never show raw JSON
+   - NEVER show "Only shop partners can upload images"
+
+----------------------------------
+5) DASHBOARDS — ALL MUST BE READY
+----------------------------------
+
+Driver dashboard:
+   - earnings
+   - ride queue
+   - delivery queue
+   - map
+   - status toggle
+   - history
+
+Restaurant dashboard:
+   - orders
+   - menu editor
+   - earnings
+   - payouts
+   - order preparation flow
+
+Shop dashboard:
+   - inventory
+   - orders
+   - payouts
+
+Admin dashboard:
+   - user list
+   - partner list
+   - KYC verification
+   - payouts
+   - commissions
+   - blocking
+   - settlement of negative balance
+
+----------------------------------
+6) END-TO-END DEMO FLOWS MUST WORK
+----------------------------------
+
+You must make all these flows run without errors:
+
+**FLOW 1: Customer creates account → books ride → driver accepts → driver completes → earnings updated**
+
+**FLOW 2: Customer orders food → restaurant accepts → prepares → driver picks up → delivers → commission applied**
+
+**FLOW 3: Customer sends parcel → delivery driver handles pickup → on way → delivered → customer receives notification**
+
+**FLOW 4: Restaurant owner creates partner account → completes onboarding → admin approves → restaurant goes live → first order works**
+
+**FLOW 5: Driver creates partner account → KYC → admin verifies → first trip works**
+
+**FLOW 6: Admin verifies everything, sees earnings, manages payouts, blocks/unblocks, updates commissions**
+
+Everything MUST work cleanly.
+
+==================================================
+C) ACCEPTANCE CRITERIA
+==================================================
+
+The system is “Ready to Demo” only when ALL below are TRUE:
+
+✓ All partner onboarings work fully  
+✓ All uploads work  
+✓ No more 401/403 errors  
+✓ All roles have their dashboards working  
+✓ All service flows work (ride/food/parcel)  
+✓ BD sees 5 partner cards  
+✓ USA sees 3 partner cards  
+✓ Admin can verify every role  
+✓ Commission logic works  
+✓ Payouts work  
+✓ Customer → Partner → Driver → Delivery chain is smooth  
+✓ No broken buttons  
+✓ No "coming soon" in active features  
+✓ Entire system can run a live demo from signup to earnings  
+
+Execute this in ONE complete, cohesive, non-breaking update.

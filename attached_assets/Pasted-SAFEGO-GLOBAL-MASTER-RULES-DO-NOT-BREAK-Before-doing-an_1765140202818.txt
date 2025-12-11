@@ -1,0 +1,381 @@
+SAFEGO GLOBAL MASTER RULES – DO NOT BREAK
+
+Before doing anything, you MUST obey all existing SafeGo rules. No shortcut, no breaking change.
+
+A) ROLES (4 fixed roles)
+1. customer
+2. driver
+3. restaurant (merchant)
+4. admin
+
+For each role:
+- Separate onboarding flow
+- Separate KYC requirements
+- Separate dashboard
+- Separate permissions
+- Separate status flows
+
+Public signup is CUSTOMER ONLY.
+Drivers, restaurants, admins are created later via onboarding after login.
+Never mix role access or show one role’s KYC to another.
+
+B) GLOBAL SERVICES (3)
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+Your changes here affect US DRIVER ONBOARDING only.
+Do NOT break any ride/food/parcel flows for customers or drivers.
+
+C) COUNTRY-SPECIFIC KYC
+
+C.1 Bangladesh (BD) – do not change:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number + nid_front_image + nid_back_image
+- emergency_contact_name + emergency_contact_phone
+- verification_status + is_verified
+
+C.2 United States (US) – base:
+- date_of_birth
+- home_address (street, city, state, zip)
+- emergency_contact_name + emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status + is_verified
+
+C.3 United States (US) – DRIVERS extra:
+- driver_license_number
+- driver_license_state
+- driver_license_expiry
+- driver_license_front_image_url
+- driver_license_back_image_url
+- ssn_last4 (optional)
+- NYC TLC zone extra:
+  - tlc_license_number
+  - tlc_license_expiry
+  - tlc_license_front_image_url
+  - tlc_license_back_image_url
+  - any TLC medical/training/exam/drug-test fields already present
+
+You MUST NOT rename or remove these fields. Only add if needed.
+
+D) ADMIN PANEL – MUST REMAIN WORKING
+Admin can:
+- verify customers / drivers / restaurants
+- approve / reject KYC and see rejection_reason
+- configure pricing, fees, commissions
+- block / unblock any user
+- manage payouts
+- see driver negative balances
+- see restaurant negative balances
+
+Do not break any admin route or query.
+
+E) CORE COLLECTIONS
+Collections:
+- rides
+- food_orders
+- deliveries
+
+All must preserve:
+- identity fields (customer_id, driver_id, restaurant_id…)
+- pickup/dropoff/restaurant addresses + geolocation
+- fees + commission details
+- payment info (cash/online, transaction_id, method)
+- timestamps for each status change
+- rating and feedback fields
+
+Do NOT rename or drop any of these.
+
+F) COMMISSION & PAYOUT RULES
+1. Ride paid CASH
+   - Driver receives full cash.
+   - SafeGo commission becomes negative balance in driver_wallet_balance.
+   - Driver must settle weekly.
+
+2. Food order paid CASH
+   - Restaurant keeps cash.
+   - Commission becomes negative balance in restaurant_wallet.
+
+3. Online payment
+   - SafeGo keeps commission automatically.
+
+4. Admin can settle and mark balances as paid.
+
+No change here.
+
+G) SECURITY
+- Customers cannot see driver docs (NID, license, TLC).
+- Drivers cannot see customer KYC or NID.
+- Restaurants cannot see other restaurants.
+- Only admin can change pricing/commission/verification/blocking.
+- Users can update only their own profile.
+- Keep existing auth/CSRF/session protections intact.
+
+H) STATUS FLOWS
+Rides:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+None of these flows may be broken.
+
+I) ONBOARDING
+- Customer signup simple and public.
+- Driver/restaurant onboarding after login, multi-step:
+  basic info → address → KYC docs → emergency contacts.
+- verification_status starts "pending"; driver features blocked until admin approves.
+
+J) NOTIFICATIONS
+- Keep notifications for new rides, order/parcel updates, verification decisions, important admin messages.
+
+All your changes must be NON-BREAKING and ADDITIVE.
+
+====================================================
+NOW THE REAL TASK – DRIVER LICENSE STEP IS STILL WRONG
+====================================================
+
+User’s screenshots prove:
+
+- On `/partner/driver/register?type=ride` (US driver onboarding):
+  - After completing Personal Information and clicking “Next”:
+    - Driver License Number is STILL pre-filled with the user’s full legal name (e.g. "md tazizul islam").
+    - License Expiration Date is STILL pre-filled with some date.
+  - These values appear automatically; the user did not type them.
+
+You previously claimed:
+- “I’ve added browser autofill prevention… fields should now remain empty.”
+
+But in reality they ARE NOT empty.  
+This means:
+1) There is still some STATE MAPPING from Personal Info → Driver License, OR
+2) The fields share the same `name`/`id`, so the browser treats them as the same and autofills.
+
+You must now do a deep, explicit fix. Do NOT just “tweak” autofill.  
+You must PROVE that:
+- Step 1 values do NOT flow into Step 2,
+- Driver License fields start EMPTY.
+
+====================================================
+1. FIND AND REMOVE ALL STATE MAPPING BETWEEN STEPS
+====================================================
+
+1.1 Open the US driver onboarding V2 container that controls the steps
+   - The component that renders the tabs:
+     Personal Information → Driver License → Vehicle Details → NYC Compliance
+   - Example paths (adjust to real paths):
+     - `client/src/pages/partner/driver-registration-v2.tsx`
+     - or wherever the step logic lives.
+
+1.2 Search for any code that:
+   - Reads Personal Info values and assigns them into Driver License fields.
+
+Explicit patterns to look for (examples):
+
+   setValue("driver_license_number", getValues("full_legal_name"))
+   setValue("driver_license_expiry", getValues("date_of_birth"))
+   setValue("driver_license_state", getValues("home_address.state"))
+
+or any equivalent mapping, including spread/merge like:
+
+   { ...personalInfo, ...driverLicense }
+
+where field names collide.
+
+1.3 REMOVE all such mappings.
+
+The Driver License fields MUST NOT be pre-populated from:
+- full_legal_name
+- date_of_birth
+- home address fields
+- any other Personal Info field.
+
+1.4 Check `defaultValues` / `initialValues` for the form:
+   In the `useForm` (or equivalent) call for driver onboarding, confirm:
+
+   driver_license_number: ""
+   driver_license_state: ""
+   driver_license_expiry: ""
+   driver_license_front_image: null
+   driver_license_back_image: null
+
+and NOT something like:
+
+   driver_license_number: full_legal_name
+   driver_license_expiry: date_of_birth
+
+Fix any incorrect default mapping.
+
+1.5 Check any `useEffect` that runs on step change:
+   - If there is an effect that runs when switching to the Driver License step and calls `setValue` on its fields, remove that logic or restrict it so it only runs when editing an EXISTING driver profile (not during NEW onboarding).
+   - For brand-new onboarding, Driver License fields must remain empty until the user types.
+
+====================================================
+2. ENSURE UNIQUE FIELD NAMES & IDS
+====================================================
+
+2.1 Open the Personal Information step component.
+
+Confirm fields use names like:
+
+   name="full_legal_name"
+   name="date_of_birth"
+   name="home_address.street"
+   name="home_address.state"
+   name="home_address.zip"
+
+2.2 Open the Driver License step component (V2, not legacy).
+
+Confirm fields use names like:
+
+   name="driver_license_number"
+   name="driver_license_state"
+   name="driver_license_expiry"
+
+VERY IMPORTANT:
+
+- The name of the Driver License inputs must NOT be the same as any Personal Info field’s `name` OR `id`.
+- IDs must also be unique:
+
+  Personal Info:
+    id="full-legal-name"
+    id="dob"
+    id="home-state"
+
+  Driver License:
+    id="driver-license-number"
+    id="driver-license-state"
+    id="driver-license-expiry"
+
+2.3 If you find any shared `name` or `id` between steps, CHANGE the Driver License ones to the dedicated driver_license_* names.
+
+====================================================
+3. HARD DISABLE BROWSER AUTOFILL ON DRIVER LICENSE FIELDS
+====================================================
+
+In the Driver License form (V2):
+
+3.1 Wrap the form section in:
+
+   <form autoComplete="off" ...>
+
+3.2 For the three main inputs, add explicit props:
+
+- Driver License Number:
+
+   <Input
+     id="driver-license-number"
+     autoComplete="off"
+     inputMode="text"
+     {...field} // where field comes from Controller with name="driver_license_number"
+   />
+
+- License Issuing State:
+
+   <Select
+     id="driver-license-state"
+     autoComplete="off"
+     {...field} // name="driver_license_state"
+   />
+
+- License Expiration Date:
+
+   <Input
+     id="driver-license-expiry"
+     type="date"
+     autoComplete="off"
+     {...field} // name="driver_license_expiry"
+   />
+
+3.3 Ensure shadcn or any wrapper component passes `autoComplete`, `id`, `name` down to the real HTML element.
+
+3.4 Do NOT use generic names like `"name"`, `"address"`, `"birthdate"` on these fields, as they trigger autofill.
+
+====================================================
+4. VALIDATION AND "NEXT" BUTTON
+====================================================
+
+4.1 In the validation schema (Zod/Yup/etc), confirm the keys are exactly:
+
+   driver_license_number
+   driver_license_state
+   driver_license_expiry
+
+4.2 In the form, the `Controller` / `register` names must match exactly:
+
+   <Controller name="driver_license_number" ... />
+   <Controller name="driver_license_state" ... />
+   <Controller name="driver_license_expiry" ... />
+
+4.3 The "Next" button must be enabled based on these fields, not on personal info:
+
+   disabled={isSubmitting || !driverLicenseStepIsValid}
+
+Where `driverLicenseStepIsValid` checks the same driver_license_* fields.
+
+====================================================
+5. MANUAL VERIFICATION (MANDATORY)
+====================================================
+
+After all changes:
+
+5.1 Hard refresh browser and clear autofill suggestions for this domain if necessary.
+
+5.2 Navigate to `/partner/driver/register?type=ride`.
+
+5.3 Fill the Personal Information step completely with test data, click “Next”.
+
+EXPECTED RESULT:
+- On Driver License step:
+  - Driver License Number is EMPTY.
+  - License Issuing State is EMPTY.
+  - License Expiration Date is EMPTY.
+
+If ANY of these fields is pre-filled, YOU HAVE NOT FIXED THE BUG. Keep debugging until they are empty.
+
+5.4 Then:
+
+- Type a test license number.
+- Select a state.
+- Choose an expiration date.
+- Upload front and back license images if required.
+
+5.5 Confirm:
+
+- Error messages disappear.
+- Next button turns active.
+- Clicking Next moves to Vehicle Details.
+
+====================================================
+6. TEST SUITE
+====================================================
+
+- Update/add unit tests for US driver onboarding V2 to assert:
+  - Driver License fields start empty after completing Personal Info.
+  - Manual input updates form state.
+- Update integration/E2E tests:
+  - Full US driver onboarding happy path including Driver License step.
+- Ensure BD driver onboarding, admin KYC, rides/food/parcel flows all pass tests with no regressions.
+
+====================================================
+7. REPORT BACK
+====================================================
+
+When finished, clearly report:
+
+1) What piece of code was causing Driver License fields to be pre-populated (exact file + function).
+2) How you removed state mapping between Personal Info and Driver License.
+3) How you ensured unique field names/ids.
+4) How autofill was disabled on the Driver License fields.
+5) Confirmation that:
+   - After Personal Info → Next, Driver License fields are truly empty.
+   - Only manual user input fills them.
+   - Next button works correctly.
+   - All tests pass and no SafeGo rule or existing flow was broken.

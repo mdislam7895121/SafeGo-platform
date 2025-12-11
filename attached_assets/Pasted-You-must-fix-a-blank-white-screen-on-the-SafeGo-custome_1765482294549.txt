@@ -1,0 +1,65 @@
+You must fix a blank white screen on the SafeGo customer web app.
+
+Context:
+- Workspace: ReplitBackend (SafeGo global project)
+- Landing page at "/" is working again and MUST NOT be redesigned or replaced.
+- After signup / login, when navigating to the customer home route, the page becomes fully white.
+- Example URL (from my browser): https://<current-preview>.replit.dev/customer (white screen, no UI).
+
+Your tasks:
+
+1. Reproduce the bug
+   - Start the application normally.
+   - In the browser, go through the normal flow:
+     a) Open "/" (landing page) – confirm it loads.
+     b) Click "Sign up" or "Log in" and create/sign in to a customer account.
+     c) Navigate to the main customer app route ("/customer" or whatever route is supposed to open after login).
+   - Confirm that this route shows a blank white page.
+
+2. Inspect logs and errors
+   - Open browser devtools console (or use a headless browser) and capture any JavaScript errors when loading the customer route.
+   - Check the server logs for any 500 errors or route errors when "/customer" is requested.
+   - Pay special attention to:
+     - React Router route configuration for "/customer"
+     - Auth guards / ProtectedRoute logic
+     - Layout or Suspense wrappers that might swallow errors
+     - Missing component exports (default vs named export mismatch)
+
+3. Audit the routing and components for the customer app
+   - Locate the main route configuration file (e.g. client/src/App.tsx or client/src/routes/index.tsx) and find the route that should render the customer home screen.
+   - Verify:
+     - The path mapping for "/customer" (or equivalent) points to a valid component.
+     - The component file actually exports a React component of the correct type.
+     - Any layout or nested routes for the customer area are wired correctly.
+   - Check any hooks used there (e.g. useAuth, useCustomerContext, useQuery) for runtime errors when user is null, token missing, or data not yet loaded.
+
+4. Fix the root cause
+   - If there is a React runtime error (TypeError, Cannot read property of undefined, etc.), fix it with the smallest possible change:
+     - Add null checks for user/session.
+     - Fix incorrect imports / exports.
+     - Fix incorrect element passed to React Router (e.g. `element={<CustomerHome />}` not `element={CustomerHome}` in v6).
+   - If the issue is caused by bad route guards:
+     - Make sure unauthenticated users are redirected to "/login".
+     - Make sure authenticated customers are allowed into "/customer".
+   - If the issue is a failed API call that blocks rendering:
+     - Add proper loading & error states so the page still renders the shell instead of staying blank.
+   - Do NOT create a new landing page and do NOT change the global landing layout. Only fix what is needed for the customer area.
+
+5. Verify that everything still works
+   - Test the following without errors or blank pages:
+     - "/" (public landing page)
+     - Signup & login flow for a customer
+     - Redirect after login to the customer app ("/customer" or equivalent)
+     - Any sub-routes under the customer app (e.g. ride, food, parcel tabs)
+   - Confirm no new console errors were introduced.
+   - Confirm the app still respects existing SafeGo rules:
+     - Single shared backend for pricing/status.
+     - No duplicate logic in the landing page for ride/food/parcel.
+     - Bangladesh vs US logic remains unchanged.
+
+6. Report back
+   - Explain clearly:
+     - What was the exact root cause of the white screen on the customer route?
+     - Which files you changed (with paths).
+     - The exact code-level fix you applied.
+   - Do NOT refactor unrelated modules. Only fix the bug causing the white screen on the customer page.

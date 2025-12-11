@@ -1,0 +1,86 @@
+You are continuing the SafeGo admin panel work. This is Step 34 – USA driver profile layout fix.
+
+Goal
+Fix the USA Identity Information section for drivers so that:
+1) The name uses First / Middle / Last name format instead of a single “Full Legal Name” label.
+2) The Emergency Contact section is shown at the very bottom of the USA profile page (after all identity, address, and license document blocks).
+Do this without breaking existing data or changing the database schema.
+
+Key requirements
+
+1) Name format (UI only, no schema change)
+- Current behavior: The USA Identity Information section shows a single field/label like “Full Legal Name: John Michael Smith”.
+- Target behavior:
+  - Display the name in three parts:
+    • First Name
+    • Middle Name
+    • Last Name
+  - In the read-only view, show three separate labels (First Name, Middle Name, Last Name).
+  - In the "Edit USA Profile" form:
+    • Replace any single full-name input with three inputs: firstName, middleName, lastName.
+    • Middle name can be optional (nullable).
+- Backward compatibility (important):
+  - DO NOT change the Prisma schema or database structure.
+  - Assume the database still stores a single full name field (e.g. fullLegalName).
+  - On load:
+    • Safely split the existing full name into first/middle/last in the UI only.
+    • A simple, safe approach is:
+      – If there are 2 parts: first + last.
+      – If there are 3 or more parts: first = first word, last = last word, middle = everything in between joined with spaces.
+  - On save:
+    • Recombine first/middle/last into a single full name string and save back to the existing fullLegalName field.
+    • If middle name is empty, only use first + last.
+
+2) Emergency Contact section order
+- Current behavior: The Emergency Contact section appears in the middle of the USA profile page (before or between other blocks).
+- Target behavior:
+  - The USA Identity Information section should follow this order:
+    1. Profile Photo
+    2. Name fields (First, Middle, Last)
+    3. Phone, Date of Birth, License state/number/expiry
+    4. SSN block (with masked “Show SSN” button, unchanged)
+    5. Residential Address (Street, City, State, ZIP)
+    6. DMV License Documents (front, back, expiry)
+    7. TLC License (New York only) – front, back, expiry
+    8. Emergency Contact – this entire block must be the last section on the page
+       • Name
+       • Phone
+       • Relationship (if already present; if not present, DO NOT add new fields in this step)
+- Make sure that moving Emergency Contact to the bottom does not break:
+  • Responsive layout
+  • Existing styles
+  • Any conditional rendering for non-USA drivers (this layout applies only to USA Identity Information).
+
+3) No breaking changes / safety rules
+- DO NOT:
+  - Change any Prisma schema or database migrations.
+  - Remove or relax any existing validation or RBAC protections.
+- DO:
+  - Keep all existing security behavior, including:
+    • Admin-only access to USA driver identity and documents.
+    • SSN encryption and masked display as implemented in previous steps.
+  - Ensure that:
+    • USA drivers without middle name still work.
+    • Legacy full names continue to display correctly after the split/rejoin logic.
+
+4) Testing checklist
+After implementation, verify the following:
+
+USA driver (non-NY):
+- Go to an existing USA driver detail page (/admin/drivers/[id]):
+  • Name is displayed as First / Middle / Last (with middle possibly empty).
+  • Emergency Contact is visible at the very bottom of the USA Identity Information section.
+- Click “Edit USA Profile”:
+  • Three name inputs are shown.
+  • Saving updates recombines to the same full name field and the name renders correctly in read-only view.
+- Confirm there are no console errors and no TypeScript errors in the affected components.
+
+USA New York driver:
+- Filter to United States + New York (NY) and open a NY driver.
+- Verify the same order as above, with TLC License block before Emergency Contact.
+- Confirm that moving Emergency Contact did not break the DMV/TLC document warnings and status messages.
+
+Non-USA drivers:
+- Bangladesh driver pages and identity sections must be unchanged by this step.
+
+If everything passes, summarize the exact files you changed (client and server), confirm no schema changes were made, and that the new layout is production-safe and fully backward compatible.

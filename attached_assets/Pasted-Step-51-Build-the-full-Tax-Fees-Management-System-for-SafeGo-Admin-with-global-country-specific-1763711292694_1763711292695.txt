@@ -1,0 +1,139 @@
+Step 51: Build the full Tax & Fees Management System for SafeGo Admin with global + country-specific support, following all SafeGo Master Rules.
+
+## Requirements
+Create a complete Tax Configuration module so SUPER_ADMIN and COUNTRY_ADMIN can control all tax rules from the Admin Panel. This must not break any existing analytics, payouts, earnings, or wallet systems.
+
+## Functional Requirements
+
+### 1. Admin UI (client/src/pages/admin/finance/tax.tsx)
+Create a new screen under:
+Admin → Finance → Tax & Fees Settings
+
+UI sections:
+- Tax List Table
+- Create/Edit Tax Rule Modal
+- Country selector (RBAC filtered)
+- Filters (serviceType, payeeType, active/inactive)
+
+Fields in the Create/Edit form:
+- countryCode (required)
+- stateCode (optional for US)
+- cityCode (optional for future use)
+- taxName (string)
+- taxRatePercent (number)
+- appliesTo (enum: RIDE, FOOD, PARCEL, ALL)
+- payeeType (enum: DRIVER, RESTAURANT, CUSTOMER, PLATFORM)
+- isInclusive (boolean)
+- isActive (boolean)
+- effectiveFrom (Date)
+- effectiveTo (Date or null)
+
+Enforce RBAC:
+- SUPER_ADMIN: Full access to all countries
+- COUNTRY_ADMIN: Access only to own country
+- CITY_ADMIN: Read-only (no create/edit)
+
+### 2. Backend Models (prisma/schema.prisma)
+Add a new model:
+
+model TaxRule {
+  id            String   @id @default(cuid())
+  countryCode   String
+  stateCode     String?
+  cityCode      String?
+  taxName       String
+  taxRatePercent Decimal
+  appliesTo     ServiceType
+  payeeType     PayeeType
+  isInclusive   Boolean @default(false)
+  isActive      Boolean @default(true)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isDemo        Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+Add enums:
+enum ServiceType {
+  RIDE
+  FOOD
+  PARCEL
+  ALL
+}
+
+enum PayeeType {
+  DRIVER
+  RESTAURANT
+  CUSTOMER
+  PLATFORM
+}
+
+### 3. Backend Routes
+Create REST routes:
+- GET /admin/tax
+- POST /admin/tax
+- PATCH /admin/tax/:id
+- DELETE /admin/tax/:id
+
+Filtering rules:
+- RBAC-based jurisdiction filtering (reuse getRBACFilter)
+- Never allow cross-country leakage
+
+### 4. Apply Tax Logic Across the System
+
+#### Rides:
+- Include/exclude tax based on isInclusive
+- Apply tax to driver or customer depending on payeeType
+
+#### Food Orders:
+- Apply tax on serviceFare, restaurant payout, or customer fee based on payeeType
+
+#### Parcels:
+- Apply tax on delivery fare accordingly
+
+#### Payout Statements:
+Rewrite earningsService to include:
+- taxAmount
+- netAmountAfterTax
+
+#### Dashboard Updates:
+Ensure the following screens auto-update with tax:
+- Earnings Overview
+- Revenue Breakdown
+- Payouts Overview
+- Wallets → Transaction History
+
+Do not break existing analytics or RBAC filtering.
+
+### 5. Security
+- Every route must use: authenticateToken → requireAdmin → loadAdminProfile → checkPermission
+- All numeric fields processed with safeNumber()
+- Strings processed with safeString()
+- Arrays processed with safeArray()
+
+### 6. Demo Mode
+Add demo tax rules for 3 countries:
+- US (Sales Tax 7.5%)
+- BD (VAT 15%)
+- Default Global (10%)
+
+Ensure demo tax can be cleared without affecting real data.
+
+### 7. Documentation
+Update replit.md:
+- TaxRule model documentation
+- Code example for tax calculation
+- RBAC behavior
+- Test checklist
+
+### 8. Testing Requirements
+- Create 20+ test tax rules across countries
+- Validate RBAC filtering
+- Validate effectiveFrom/effectiveTo date logic
+- Verify inclusive vs exclusive calculations
+- Update earnings/payout calculations with regression check
+- Ensure reports include tax data
+
+## Final Goal
+Deliver a fully functional, secure, RBAC-compliant Tax & Fees Management system without breaking any existing admin modules (earnings, wallets, analytics, payouts).

@@ -1,0 +1,178 @@
+STEP 43 – SAFEGO EATS CUSTOMER APP PROFESSIONAL UPGRADE (DOORDASH-LEVEL UI)
+
+You must follow ALL SafeGo Master Rules exactly.
+Do not skip any role, KYC rule, security rule, status flow, collection requirement, or backend compatibility rule.
+Do NOT modify payouts, commissions, admin logic, or any financial engine. Only UI/UX improvements for Customer Eats.
+
+STRICT SCOPE LIMITATIONS:
+- Do NOT touch commission logic
+- Do NOT touch wallet or payout logic
+- Do NOT modify Admin or Restaurant balances
+- Do NOT rename/remove fields in rides, food_orders, deliveries, or user collections
+- Only ADD new UI components, screens, style improvements, filters, search endpoints
+- Customer-side ONLY (Eats module)
+- All 4 roles and 3 services must stay working
+
+====================================================
+PART A — SAFEGO EATS HOME SCREEN (DOORDASH-LEVEL UI)
+====================================================
+
+Rebuild the Customer Eats Home Screen with a fully professional, mobile-first layout:
+
+1. Search bar (restaurant + cuisine + item search)
+2. Category chips (pizza, burgers, bangladeshi, halal, mexican, desserts, etc.)
+3. Featured sections:
+   - Popular Near You
+   - Top Rated
+   - Delivered Under 30 Minutes
+   - Recommended For You (simple rating-based)
+4. Restaurant cards must show:
+   - banner image
+   - name
+   - cuisines (1–2 tags)
+   - rating + number of ratings
+   - estimated delivery time
+   - delivery fee text (existing logic only)
+5. Mobile-first layout:
+   - Single-column on mobile
+   - Multi-column grid on tablet/desktop without breaking existing desktop design
+6. Add optional horizontal carousels (safe & non-breaking)
+
+====================================================
+PART B — RESTAURANT DETAIL PAGE (FULL REDESIGN)
+====================================================
+
+Upgrade the restaurant page to DoorDash-level:
+
+1. Hero banner image (large)
+2. Restaurant name, cuisines, rating, delivery time
+3. Collapsible “More Info”:
+   - opening hours
+   - description
+4. Menu category navigation:
+   - sticky category bar (mobile)
+   - sidebar (desktop)
+5. Menu item cards:
+   - name
+   - short description
+   - price
+   - optional image
+   - Add to Cart button
+6. Smooth scroll between categories
+
+====================================================
+PART C — CART EXPERIENCE
+====================================================
+
+Rebuild cart screen:
+
+1. Restaurant name
+2. Items list:
+   - name
+   - quantity +/-
+   - per-item price
+   - subtotal
+3. Delivery fee, tax (existing logic only)
+4. Total
+5. Clean, modern layout
+6. Must be 100% backward compatible with existing order creation endpoint
+
+====================================================
+PART D — CHECKOUT EXPERIENCE
+====================================================
+
+Upgrade checkout screen:
+
+1. Delivery address:
+   - BD → present_address format (area/thana)
+   - US → home_address ZIP format
+2. Customer contact number (editable, validated)
+3. Payment method (existing methods only)
+4. Place Order button (existing API)
+5. Full error handling:
+   - item unavailable
+   - restaurant closed
+   - address missing
+
+====================================================
+PART E — ORDER TRACKING (TIMELINE)
+====================================================
+
+Create a DoorDash-style Order Tracking page:
+
+Status timeline:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+
+Show:
+- Restaurant name + logo
+- Ordered items summary
+- Driver first name + vehicle (safe fields only)
+- Live map if already implemented (non-breaking)
+- ETA calculation using existing data only
+
+====================================================
+PART F — ORDER HISTORY + REORDER
+====================================================
+
+Implement Past Orders:
+
+1. List previous food_orders
+2. Show:
+   - restaurant
+   - date
+   - total amount
+   - status
+3. “Reorder” button:
+   - rebuild cart using same items if available
+   - fallback gracefully if not
+
+====================================================
+PART G — COUNTRY DIFFERENCES (BD vs US)
+====================================================
+
+BD customers:
+- Bangladeshi cuisine categories appear first
+- Delivery location uses area/thana-style format
+
+US customers:
+- US cuisine categories first
+- ZIP-style delivery address display
+
+====================================================
+PART H — SECURITY RULES (MANDATORY)
+====================================================
+
+- Do NOT show any KYC document (NID, government_id_last4, license, SSN)
+- Do NOT show driver-sensitive info
+- Restaurant cannot see other restaurants' data
+- Only customer can see these screens
+- All PII protected and limited
+- All logic must remain fully backward-compatible
+
+====================================================
+PART I — FILES/COMPONENTS TO UPDATE (ADD-ONLY)
+====================================================
+
+Create or update these:
+
+customer-app/screens/EatsHomeScreen.*
+customer-app/screens/EatsRestaurantDetailScreen.*
+customer-app/screens/EatsCartScreen.*
+customer-app/screens/EatsCheckoutScreen.*
+customer-app/screens/EatsOrderTrackingScreen.*
+customer-app/screens/EatsOrderHistoryScreen.*
+customer-app/components/eats/* (cards, chips, menu items)
+api/customer/eats/* (search/filter endpoints — ADD ONLY)
+
+====================================================
+FINAL REQUIREMENT
+====================================================
+
+Deliver Step 43 as a complete, production-ready Customer Eats UI/UX upgrade with NO breaking changes to:
+- rides
+- deliveries
+- payouts
+- commissions
+- admin workflows
+
+This step updates ONLY the Customer Eats interface.

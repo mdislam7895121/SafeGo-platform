@@ -1,0 +1,174 @@
+=========================
+SAFEGO GLOBAL MASTER RULES
+(Always apply – do NOT skip)
+=========================
+
+ROLES (4 distinct roles, separated permissions):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+SERVICES (must all be supported):
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+COUNTRY-SPECIFIC KYC:
+
+Bangladesh (BD) mandatory:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number + front/back images
+- emergency_contact details
+- verification_status + is_verified
+
+United States (US) mandatory:
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license number + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified
+
+ONBOARDING (all roles):
+- Multi-step: basic info → address → ID/KYC upload (country-specific) → emergency contact.
+- Set verification_status="pending" and block all services until admin approves.
+
+ADMIN PANEL (must support):
+- Approve / reject KYC for customers, drivers, restaurants
+- Store rejection_reason
+- Block / unblock any user or restaurant
+- Update pricing, fees, commissions
+- Manage payouts & mark balances paid
+- View driver negative balance
+- View restaurant negative balance
+
+CORE COLLECTIONS:
+
+1) rides
+   - customer_id, driver_id
+   - pickup/dropoff addresses + geo
+   - service_type
+   - fare, fees, safego_commission
+   - payment_method (cash/online)
+   - status: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+   - rating, feedback
+   - timestamps
+
+2) food_orders
+   - customer_id, driver_id, restaurant_id
+   - restaurant & delivery addresses + geo
+   - items, subtotal, fees, safego_commission
+   - payment_method
+   - status: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+   - rating, feedback
+   - timestamps
+
+3) deliveries
+   - customer_id, driver_id
+   - pickup/dropoff addresses + geo
+   - package details
+   - fees, safego_commission
+   - payment_method
+   - status: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+   - rating, feedback
+   - timestamps
+
+COMMISSION & PAYOUT RULES:
+- CASH ride: driver takes all cash; SafeGo commission becomes negative driver_wallet_balance; settle weekly; admin can mark paid.
+- CASH food: restaurant takes all cash; commission becomes negative restaurant_wallet.
+- ONLINE: SafeGo keeps commission automatically.
+- Admin can view and settle balances.
+
+SECURITY RULES:
+- Customers cannot see driver documents (NID, license, SSN, etc.).
+- Drivers cannot see customer KYC or sensitive data.
+- Restaurants cannot see other restaurants.
+- Only admin can change pricing, commissions, verification, blocking.
+- Users may update only their own profile.
+- All APIs over HTTPS.
+
+STATUS FLOWS:
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_by_driver / cancelled_by_customer / cancelled_by_system.
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x.
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x.
+
+NOTIFICATIONS:
+- new ride/food/parcel alerts
+- status updates
+- verification decisions
+- payout reminders
+- important admin notices.
+
+MAP RULE:
+- Do NOT change the map engine, style, markers, or zoom controls in this task.
+
+====================================================
+TASK: Remove duplicate Go Online button and legend card
+====================================================
+
+Goal:
+- On the driver map screen, there must be ONLY ONE Go Online/Go Offline control (in the footer).
+- Remove the old upper Go Online button from the status card.
+- Remove the “You | Pickup | Dropoff” legend card at the bottom of the map.
+- Keep all backend logic and matching rules unchanged.
+
+----------------------------------
+1) REMOVE TOP GO ONLINE BUTTON
+----------------------------------
+Current issue:
+- The driver status card at the top of the map shows:
+  “You’re Offline / Go online to start getting trips…” PLUS an extra Go Online button.
+
+Required change:
+- Inside the status card, remove the Go Online/Go Offline button completely.
+- The status card should only display:
+  - status title: “You’re Online” / “You’re Offline”
+  - subtitle: “Go online to start getting trips…” (or online variant)
+- All online/offline toggling must now be controlled ONLY by the footer control (or GO button if already implemented).
+
+Backend logic:
+- Do NOT remove or change the existing API for setting driver_online_status.
+- Reuse the same endpoint from the footer toggle.
+- Ensure the removed top button no longer triggers any calls.
+
+----------------------------------
+2) REMOVE “You | Pickup | Dropoff” LEGEND CARD
+----------------------------------
+Current issue:
+- At the bottom of the map there is a pill-style legend card showing:
+  “You     Pickup     Dropoff”.
+
+Required change:
+- Remove this entire legend card component from the driver map screen.
+- Do NOT remove or change the underlying markers on the map (driver marker, pickup, dropoff).
+- Only the UI legend pill should be removed.
+
+----------------------------------
+3) FOOTER ONLINE/OFFLINE CONTROL (KEEP)
+----------------------------------
+- Keep the footer bar exactly as designed:
+  - Center: single Go Online / Go Offline control (pill or GO button, depending on current implementation).
+  - This is now the ONLY way for the driver to switch online/offline.
+- Ensure:
+  - driver_online_status="online" → footer shows “Go Offline”.
+  - driver_online_status="offline" → footer shows “Go Online”.
+- Keep all matching logic for rides/food_orders/deliveries tied to driver_online_status and service_preferences.
+
+----------------------------------
+4) NON-BREAKING REQUIREMENTS
+----------------------------------
+- Do NOT rename or remove any database fields, collections, routes, or APIs.
+- Only:
+  - remove the top status-card button UI,
+  - remove the legend pill UI,
+  - keep footer control and backend logic intact.
+- Map visual behavior (markers, zoom, movement) must stay exactly the same.
+
+NO QUESTIONS.  
+Apply exactly these UI removals in a single build without touching existing business logic.

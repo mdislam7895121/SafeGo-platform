@@ -1,0 +1,34 @@
+You’ve already implemented the Uber-style Tax & Fees configuration backend and admin UI for SafeGo. The TaxRule model, API routes, and the “Tax & Fees” tab under /admin/settings are working, but there are currently no tax rules configured.
+
+Task:
+1. Do NOT change any existing payout, wallet, or earnings logic that was previously approved as production-ready.
+2. Using the existing TaxRule model and the Tax & Fees settings UI only, create a safe set of initial Uber-style tax rules, so that I can test the feature without breaking anything.
+
+Design the rules with these principles:
+- Support multiple jurisdictions:
+  - USA: at least rules for New York City (NYC) and San Francisco (SF)
+  - Bangladesh: rules for Dhaka
+- Support multiple services:
+  - Rides, Food delivery, Parcels
+- Tax structure:
+  - Percent-based tax on the fare amount (e.g. 8–15% ranges, you can pick realistic demo values)
+  - Optional fixed booking/service fee per trip/order (small flat amount)
+- Fields per rule:
+  - countryCode, optional city, serviceType (ride/food/parcel), taxType (percentage or flat), rate/value, isActive, appliesTo (driver/restaurant/platform/customer) based on how you designed TaxRule
+- Security:
+  - All reads/writes must respect existing RBAC and jurisdiction filtering
+  - Validate all inputs server-side and reject invalid rules
+
+Steps:
+1. Inspect the existing TaxRule model, tax service, and settings API to confirm how rules are stored and applied.
+2. Seed a small, well-structured set of demo tax rules via a safe script or migration, marked with any existing isDemo flag if available.
+3. Make sure the admin “Tax & Fees” tab loads these rules, allows editing, and uses safeNumber/safeString style helpers where needed to avoid crashes.
+4. Verify:
+   - No errors in server logs or browser console when viewing or editing tax rules.
+   - Existing payouts, wallets, earnings, and analytics remain unchanged except for reading the new tax configuration where already wired.
+5. Update replit.md:
+   - Document the Tax & Fees system
+   - Describe fields for each rule
+   - Explain how to safely add/modify/delete tax rules for new countries or cities.
+
+Do not refactor any other parts of the system. Keep changes minimal, configuration-driven, and fully backward compatible with the current production-ready payout and analytics logic.

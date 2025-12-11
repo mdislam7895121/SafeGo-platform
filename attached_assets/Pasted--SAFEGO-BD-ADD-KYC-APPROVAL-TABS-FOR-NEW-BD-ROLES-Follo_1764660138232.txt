@@ -1,0 +1,70 @@
+# SAFEGO BD — ADD KYC APPROVAL TABS FOR NEW BD ROLES
+# Follow ALL SafeGo master rules. Must be non-breaking and additive.
+
+======================================================
+A) PURPOSE
+======================================================
+Add two new KYC approval sections in the Admin Panel:
+
+1. Shop Partners (role = "shop_partner")
+2. Ticket & Rental Operators (role = "ticket_operator")
+
+These must appear alongside:
+- Drivers
+- Customers
+- Restaurants
+
+======================================================
+B) ADMIN ROUTING
+======================================================
+Update the Admin KYC page (likely under /admin/kyc or equivalent):
+Add two new tabs or sections:
+
+Tab: "Shop Partners"
+  Show all users with role = "shop_partner"
+  Fields:
+    - Shop name
+    - Country
+    - Owner name
+    - verification_status
+    - KYC documents (BD rules)
+  Buttons: Approve / Reject
+
+Tab: "Ticket Operators"
+  Show all users with role = "ticket_operator"
+  Fields:
+    - Operator name
+    - Country
+    - Business type (ticket/rental)
+    - verification_status
+    - KYC documents (BD rules)
+  Buttons: Approve / Reject
+
+======================================================
+C) DATA SOURCE
+======================================================
+Use existing user + KYC tables. Do NOT change schema.
+Filter by role + countryCode === "BD".
+
+======================================================
+D) SECURITY
+======================================================
+- Admin only access
+- Do NOT expose customer or driver sensitive data
+- Operators cannot see other operators
+- Shop Partners cannot see restaurants
+
+======================================================
+E) NON-BREAKING RULES
+======================================================
+Do NOT modify:
+- Existing 4 signup roles
+- Existing KYC logic
+- Rides/food/delivery collections
+- Restaurant or driver workflows
+
+Only ADD two new tabs + filters.
+
+======================================================
+END OF TASK
+======================================================

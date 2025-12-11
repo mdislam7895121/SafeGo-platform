@@ -1,0 +1,73 @@
+We are working on SafeGo admin → Driver Management.
+
+Problem:
+- On the Admin Dashboard “Platform Overview” card it shows `Total Drivers = 49`.
+- But on `/admin/drivers` the "Drivers" table shows "No drivers found" even when there are active/verified drivers.
+- Filters on the page: All Countries, All Statuses, All Verification. Even with these defaults we see an empty state.
+
+Goal:
+Make the Admin Driver Management page show the same drivers that are counted in the Platform Overview stats, with basic filters working.
+
+Please do the following:
+
+1) Backend: Admin driver listing endpoint
+- Locate the existing driver profile model (DriverProfile / driver_profile table).
+- Implement an admin-only endpoint, for example:
+  - `GET /api/admin/drivers`
+- Requirements:
+  - Return a paginated list of drivers with:
+    - driverProfileId
+    - full name
+    - email
+    - country
+    - city (if available)
+    - verification status (KYC / documents)
+    - driver account status (active / suspended / pending)
+    - totalTrips, rating, yearsActive (if those metrics already exist; otherwise return 0 / null safely).
+  - Support filters:
+    - country (All Countries = no filter)
+    - status (All Statuses = no filter; otherwise active / inactive / pending / suspended, based on existing enum/flags)
+    - verification (All Verification = no filter; otherwise verified / unverified / pending).
+  - Make sure the query uses the SAME source of truth as the dashboard “Total Drivers” metric, or document the difference and then align them so counts are consistent.
+  - Protect with admin RBAC (admin role only).
+
+2) Frontend: wire `/admin/drivers` page to the API
+- File is something like `client/src/pages/admin/drivers.tsx` (or similarly named).
+- Replace any fake data / TODO state so that:
+  - On initial load it calls `GET /api/admin/drivers` with no filters and shows the returned list.
+  - The filters (country, status, verification) update the query parameters and refetch.
+  - The empty state only appears when the API actually returns zero results, not when the call fails.
+- Show at least:
+  - Name
+  - Email
+  - Country
+  - Status
+  - Verification
+  - Created date (or years active) if available.
+
+3) Consistency with dashboard cards
+- Find where the “Total Drivers” card gets its value (e.g. `adminDashboardService` or analytics query).
+- Ensure that:
+  - Both the dashboard card and `/api/admin/drivers` are counting from the same driver_profile source.
+  - Soft-deleted or test drivers are handled consistently (either excluded everywhere or counted everywhere, but consistent).
+- If there is a difference (e.g. card counts all drivers, table shows only KYC-complete drivers), make that logic explicit and document it in `replit.md` under an “Admin Driver Management” section.
+
+4) Safety and KYC
+- Ensure the endpoint does NOT return sensitive fields like full SSN, document numbers, raw file paths, etc.
+- It’s fine to return high-level flags like `kycStatus`, `hasDocuments`, `isSuspended`.
+
+5) Testing
+- Seed or reuse my existing driver account so that:
+  - It appears in the Total Drivers card.
+  - It also appears in the `/admin/drivers` table.
+- Confirm:
+  - With filters set to “All”, my driver row is visible.
+  - Changing filters (e.g. by country or status) behaves as expected.
+  - No console errors on the admin drivers page.
+
+Finally:
+- Update `replit.md` with:
+  - The new endpoint contract.
+  - Filter behavior.
+  - Any limitations or future improvements (e.g. pagination, advanced search).
+- Leave a short summary in the agent log explaining that the Admin Driver Management page is now showing real drivers and is consistent with the dashboard metrics.

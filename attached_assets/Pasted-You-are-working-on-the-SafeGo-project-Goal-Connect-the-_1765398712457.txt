@@ -1,0 +1,245 @@
+You are working on the SafeGo project. 
+Goal: Connect the public Support / Contact system from the landing page directly to the Admin Dashboard as a full “Support Center” (ticket system).
+
+Context and constraints:
+- Stack: TypeScript/Node backend with existing middleware (securityHeaders.ts, rate limiting, logging, etc.), Prisma ORM, React/Next-style frontend (client/src) with landing pages and admin panel already present.
+- The landing page is already production-grade secured (CSP, HTTPS, HSTS, rate limiting, security logging) and must NOT be broken.
+- Current contact/help center page already exists at /contact with:
+  - Contact cards (“Contact our teams”)
+  - A “Send us a message” form
+- We now want each submitted message to become a **Support Ticket** that appears in the **Admin Dashboard Support Center**, where admins can read, filter, assign, and resolve tickets.
+- No real email sending is required yet — only safe test-mode behavior (e.g., console log or mock email function).
+
+--------------------------------
+PART 1 – AUDIT CURRENT CONTACT & ADMIN SETUP
+--------------------------------
+1. Inspect the existing contact/help center implementation:
+   - Contact form component (likely under client/src/pages/contact or similar).
+   - The API or handler currently used when the form is submitted (if any).
+2. Inspect the Admin Dashboard:
+   - Where admin navigation items are defined.
+   - What pattern is used for listing entities (tables) and viewing details.
+3. Confirm the existing security middlewares:
+   - server/middleware/securityHeaders.ts
+   - Any rate limiter or logging middleware used for public routes.
+4. Do NOT remove or weaken any existing security features. You may reuse them for the new endpoints.
+
+Give yourself a short internal plan and then implement the next parts.
+
+--------------------------------
+PART 2 – DATABASE MODEL FOR SUPPORT TICKETS
+--------------------------------
+Create a new Prisma model (or update if already present) for support tickets in prisma schema, called SupportTicket.
+
+Model fields (at minimum):
+
+- id: string (cuid / uuid)
+- createdAt: DateTime @default(now())
+- updatedAt: DateTime @updatedAt
+
+- fullName: String
+- email: String
+- country: String         // e.g. "Bangladesh" or "USA"
+- region: String?         // optionally "Bangladesh", "United States", "Global"
+
+- category: String        // e.g. "Rides & Transportation", "Food Delivery", "Local Shops", "Tickets & Travel", etc.
+- message: String
+
+- source: String          // e.g. "landing_contact_form"
+- status: String          // e.g. "open" | "pending" | "resolved" (store as simple string)
+- priority: String        // e.g. "low" | "normal" | "high"
+
+- relatedService: String? // e.g. "rides", "food", "parcel", "shops", "tickets"
+- assignedToAdminId: String? // optional link to an admin user if the system already has an AdminUser model
+- resolvedAt: DateTime?   // when ticket is marked resolved
+- metadata: Json?         // extra structured data (IP, userAgent, etc.)
+
+Tasks:
+1. Add this model to the Prisma schema file.
+2. Run Prisma migration / generate so the model is available (follow the project’s existing migration pattern).
+3. Make sure the table name and fields are consistent with project conventions.
+
+--------------------------------
+PART 3 – PUBLIC CONTACT API ENDPOINT
+--------------------------------
+Now create or update an API endpoint that the public contact form will post to, for example:
+
+- POST /api/support/tickets or similar.
+
+Requirements:
+1. Validate request body:
+   - fullName: non-empty string, reasonable length
+   - email: valid email format
+   - country: string (e.g. "Bangladesh" / "United States")
+   - category: one of the allowed category values for that region (see below)
+   - message: non-empty, length-limited
+   - optional: orderId / tripId, attach into metadata if present.
+2. Derive region & relatedService:
+   - If country = "Bangladesh":
+     - categories can include: 
+       "General Inquiry",
+       "Rides & Transportation",
+       "Food Delivery",
+       "Parcel Delivery",
+       "Local Shops",
+       "Tickets & Travel",
+       "Driver/Courier Support",
+       "Business Partnership",
+       "Payments & Billing",
+       "Safety Concern",
+       "Technical Issue",
+       "Other"
+   - If country = "United States":
+     - categories:
+       "General Inquiry",
+       "Rides",
+       "Food Delivery",
+       "Parcel Delivery",
+       "Driver/Courier Support",
+       "Business Partnership",
+       "Payments & Billing",
+       "Safety Concern",
+       "Technical Issue",
+       "Other"
+   - Map each category to a relatedService:
+     - Rides / Rides & Transportation → "rides"
+     - Food Delivery → "food"
+     - Parcel Delivery → "parcel"
+     - Local Shops → "shops" (Bangladesh only)
+     - Tickets & Travel → "tickets" (Bangladesh only)
+     - Driver/Courier Support → "driver"
+     - Business Partnership → "business"
+     - Payments & Billing → "payments"
+     - Safety Concern → "safety"
+     - Technical Issue → "technical"
+     - General Inquiry / Other → "general"
+3. Initial status and priority:
+   - status = "open"
+   - priority:
+     - If category = "Safety Concern" → "high"
+     - Else if category in ["Technical Issue", "Payments & Billing", "Driver/Courier Support"] → "normal"
+     - Else → "low"
+4. Security & logging:
+   - Reuse existing rate limiter middleware for this public endpoint to prevent abuse.
+   - Log suspicious patterns (e.g. many tickets from same IP).
+   - Sanitize message to avoid script injection in any admin views (escape HTML when rendering).
+5. Save the SupportTicket in the DB.
+6. For now, instead of real email sending, call a safe mock function or simply log to the server console which internal mailbox would receive it, e.g.
+   - Bangladesh + Local Shops → shops@safego.com
+   - Bangladesh + Tickets & Travel → tickets@safego.com
+   - Driver/Courier Support → drivers@safego.com
+   - General Support → support@safego.com
+   - Legal or safety-related topics (if inferred) → legal@safego.com or safety@safego.com
+7. Return a success response to the frontend:
+   - { success: true } or similar, with no sensitive details.
+
+--------------------------------
+PART 4 – CONNECT CONTACT FORM (FRONTEND)
+--------------------------------
+Update the Contact / Help Center page frontend:
+
+1. When the user selects the country (Bangladesh / United States / Global), ensure:
+   - The category dropdown only shows valid categories for that region.
+   - For Global, you may default to the more generic set (no Shops/Tickets) or route to General Support.
+2. On form submit:
+   - Call the new support ticket API endpoint.
+   - Show proper UX states: loading, success message, error handling.
+   - Do NOT expose any internal error details; show a generic failure message if request fails.
+3. Keep the existing layout and design (no visual downgrade).
+4. Ensure the page remains accessible on mobile and desktop.
+
+--------------------------------
+PART 5 – ADMIN SUPPORT CENTER (DASHBOARD)
+--------------------------------
+Now create a full “Support Center” section inside the Admin Dashboard that reads from the SupportTicket model.
+
+Navigation:
+1. Add a new main menu or submenu entry called “Support Center” or “Customer Support” in the admin sidebar/top navigation (where other admin sections are defined).
+2. Only show this section for admin/super-admin roles. No access for drivers, partners, or customers.
+
+Support Center – List View:
+1. Create an Admin page that lists support tickets in a table:
+   - Ticket ID (shortened)
+   - Created time (relative + exact)
+   - Country / Region
+   - Category
+   - Related Service
+   - Status (open/pending/resolved)
+   - Priority (low/normal/high)
+   - Optional: Assigned admin
+2. Add filters:
+   - Filter by status
+   - Filter by priority
+   - Filter by country (Bangladesh / USA / Global)
+   - Filter by relatedService (rides, food, parcel, shops, tickets, driver, etc.)
+   - Quick filter for “Safety Concern” tickets.
+3. Add a search box that searches by:
+   - email, fullName, message text (basic search is fine).
+
+Support Center – Detail View:
+1. When clicking on a ticket in the list, open a detail view that shows:
+   - Full name, email
+   - Country, region
+   - Category, relatedService
+   - Message (escaped safely)
+   - CreatedAt, updatedAt
+   - Status, priority
+   - AssignedToAdminId (if available)
+   - metadata (pretty-printed, but safe)
+2. Admin actions:
+   - Change status: open ↔ pending ↔ resolved
+   - Change priority: low/normal/high
+   - Assign ticket to an admin (if there is an AdminUser model; otherwise keep this as a future placeholder).
+   - Add internal notes field (Notes not required for v1, but if simple to implement, store them in an InternalNote model or in metadata as an array).
+
+3. Every admin action should update updatedAt and, when status becomes resolved, set resolvedAt.
+
+Security:
+1. Protect all Support Center routes behind Existing admin auth middleware.
+2. Ensure CSRF protection is applied to admin mutations if other admin panels use it.
+3. Do NOT allow arbitrary HTML injection from message content; render safely escaped text.
+4. Log admin actions to existing logging system if possible (e.g. who changed what).
+
+--------------------------------
+PART 6 – COUNTRY-SPECIFIC HANDLING
+--------------------------------
+Implement region-aware behavior for tickets:
+
+1. When viewing the ticket list, add a quick filter for:
+   - Bangladesh tickets (includes Shops + Tickets & Travel)
+   - USA tickets (no Shops/Tickets)
+2. In the detail view, clearly show:
+   - “Bangladesh – Local Shops” or 
+   - “Bangladesh – Tickets & Travel” 
+   - or “USA – Rides” etc., based on country + relatedService.
+3. Ensure that no USA ticket ever shows service type “shops” or “tickets” for now, since those services are Bangladesh-only on the landing page.
+
+--------------------------------
+PART 7 – TESTING & VERIFICATION
+--------------------------------
+After implementation, please:
+
+1. Run tests or at least manual checks:
+   - Submit a ticket from Bangladesh landing contact form with category “Local Shops”.
+   - Submit a ticket with category “Tickets & Travel”.
+   - Submit a ticket from USA landing contact form with category “Rides”.
+2. Confirm in the Admin Support Center:
+   - All three tickets appear in the list.
+   - Shops/Tickets tickets are correctly tagged as Bangladesh-only.
+   - Tickets can be filtered, opened, and status changed.
+3. Verify security and stability:
+   - Landing page still loads correctly.
+   - Maps and region switching still work.
+   - Rate limiting and security headers are still applied.
+4. Summarize:
+   - Which files were created/updated.
+   - How an admin should access the Support Center.
+   - How the routing logic works (which categories map to which internal teams).
+
+Important:
+- Keep everything in **test mode only** for now (no real external email sending).
+- Do NOT remove any security middleware.
+- Maintain the existing professional design quality of the landing page and admin dashboard.
+
+Once all of this is complete and verified, tell me clearly:
+“The landing page Support Center is now fully connected to the Admin Dashboard ticket system, with region-aware categories and secure handling.”

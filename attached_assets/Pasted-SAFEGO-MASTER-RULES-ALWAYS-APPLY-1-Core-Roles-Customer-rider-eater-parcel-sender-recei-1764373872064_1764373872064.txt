@@ -1,0 +1,214 @@
+SAFEGO MASTER RULES (ALWAYS APPLY)
+
+1) Core Roles
+   - Customer (rider + eater + parcel sender/receiver)
+   - Driver (rides, delivery, parcel)
+   - Restaurant / Merchant (Eats + other merchants later)
+   - Admin (global control panel + compliance + finance)
+
+2) Global App Scope
+   - One unified platform: rides, food delivery (SafeGo Eats), parcel/courier, later business travel.
+   - Shared accounts for customer & driver; strict separation of permissions.
+   - All flows must be multi-city and multi-country ready (USA now, Bangladesh later).
+
+3) Legal & KYC
+   - USA: TLC / DMV rules for NYC rides, SSN/ITIN handling, driver license, background check, vehicle docs.
+   - Bangladesh: NID, driving license, local tax IDs when that phase starts.
+   - KYC data must never be exposed in plain text in logs, screenshots, or public APIs.
+
+4) Data Models & Collections (Mongo / Prisma style)
+   - rides, ride_requests, ride_quotes
+   - drivers, driver_documents, driver_payouts, driver_vehicles
+   - customers, customer_profiles, payment_methods
+   - restaurants, restaurant_menus, menu_items, food_orders
+   - deliveries / parcels for courier
+   - admin_users, audit_logs, system_settings, tlc_reports
+   - Commission, pricing, and incentive configs must be stored in configuration tables, not hard-coded in UI.
+
+5) Pricing, Commission, and Payouts
+   - Base fare = distance + time + TLC minimum pay engine (for NYC) or country-specific rules.
+   - Platform commission (e.g., 15%) + fixed service fee (e.g., $1.99) applied on top of regulatory fees.
+   - Regulatory fees (TLC: congestion, airport, AVF, BCF, HVRF, state surcharge, long-trip, out-of-town, tolls) go to government, never into commission.
+   - Driver earnings = rider fare – (regulatory fees that driver doesn’t get) – platform commission + incentives.
+   - AI Marketplace Balancer can adjust service fee, surge multipliers, and incentives but must ALWAYS respect:
+     * TLC minimum pay for drivers
+     * NYC TLC rider fare rules
+     * Configured caps (no extreme surge)
+
+6) Status Flows (High Level)
+   - Rides: REQUESTED → MATCHING → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED / CANCELED (by rider/driver/system).
+   - Drivers: OFFLINE → ONLINE → ON_TRIP → UNAVAILABLE; verification statuses: PENDING_REVIEW → APPROVED / REJECTED / NEEDS_UPDATE.
+   - Payments: AUTHORIZED → CAPTURED → SETTLED → PAID_OUT (to driver/restaurant).
+   - Food Orders & Parcels: keep similar multi-step flows with clear audit logs.
+
+7) Security & Safety
+   - Never expose API keys, secrets, or internal URLs in UI or logs.
+   - Validate all inputs server-side; never trust client category IDs, pricing, or discounts.
+   - Rate-limit sensitive endpoints (login, OTP, payment, pricing previews).
+   - All fare calculations that matter for billing MUST be done server-side and checked with automated tests.
+   - TLS/HTTPS everywhere; no mixed-content assumptions.
+   - Keep clear separation of customer/driver/admin routes and components; RBAC enforced on backend.
+
+8) Admin Panel (Mandatory Capabilities)
+   - Manage drivers, vehicles, documents, and verification workflow.
+   - Manage restaurants, menus, categories.
+   - View, edit, and audit rides, orders, payouts, disputes.
+   - Configure pricing rules, surge policies, incentives, AI Marketplace Balancer parameters.
+   - TLC reporting: exports, audits, validation of fee rates.
+   - Full audit logging of sensitive actions.
+
+9) Notifications & Onboarding
+   - Email/SMS/Push templates must be generic and translatable.
+   - Onboarding requirements: driver cannot go ONLINE without verified documents, vehicle, bank info, and category assignment.
+   - Riders must see clear fare estimates, fee breakdowns, and surge indicators before confirming.
+
+10) Implementation Rules
+   - Never break existing working features; changes must be incremental and backward-compatible.
+   - Reuse existing helpers, hooks, and services where possible.
+   - Keep test coverage; add new tests when you touch pricing, dispatch, or TLC logic.
+   - Respect all previous NYC TLC rules that were already implemented (minimum pay engine, all fees, cross-state logic, tolls, report generator, audit engine).
+
+------------------------------------------------
+TASK PROMPT: C4 – Rider Vehicle Options Rendering & Selection (Customer App)
+
+You are working in the existing SafeGo monorepo on Replit. The following are already implemented and working:
+
+- NYC TLC fare engine with all regulatory fees and minimum pay enforcement.
+- AI Marketplace Balancer (surge, fee tuning, incentives) integrated into fare calculations.
+- Multi-category vehicle system with 7 categories:
+  * SAFEGO_X
+  * SAFEGO_COMFORT
+  * SAFEGO_COMFORT_XL
+  * SAFEGO_XL
+  * SAFEGO_BLACK
+  * SAFEGO_BLACK_SUV
+  * SAFEGO_WAV
+- Driver vehicle verification and category eligibility logic, including:
+  * AI suggestions + admin approval workflow.
+  * Category locking for premium/WAV and TLC compliance.
+  * Dispatch rules that assign trips only to drivers eligible for a given category.
+  * Driver ride preferences (which categories they are willing to accept).
+- Rider flow up to “Plan your ride” screen:
+  * Pickup & dropoff selection with suggestions and live route preview.
+  * Estimated fare shown (currently a single value).
+  * Cross-state and NYC TLC rules already applied correctly.
+
+C1–C3 are done (vehicle integration, category pricing, availability indicators, accessibility). Now you must implement **C4: full Rider Vehicle Options UI** so that the rider can see and select among all 7 SafeGo categories, with correct real-time pricing and availability.
+
+Your goal: make the ride options screen look and behave like a professional multi-option ride marketplace (similar to Uber), but using SafeGo’s logic and TLC rules.
+
+------------------
+C4 OBJECTIVES
+
+1) Rider Vehicle Options Rendering
+   - On the “Plan your ride” / ride options screen, render a **horizontal carousel on mobile** and a **vertical list/grid on desktop** that shows all available SafeGo categories for the current route.
+   - Each category card must include at minimum:
+     * Category name (SafeGo X, Comfort, Comfort XL, XL, Black, Black SUV, WAV).
+     * Short label/description (e.g. “Affordable everyday rides”, “Extra legroom”, “Luxury black car”, “Wheelchair accessible”).
+     * Estimated fare for that category (using existing backend multiplier / pricing logic).
+     * Estimated arrival / trip time if available (or “~X min” same as base).
+     * **Driver availability badge**:
+       - e.g. “Available”, “Limited”, “High demand”, or “Unavailable”.
+       - If zero eligible drivers for a category, show state as “Unavailable” and disable selection.
+     * **Surge indicator** where applicable:
+       - Small badge like “Busy area” or “Surge x1.2”.
+       - Use the surge/multiplier information already provided by the pricing engine / AI Marketplace Balancer.
+   - Category order should be:
+     1) SafeGo X
+     2) SafeGo Comfort
+     3) SafeGo Comfort XL
+     4) SafeGo XL
+     5) SafeGo Black
+     6) SafeGo Black SUV
+     7) SafeGo WAV
+
+2) Selection & State Management
+   - Only **one** category can be selected at a time.
+   - Default selection:
+     * Use the same default category the backend currently assumes (likely SAFEGO_X) **unless**:
+       - That category is unavailable OR there are driver preference constraints.
+       - In those cases, select the cheapest available category automatically.
+   - When rider taps/clicks a category card:
+     * Update selected category in the front-end state (e.g. via React state, context, or existing hooks).
+     * Immediately update the **Estimated fare** summary shown under the map to match this category.
+     * Ensure the selected category is passed through to the request/confirmation screen and to the backend when “Request ride” is pressed.
+   - Respect backend constraints:
+     * Never let the user select a category that the backend indicates as unavailable or invalid.
+     * If the backend returns an error for a selected category, show a user-friendly message and revert to a safe default category.
+
+3) Integration with Existing Pricing & Dispatch
+   - DO NOT re-implement pricing formulas on the client.
+   - Use existing API responses / pricing model for:
+     * Per-category fare
+     * Surge multiplier / busy-area flags
+     * Driver availability flags/counts
+   - If such values are not yet present in the existing API response:
+     * Update the server-side response shape in a backward-compatible way (e.g., extend an existing “quote” or “ride options” endpoint).
+     * Update the TypeScript types/interfaces accordingly.
+   - When the rider confirms (“Request ride”), ensure the backend receives:
+     * selectedCategory (enum keyed by SAFEGO_…)
+     * route details
+     * all TLC related flags (NYC vs cross-state, etc.) that already exist.
+   - Dispatch should already respect:
+     * Driver eligibility (vehicle type, category).
+     * Driver preferences (which categories they accept).
+     * Accessibility constraints for WAV.
+
+4) Unavailable Categories Behaviour
+   - If a category has **no drivers available** (based on existing marketplace/availability engine):
+     * Render that card as **disabled**:
+       - Faded style, non-clickable.
+       - Badge text like “Currently unavailable”.
+     * The “Request ride” button should never send a request for a disabled category, even if selected state is somehow inconsistent.
+   - If availability is low or surge is high:
+     * Use text like “Few cars nearby” / “High demand”.
+     * These are display-only hints; actual surge pricing still comes from backend.
+
+5) Accessibility & UX
+   - Keep all C3 accessibility improvements:
+     * Keyboard navigation across cards (left/right arrows for carousel, up/down for list).
+     * Proper ARIA roles and labels for selected/not-selected categories.
+     * Screen-reader announcements when selection changes (e.g., “SafeGo Comfort selected, estimated 32 dollars, few cars nearby”).
+   - Mobile:
+     * Smooth horizontal scroll with snap to card if possible.
+   - Desktop:
+     * List or grid on the side of the map; selected category clearly highlighted.
+
+6) Files & Code Organisation (example – adapt to actual repo)
+   - Likely involved files (do not rename without reason):
+     * `client/src/pages/rider/ride/options.tsx` or similar.
+     * Shared components under `client/src/components/ride/` (e.g., create `VehicleCategoryCard.tsx`).
+     * Types/interfaces under `client/src/types/ride.ts` or existing types file.
+     * Server code for quotes under `server/services/fareCalculation` or `server/routes/quotes` (use correct actual paths).
+   - Create a **reusable component** for the category cards (e.g. `<VehicleCategoryCard />`) that:
+     * Accepts props for category id, display name, price, eta, surge info, availability, selected, onSelect.
+     * Handles accessibility attributes but keeps styling consistent with the existing app.
+
+7) Tests & Safety
+   - Add/extend front-end tests (unit or integration) to cover:
+     * Rendering of all categories received from API.
+     * Selection change updates the displayed fare.
+     * Disabled categories cannot be selected.
+     * Correct badge text for different availability/surge states.
+   - Add/extend back-end tests (if you changed the quote API) to cover:
+     * Correct mapping of per-category pricing and availability into the response payload.
+     * Validation that only known SAFEGO_ category enums are accepted.
+   - Do NOT modify any TLC fee enforcement or audit logic.
+   - Do NOT change commission or driver earning formulas.
+
+8) Migration & Backward Compatibility
+   - Ensure the system still works if, for any reason, only a single default category is returned by the backend:
+     * In that case, render just that one card and keep the experience consistent.
+   - If new categories are added in the future:
+     * Use a generic mapping from backend enums to display labels and icons so we can expand later without rewriting the component.
+
+9) Final Verification Checklist
+   - From a fresh user session:
+     * Open Rider app, set NYC pickup and dropoff.
+     * See route map + Estimated fare + car carousel/list with all 7 categories rendered.
+     * Tap between categories: fare and any surge indicators update correctly.
+     * Try a scenario where some categories are unavailable; ensure disabled state works.
+     * Confirm a ride and verify (via logs/tests) that the selected category is passed to backend and dispatch respects that category.
+   - Confirm no TypeScript errors, no failing tests, and no console errors in browser.
+
+Now implement C4 exactly as described above, following all SafeGo master rules and keeping the codebase stable, secure, and production-ready.

@@ -1,0 +1,96 @@
+Follow all existing SafeGo rules. Do NOT change any backend logic: no fare math, no promo logic, no route calculation, no dispatch behavior. Only adjust the UI of the lower panel (route selector + fare summary) so it looks professional on both desktop and mobile.
+
+Context:
+- On the unified booking screen, after a ride type is chosen, the bottom section shows:
+  • “Choose your route” with route chips: Fastest, CT-15 N and CT-8 N, I-684 N...
+  • Below that, the fare summary card for the selected ride (SafeGo X) with:
+        $235.01   $245.01
+        You save $10.00
+        Heavy traffic / Card/Wallet etc.
+- Right now:
+  • The "Selected" label sits as a separate line under the Fastest chip.
+  • Route chips alignment and spacing feel off.
+  • On smaller screens (mobile), the rightmost route chip is partially cut off.
+  • The fare summary card is visually disconnected from the selected route info.
+
+I need you to completely polish this section, step by step, without breaking any existing data.
+
+1. Refactor the route selector chips
+   - Use the same component for all routes (Fastest, others).
+   - Design each chip as a self-contained pill with:
+       • Top line: route label (e.g. "Fastest", or the main road name).
+       • Second line: "Xh Ym • Z mi" (duration and distance in a single line).
+       • If this route is selected, show a small "Selected" badge INSIDE the chip, aligned to the bottom-right or top-right, instead of a separate line below the chip.
+   - Visual styles:
+       • Selected chip:
+           - Border: 2px solid SafeGo blue (reuse the same token as selected ride card).
+           - Background: very light blue tint.
+           - Text: dark, clear.
+       • Unselected chip:
+           - Border: 1px solid neutral gray (#E5E7EB or existing border token).
+           - Background: white.
+   - Remove any external text like "Selected" that sits outside the chip. Only the chip should show selection state.
+
+2. Layout behavior (desktop vs mobile)
+   - Desktop:
+       • Keep all route chips in a single row, with equal height and consistent gap between them.
+       • Ensure all text is fully visible (no clipping of the rightmost chip).
+   - Mobile:
+       • Make the route chips horizontally scrollable in a carousel-like row.
+       • Use padding on the left and right so that chips do not touch the screen edge.
+       • Ensure the selected chip is fully visible (no partial clipping).
+       • Enable snap or centered scroll if supported by our design system, so chips feel smooth to swipe.
+   - Do NOT change the number of routes or the underlying route selection logic: when the user taps a chip, it should still behave exactly as before.
+
+3. Connect the route selector to the fare summary visually
+   - Directly under the route chips, add a small summary line that reflects the currently selected route:
+       • Format: `<RouteLabel> • Xh Ym • Z mi`
+         Example: `Fastest • 1h 43m • 94.9 mi`
+       • Use a subtle neutral gray text style, slightly smaller than the main body text.
+   - This summary should update instantly when the user selects another route.
+
+4. Fare summary card cleanup
+   - For the selected ride card (the big SafeGo X block under "Choose your route"):
+       • Keep the promo UI YOU ALREADY IMPLEMENTED:
+           - Original price in small gray with strikethrough.
+           - Final price in bold.
+           - "You save $X.XX" in green on a separate line.
+       • Make sure that:
+           - The final price and original price are aligned on the same baseline.
+           - "You save $X.XX" always appears directly underneath the prices, with consistent margin.
+       • Align the distance/time (`94.9 mi • ~1h 43m`) and pickup ETA (`Pickup in ~2 min`) on the right side of the card, vertically centered relative to the price block.
+   - Ensure nothing overflows horizontally on mobile. If needed, allow the right-side metadata to wrap to two lines but keep it readable.
+
+5. Responsive hierarchy for the entire lower panel
+   - Desktop:
+       • Order (top to bottom):
+           1) "Choose your route" title.
+           2) Route chips row.
+           3) Selected route summary line.
+           4) Selected ride fare summary card (with promo display).
+       • Keep existing map layout on the right unchanged.
+   - Mobile:
+       • When the user is in the "Choose your route" step:
+           - Place the map above, the route panel below.
+           - Ensure the route section (chips + summary + fare card) fills the width of the screen with proper padding.
+           - Confirm the Request ride button remains fully visible and does not overlap the chips.
+       • The three route chips and the request button must be fully visible; nothing should be cut off on the right side.
+
+6. No logic changes, only UI
+   - Do NOT:
+       • Change how many routes are returned.
+       • Change any ETA or distance values.
+       • Change any fare amounts or promo application.
+   - Only adjust component layout, styling, and the way existing fields are displayed.
+
+7. Verification (you must perform and describe)
+   - Use a test case similar to my screenshot: origin 188 Sutter Ave, destination Connecticut, with an active Saver promo (e.g. You save $10.00).
+   - Confirm on DESKTOP:
+       • All route chips are fully visible in one row.
+       • The selected chip shows "Selected" inside the chip, not below it.
+       • A route summary line appears above the SafeGo X summary card.
+       • The SafeGo X card shows final price, original price (struck through), and "You save $10.00" neatly aligned.
+   - Confirm on MOBILE:
+       • Route chips are scrollable horizontally, none are cut off.
+       • Request ride button is fully visible.
+   - Take a screenshot of both desktop and mobile, and confirm in your message that the route and fare panel now looks consistent and professional on both devices.

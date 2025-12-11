@@ -1,0 +1,111 @@
+You are upgrading the SafeGo multi-service platform to add an Uber-style Food Ordering system.
+
+⚠️ Hard rules (must not break):
+- Do NOT break any existing flows: rides, KYC, wallets, payouts, earnings, analytics, tax & fees, RBAC, demo mode.
+- Keep the 4-role model intact: CUSTOMER, DRIVER, RESTAURANT, ADMIN.
+- Keep existing jurisdiction logic and RBAC filters (SUPER_ADMIN, COUNTRY_ADMIN, CITY_ADMIN, etc).
+- All changes must be backward-compatible and non-destructive.
+
+Goal for this task (Food Step 1 – Architecture & Read-Only APIs):
+- Implement the first slice of the Food Ordering system on the CUSTOMER side:
+  1) Safe domain architecture for food.
+  2) Read-only APIs for restaurants and menus.
+  3) Basic customer UI screens to browse restaurants and see menus.
+- Do NOT implement cart/checkout or order placement in this step. Only browsing.
+
+Context alignment:
+1. Inspect the existing codebase and summarize (in comments / replit.md) what already exists for:
+   - RestaurantProfile / restaurants
+   - FoodOrder / Delivery or any similar models
+   - Wallets, payouts, tax & fees (for later integration)
+   - Existing customer app routes and layouts
+2. Reuse or extend existing models instead of creating duplicates.
+   - If a FoodOrder model already exists, do NOT redesign it; just note how it will be used later.
+
+Data layer (Prisma or current ORM):
+1. Add or confirm minimal models needed for read-only restaurant + menu browsing, for example:
+   - RestaurantProfile (already exists – reuse)
+   - MenuCategory
+   - MenuItem
+2. For each model, use:
+   - isActive flags
+   - countryCode / cityCode or equivalent for jurisdiction filtering
+   - isDemo flag where appropriate (aligned with existing demo mode).
+3. Write clear comments on these models so later steps can use them for ordering, tax, and payouts.
+
+Backend APIs (customer-facing):
+Create a dedicated, RBAC-protected customer food API surface, for example under something like:
+- GET /api/customer/food/restaurants
+- GET /api/customer/food/restaurants/:id
+- GET /api/customer/food/restaurants/:id/menu
+
+Requirements:
+1. Only authenticated CUSTOMERS can call these endpoints.
+2. Apply existing jurisdiction filters (country/city) just like ride/analytics data:
+   - Customers should only see restaurants in their allowed city/country.
+3. Implement defensive patterns you already use:
+   - safeNumber / safeString / safeArray helpers
+   - Optional chaining and null-safe defaults in responses
+4. Responses must be shaped specifically for the customer app (no internal admin-only fields).
+5. Add basic logging for these routes so admin analytics can be extended later.
+
+Customer app UI (read-only, minimal but production-ready skeleton):
+Add new routes and pages without breaking existing ones:
+
+1. Routes (or equivalent):
+   - /customer/food          → Restaurant list
+   - /customer/food/:id      → Restaurant details + menu
+
+2. Restaurant list screen:
+   - Reuse existing customer layout and navigation style.
+   - Show:
+     - Restaurant name
+     - Cuisine type / short description
+     - Average rating (if available)
+     - City and area
+   - Include simple filters or placeholders (e.g., “All cuisines”, “Sort by rating”) even if non-functional for now.
+
+3. Restaurant details + menu screen:
+   - Show restaurant information at the top.
+   - Under that, show categories and items:
+     - Category name (e.g., “Burgers”, “Drinks”)
+     - For each item: name, short description, price, and a disabled “Add to cart” button or a non-functional CTA.
+   - Do NOT implement cart logic yet. The CTA can simply be a placeholder with a TODO.
+
+Security & KYC rules:
+1. Only KYC-approved customers should see the Food tab/entry point in the customer app.
+2. If a non-KYC customer tries to access /customer/food routes:
+   - Redirect them to KYC / verification or show a friendly “Complete verification to order food” message.
+3. Make sure RBAC and authentication follow the same middleware stack you already use for ride tracking and wallets.
+
+Admin & analytics compatibility:
+1. Do NOT build any new admin UI here.
+2. However, structure the APIs and models so later we can:
+   - Track food orders in earnings and analytics dashboards.
+   - Link restaurant revenue and commission to existing wallets/payouts/tax structures.
+
+Testing & validation:
+1. Add a small set of demo restaurants and menu items to the existing demo data script so that:
+   - When demo mode is enabled, the new customer food screens show realistic data (for NYC, SF, Dhaka).
+2. Manually test:
+   - Customer login → KYC-approved user → navigate to /customer/food and /customer/food/:id.
+   - Confirm API responses are non-empty with demo mode enabled.
+   - Confirm unauthorized or non-KYC customers cannot access food routes.
+3. Check browser console and server logs:
+   - No runtime errors.
+   - All new routes show 200 OK responses.
+   - Memory warnings acceptable but no crashes.
+
+Documentation:
+1. Update replit.md with a new section:
+   - “SafeGo Food System – Step 1: Restaurant & Menu Browsing”
+   - Describe:
+     - Models used/added
+     - API endpoints and request/response shapes
+     - RBAC and jurisdiction rules
+     - What is implemented now (browse only) vs what is planned next (cart, checkout, orders, tracking).
+
+When you finish:
+- Summarize exactly what was added or changed.
+- Confirm that no existing features were broken (rides, wallets, earnings, payouts, analytics, tax & fees, RBAC).
+- Tell me how to navigate in the customer app to see the restaurant list and menu screens.

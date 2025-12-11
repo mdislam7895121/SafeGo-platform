@@ -1,0 +1,70 @@
+Make the Admin > Restaurants > Restaurant Management screen fully responsive by device size, without breaking any SafeGo logic, routes, roles, KYC, or database schema.
+
+1) Global layout
+- Keep the current design system (glow cards, filters, table) but make it adapt to screen width.
+- Use a responsive layout approach: flex/grid + CSS breakpoints instead of fixed pixel widths.
+
+2) Breakpoints
+Implement at least these breakpoints:
+- Desktop: >= 1280px
+- Laptop: 1024–1279px
+- Tablet: 768–1023px
+- Mobile: < 768px (can be prepared, even if the admin is mainly desktop).
+
+3) Search & Filters card
+- Desktop/Laptop: keep current padding and layout.
+- Tablet:
+  - Reduce horizontal padding slightly.
+  - Stack fields vertically if there is not enough width.
+- Mobile:
+  - All filters stack in a single column.
+  - Keep glow and radius but reduce padding so it fits well on small screens.
+
+4) Restaurants table – desktop & laptop
+- Table container stays full-width with horizontal scroll inside the wrapper (no clipping).
+- On laptop widths:
+  - Slightly reduce column padding (left/right) so more content fits.
+  - Long text in cells should use text-overflow: ellipsis, not break layout.
+  - Keep all important columns visible via scroll (Restaurant, Email, Country, KYC, Status, Commission).
+
+5) Restaurants table – tablet
+- Show only the most important columns directly:
+  - Restaurant, Email, Country, Status.
+- Hide less important columns (Commission, created_at, etc.) by default and expose them via:
+  - the Columns toggle, or
+  - a "View details" / "More" action on each row.
+- Ensure the Restaurant column remains sticky on the left when scrolling horizontally.
+
+6) (Optional) Mobile behavior
+- For screen widths < 768px:
+  - Render restaurants as stacked list cards instead of a wide table.
+  - Each card shows:
+      - Restaurant name + address
+      - Email (shortened if long)
+      - Country
+      - KYC + Status badges
+      - A "View details" or chevron to open a detail view (drawer / modal) with all other fields.
+  - Keep the same glow-card style for each row card.
+
+7) Columns button
+- The Columns button must remain visible on laptop and tablet.
+- Ensure any hidden columns are controlled through this button and not by clipping off-screen.
+
+8) Typography & spacing
+- Adjust font sizes slightly at smaller breakpoints (e.g., -1px) so text stays readable without overflowing.
+- Use consistent vertical spacing (8/16/24px) at all sizes; just scale padding down on smaller devices.
+
+9) Testing
+- Test Restaurant Management screen at:
+  - 1440px (desktop)
+  - ~1280px (laptop)
+  - 1024px (tablet landscape)
+  - 768px (tablet portrait)
+- Verify:
+  - No headers are partially visible (e.g., “Com”).
+  - Horizontal scroll reveals all columns on desktop/laptop where needed.
+  - On tablet/mobile, layout is usable and not cut off.
+  - Glow cards, filters, and table/list remain visually consistent with the rest of the Admin panel.
+
+Goal:
+The Restaurant Management page should look clean and professional on any device size: on large screens as a full table with scroll, and on smaller screens as a compact, readable, responsive layout with no clipped columns.

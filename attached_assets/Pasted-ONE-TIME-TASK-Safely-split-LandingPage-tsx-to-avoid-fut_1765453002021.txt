@@ -1,0 +1,63 @@
+ONE-TIME TASK: Safely split LandingPage.tsx to avoid future memory issues.
+
+Goal:
+Reduce bundle/memory pressure for the public landing page WITHOUT changing any UI, layout, copy, routing, or architecture.
+
+Hard Scope Limits:
+- You are ONLY allowed to touch:
+  - client/src/routes/LandingPage.tsx  (or wherever the main landing page component lives)
+  - New presentational components under: client/src/components/landing/*
+- You are NOT allowed to modify:
+  - App.tsx routing
+  - Any auth logic
+  - Any backend code or APIs
+  - Any other pages (ride, food, parcel, shop, ticket, admin, driver, restaurant, etc.)
+
+Refactor Plan (do exactly this):
+
+1) Create new presentational components:
+   - client/src/components/landing/LandingHero.tsx
+   - client/src/components/landing/LandingCountryTabs.tsx
+   - client/src/components/landing/LandingServices.tsx
+   - client/src/components/landing/LandingFooter.tsx
+   (If needed, you may add 1–2 more components, but only for the landing page.)
+
+2) Move EXISTING JSX from LandingPage.tsx into these components:
+   - Hero section (title “Move, eat, and deliver with SafeGo”, buttons, etc.) → LandingHero
+   - Country tabs (Bangladesh / United States / Global) → LandingCountryTabs
+   - Services list (Rides, Food Delivery, Parcel Delivery, Local Shops, Tickets & Travel) → LandingServices
+   - Bottom/footer area → LandingFooter
+
+3) Update LandingPage.tsx to look like:
+
+   - Import the new components.
+   - Render them in the SAME order as before:
+     <LandingHero />
+     <LandingCountryTabs />
+     <LandingServices />
+     <LandingFooter />
+
+4) STRICT VISUAL RULES:
+   - Do NOT change any text.
+   - Do NOT change any spacing, colors, fonts, or layout.
+   - Do NOT add or remove any buttons, cards, or sections.
+   - The final UI at "/" must look pixel-identical to the current landing page.
+
+5) Routing rules:
+   - Keep "/" mapped to LandingPage as it is now.
+   - Do NOT add or remove any routes.
+   - Do NOT introduce any new wrappers (AuthenticatedApp, etc.).
+   - Do NOT add lazy-loading or Suspense here. Only split into smaller files.
+
+6) After refactor, verify:
+   - "/" loads correctly with the exact same design.
+   - Ride / Food / Parcel / Shop / Ticket / Admin pages still load.
+   - No “Unexpected end of input” or bundle errors appear.
+   - Memory usage is reduced compared to before (you can mention the new approximate usage).
+
+7) Final report:
+   - List the exact files you created/modified.
+   - Confirm that this change is NON-BREAKING:
+     - No backend or collections changed.
+     - No SafeGo roles, KYC, commission, or status flows changed.
+     - Only landing page presentation code was split into smaller components.

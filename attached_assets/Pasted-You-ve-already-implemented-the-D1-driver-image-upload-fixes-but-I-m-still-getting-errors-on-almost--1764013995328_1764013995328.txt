@@ -1,0 +1,143 @@
+You’ve already implemented the D1 driver image upload fixes, but I’m still getting errors on almost EVERY driver account action.
+
+Here is the problem from the real UI:
+
+1) Driver profile photo upload:
+   - Error toast: "Upload failed – Cannot read properties of null (reading 'status')"
+
+2) Edit name (Manage Account → Edit Name → Save):
+   - Error toast: "Failed to update name – Cannot read properties of null (reading 'json')"
+
+3) Edit address (Edit Address → Save Address):
+   - Error toast: "Error updating address – Cannot read properties of null (reading 'json')"
+
+4) Vehicle registration (Driver → Vehicles → Register Vehicle):
+   - Error toast: "Registration failed – Cannot read properties of null (reading 'json')"
+
+So it’s not just one endpoint. Any driver-side mutation (update name, update address, upload photo, register vehicle) is throwing the same type of error.
+
+YOUR GOAL
+=========
+
+1. Find the exact place(s) in the client where these errors come from.
+2. Standardize the API responses for all driver account + vehicle endpoints.
+3. Add strong null / error handling on the frontend so these “reading 'json' / 'status' of null” errors can NEVER happen again.
+4. Make sure restaurant features are not broken.
+
+CONSTRAINTS
+===========
+
+- Do NOT change the overall API design; only fix and standardize responses + error handling.
+- Do NOT break any existing restaurant flows (menu, orders, promotions, reviews, earnings etc.).
+- Keep all changes compatible with the existing auth/KYC model.
+- Leave detailed documentation in `replit.md` under a new section `D1-ERR`.
+
+STEP 1 – Reproduce & DEBUG
+==========================
+
+1. Run the backend and frontend, log in as the same driver account I’m using.
+2. Open browser dev tools → Network + Console.
+3. For each action below, trigger it once and inspect the response:
+
+   a) Upload driver profile photo (Manage Account → Profile Photo).
+   b) Edit Name and click Save.
+   c) Edit Address and click Save Address.
+   d) Register a vehicle and click Register Vehicle.
+
+4. For EACH failed action, record:
+   - Request URL
+   - HTTP method
+   - Status code
+   - Raw response body
+   - Any console error stack trace
+
+Update `replit.md` with a short "D1-ERR / Reproduction Notes" subsection summarizing exactly what each endpoint returns right now.
+
+STEP 2 – Backend RESPONSE STANDARDIZATION
+=========================================
+
+For every driver account / vehicle endpoint used in these flows, make sure the backend ALWAYS returns a JSON object with a consistent structure, even on errors. For example:
+
+- Success:
+  {
+    success: true,
+    message: "Profile updated successfully",
+    data: { ...optional payload... }
+  }
+
+- Error (validation / auth / server error):
+  {
+    success: false,
+    message: "Human-readable error message",
+    code: "VALIDATION_ERROR" | "AUTH_ERROR" | "SERVER_ERROR" | etc.
+  }
+
+Tasks:
+
+1. Inspect these server files first:
+   - `server/routes/driver.ts`
+   - `server/routes/account.ts` (or similar, if driver account routes are there)
+   - Any upload-related middleware:
+     - `server/middleware/upload.ts`
+   - Any helper used for driver responses.
+
+2. For EACH endpoint involved in:
+   - Update name
+   - Update address
+   - Update legal name / driver profile
+   - Upload profile photo
+   - Register vehicle (create vehicle)
+   enforce the JSON structure above.
+
+3. Make sure:
+   - No endpoint returns an empty body with 204 if the client expects JSON.
+   - On error, you `res.status(...).json({ success: false, ... })` instead of sending HTML or nothing.
+   - Ensure file upload endpoints also respond with JSON, not just a bare status.
+
+4. If any endpoint can return `null` / undefined from a service layer, protect against that on the server before sending the response.
+
+STEP 3 – FRONTEND FETCH / ERROR HANDLING FIX
+============================================
+
+Now fix the client so it never blindly calls `.json()` or reads `.status` on a null response.
+
+1. Find all driver account + vehicle API calls, especially in:
+   - `client/src/pages/driver/account/manage.tsx`
+   - `client/src/pages/driver/account/address.tsx` (or equivalent)
+   - `client/src/pages/driver/vehicles.tsx`
+   - Any shared driver API utility (e.g. `client/src/lib/api.ts` or similar)
+
+2. For every `fetch` / `api` call used by:
+   - Update name
+   - Update address
+   - Upload profile photo
+   - Register vehicle
+
+   enforce this pattern:
+
+   ```ts
+   const res = await fetch(url, options);
+
+   let data: any = null;
+   const contentType = res.headers.get("content-type") || "";
+
+   if (contentType.includes("application/json")) {
+     try {
+       data = await res.json();
+     } catch {
+       data = null;
+     }
+   }
+
+   if (!res.ok || !data || data.success === false) {
+     const message =
+       (data && data.message) ||
+       `Request failed with status ${res.status || "unknown"}`;
+
+     // show toast with this message
+     showErrorToast(message);
+     return;
+   }
+
+   // success path
+   showSuccessToast(data.message || "Updated successfully");

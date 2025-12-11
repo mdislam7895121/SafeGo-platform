@@ -1,0 +1,275 @@
+You are working on the SafeGo web client (HTML Codebase on Replit).
+
+IMPORTANT GLOBAL RULES (DO NOT BREAK THESE)
+
+1. Single shared SafeGo backend
+   - All pricing, GPS, ride status, region, currency, and business rules come ONLY from the backend.
+   - The /ride landing page is just a client. It must CALL the backend; it must NOT re-invent any pricing or status logic.
+
+2. Four main roles
+   - Customer, Driver, Restaurant Partner, Admin.
+   - For this task, you are working ONLY on the CUSTOMER side (/ride landing + ride tracking).
+   - Do NOT add any fake driver/admin logic in the frontend; always read from backend responses.
+
+3. Country + region rules
+   - Backend already supports BD and US with full KYC, pricing, commission, and currencies.
+   - Frontend must:
+     - Use backend’s `countryCode`, `fareCurrency`, and other fields.
+     - Never hardcode “BDT” or “USD” or any fixed currency logic.
+     - When backend returns `fareCurrency = "BDT"` → display in ৳ with 0 decimals.
+     - When backend returns `fareCurrency = "USD"` → display in $ with 2 decimals.
+
+4. Status engine rules
+   - Backend is the single source of truth for ride status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     + cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - Frontend must only map these statuses to human-friendly text; never invent its own status lifecycle.
+
+5. Security rules
+   - Auth is handled via JWT + refresh token (HTTP-only cookie).
+   - Frontend must:
+     - Use a shared `apiClient` with `withCredentials: true`.
+     - Call `/api/auth/refresh` when needed (or rely on 401 + retry pattern).
+     - Never store plain tokens in localStorage.
+
+6. No duplicate backends in frontend
+   - Remove / stop using any “mock backend” or in-memory repositories inside the client for rides.
+   - All ride data must come from the real backend described below.
+
+====================================================
+BACKEND CONTEXT (TREAT THIS AS FINAL AND CORRECT)
+====================================================
+
+You already have this backend, fully implemented and audited:
+
+Key ride endpoints:
+- POST  /api/rides                    → Create new ride request
+- GET   /api/rides/:id               → Get ride details (status, fare, pickup/dropoff, polyline, currency, etc.)
+- PATCH /api/rides/:id/status        → Update ride status (backend side; in production this is driver/dispatch)
+- POST  /api/rides/:id/complete      → Complete ride
+- POST  /api/rides/:id/cancel        → Cancel ride
+- GET   /api/rides/:id/live-tracking → Live tracking data (driver location, ETA, route polyline, status history)
+- GET   /api/rides/:id/receipt       → Receipt details
+
+Fare + map endpoints:
+- GET   /api/maps/config             → Returns Maps config + public key for client
+- POST  /api/maps/directions         → Returns routes and polylines between pickup/dropoff
+- POST  /api/fares/calculate-all     → Returns fares for all vehicle types for a given route
+- GET   /api/fares/ride-types        → Vehicle / ride categories metadata
+
+Customer endpoints:
+- GET   /api/customer/rides          → Trip history list (for later)
+- GET   /api/customer/profile        → Profile + countryCode, etc.
+
+Auth endpoints:
+- POST  /api/auth/signup
+- POST  /api/auth/login
+- GET   /api/auth/me
+- GET   /api/auth/validate
+- POST  /api/auth/refresh
+
+Region & pricing behaviour:
+- `Ride.countryCode` = "BD" or "US".
+- `Ride.fareCurrency` = "BDT" or "USD".
+- Encoded `routePolyline` is provided when available (may be null; frontend must handle).
+
+Ride object (simplified expectation for GET /api/rides/:id):
+- id
+- status
+- pickupAddress, pickupLat, pickupLng
+- dropoffAddress, dropoffLat, dropoffLng
+- distanceMiles, durationMinutes
+- routePolyline (may be null)
+- serviceFare
+- safegoCommission
+- driverPayout
+- paymentMethod
+- countryCode
+- fareCurrency
+- driver info (if assigned): name, rating, vehicle model, plate, driverLocation, etc.
+
+====================================================
+YOUR SCOPE IN THIS TASK (DO NOT GO OUTSIDE IT)
+====================================================
+
+You are working ONLY on the SafeGo CUSTOMER web flow:
+
+1) Ride Booking page → `/ride`
+2) Ride Tracking page → `/ride/track/:id`
+3) Shared API client + types for the above
+4) Basic auth wiring just enough for these pages to talk to backend
+
+You must NOT:
+- Implement admin UI here.
+- Implement driver or restaurant panels.
+- Change any backend code.
+- Invent new endpoints.
+
+====================================================
+PART 1 – FULL FRONTEND–BACKEND MAPPING (ANALYSIS)
+====================================================
+
+Step 1: Scan the current frontend code (HTML Codebase project) and identify:
+
+- Which files implement:
+  - `/ride` booking page (pickup/dropoff, “Get prices”, list of vehicles, “Confirm SafeGo X”).
+  - `/ride/track/:id` tracking page (driver card, map, polyline).
+  - Map components (Google Map wrapper, markers, polylines).
+  - Any existing `rideApi`, `mapApi`, `fareApi`, or mock data.
+
+Step 2: For EACH of these pages/components, write down:
+
+- Current data source (mock, hardcoded, or already calling something).
+- Which backend endpoint it SHOULD call (from the context above).
+- Which request fields it needs to send.
+- Which response fields it needs to read.
+
+Deliverable for Part 1:
+- A clear mapping table:
+  - Page / Component
+  - Backend endpoint
+  - Request payload
+  - Response fields actually used in UI
+  - Missing or currently-hardcoded fields
+
+Do NOT write code yet. Only produce the mapping.
+
+====================================================
+PART 2 – DESIGN THE INTEGRATION (NO CODE YET)
+====================================================
+
+Based on the mapping, design how the frontend SHOULD work:
+
+A) Shared apiClient
+- One central module (e.g. `client/src/lib/apiClient.ts`) that:
+  - Uses `VITE_API_BASE_URL` as base URL.
+  - Sends `credentials: 'include'` or `withCredentials: true`.
+  - On 401, can be extended later to call `/api/auth/refresh` (you can leave TODO comments).
+
+B) /ride Booking Flow (Customer)
+
+Target behaviour:
+1. User enters pickup & dropoff as addresses.
+2. Frontend:
+   - Calls `/api/maps/directions` or `/api/maps/route` to get distance, duration, and `routePolyline`.
+   - Calls `/api/fares/calculate-all` with route data to get a list of available ride types + prices.
+3. UI shows SafeGo vehicles (X, XL, Comfort, etc.) with:
+   - Name
+   - ETA (if backend provides or can be approximated from durationMinutes)
+   - Price from backend (serviceFare per type)
+   - Correct currency symbol using `fareCurrency`.
+4. When customer clicks “Confirm SafeGo X”:
+   - Call POST `/api/rides` with:
+     - pickupAddress, pickupLat, pickupLng
+     - dropoffAddress, dropoffLat, dropoffLng
+     - distanceMiles, durationMinutes
+     - routePolyline
+     - selected vehicle / ride type id
+     - countryCode (if not inferred server-side)
+     - paymentMethod (e.g. "cash")
+   - On success, redirect to `/ride/track/:id` using the returned ride id.
+
+C) /ride/track/:id Ride Tracking Flow
+
+Target behaviour:
+1. On mount, read rideId from URL.
+2. Call GET `/api/rides/:id` to get:
+   - status
+   - pickup/dropoff coordinates + addresses
+   - routePolyline
+   - driver info
+   - total fare + currency.
+3. Call GET `/api/rides/:id/live-tracking` periodically (e.g. every 4–5 seconds) to update:
+   - driver’s current location.
+   - ETA.
+   - possibly updated status.
+4. Map must:
+   - Center and fit bounds using pickup, dropoff, and driver position when available.
+   - Draw the routePolyline from backend when present.
+5. UI status banner:
+   - Map backend status → human text:
+     - requested          → “Looking for a driver…”
+     - searching_driver   → “Looking for a driver…”
+     - accepted           → “Driver assigned”
+     - driver_arriving    → “Driver is arriving”
+     - in_progress        → “Trip in progress”
+     - completed          → “Trip completed”
+     - cancelled_*        → “Ride cancelled”
+   - DO NOT invent new status values.
+
+D) Currency and Region Handling
+
+- Use `fareCurrency` from ride object to select:
+  - Symbol (৳ vs $).
+  - Decimal places (0 vs 2).
+- Do NOT hardcode BD/US logic by checking the frontend’s region; always trust backend.
+- If `fareCurrency` is missing, temporarily fall back to:
+  - `$` and 2 decimals, but also log a warning (for debugging).
+
+E) Error and empty-state handling
+
+- If `/api/maps/directions` fails → show error message near “Get prices”.
+- If `/api/fares/calculate-all` returns no ride types → show “No vehicles available”.
+- If `/api/rides/:id` returns 404 → show “Ride not found” with a safe fallback link back to `/ride`.
+- If `routePolyline` is null → show pickup and dropoff markers only.
+
+Deliverable for Part 2:
+- A written integration design:
+  - apiClient responsibilities
+  - Data flow for /ride
+  - Data flow for /ride/track/:id
+  - Exact backend fields each UI section depends on
+  - How to handle null / missing fields
+
+====================================================
+PART 3 – FILE-BY-FILE IMPLEMENTATION PLAN
+====================================================
+
+Now, WITHOUT writing the actual code, produce a concrete TODO list:
+
+1. Shared client
+   - [ ] Create or update `lib/apiClient.ts`.
+   - [ ] Define TypeScript types for: Ride, RideStatus, FareEstimateResult, LiveTrackingResponse.
+
+2. Ride booking page (`/ride`)
+   - [ ] Replace any mock ride data or local fare calculations with:
+         - `POST /api/maps/directions`
+         - `POST /api/fares/calculate-all`
+   - [ ] Map backend ride types → UI cards (SafeGo X, XL, etc.).
+   - [ ] Use `fareCurrency` to format prices.
+   - [ ] On confirm, call `POST /api/rides` and redirect.
+
+3. Ride tracking page (`/ride/track/:id`)
+   - [ ] Replace any static demo data with `GET /api/rides/:id`.
+   - [ ] Add polling to `GET /api/rides/:id/live-tracking`.
+   - [ ] Feed pickup/dropoff + polyline into MapComponent.
+   - [ ] Feed status into the banner (using status-mapping table).
+   - [ ] Feed driver info into the driver card.
+
+4. MapComponent
+   - [ ] Accept props: pickup, dropoff, driverLocation, routePolyline.
+   - [ ] Decode polyline from backend and fit bounds to all points.
+   - [ ] Remove any “default US center” or “BD fallback center” behaviour when real data exists.
+   - [ ] Only use fallback center when NO coordinates AND NO polyline are provided.
+
+5. Minimal Auth hooks (for now)
+   - [ ] Make sure apiClient sends cookies.
+   - [ ] Use `/api/auth/me` on app init to get current user and their `countryCode` (if needed for UI hints).
+   - [ ] If unauthenticated response comes back where auth is required, define a TODO (future work) to redirect to Login page.
+
+Deliverable for Part 3:
+- A numbered, file-by-file checklist like above, adapted to the actual file names in this project.
+
+====================================================
+OUTPUT FORMAT
+====================================================
+
+Your final answer MUST be pure analysis and planning, no code:
+
+1. Frontend–Backend Mapping Table
+2. Identified Frontend Problems vs Backend Reality
+3. Integration Design (Booking + Tracking + Map + Currency)
+4. Detailed File-By-File Implementation Plan
+5. Any open questions / assumptions you had to make
+
+Do NOT start coding or editing files yet. I will review your plan first, then give you a separate “implementation” prompt.

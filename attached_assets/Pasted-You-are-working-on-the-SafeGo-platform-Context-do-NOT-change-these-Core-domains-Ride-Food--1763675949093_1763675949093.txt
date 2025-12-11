@@ -1,0 +1,93 @@
+You are working on the SafeGo platform.
+
+Context (do NOT change these):
+- Core domains: Ride, Food, Parcel
+- Four roles: Customer, Driver, Restaurant, Admin
+- KYC already implemented for BD + US with proper document flows
+- All 15 admin dashboard cards are now restored and wired:
+  - Core Management (9 cards)
+  - Financial (Wallets, Payouts, Earnings Analytics)
+  - Security (System Monitoring, Security Threat Center)
+  - Support (Support Chat)
+- Security Phases 1–4 (Steps 42–45) are COMPLETED and must NOT be broken:
+  1) Real-Time Threat Monitoring
+  2) Fraud Detection Engine
+  3) DevOps Security
+  4) Automated Incident Response
+- RBAC is active with permissions like VIEW_DASHBOARD, VIEW_WALLETS, MANAGE_PAYOUTS, VIEW_EARNINGS_DASHBOARD, VIEW_SUPPORT_CONVERSATIONS, etc.
+- JWT_SECRET is configured, authentication and /api/auth/me capabilities endpoint are working.
+- Admin dashboard home is at /admin and already shows the financial & security cards.
+
+Goal (Step 46): Build the **Admin Financial Suite** pages behind:
+- /admin/wallets
+- /admin/payouts
+- /admin/earnings
+
+High-level requirements:
+1. Wallets Management (/admin/wallets)
+   - Show aggregated balances per driver and restaurant.
+   - Columns: entity type (Driver/Restaurant), name, country/region, available balance, pending balance, last payout date, status (Active, Suspended, Flagged).
+   - Filters: by role (Driver/Restaurant), country, status, minimum balance.
+   - Actions (with confirmation modal):
+     - View wallet history (transactions list)
+     - Manually adjust balance (admin note required)
+   - Security:
+     - Route requires VIEW_WALLETS
+     - All wallet changes are logged to the audit system already used in previous security phases.
+     - No PII beyond what is already approved in KYC.
+
+2. Payouts Management (/admin/payouts)
+   - List of payout requests from drivers and restaurants.
+   - States: Pending Review, Approved, Rejected, Processing, Paid, Failed.
+   - Show: request ID, user type, name, amount, method (Bank, Card, Wallet), country, risk score (from fraud engine if available), created at, status.
+   - Actions:
+     - Approve or Reject payout (with SensitiveActionModal and security notes)
+     - View linked KYC and recent activity (click-through or side panel)
+   - Business rules:
+     - Do NOT allow approval if KYC is not verified or account is Suspended.
+     - Show clear error / warning in UI if fraud engine marks this as high risk.
+   - Security:
+     - Route requires MANAGE_PAYOUTS
+     - All status changes must generate audit log entries.
+     - Use existing security components where possible (SecurityStatusBadge, SensitiveActionModal, SecurityNotesPanel).
+
+3. Earnings Analytics Dashboard (/admin/earnings)
+   - Overview cards:
+     - Today’s earnings (platform commission total)
+     - Last 7 days earnings
+     - This month vs last month (percentage change)
+   - Charts:
+     - Earnings over time (per day) with breakdown for Rides, Food, Parcel.
+     - Top 5 cities / regions by earnings.
+   - Tables:
+     - Top 10 drivers by completed earnings.
+     - Top 10 restaurants by completed earnings.
+   - Filters:
+     - Date range
+     - Country / city
+     - Service type (Ride / Food / Parcel)
+   - Security:
+     - Route requires VIEW_EARNINGS_DASHBOARD
+     - All analytics must be read-only and derived from existing completed orders.
+     - No raw card or bank details displayed here.
+
+Global constraints:
+- DO NOT modify or weaken any of the existing Security Phases (42–45).
+- DO NOT change RBAC roles or permissions names except to plug into these three pages.
+- Use the existing design system and layout patterns already used in the admin dashboard.
+- Keep TypeScript strict and fix any type errors you introduce.
+- Update replit.md with:
+  - Step 46: Admin Financial Suite – implementation summary
+  - Routes, permissions, and a short description of each page.
+
+Step-by-step plan:
+1) Inspect current routes and pages for /admin/wallets, /admin/payouts, and /admin/earnings (if they exist).
+2) Design or update the React pages (or components) for each route following the requirements above.
+3) Wire them to the backend endpoints (reuse existing models & services; only add fields if needed).
+4) Enforce RBAC permissions on both frontend and backend.
+5) Add necessary audit-logging calls for payout and wallet changes.
+6) Run the test suite / type-checker and fix any issues.
+7) Update replit.md with Step 46 documentation.
+8) Provide a clear summary of what was implemented and any TODOs for later phases.
+
+Now start implementing Step 46 following this plan. Do not start any Step 47+ work until I explicitly ask.

@@ -1,0 +1,116 @@
+You are working on the SafeGo production web project on ReplitBackend.
+Your goal in this task: 
+Redesign and harden the root landing page (/) so that it looks as professional as Uber’s marketing site AND strictly follows SafeGo’s security rules.
+
+IMPORTANT GLOBAL SAFEG0 ARCHITECTURE RULES
+1) There is ONE shared SafeGo backend for pricing, GPS, ride status, and region rules. The landing page (/) and the /ride page are ONLY frontend clients that call backend APIs. They may NOT implement their own pricing or status logic.
+2) The root domain https://safegoglobal.com must point to this ReplitBackend project. Any old “HTML Codebase” project must NOT be used for the root domain.
+3) Auth tokens are handled by the backend via Authorization: Bearer headers and/or secure HttpOnly cookies. Do NOT store secrets or tokens in localStorage or hard-coded in the frontend.
+
+DESIGN GOAL (MATCH ORIGINAL safegoglobal.com DESIGN QUALITY)
+Keep the current SafeGo marketing layout that the user already likes, but refine it to a truly professional, Uber-level landing page:
+
+1) HEADER
+   - Left: SafeGo logo.
+   - Center/left: nav links: Ride, Drive, Business, About.
+   - Left of nav or centered: region switcher (Bangladesh, United States, Global).
+   - Right: “Log in” text link + “Sign up” primary button.
+   - Sticky header on scroll with subtle shadow, no flashy animations.
+
+2) HERO SECTION
+   - Left side:
+     - H1: “Move, eat, and deliver with SafeGo”
+     - Subtext: “One platform for rides, food delivery, and parcel delivery — launching first in Bangladesh.”
+     - Two CTAs:
+       - Primary button: “Explore services” (scrolls to Services section).
+       - Secondary text button: “Become a partner” (scrolls to Partner section).
+   - Right side:
+     - Card titled “SafeGo Services – All-in-one platform”.
+     - Inside: list of services with icons (Rides, Food, Parcel, Shops).
+     - Soft rounded card with subtle shadow and light gradient, similar to the user’s original safegoglobal.com design.
+   - The whole hero should look balanced, with good typography and spacing on desktop and mobile.
+
+3) SERVICES SECTION
+   - Section title: “SafeGo Services”.
+   - Subtext: “Everything you need, all in one app. Choose a service to get started.”
+   - Row of 4–5 cards:
+     - Rides, Food delivery, Parcel delivery, Local shops, Tickets & Travel.
+     - Each card: icon, title, one-line description, soft hover effect (slight shadow and scale).
+
+4) PARTNER SECTION
+   - Title: “Become a Partner”.
+   - Two large cards:
+     - “For Drivers & Couriers” with bullets (flexible hours, weekly payouts, clear commissions, bonuses).
+     - “For Restaurants & Shops” with bullets (access to thousands of customers, order dashboard, analytics, marketing support).
+   - Primary buttons:
+     - “Start driving” → /drive.
+     - “Register your business” → /business or /restaurant/signup as appropriate.
+
+5) HOW SAFEG0 WORKS SECTION
+   - Title: “How SafeGo Works”.
+   - Three columns: Rides, Food Delivery, Parcel Delivery.
+   - Each column contains 5 simple numbered steps (1..5), explaining the flow.
+   - Rides column must match the real app flow: enter pickup/dropoff, see price estimate, confirm ride, track driver, rate & tip.
+
+6) SAFETY & SECURITY SECTION
+   - Title: “Safety & Security”.
+   - Subtext: “Your safety is our top priority at every step.”
+   - Three cards:
+     - “Your safety comes first” (for customers: verified drivers, GPS tracking, SOS).
+     - “Safety while you work” (for drivers & couriers: verified rider profiles, navigation, support, insurance).
+     - “Protecting your data” (for cybersecurity: end-to-end encryption in transit, no data sharing without consent, regular security audits).
+   - This section must visually emphasise that SafeGo is “Cybersecurity First”.
+
+7) FAQ SECTION
+   - Title: “Frequently Asked Questions”.
+   - Use an accordion component with these questions at minimum:
+     - How do I request a SafeGo ride?
+     - When is SafeGo launching in Bangladesh?
+     - How do I become a driver or courier?
+     - What payment methods are accepted?
+     - How is my safety ensured?
+     - Can I schedule rides in advance?
+
+8) FINAL CTA + FOOTER
+   - Blue CTA block:
+     - Title: “Ready to move with SafeGo?”
+     - Subtitle: Short sentence about trusting SafeGo for daily transportation and delivery.
+     - Two buttons: “Download the app” (placeholder link) and “Become a partner” (scrolls to Partner section).
+   - Footer:
+     - Columns: Company (About us, Careers, Press, Blog), Services (Ride, Food, Parcel, Shops), Partners (Drive with us, Deliver with us, Restaurant partners, Shop partners), Support (FAQ, Safety, Contact, Help Center).
+     - Bottom line: “© 2025 SafeGo Global. All rights reserved.” and links to Terms of Service, Privacy Policy, Cookie Policy.
+
+SECURITY REQUIREMENTS FOR THE LANDING PAGE (MUST IMPLEMENT OR VERIFY)
+1) The app must be served only over HTTPS. Ensure the production deployment for safegoglobal.com enforces HTTPS and supports HSTS (Strict-Transport-Security header).
+2) Do NOT expose any API keys or secrets in the frontend code. All secrets must stay in environment variables on the backend.
+3) Implement a strict Content Security Policy (CSP) in the backend responses for the landing page. Start with:
+   - default-src 'self';
+   - script-src 'self' https://trusted-analytics-hosts... (only if needed, otherwise keep 'self' only);
+   - img-src 'self' data:;
+   - style-src 'self' 'unsafe-inline';
+   - font-src 'self' data:;
+   - frame-ancestors 'none';
+4) Set security headers from the backend:
+   - X-Frame-Options: DENY
+   - X-Content-Type-Options: nosniff
+   - Referrer-Policy: strict-origin-when-cross-origin
+   - Permissions-Policy: disable camera/mic/etc unless explicitly needed.
+5) If any auth cookie is used on the landing page domain, it must be:
+   - HttpOnly
+   - Secure
+   - SameSite=Lax or Strict
+6) CORS must allow only trusted origins like https://safegoglobal.com (and official subdomains), not “*”.
+7) Do not run any high-risk actions from the landing page (no direct mutations, no dangerous debug endpoints). Only low-risk read-only APIs (e.g. geolocation suggestions, city list) may be called.
+8) Avoid third-party scripts unless they are absolutely necessary. If you add a privacy-friendly analytics tool, integrate it in a way that still passes the CSP and privacy expectations.
+9) Clean up any leftover references to the old HTML Codebase project so that users never hit a 404 due to mixed deployments.
+
+DELIVERABLES
+- Update the React/Vite landing page component(s) under src/pages or src/components so that the root route (/) matches the above layout and is fully responsive for desktop and mobile.
+- Ensure all CTAs point to the correct internal routes (/ride, /drive, /business, /food, /parcel, /shops, /tickets, /driver/signup, /restaurant/signup).
+- Verify the security headers and CSP from the backend configuration or middleware.
+- Do NOT change any core backend business logic for pricing or ride status.
+
+When you are done, show me:
+1) A summary of the files you changed.
+2) A short bullet list of the security settings you verified or added.
+3) A brief explanation of how the new landing page design matches the original safegoglobal.com style but with professional, Uber-like polish.

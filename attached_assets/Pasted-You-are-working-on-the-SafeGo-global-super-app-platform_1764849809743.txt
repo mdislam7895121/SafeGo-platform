@@ -1,0 +1,445 @@
+You are working on the SafeGo global super-app platform.
+
+====================================================
+0. SAFEGO MASTER RULES (ALWAYS APPLY, DO NOT BREAK)
+====================================================
+
+0.1 Core roles (must always exist, never merge or mix access)
+- customer
+- driver
+- restaurant (merchant)
+- admin
+
+Each role MUST have its own:
+- signup / onboarding path
+- KYC rules (with country branching)
+- dashboard / UI scope
+- permissions
+- status flows
+
+Do NOT mix access between roles. Do NOT let one role see another role’s sensitive data.
+
+0.2 Global services (every change must respect all 3)
+SafeGo always supports, at minimum:
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+
+Any new logic (roles, permissions, KYC, commission, dashboards, etc.) must work consistently across:
+- rides
+- food_orders
+- deliveries
+
+0.3 Country-specific KYC (MUST KEEP STRICT BRANCHING)
+
+Bangladesh (BD) mandatory fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front and back images)
+- emergency contact details
+- verification_status + is_verified
+
+United States (US) mandatory fields:
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified
+
+You MUST preserve and enforce these rules. You may extend them only in a backward-compatible way.
+
+0.4 Admin panel – mandatory capabilities (must not be broken)
+Admin must be able to:
+- verify customers
+- verify drivers
+- verify restaurants
+- approve/reject KYC (with rejection_reason)
+- see verification_status and is_verified
+- update pricing, fees, commissions
+- block/unblock any user (customer/driver/restaurant/shop/ticket/rental)
+- manage payouts
+- view driver negative balance
+- view restaurant negative balance
+
+Do NOT remove or weaken any of this. Only extend safely.
+
+0.5 Core collections (must always exist and remain consistent)
+You MUST keep and use these collections:
+
+1) rides
+2) food_orders
+3) deliveries
+
+Each must always include:
+- identity fields (customer_id, driver_id, restaurant_id, etc.)
+- addresses + geolocation
+- fees + commission fields
+- payment details
+- timestamps
+- full status flow
+- rating and feedback
+
+Do NOT rename or drop existing fields. Only add new ones.
+
+0.6 Commission & payout rules (MUST ALWAYS APPLY)
+
+1) If customer pays CASH for a ride:
+   - Driver receives full cash.
+   - SafeGo commission becomes negative balance in driver_wallet_balance.
+   - Driver must settle weekly (or per current config).
+
+2) If food order is CASH:
+   - Restaurant receives all cash.
+   - Commission becomes negative balance in restaurant_wallet.
+
+3) If payment is ONLINE:
+   - SafeGo keeps commission automatically (no negative balance).
+
+4) Admin can settle balances and mark them paid.
+   - Never remove admin manual settlement tools.
+
+All new code MUST respect these rules and must not silently break any payout logic.
+
+0.7 Security rules (no shortcuts)
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer NID or sensitive info.
+- Restaurant cannot view other restaurants’ data.
+- Partners cannot see internal admin data.
+- ONLY admin can change pricing, commission, verification, and blocking.
+- Users can update only their own profile (within allowed fields).
+- All sensitive admin routes MUST be authenticated and authorization-checked.
+
+0.8 Status flow (do not break these enums / flows)
+
+Ride:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+Food:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+Parcel:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+You may add richer internal sub-states, but MUST NOT break or remove these main flows.
+
+0.9 Onboarding flows (strict rule)
+Each user type must have multi-step onboarding:
+- Basic info
+- Address
+- ID/KYC upload (country-specific)
+- Emergency contact
+- verification_status = "pending"
+- Block access until approved by admin
+
+Company rule (must not break):
+- Simple, secure customer-only signup.
+- All other roles (driver, restaurant, shop partner, ticket operator, rentals partner, admins) are created later through separate onboarding flows after login.
+- Do NOT change core signup to directly create partners.
+
+0.10 Notifications (must keep or extend)
+- New ride alert for driver
+- Order updates
+- Parcel updates
+- Verification approval/rejection
+- Important admin notifications
+
+0.11 Backward-compatibility constraints
+- Do NOT remove or rename existing DB fields, APIs, or front-end routes.
+- Only ADD fields/endpoints/components in a backward-compatible way.
+- If you’re unsure, prefer additive changes.
+- Do NOT break any existing SafeGo feature.
+
+At the end, you MUST summarize:
+- Which files/modules you changed
+- How you guaranteed no breaking changes
+
+====================================================
+1. TASK: IMPLEMENT ADMIN ROLE & PERMISSION SYSTEM (RBAC v2)
+====================================================
+
+Goal:
+Upgrade the SafeGo admin side to use a clean, explicit Role-Based Access Control (RBAC v2) for all admin functionality, while keeping every existing feature working. After this, all critical admin actions must be controlled by role/permission checks, not scattered ad-hoc conditions.
+
+You MUST:
+- Keep all existing admin behavior working.
+- Only ADD roles, permissions, middleware, and checks.
+- Do NOT break any current admin route, page, or API.
+
+--------------------------------
+1.1 Roles to support (admin side)
+--------------------------------
+
+You must implement at least these admin roles:
+
+- SUPER_ADMIN
+- ADMIN
+- FINANCE_ADMIN
+- SUPPORT_ADMIN
+- COMPLIANCE_ADMIN
+- RISK_ADMIN
+
+Business meaning:
+
+- SUPER_ADMIN
+  - Full access to all admin features (current + future).
+  - Can manage other admin users and their roles.
+  - Can manage global config, feature flags, pricing, commissions.
+
+- ADMIN
+  - General management (non-sensitive).
+  - Can view most admin dashboards (read-only on sensitive data unless explicitly allowed).
+  - Cannot change feature flags, core pricing, or security configs unless explicitly permitted.
+
+- FINANCE_ADMIN
+  - Focused on payouts, commissions, and balances.
+  - Can view and manage:
+    - driver_wallet_balance
+    - restaurant_wallet
+    - negative balances
+    - payout records
+  - Can mark settlements as paid.
+  - Cannot change KYC verification or safety decisions.
+
+- SUPPORT_ADMIN
+  - Can handle:
+    - customer disputes
+    - ride/food/parcel complaint resolution
+    - basic account actions (e.g. temporary lock, reset password token)
+  - Cannot access payment secrets, core configs, or KYC documents.
+
+- COMPLIANCE_ADMIN
+  - Can review and approve/reject KYC for:
+    - customers
+    - drivers
+    - restaurants
+    - shop partners
+    - ticket/rental partners
+  - Has access to:
+    - KYC documents
+    - KYC status
+    - rejection_reason
+  - Cannot modify commissions or advanced system config.
+
+- RISK_ADMIN
+  - Can access Safety & Risk Center:
+    - risk_cases
+    - risk_events
+    - fraud signals
+  - Can block/unblock users from a safety perspective (with logs).
+  - Cannot override finance or payouts.
+
+You may extend roles later, but must implement at least these six now.
+
+--------------------------------
+1.2 Permission model (do NOT hardcode logic everywhere)
+--------------------------------
+
+Implement a centralized permission model:
+
+- A canonical ENUM or constant map of permissions, e.g.:
+
+  - admin.manage_users
+  - admin.view_users
+  - admin.view_kyc
+  - admin.review_kyc
+  - admin.manage_payouts
+  - admin.view_finance
+  - admin.manage_feature_flags
+  - admin.view_feature_flags
+  - admin.view_risk_center
+  - admin.manage_risk_cases
+  - admin.manage_disputes
+  - admin.send_broadcast
+  - admin.manage_configs
+  - admin.view_audit_log
+  - etc.
+
+- Then define a mapping:
+
+  - SUPER_ADMIN → all permissions
+  - ADMIN → safe subset (view dashboards, some operations)
+  - FINANCE_ADMIN → finance & payouts related permissions
+  - SUPPORT_ADMIN → disputes, tickets, customer support tools
+  - COMPLIANCE_ADMIN → KYC view & review permissions
+  - RISK_ADMIN → risk_center view + risk_cases management
+
+This mapping MUST live in one place (e.g. server-side RBAC config file / module), not scattered.
+
+All permission checks should go through a small helper like:
+
+- hasPermission(user, permissionKey)
+- requirePermission(permissionKey) middleware
+
+--------------------------------
+1.3 Backend changes (API & middleware)
+--------------------------------
+
+1) Add or extend admin user model:
+- Admin users must have:
+  - id
+  - email
+  - role (one of the 6 roles)
+  - is_active
+  - last_login_at
+  - created_at / updated_at
+
+Do NOT rename existing fields. If the field name is currently different (like adminRole), map to the new logic in a backwards-compatible way.
+
+2) Authentication:
+- Reuse existing admin authentication (JWT/session).
+- Extend the decoded token / session to include admin role.
+- If role is absent for legacy admins, treat them as SUPER_ADMIN for now (or legacy_admin_role) but log a warning to migrate them later.
+
+3) Authorization middleware:
+- Implement middleware functions:
+  - requireAdminAuth()
+  - requireAdminRole(allowedRoles[])
+  - requirePermission(permissionKey)
+
+Use these on all admin API routes:
+- KYC verify/reject
+- wallet/commission/payout APIs
+- Safety & Risk endpoints
+- Feature Flags endpoints
+- User/block/unblock
+- Config management
+- Broadcast / notifications
+
+Do NOT remove any existing guard conditions; only add new ones in a safe way where missing.
+
+4) Audit log:
+- Any critical admin action MUST log:
+  - admin_id
+  - admin_role
+  - action_type (e.g. "KYC_APPROVE", "USER_BLOCK", "FEATURE_FLAG_UPDATE")
+  - target_type (user, driver, restaurant, config, feature_flag, etc)
+  - target_id
+  - metadata (before/after snapshot when possible)
+  - timestamp
+
+If an audit_log model already exists, extend it. Otherwise, add a new model *without* breaking existing logs.
+
+--------------------------------
+1.4 Frontend admin panel changes (navigation + UI visibility)
+--------------------------------
+
+1) Navigation:
+- Make all admin sidebar items role-aware.
+- Only show menu items if the current admin has permission:
+
+  Examples:
+  - People & KYC:
+    - visible to SUPER_ADMIN, COMPLIANCE_ADMIN, maybe ADMIN (view-only)
+  - Safety & Risk Center:
+    - visible to SUPER_ADMIN, RISK_ADMIN
+  - Feature Flags:
+    - visible to SUPER_ADMIN only (or explicit permission)
+  - Payouts / Finance:
+    - visible to SUPER_ADMIN, FINANCE_ADMIN
+  - Support / Disputes:
+    - visible to SUPER_ADMIN, SUPPORT_ADMIN
+
+2) Button/action visibility:
+- On sensitive pages, hide or disable dangerous actions for roles without permission, for example:
+  - Only COMPLIANCE_ADMIN can actually click "Approve KYC" / "Reject KYC".
+  - Only RISK_ADMIN can permanently block a user for safety reasons.
+  - Only FINANCE_ADMIN can mark payout as paid.
+
+3) Empty/safe defaults:
+- For roles without permission, show:
+  - disabled buttons
+  - a read-only message: “You do not have permission to perform this action.”
+- Never crash the UI if role info is missing; fall back to safest (read-only) behavior.
+
+--------------------------------
+1.5 Security and safety checks
+--------------------------------
+
+- Ensure that:
+  - No customer, driver, restaurant, shop, ticket operator can ever access admin endpoints.
+  - All admin endpoints require:
+    - authentication
+    - role
+    - permission
+
+- Confirm:
+  - Customers cannot see driver documents.
+  - Drivers cannot see customer sensitive data.
+  - Only admins with COMPLIANCE_ADMIN or SUPER_ADMIN can see full KYC documents.
+  - Only FINANCE_ADMIN or SUPER_ADMIN can see sensitive financial details.
+
+- Do NOT weaken any existing checks. If there is some legacy logic, wrap it inside the new RBAC checks.
+
+--------------------------------
+1.6 Backward-compatibility requirements
+--------------------------------
+
+- Do NOT:
+  - rename existing admin routes
+  - remove any current admin pages
+  - change response shapes in a breaking way
+
+- If you introduce new APIs for RBAC, ensure:
+  - they are additive
+  - they do not break existing front-end consumers
+
+- If a route previously allowed any “admin” to do everything, now:
+  - SUPER_ADMIN keeps full rights
+  - other roles are restricted
+  - but the route must still exist and respond correctly for authorized roles
+
+--------------------------------
+1.7 Tests and verification
+--------------------------------
+
+You MUST add or update tests to check:
+
+1) For each admin role:
+   - Can they log in?
+   - What pages can they see?
+   - What actions can they perform?
+
+2) Critical paths:
+   - KYC approval/rejection is blocked for non-COMPLIANCE roles.
+   - Feature flag updates are blocked for non-SUPER_ADMIN.
+   - Payout settlement is blocked for non-FINANCE_ADMIN.
+   - Safety & Risk Center write actions blocked for non-RISK_ADMIN.
+
+3) Negative tests:
+   - A SUPPORT_ADMIN cannot change commission values.
+   - A FINANCE_ADMIN cannot approve KYC documents.
+   - A COMPLIANCE_ADMIN cannot edit feature flags.
+
+4) No breaking changes:
+   - Existing admin flows continue to work for a SUPER_ADMIN.
+   - No TypeScript / lint / build errors.
+
+--------------------------------
+1.8 Final required summary (DO NOT SKIP)
+--------------------------------
+
+After implementation, you MUST output a clear summary including:
+
+1) Files and modules changed:
+   - backend (models, middleware, routes)
+   - frontend (admin navigation, layouts, pages, hooks)
+   - any shared RBAC config
+
+2) How you guaranteed backward-compatibility:
+   - confirm no existing APIs were removed or renamed
+   - confirm all existing admin features still work as SUPER_ADMIN
+
+3) New behavior:
+   - which role can access what (a simple matrix)
+   - where permission checks are enforced
+   - how audit logging works for critical actions
+
+4) Any TODOs or safe future extensions:
+   - Optional role combinations
+   - Future granular permissions
+   - Migration steps for existing admin accounts (if needed)

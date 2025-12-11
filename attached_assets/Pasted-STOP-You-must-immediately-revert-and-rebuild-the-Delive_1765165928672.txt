@@ -1,0 +1,86 @@
+STOP. You must immediately revert and rebuild the Delivery Driver onboarding flow.  
+Your current implementation violates SafeGo Master Rules by using a simplified 3-step onboarding.  
+This is NOT allowed.
+
+REQUIREMENT:  
+Rebuild the FULL 7-STEP DRIVER ONBOARDING WIZARD exactly as required below.  
+This is mandatory and non-negotiable.
+
+=====================================================
+MANDATORY 7-STEP ONBOARDING WIZARD  
+(Apply country-specific BD/US KYC rules)
+
+Step 1 — Select Country (BD or US)
+Step 2 — Personal Info (dynamic by country)
+Step 3 — Address Info
+Step 4 — Government ID Upload
+Step 5 — Delivery Method (US only: car, bike, walking)
+Step 6 — Vehicle Documents (car only; bike/walking skip)
+Step 7 — Final Review → Submit → verification_status = "pending"
+
+=====================================================
+YOU MUST REMOVE your simplified onboarding.  
+YOU MUST FOLLOW the official SafeGo required fields:
+
+BANGLADESH DRIVER KYC:
+- full_name
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- emergency_contact_name
+- emergency_contact_phone
+- nid_number
+- nid_front_image
+- nid_back_image
+- profile_photo
+- driving_license_number
+- driving_license_front
+- driving_license_back
+- vehicle_registration
+- insurance_document (optional)
+- verification_status
+- is_verified
+
+UNITED STATES DRIVER KYC:
+- full_name
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- government_id_front_image
+- government_id_back_image
+- ssn_last4
+- background_check_consent
+- profile_photo
+- delivery_method (car | bike | walking)
+
+If delivery_method = car:
+- driver_license_front
+- driver_license_back
+- vehicle_registration
+- insurance_card
+
+If delivery_method = bike OR walking:
+- government_id_front_image
+- government_id_back_image
+- profile_photo
+
+=====================================================
+MANDATORY RULE:
+You must NOT simplify, remove, or minimize ANY step.  
+You must implement SafeGo Master Rules EXACTLY.
+
+After implementing:
+- Show full UI flow
+- Show API endpoints
+- Show validation schema
+- Show database changes (ADD ONLY, never modify existing)
+- Show admin panel verification module integration
+
+Everything must be publish-ready and fully aligned with SafeGo rules.
+
+DO NOT continue with shortcuts.  
+Rebuild the full correct system now.

@@ -1,0 +1,236 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS APPLY)
+
+1. Roles (4):
+   - Customer: books rides/food/parcel; manages profile, saved locations, and payment methods.
+   - Driver: accepts rides/deliveries; manages vehicles, documents, and payouts.
+   - Restaurant: manages menu, orders, and payouts (SafeGo Eats).
+   - Admin: full back-office (all users, KYC, payouts, disputes, configs, audit logs).
+
+2. Global products:
+   - Rides (Uber-like).
+   - Food delivery (SafeGo Eats).
+   - Parcel / Courier.
+   One shared super-app codebase; features are enabled per country/phase.
+
+3. Country/KYC (US now, BD later):
+   - US customers: email + phone verified.
+   - US drivers: license, SSN/ITIN, background check, vehicle docs.
+   - Restaurants: legal entity + tax info.
+   Code must stay extensible for BD later without mixing rules.
+
+4. Data models (must NOT be broken):
+   - Core entities: Users, Customers, Drivers, Restaurants, Rides, Deliveries, FoodOrders, Vehicles, PaymentMethods, PayoutAccounts, Notifications, AuditLogs, Config.
+   - You may extend schemas safely, but do not break existing migrations or queries.
+
+5. Admin panel:
+   - Admin can inspect and, where appropriate, edit: users, profiles, documents, vehicles, payouts, and risk flags.
+   - Any new ride/pricing fields should remain observable from admin tools.
+
+6. Commissions & payouts:
+   - Platform keeps a commission per ride/order.
+   - Drivers/restaurants receive net payouts via payout provider (never store raw bank/card details).
+   - New pricing logic must not expose commission internals on the customer UI.
+
+7. Status flows (do not change semantics):
+   - Rides: REQUESTED → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED / CANCELLED.
+   - Food: PLACED → ACCEPTED → PREPARING → PICKED_UP → DELIVERED / CANCELLED.
+   - Parcel: CREATED → PICKUP_CONFIRMED → IN_TRANSIT → DELIVERED / CANCELLED.
+
+8. Onboarding & documents:
+   - Drivers/restaurants: photo, IDs, licenses, insurance, payouts, background check status.
+   - Customers: low friction; only essential profile and payment info.
+
+9. Security:
+   - Auth required for any ride booking, pricing, profile, or payment endpoints.
+   - Strong access control: customers only see/update their own rides & payments.
+   - Never log secrets, card numbers, CVV, or SSN. Only store masked card data and provider tokens.
+
+10. Privacy:
+    - Show masked payment details only (e.g. “Card •••• 4242”).
+    - No sensitive data in logs, URLs, or analytics.
+
+11. Notifications:
+    - Changing core account info (phone/email/payment) should be hook-ready for email/SMS, even if only stubbed.
+
+12. Environment:
+    - Replit dev/staging; test-only behavior for billing.
+    - Keep the existing Maps + autocomplete + ride booking flow working.
+
+13. Frontend:
+    - React + TypeScript; reuse existing components/layout/hooks for forms, requests, and layout.
+    - Mobile-first – must look good on iPhone-sized viewport.
+
+14. Backend:
+    - Node/TypeScript; use the existing routing/service structure (e.g., `server/routes/*`, `server/services/*`, `client/src/lib/*`).
+
+15. Our current focus:
+    - Customer “Plan your ride” screen:
+      - It currently shows an estimated fare, distance in km, and duration only in minutes (e.g. “326 min”).
+    - We need:
+      - Better ETA formatting (hours + minutes).
+      - Traffic-aware pricing so we don’t undercharge in heavy traffic.
+
+--------------------------------------------------
+TASK: IMPROVE ETA DISPLAY AND ADD TRAFFIC-AWARE PRICING
+--------------------------------------------------
+
+Goal
+- On the customer “Plan your ride” screen, change the displayed ride duration from raw minutes to a human-readable “X h Y min” format.
+- Update the fare calculation so it uses a traffic-aware duration, not just a naive duration, by applying a time-of-day-based traffic multiplier.
+- Keep all existing working functionality (maps, route, price card, booking).
+
+1. Locate current ETA & price rendering
+   - Find the React component that renders the “Plan your ride” screen with:
+     - Map
+     - Origin & destination inputs
+     - Price summary card (Estimated fare, distance in km, and duration in minutes).
+   - It is likely under something like:
+     - `client/src/pages/customer/ride-plan*`
+     - or a shared component like `client/src/components/rides/RideEstimateCard.tsx`.
+   - Identify:
+     - The prop or state that represents `durationMinutes` and `distanceKm`.
+     - Where the price is calculated (often via a `pricing` helper or `useRidePrice` hook).
+
+2. Implement a duration formatting helper
+   - Create a small utility function, for example in a shared util file:
+     - `client/src/lib/formatters.ts` or `client/src/lib/time.ts`.
+   - Implement:
+
+     ```ts
+     export function formatDurationMinutes(totalMinutes: number): string {
+       if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
+         return '';
+       }
+       const minutes = Math.round(totalMinutes);
+       const hours = Math.floor(minutes / 60);
+       const rest = minutes % 60;
+
+       if (hours <= 0) {
+         return `${rest} min`;
+       }
+       if (rest === 0) {
+         return `${hours} h`;
+       }
+       return `${hours} h ${rest} min`;
+     }
+     ```
+
+   - Replace the raw `XXX min` display on the Plan-your-ride summary card with `formatDurationMinutes(durationMinutesToDisplay)`.
+
+3. Add traffic-aware duration logic
+   - Find where the route duration is currently computed, e.g. a function/service like:
+     - `getRouteEstimate`, `calculateRoute`, or similar, possibly in:
+       - `client/src/lib/locationService.ts`
+       - `server/services/routeService.ts`
+   - Keep the base “no-traffic” duration from the routing service as `baseDurationMinutes`.
+
+   - Introduce a helper to compute a **traffic multiplier** based on local time and maybe simple heuristics:
+
+     ```ts
+     export function getTrafficMultiplier(date: Date): number {
+       const hour = date.getHours();
+       const day = date.getDay(); // 0 = Sunday
+
+       const isWeekend = day === 0 || day === 6;
+
+       // Peak hours on weekdays: 7–10am, 4–7pm
+       const isMorningPeak = hour >= 7 && hour < 10;
+       const isEveningPeak = hour >= 16 && hour < 19;
+
+       if (!isWeekend && (isMorningPeak || isEveningPeak)) {
+         return 1.30; // heavy traffic
+       }
+
+       // Moderate traffic during daytime
+       if (hour >= 10 && hour < 22) {
+         return 1.15;
+       }
+
+       // Night / very early morning
+       return 1.0;
+     }
+     ```
+
+   - Compute a **traffic-aware duration**:
+
+     ```ts
+     const baseDurationMinutes = routeResult.durationMinutes;
+     const multiplier = getTrafficMultiplier(new Date());
+     const durationWithTrafficMinutes = baseDurationMinutes * multiplier;
+     ```
+
+   - Use `durationWithTrafficMinutes` as:
+     - The duration passed to the pricing engine.
+     - The value displayed in the “Estimated fare” card (through `formatDurationMinutes`).
+
+   - Keep the distance in km as-is.
+
+4. Update the pricing calculation to use traffic duration
+   - Find the pricing logic, e.g. in:
+     - `server/services/pricingService.ts`
+     - or `client/src/lib/pricing.ts`.
+   - Today, pricing is likely something like:
+
+     ```ts
+     const fare =
+       baseFare +
+       perKmRate * distanceKm +
+       perMinuteRate * baseDurationMinutes;
+     ```
+
+   - Replace `baseDurationMinutes` with `durationWithTrafficMinutes`:
+
+     ```ts
+     const fare =
+       baseFare +
+       perKmRate * distanceKm +
+       perMinuteRate * durationWithTrafficMinutes;
+     ```
+
+   - Keep all monetary rounding the same (e.g., round to 2 decimals, proper currency).
+
+   - Optionally, store both values on the ride estimate object:
+     - `baseDurationMinutes`
+     - `durationWithTrafficMinutes`
+     so that admin and debug logs can see both, but only the traffic-aware value is used for pricing.
+
+5. UI tweaks on the Plan-your-ride screen
+   - In the price summary card:
+     - Replace `326 min` style text with the formatted output, e.g. `5 h 26 min`.
+     - Keep distance (“162.6 km”) visible as it is.
+   - Optionally, add a short label so the user knows it considers traffic, for example:
+     - “~5 h 26 min with traffic”
+   - Make sure this text is friendly on mobile (no overflow or wrapping issues).
+
+6. Security and performance
+   - All logic remains in existing frontend/backend files; do not introduce new external APIs for traffic.
+   - Do NOT expose internal multipliers or cost breakdowns in API responses to the client; only return what’s needed to render the UI (fare, distance, ETA).
+   - No secrets, keys, or tokens should be logged.
+
+7. Testing checklist (must actually run these flows)
+   - Scenario 1: ETA formatting
+     - Choose a route with a long duration (e.g., current example around 162 km).
+     - Verify the summary card shows something like “5 h 26 min” instead of “326 min”.
+     - Try a short route (< 60 minutes) and verify it shows only minutes, e.g., “12 min”.
+
+   - Scenario 2: Traffic multiplier effect
+     - Temporarily simulate different times of day by:
+       - Either mocking `new Date()` in the helper, or
+       - Adding a simple dev toggle/flag in code to test morning peak vs night.
+     - Confirm that during “peak hours” the computed `durationWithTrafficMinutes` is higher than the base duration and leads to a higher fare.
+     - Confirm pricing stays reasonable for night/off-peak (multiplier 1.0).
+
+   - Scenario 3: Regression checks
+     - Confirm the route still renders on the map correctly.
+     - Confirm the origin/destination inputs and Google Places autocomplete still work.
+     - Confirm requesting a ride still works with the new pricing data.
+     - Confirm no type errors or TS build errors were introduced.
+
+8. Report back
+   - List the files you created/modified (components, utils, pricing service).
+   - Briefly describe:
+     - The previous behavior (duration only in minutes, no traffic factor).
+     - The new behavior (formatted ETA + traffic-aware pricing).
+   - Confirm that:
+     - ETA and fare now respect the traffic multiplier.
+     - No existing working features were broken.

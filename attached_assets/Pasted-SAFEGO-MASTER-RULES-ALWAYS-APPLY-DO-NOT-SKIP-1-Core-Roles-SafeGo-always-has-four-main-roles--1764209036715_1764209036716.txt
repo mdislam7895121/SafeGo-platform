@@ -1,0 +1,256 @@
+SAFEGO MASTER RULES (ALWAYS APPLY – DO NOT SKIP)
+
+1. Core Roles
+- SafeGo always has four main roles:
+  1) Customer (rider / eater / parcel sender & receiver)
+  2) Driver (ride / delivery / parcel)
+  3) Restaurant / Merchant (food + other stores later)
+  4) Admin (platform owner + ops team)
+- Every feature must be clearly scoped to one or more of these roles.
+- Do not break existing flows for any role when implementing new features.
+
+2. Global App Domains
+- The platform supports three parallel domains that share accounts, KYC, wallet, payouts and notifications:
+  - Ride-hailing (customer ↔ driver)
+  - Food delivery (customer ↔ restaurant ↔ driver)
+  - Parcel / package delivery (sender ↔ driver ↔ receiver)
+- Any layout, navigation, or shared header components must be reusable across these domains where possible.
+
+3. KYC & Compliance (Country-Aware)
+- KYC rules differ by country but share a common base:
+  - Base identity: full legal name, DOB, phone, email, address.
+  - Government ID and selfie match for drivers and merchants.
+- USA specifics (must already be respected by driver flows):
+  - Drivers: DMV license, NY TLC license for New York, SSN (masked), background check, vehicle documents, insurance.
+  - Restaurants: business name, EIN or SSN, business address, owner identity, bank details.
+- Bangladesh specifics (for future expansion, keep schema compatible): NID, driving license, trade license, local bank / mobile money.
+- KYC status gates access to:
+  - Going online, accepting trips/orders.
+  - Wallet features and payout methods.
+  - High-risk settings (payout changes, document changes).
+- Do not weaken existing KYC or security gates while editing navigation.
+
+4. Admin Panel Requirements (Global)
+- Admin has unified access to:
+  - User management for all roles (search, view, suspend, verify).
+  - KYC reviews, document approvals, and background check results.
+  - Rides, food orders, parcel deliveries collections (see below).
+  - Commissions, payouts, and dispute handling.
+  - Settings for notification templates, fees, surge pricing, incentives.
+- Your changes must remain compatible with existing admin APIs and data, even if admin UI is not edited in this task.
+
+5. Mandatory Collections / Data Models
+- The following logical collections must always be preserved:
+  - rides
+  - food_orders
+  - deliveries (for parcels)
+  - wallets (per user)
+  - payout_methods and payout_requests
+  - ratings / reviews
+  - incentives / promotions
+  - notifications and audit_logs
+- When you touch layout or header, do not rename or break any model. Only import/use existing hooks/components.
+
+6. Commission & Payout Logic (Do Not Break)
+- Commission is taken per completed ride / order / delivery, not at the time of request.
+- Wallet balances and payouts must remain:
+  - Consistent per role (driver / restaurant).
+  - KYC-gated.
+  - Protected by the existing 2FA / OTP and password re-check for payout changes.
+- Any new header/navigation you add must not bypass these requirements.
+
+7. Status Flows (Keep Compatible)
+- Driver statuses: offline → online → on-trip / delivering → completed → back to online.
+- Restaurant statuses: open / busy / closed, plus real-time order states.
+- Customer journeys: browsing → request → in progress → completed / cancelled.
+- Header / navigation changes must not hide or break access to current status controls, safety center, support, or documents.
+
+8. Onboarding & Settings (Driver Focus)
+- New drivers must be able to find:
+  - Profile & Account settings (personal info, phone, DOB, address).
+  - Documents & KYC.
+  - Vehicle details.
+  - Wallet & payout methods.
+  - Training / Getting Started.
+- Navigation must be simple and obvious; no “developer-looking” placeholders or confusing icons.
+
+9. Notifications & Support
+- System-wide notification rules:
+  - Header bell / notification center for all roles.
+  - In-app support center and help pages.
+  - Critical errors must show user-friendly messages (not raw JSON).
+- Any changes in header must properly wire the bell icon and language globe to existing notification and language systems.
+
+10. Security Phases (Already In Use – Do Not Weaken)
+- Security Hardening Phase 1 (already present):
+  - HSTS, CSP, CORS, secure cookies, basic rate limiting, secure headers.
+- Security Hardening Phase 2 (already present):
+  - OTP service, device/session security, tamper-proof audit logs, enhanced payout 2FA.
+- Future phases (for later, not in this task): SIEM integration, anomaly detection, bug bounty workflow, security monitoring dashboards.
+- In this task you may REUSE security helpers but must not add any insecure shortcuts or debug bypasses.
+
+11. Implementation Principles
+- Non-breaking, incremental changes only.
+- Respect existing TypeScript types, ESLint/Prettier, and architectural patterns (hooks, layout components, etc.).
+- Keep the code production-grade, not demo-level.
+- After changes: run architect review, restart app, and verify visually on the main driver pages.
+
+--------------------------------------------------------------------
+TASK: C-2 – DRIVER HEADER & NAVIGATION INTEGRATION (UBER-LEVEL POLISH)
+
+CONTEXT
+- We are now in the “C” phase (cross-cutting polish for Driver and Restaurant).
+- C-1 (Restaurant Dashboard verification and error states) is already complete.
+- The latest status audit shows the main remaining gap for a professional, Uber-like experience is:
+  1) Driver header/navigation integration (DriverTopBar + drawer + notifications + language),
+  2) Real-time trip/accept flows and push notifications (those are future tasks, NOT part of C-2).
+
+GOAL OF C-2
+- Implement a complete, integrated, and professional driver header/navigation system on the web app that:
+  - Uses the existing DriverTopBar component.
+  - Provides a clear hamburger menu trigger.
+  - Correctly wires the notification bell and language globe.
+  - Connects the profile dropdown to account/profile pages.
+  - Properly opens AND closes the side drawer when navigating.
+  - Feels intuitive to a new driver (no confusion about how to open settings).
+
+SCOPE (DO ONLY THESE PARTS IN THIS TASK)
+1) DriverTopBar integration into driver layout.
+2) Side drawer (navigation menu) trigger + close behaviour.
+3) Notification bell header wiring.
+4) Language globe header wiring.
+5) Profile avatar / name dropdown behaviour.
+6) Mobile-friendly behaviour for header + drawer.
+7) Small UX refinements only related to navigation (no ride-flow logic yet).
+
+Do NOT:
+- Implement real-time trip screen, accept/decline popup, or map navigation in this task.
+- Touch admin flows, payout logic, or KYC logic (only reuse where needed).
+- Change database schema or main models.
+
+DETAILED REQUIREMENTS
+
+A. Integrate DriverTopBar into Driver Layout
+1. Find the main driver layout component (likely wrapping driver routes in client/src/App.tsx or a dedicated driver layout file).
+2. Confirm there is an existing DriverTopBar component in the codebase (the audit says it exists but is not integrated).
+3. Update the driver layout so that:
+   - DriverTopBar is rendered at the top of all driver-facing pages:
+     - /driver/dashboard or /driver/home
+     - /driver/profile
+     - /driver/account
+     - /driver/documents
+     - /driver/vehicle
+     - /driver/wallet
+     - /driver/performance
+     - /driver/trust-score
+     - /driver/incentives
+     - /driver/support, /driver/support/help, /driver/support/live-chat
+     - /driver/safety-center (or equivalent route)
+   - Avoid duplicate headers: if a page currently renders its own header, refactor to use the shared DriverTopBar instead, or wrap it appropriately.
+
+B. Drawer Trigger & Close Behaviour (Hamburger Menu)
+Current problem (from user feedback):
+- Existing icon looks like a checklist; new drivers will not realize it opens profile/settings.
+- When user taps a menu item (e.g., Account), the drawer content changes but the drawer panel remains open. User has to tap twice to close.
+
+Implement:
+1. Replace the confusing “tick box” icon with a standard hamburger menu icon in the DriverTopBar.
+2. When hamburger icon is tapped:
+   - Open the driver side drawer (existing navigation menu with Dashboard, Getting Started, Documents, Vehicle, etc.).
+3. When ANY of these events happen, the drawer must automatically close:
+   - User taps a menu item that navigates to a new route (Account, Wallet, Trust Score, etc.).
+   - User taps outside the drawer area (overlay click).
+   - User taps an explicit close icon (if available).
+4. Ensure that drawer state is controlled in a single source of truth (e.g., React state or context) so that it doesn’t get stuck open when navigating quickly.
+5. Keep the drawer accessible and mobile-friendly (no overlap with iOS status bar etc.).
+
+C. Notification Bell / Notification Center Wiring
+Current problem:
+- Bell icon is visible but does nothing on tap; user receives no dropdown or navigation.
+
+Implement:
+1. In DriverTopBar, wire the notification bell to the existing notification system:
+   - If a notifications dropdown component already exists, integrate it:
+     - Tapping the bell toggles the dropdown.
+     - Show unread count badge (if service available) on the bell.
+   - If no dropdown exists but a notification center page exists (e.g., /driver/notifications), make the bell navigate to that page.
+2. Ensure that:
+   - Clicking a notification item (if dropdown exists) navigates to the relevant page (trip, payout, documents, etc.).
+   - All calls use existing hooks/services; do not create new APIs.
+3. The notification feature must respect KYC and login state:
+   - If driver is not fully verified or not logged in, fall back to a safe state (e.g., show “No notifications available” or require login).
+
+D. Language Globe in Header
+Current problem:
+- There is a language page at /driver/account/language (or similar),
+  but the globe icon in the header is not wired to anything.
+
+Implement:
+1. Make the globe icon in DriverTopBar open a compact language selector menu OR navigate to the language settings page:
+   - Preferred: a dropdown menu with available languages (for now, at least English + future placeholder for Bengali).
+   - When user selects a language:
+     - Update the app’s i18n / locale state using the existing language system.
+     - Persist to user preferences if a backend/API exists.
+2. If it is simpler and more consistent with existing code, the globe can navigate directly to the language settings page where the user selects language. In that case:
+   - Make sure navigation is immediate and obvious (no dead link).
+3. Do NOT hard-code languages in multiple places; reuse constants or localization config if already present.
+
+E. Profile Avatar / Name Dropdown
+- In the driver header, there should be a clear way to access:
+  - Account settings
+  - Help Center / Support
+  - Logout
+- Implement or refine the profile dropdown so that:
+  1. Avatar or name on the right side opens a dropdown menu.
+  2. Menu items link to:
+     - Profile / Account
+     - Documents
+     - Wallet
+     - Settings (including language)
+     - Help Center / Support
+     - Logout
+  3. Dropdown closes automatically when an item is selected or when user clicks outside.
+
+F. Mobile UX & Accessibility
+1. Verify on mobile-width view (similar to the user screenshots):
+   - Header elements fit properly; no overlaps.
+   - Hamburger, bell, globe, and profile avatar are comfortably tappable.
+2. Ensure all interactive elements have accessible labels / aria attributes where appropriate.
+3. Avoid text too close to screen edges.
+
+G. Keep Security Intact
+- Reuse existing authentication and authorization checks for any new header-driven navigation.
+- Do not expose any admin-only or high-privilege pages in the driver drawer.
+- If a route requires KYC or specific status (e.g., wallet, payouts, safety center), respect the existing gating and error states.
+
+H. Code Quality & Verification Steps (Agent must perform)
+1. Run an architect review focusing on:
+   - Layout hierarchy (DriverTopBar placement).
+   - State management for drawer and notifications.
+   - Avoiding duplicated headers or conflicting nav.
+2. Restart the application and manually verify:
+   - From /driver/profile or /driver/dashboard:
+     - Open drawer with hamburger.
+     - Tap Account → drawer closes, Account page visible.
+     - Tap Wallet → drawer closes, wallet page visible.
+   - Tap notification bell:
+     - See dropdown or notification center page.
+   - Tap globe:
+     - See language change UI or page.
+   - Tap profile avatar:
+     - See dropdown with expected items, including Logout.
+3. Fix any console errors or warnings related to:
+   - Missing keys, unmounted state updates, React errors.
+4. Take a screenshot of the final driver header and drawer behaviour and confirm that the previous issues are resolved:
+   - No more “double tap” needed to close drawer.
+   - Bell and globe are not dead icons.
+   - Navigation feels professional, similar to Uber.
+
+FINAL OUTPUT EXPECTATION
+- All code changes committed to the project (client side only, unless a small server-side change is absolutely necessary for notifications or language).
+- A short status message summarizing:
+  - Which files were edited (main layout + DriverTopBar + drawer + any hooks).
+  - How the drawer/notifications/language behavior now works.
+  - Any remaining limitations intentionally left for future real-time trip/notification tasks.
+
+Now, apply this C-2 task exactly as specified above and then summarize what you implemented.

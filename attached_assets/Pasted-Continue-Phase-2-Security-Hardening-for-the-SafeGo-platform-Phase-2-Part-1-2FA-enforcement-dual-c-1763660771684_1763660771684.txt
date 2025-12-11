@@ -1,0 +1,146 @@
+Continue Phase 2 Security Hardening for the SafeGo platform. Phase 2 Part 1 (2FA enforcement, dual-control, rate limiting, security headers, sessions) is being implemented separately. Now focus on advanced monitoring, fraud detection hooks, and secure developer operations, without breaking existing features.
+
+Important constraints:
+- Do not change any existing user-facing flows for rides, food, parcels, payouts, or KYC.
+- No database schema changes that break old data. Use additive migrations only.
+- No emojis in any code, comments, UI text, or documentation.
+- Follow existing logging, audit, and settings patterns.
+
+Goals of this part:
+1) Build a "Security Events" monitoring layer on top of existing logs.
+2) Add basic fraud detection hooks for rides/food/parcels.
+3) Introduce configuration for security thresholds via Global Settings.
+4) Add secure DevOps practices: safe logging, redaction, and access patterns.
+
+1. Security Events Layer
+Using existing AuditLog and application logs:
+- Define a small "SecurityEvent" abstraction (no need for a new table if not necessary; can be a view or a derived concept from AuditLog + system logs).
+- Event categories:
+  - Authentication (login failures, 2FA failures, rate-limited logins)
+  - Access control (forbidden access attempts, unauthorized API calls)
+  - Data access (suspicious document access patterns)
+  - Admin operations (failed or rejected dual-control actions)
+
+Implement:
+- Backend helper that can read from AuditLog and return only security-related events via:
+  - GET /api/admin/security-events (admin-only, super-admin recommended)
+- Filters:
+  - dateFrom, dateTo
+  - category
+  - actorEmail
+  - severity level (info/warn/high)
+- Do not duplicate storage if not needed; derive from existing logs where possible.
+
+2. Security Monitoring UI
+Add a "Security Center" or "Security Monitoring" page in the admin panel, under /admin/security-center.
+
+Layout:
+- Summary cards at the top:
+  - Number of high-severity events in last 24 hours
+  - Number of login failures in last 24 hours
+  - Number of rate-limited IPs/accounts
+- Table view:
+  - Time
+  - Category
+  - Actor/Account
+  - Description
+  - Severity
+- Filters in the UI matching the backend query parameters.
+- Clicking a row opens a detail view showing the underlying AuditLog entry and relevant metadata.
+
+Ensure:
+- Access to this page is restricted to super-admin and security-focused roles (use RBAC).
+- No sensitive data (SSN, NID, full bank numbers, 2FA secrets) is displayed.
+
+3. Fraud Detection Hooks (Rides, Food, Parcels)
+Do not implement a full ML system. Instead, add rule-based hooks and logging that can be extended later.
+
+Examples of suspicious patterns:
+- Too many trips/orders from the same account in a short period, especially with the same card or device.
+- Repeated cancellations at the last moment by the same customer.
+- Driver frequently cancelling trips after seeing destination.
+- Parcel deliveries with mismatched identity (sender/receiver flagged previously).
+
+Implementation:
+- Add a "FraudCheck" helper that runs simple rules whenever:
+  - A trip is created, updated, or cancelled.
+  - A food order is created or cancelled.
+  - A parcel delivery is created or cancelled.
+- If a rule is triggered:
+  - Do not block the user flow yet (for Phase 2).
+  - Log a security event with severity "warn" or "high".
+  - Mark the associated entity with a "suspicious" flag in a non-breaking way:
+    - Either via an additive column (e.g., isSuspicious boolean, default false)
+    - Or via a derived view if the schema should not be modified.
+
+Expose in the admin UI:
+- In driver, customer, and restaurant profiles, show a small "Security status" section indicating:
+  - Normal
+  - Under observation
+  - Needs review
+- For Phase 2, keep this read-only. Do not add enforcement actions yet.
+
+4. Security Configuration via Global Settings
+Extend the existing /admin/settings panel with a new "Security" tab (if not already present, build it now) or add more options to it:
+
+Configurable items:
+- Login rate limit thresholds (attempts, window in minutes)
+- High-risk action threshold for wallet adjustments
+- Flags to enable/disable:
+  - Strict 2FA enforcement
+  - Fraud hook logging level (info only vs high severity)
+- Document URL expiry time (in minutes)
+
+Implementation:
+- Store new settings in the existing settings model/config.
+- Wire these settings into:
+  - Rate limiting logic
+  - Dual-control high-risk thresholds
+  - Signed document URL generation
+  - FraudCheck behavior (log only vs warn/high)
+
+5. Secure DevOps Practices
+Implement developer-focused safeguards:
+
+a) Log Redaction:
+- Create a central logging utility that:
+  - Automatically redacts any patterns that look like:
+    - Credit card numbers
+    - SSN/NID patterns
+    - Bank account numbers
+    - 2FA codes and recovery codes
+  - Ensures that production logs never contain raw secrets.
+
+b) Environment Guard:
+- On application startup, validate that:
+  - JWT_SECRET and ENCRYPTION_KEY are set and meet minimum length requirements.
+  - 2FA and encryption libraries are available.
+  - If required env vars are missing, fail fast with a clear error.
+
+c) Admin Access to Logs:
+- Do not expose raw infrastructure logs in the UI.
+- Only summarized and filtered SecurityEvents via the Security Center.
+
+6. Testing and Documentation
+Testing:
+- Simulate:
+  - Multiple failed logins to verify rate limits and security events.
+  - A high-risk commission change requiring dual-control.
+  - Suspicious ride/order/parcel patterns that trigger fraud hooks.
+- Confirm:
+  - No user-visible breakage.
+  - Security Center shows correct events.
+  - No sensitive data appears in any new UI.
+
+Documentation (replit.md):
+- Add "Security Phase 2 – Advanced Protections" section.
+- Document:
+  - Dual-control actions and how they are configured.
+  - 2FA enforcement behavior.
+  - Security Center and fraud hooks.
+  - New settings in the Security tab.
+
+After all of this, confirm:
+- All migrations are backward compatible.
+- All new security features can be tuned via configuration.
+- The system remains stable and production-ready with significantly stronger security than a basic ride-share implementation.

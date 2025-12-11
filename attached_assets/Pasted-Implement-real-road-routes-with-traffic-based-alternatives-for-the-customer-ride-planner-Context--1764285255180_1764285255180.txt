@@ -1,0 +1,96 @@
+Implement real road routes with traffic-based alternatives for the customer ride planner.
+
+Context:
+- SafeGo web app uses an OpenStreetMap/Leaflet map and Google Places Autocomplete.
+- Currently the map shows a straight dashed line between pickup and dropoff, and a simple “Heavy traffic expected” badge.
+- We want actual driving routes along real roads, traffic-aware ETA, and multiple route options so the rider can choose.
+
+Tasks:
+
+1. Backend: Create a directions endpoint using Google Directions API
+   - File targets (adjust to actual structure):
+     - server/routes/maps.ts (or similar)
+   - Add GET /api/maps/route that accepts:
+     - origin: "lat,lng"
+     - destination: "lat,lng"
+   - Inside the handler, call:
+     - https://maps.googleapis.com/maps/api/directions/json
+     - Parameters:
+       - mode=driving
+       - alternatives=true
+       - departure_time=now
+       - traffic_model=best_guess
+       - key=process.env.GOOGLE_MAPS_API_KEY
+   - If status != "OK", return JSON:
+     `{ success: false, message: data.status }`
+   - If OK, map the response to a clean JSON shape:
+     ```ts
+     {
+       success: true,
+       routes: data.routes.map((r, index) => ({
+         id: index,
+         summary: r.summary,
+         polyline: r.overview_polyline.points,
+         distanceMeters: r.legs[0].distance.value,
+         durationSeconds: r.legs[0].duration.value,
+         durationInTrafficSeconds: r.legs[0].duration_in_traffic?.value ?? r.legs[0].duration.value
+       }))
+     }
+     ```
+   - Keep Google API key usage secure; do not log the key.
+
+2. Frontend: use the new endpoint on the customer ride planning screen
+   - Likely file:
+     - client/src/pages/customer/RidePlanPage.tsx
+     - or client/src/components/ride/RidePlanner.tsx
+   - When both pickup and dropoff are selected (with lat/lng), call:
+     GET /api/maps/route?origin=lat,lng&destination=lat,lng
+   - Store the returned `routes` array in component state:
+     - `routes`
+     - `activeRouteId`
+   - Draw polylines on the existing Leaflet map:
+     - Decode the polyline string into coordinates.
+     - Render all routes, but highlight the active route with higher weight/opacity.
+
+3. Traffic labels and ETA formatting
+   - For each route, compute:
+     - `etaMinutes = Math.round(durationInTrafficSeconds / 60)`
+     - Display as `~X h Y min` instead of pure minutes.
+   - Compute traffic level:
+     ```ts
+     const ratio = durationInTrafficSeconds / durationSeconds;
+     let trafficLevel: "light" | "moderate" | "heavy";
+     if (ratio < 1.1) trafficLevel = "light";
+     else if (ratio < 1.3) trafficLevel = "moderate";
+     else trafficLevel = "heavy";
+     ```
+   - Show a badge under the Estimated fare card:
+     - Light → “Light traffic on this route”
+     - Moderate → “Some traffic expected”
+     - Heavy → “Heavy traffic expected”
+
+4. Fare calculation must use traffic time
+   - Wherever we calculate price today, switch to using `durationInTrafficSeconds` instead of plain distance-only time.
+   - Keep the existing base fare and per-km/per-minute logic, just pass the new duration.
+   - Ensure changing the active route updates:
+     - the highlighted polyline
+     - the ETA
+     - the fare
+
+5. Route selection UI
+   - Under the Estimated fare card, show small buttons or tabs for each route:
+     - e.g. “Route 1 – Fastest”, “Route 2 – Less traffic”, “Route 3 – Shortest”.
+   - When the user taps a route:
+     - set `activeRouteId`
+     - update the map highlight and fare
+   - Default to the fastest route.
+
+6. Safety and non-breaking changes
+   - Do not break existing Google Places autocomplete, current location, or ride request flow.
+   - If the directions endpoint fails, gracefully fall back to the existing simple straight line and show a warning banner instead of crashing.
+
+After implementing, reload the /customer/ride screen, plan a ride from “188 Sutter Ave, Brooklyn, NY” to “Connecticut, USA”, and verify:
+   - The map shows a realistic road route instead of a straight line.
+   - ETA uses hours + minutes (e.g., `~7 h 4 min`).
+   - Traffic badge reflects the traffic level.
+   - Multiple routes are selectable and change price + ETA.

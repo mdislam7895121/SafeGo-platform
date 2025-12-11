@@ -1,0 +1,173 @@
+Task 4 - Polish restaurant search bar and notification UX across all devices (R-ENHANCE)
+
+Goal:
+Make the SafeGo Eats restaurant portal search bar and notification experience feel production-quality on desktop, tablet, and mobile, without breaking any existing backend APIs, RBAC/KYC rules, or other phases. This is part of the R-ENHANCE pack (Task 4).
+
+High-level requirements:
+1) Refine the global restaurant search bar (header).
+2) Improve the notification bell UX and dropdown.
+3) Add useful, realistic placeholder behaviors everywhere that is not fully implemented yet (no “Coming Soon” feel for search/notifications).
+4) Preserve all existing security (RBAC, KYC gating, audit logging) and backend contracts.
+5) Keep changes incremental and non-breaking, with clear documentation in replit.md.
+
+Scope:
+- Only restaurant portal (SafeGo Eats) pages.
+- Primarily header layout and any shared search/notification components used in restaurant pages (dashboard, orders, menu, payouts, staff, analytics, settings, documents, support).
+- Frontend-only for this task. Do NOT modify Prisma schema, backend services, or routes.
+
+Step 1 – Identify and refine search + notification components:
+1. Locate the current components used for:
+   - Restaurant header layout (SafeGo Eats header bar).
+   - Search input (the bar that searches orders/menu/customers).
+   - Notification bell and dropdown.
+2. Centralize them if not already:
+   - Extract shared logic into reusable components (e.g., RestaurantSearchBar, RestaurantNotificationBell) if they are fragmented.
+   - Ensure these components are used consistently on all restaurant pages that render the main header.
+
+Step 2 – Search bar UX polish:
+Implement the following behaviors and visual refinements:
+
+A. Core interaction:
+- Typing in the search bar should:
+  - Show a dropdown panel under the search bar.
+  - Debounce input to avoid excessive re-renders (e.g., 250–300ms).
+- Add a visible “clear” icon/button inside the input when there is text:
+  - Clicking it clears the query and hides results/empty state.
+- Support keyboard shortcuts:
+  - Pressing "/" focuses the search input (if not currently typing in another field).
+  - Pressing "Ctrl+K" (or "Cmd+K" on macOS) also focuses the search input.
+  - Ensure shortcuts are only active on pages where the main restaurant header is present.
+
+B. Suggestions & structured results (frontend only, safe placeholders):
+Implement a structured suggestion panel when the user types, with these sections:
+
+1) Recent searches
+   - Show up to 5 recent queries the user typed.
+   - Store recent searches in client state only (e.g., local state or localStorage).
+   - Each item is clickable and re-runs that query.
+
+2) Orders
+   - Show a small list of “orders” results (use existing data if there is an API, otherwise use safe mock placeholder entries).
+   - Display: order ID, short label (e.g., “Order #1234 – 2 items”), and status pill.
+   - Clicking navigates to the appropriate order detail page or keeps it as a stub link if that page is not implemented (but never throws errors).
+
+3) Customers
+   - Show a small list of customers (name + masked phone/email).
+   - Clicking opens customer-related view if available or a safe placeholder action.
+
+4) Menu items
+   - Show matching menu items by name and category (use existing list if accessible, or mock entries if not).
+   - Clicking should navigate to the menu item edit page or open a safe placeholder.
+
+Each section should:
+- Have a clear section label (“Recent searches”, “Orders”, “Customers”, “Menu items”).
+- Hide the section when there are no results.
+- Use consistent, compact, and readable styling that fits the current design system.
+
+C. Empty and error states:
+Add polished states inside the dropdown:
+- Empty: “No results found. Try a different keyword.”
+- Loading: “Searching…” if you implement any async behavior.
+- Error-safe: If any fetch or mapping fails, show a generic safe message instead of crashing. Never expose internal errors to the UI.
+
+D. Layout & responsiveness:
+- On desktop:
+  - Search bar remains inline with the header, width balanced to avoid overflow.
+- On tablet:
+  - If necessary, allow the search bar to grow below the top header while still visually connected.
+- On mobile:
+  - Search bar should be full-width under the top header row.
+  - Make sure it is easily tappable and does not cause horizontal scroll.
+- Ensure:
+  - No horizontal scroll at any breakpoint due to the search bar or its dropdown.
+  - All clickable elements meet minimum 44px tap target height.
+
+E. Accessibility:
+- Add/verify aria-labels:
+  - Search input (e.g., aria-label="Search orders, menu items, and customers").
+  - Clear button (e.g., aria-label="Clear search").
+- Keyboard navigation:
+  - Tab/Shift+Tab moves between search input and dropdown items.
+  - Enter selects the highlighted item.
+  - Esc closes the dropdown and leaves focus in the search bar.
+
+Step 3 – Notification bell & dropdown polish:
+Refine the notification experience as follows:
+
+A. Visual styling:
+- Keep the bell icon in the header (top right).
+- Show a small badge with unread count (capped, e.g., “9+”).
+- Styling must match the updated header (Uber Eats–style professional look already implemented in Task 1).
+
+B. Dropdown behavior:
+- On click:
+  - Open a dropdown panel aligned with the bell icon.
+  - Show a list of notifications: type icon, short title, one-line description, relative time (e.g., “2 min ago”).
+- Support basic categories:
+  - Orders (new orders, cancellations, modifications).
+  - Payouts (payout sent, failed, needs verification).
+  - Account (KYC reminders, document expiry, health & safety reminders).
+- If no real notifications exist, show a friendly empty state:
+  - “You’re all caught up. No new notifications.”
+- Clicking outside closes the dropdown.
+- Pressing Esc closes the dropdown.
+
+C. Keyboard and accessibility:
+- The bell should be focusable via keyboard.
+- Pressing Enter/Space toggles the dropdown.
+- Add aria attributes like:
+  - aria-expanded, aria-controls on the bell icon.
+  - role="menu" / role="menuitem" or suitable roles on dropdown and list items.
+
+D. Data-safety:
+- If real notification data is available from the backend, use it.
+- If not, use clearly placeholder-safe content that does not leak internal IDs or debugging info.
+- Never expose raw JSON or internal IDs directly in the UI beyond what is already exposed elsewhere in the portal.
+
+Step 4 – General layout cleanup related to search/notifications:
+While implementing the above, ensure that:
+- Header layout does not break the rest of the page content.
+- The search bar and notifications align consistently with the restaurant name, status capsules, and “You’re receiving orders” capsule button.
+- All breakpoints (desktop, tablet, mobile) show clean alignment and spacing, with no overlapping elements.
+
+Step 5 – Testing and data-testid attributes:
+1. Add or update data-testid attributes for automated testing:
+   - Search input, clear button, dropdown container, each section (recent, orders, customers, menu items), each notification item, notification bell, notification badge, and the dropdown close behavior.
+2. Manually test:
+   - Desktop: standard laptop width (~1366px).
+   - Tablet: around 768–1024px.
+   - Mobile: 375–430px.
+3. Confirm:
+   - No runtime errors in the console.
+   - No horizontal scroll appears due to the new components.
+   - Shortcuts ("/", Ctrl+K/Cmd+K) behave correctly.
+   - Search and notification dropdowns work across all tested pages.
+
+Step 6 – Security and backend safety checks:
+- Do NOT change:
+  - Prisma schema
+  - Database migrations
+  - Backend routes or guards
+  - RBAC roles and KYC gating
+- Ensure the search and notifications components do not bypass any existing access-control logic.
+- All new props and hooks must be type-safe with TypeScript.
+
+Step 7 – Documentation in replit.md:
+At the end of this task:
+- Update replit.md with a “R-ENHANCE Task 4 – Search + Notification UX Polish” section including:
+  - Files touched.
+  - Summary of UX improvements for search.
+  - Summary of notification improvements.
+  - Any known limitations or placeholders (e.g., where mock data is used for now).
+  - Notes confirming no backend or RBAC changes were made.
+
+Acceptance criteria:
+- Search bar:
+  - Works with clear button, keyboard shortcuts, suggestions, and proper empty states.
+  - Is fully responsive on desktop, tablet, and mobile, with no horizontal scroll.
+- Notifications:
+  - Bell opens a clean dropdown with readable list items and proper empty state.
+  - Keyboard and click interactions work as expected.
+- No runtime errors in the console.
+- No breaking changes to backend, RBAC, or KYC.
+- replit.md updated with a clear description of the work.

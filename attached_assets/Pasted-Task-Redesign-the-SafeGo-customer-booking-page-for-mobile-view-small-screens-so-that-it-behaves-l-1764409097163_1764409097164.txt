@@ -1,0 +1,120 @@
+Task: Redesign the SafeGo customer booking page for mobile view (small screens) so that it behaves like Uber’s mobile experience, while keeping the current desktop layout and all pricing/dispatch logic exactly as they are.
+
+Important rules
+- Do NOT change fares, surge, promos, commission, payouts, matching, or routing logic.
+- Desktop layout (2-column with map on the right, ride list on the left) must stay the same for large screens.
+- This task is ONLY about the responsive layout and visual structure for mobile (small widths).
+
+Target routes
+- Unified booking page: /customer (or /customer/unified-booking, whichever is currently used for the new design).
+- Apply the same responsive rules anywhere this layout appears.
+
+1. Add a proper mobile breakpoint
+- Introduce a breakpoint at around max-width: 768px (you can adjust slightly if needed).
+- For widths above the breakpoint: keep the current desktop layout exactly as it is.
+- For widths at or below the breakpoint: switch to a dedicated mobile layout described below.
+
+2. Mobile layout structure (single column, Uber-style)
+On small screens, restructure the page into a single vertical column:
+
+Order (top → bottom):
+  1) Header bar
+     - SafeGo logo + current tab (Ride / Eats / Parcel) as we already show.
+     - Keep height compact.
+
+  2) Address capsule block
+     - Combine pickup and dropoff into one vertical card over the map.
+     - Use rounded “capsule” style instead of a large rectangular panel:
+       • Full width minus small side padding.
+       • Rounded corners (e.g., 9999px).
+       • Light background (#F9FAFB).
+       • Thin border (#E5E7EB).
+     - Inside the capsule show:
+       • First row: pickup dot + pickup address (single line, ellipsis if long).
+       • Second row: dropoff dot + dropoff address.
+     - On the right side of the capsule:
+       • A small up/down chevron button to expand/collapse full address editor.
+       • A small pencil icon button to edit both addresses.
+     - When expanded, show the full pickup/dropoff input fields below, in the same card.
+
+  3) Promo banner
+     - If a promo is active, show a pill banner just under the address capsule:
+       • Background: light green (#ECFDF3).
+       • Text: "SafeGo Everyday Saver · 15% off your ride" (or current promo name).
+       • Smaller secondary text: "Applied automatically".
+     - If no promo is active: hide this banner completely.
+
+  4) Route selector (horizontal chips)
+     - Show the available routes as full-width chips but inside a horizontal scroll area.
+       Example:
+         [ Fastest · 1h 43m · 94.9 mi ] [ CT-15 N and CT-8 N ] [ I-684 N … ]
+     - Each chip:
+       • Rounded pill.
+       • Selected route = blue border + light blue background.
+       • Non-selected routes = neutral border.
+     - Make sure that even on small screens:
+       • All chips are visible via horizontal scrolling.
+       • The *rightmost* chip is not cut off.
+
+  5) Ride list (full-width cards, vertical list)
+     - Show each ride option as a full-width card stacked vertically (no 2×2 grid on mobile).
+     - Card content:
+       • Left: car image.
+       • Middle: title + caption:
+           "SafeGo X"
+           "2 min away · 4 seats"
+       • Right: price section with promo:
+           - Original price (gray, small, strikethrough).
+           - Final price (bold, larger).
+           - Small “Saver” badge in green if discount applied.
+     - Add small badges like "Popular" / "Limited" in the top-right of each card, same as desktop.
+     - Tapping on a card:
+       • Selects that ride.
+       • Updates the selected ride summary and confirm button text below.
+
+  6) Selected ride summary + traffic + payment (compact)
+     - Under the ride list, show only the currently selected ride summary in a compact block:
+       • Car image + ride name + price + "You save $X.XX" if applicable.
+       • Traffic badge from the previous task ("Light traffic / Moderate / Heavy") in the correct color.
+       • Payment method chip (e.g., "Card/Wallet").
+     - Make sure this block is not too tall on mobile.
+
+  7) Sticky bottom confirm button (like Uber)
+     - At the very bottom, add a sticky, full-width primary button that stays visible:
+       • Label format: "Confirm SafeGo X · $235.01"
+         (use the selected ride name and current total fare).
+       • Button height ~52–56px, large rounded corners at top.
+       • Sticks above the system safe-area on mobile.
+     - When the button is tapped:
+       • Keep the existing booking/confirm logic exactly as before.
+       • No change to backend behavior.
+
+3. Mobile map behavior
+- On desktop: keep current side-by-side map as-is (right column).
+- On mobile:
+  • Do NOT render the map as a full-height right column.
+  • Instead, show a compact "View on map" / "Choose on map" button below the route chips or just above the ride list.
+  • Tapping this opens one of:
+      - A full-screen overlay with the map and the current routes, OR
+      - A bottom sheet where the upper 60–70% is the map and the lower area shows the route chips.
+  • When the user switches route from the map view, update the selected route and ETA on the main page.
+
+4. Typography & spacing adjustments for mobile
+- Reduce font sizes slightly for headings and labels so they fit nicely on narrow screens.
+- Keep:
+  • Clear section titles: "Choose your route", "Choose a ride".
+  • Enough vertical spacing between sections (12–16px).
+- Avoid horizontal scrolling for any content except the route chips.
+
+5. Consistency and safety
+- All data shown (prices, discounts, promos, fees, traffic, ETA) must be exactly the same as desktop; only the layout changes.
+- Test flows to confirm:
+  • Desktop layout is unchanged.
+  • On mobile width (e.g., iPhone 15 Pro simulator in the Replit preview), the page shows:
+     - Address capsule at top,
+     - Promo banner,
+     - Route chips (scrollable),
+     - Vertical ride list,
+     - Compact summary,
+     - Sticky bottom "Confirm SafeGo [Ride]" button,
+     - Optional “View on map” flow.

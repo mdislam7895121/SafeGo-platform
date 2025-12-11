@@ -1,0 +1,74 @@
+C8 — SafeGo Mobile Address Bar Redesign (Uber-style)
+
+Follow ALL SafeGo rules. Do NOT change backend logic, fare engine, map engine, dispatch, promo, or routes. Only update the MOBILE UI. Desktop stays unchanged.
+
+GOAL:
+Fix the issue of showing address bars on all screens. Implement Uber-style clean address UX for mobile: only ONE screen shows full address inputs, others show compact summary.
+
+TASKS:
+
+1. Screen Logic (Critical)
+Implement the following behavior:
+
+A) Screen 1 — Plan Your Ride (First Step)
+• This is the ONLY screen where full address input capsules appear.
+• Show full Pickup capsule (editable)
+• Show full Dropoff capsule (editable)
+• Medium-thick balanced capsule style (not too fat, not too thin)
+• Rounded corners (full pill)
+• Icons: swap, clear, pin
+
+B) Screen 2 — Choose Your Ride
+• REMOVE full address input fields.
+• Show ONE compact Address Summary Capsule:
+    - Pickup + Dropoff in two lines
+    - Blue dot (pickup), red dot (dropoff)
+    - Right-side Edit icon
+• Tapping Edit returns to Screen 1 (Plan Your Ride)
+• Capsule stays fixed at top (not scrollable)
+
+C) Screen 3 — Choose Your Route (Favorite route selector)
+• DO NOT show full address bars.
+• Show the SAME compact Address Summary Capsule used in Screen 2.
+• Capsule fixed above route options.
+• User can scroll map and route list freely.
+• “Back to ride details” returns to Screen 2.
+
+This must eliminate triple address duplication.
+
+2. Capsule Design Requirements
+• Medium-thick capsule height
+• Full pill radius
+• Soft shadow: 0 2px 6px rgba(0,0,0,0.08)
+• Clean vertical spacing
+• Icons perfectly center-aligned
+• Text must be 15px–16px weight: 500
+
+3. Expand / Collapse Interaction (Mobile Only)
+• Compact summary capsule collapses by default
+• Add right-side chevron (›)
+• When tapped:
+    - Capsule smoothly expands showing 2–3 lines of each address
+• Tapping again collapses
+• This must NOT show full input bars. Full inputs appear ONLY on Screen 1.
+
+4. Cleanup Rules
+• Remove address fields from Choose Your Ride screen
+• Remove address fields from Choose Your Route screen
+• Request Ride button must always stay visible
+• Map may never be hidden by unnecessary UI
+• Do not break scroll behavior
+
+5. Behavior Rules
+• Editing address forces user back to Screen 1
+• Plan → Ride → Route flow must stay clean
+• All backend functionality must remain untouched
+• Desktop version must not change
+
+DELIVERABLES:
+• Fully updated mobile UI for all three screens
+• Full inputs only on Screen 1
+• Compact summary on Screen 2 and Screen 3
+• Smooth expand/collapse capsule
+• Clean Uber-style mobile layout
+• All logic preserved

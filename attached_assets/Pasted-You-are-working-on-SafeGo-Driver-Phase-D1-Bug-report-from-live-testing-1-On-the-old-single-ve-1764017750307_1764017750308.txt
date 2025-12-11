@@ -1,0 +1,123 @@
+You are working on SafeGo Driver Phase D1.
+
+Bug report (from live testing):
+
+1) On the old single-vehicle page `/driver/vehicle` I see:
+   - Green toast: "Vehicle Registered"
+   - Red toast: `Update failed – 404: {"error":"No vehicle registered. Use POST to register."}`
+
+2) Steps to reproduce:
+   - Log in as driver (current account: vitorgarh2 – USA driver, fresh account).
+   - Go to `/driver/vehicle`.
+   - Fill in Vehicle Type, Model, License Plate.
+   - Click the main button (Register / Update).
+   - The UI shows "Vehicle Registered" but also shows a red error 404 with `"No vehicle registered. Use POST to register."`
+
+3) Expected behaviour:
+   - If the driver does not yet have a vehicle, submitting the form should CREATE a primary vehicle record and succeed with a clean success toast.
+   - If the driver already has a vehicle, submitting the form should UPDATE the existing primary vehicle.
+   - There must be no 404 error in normal flows.
+
+4) Architectural context for D1:
+   - We changed the schema to support *multiple* vehicles per driver (1:N).
+   - New endpoints were defined:
+     * GET  `/api/driver/vehicles`            – list driver vehicles
+     * POST `/api/driver/vehicles`            – create vehicle
+     * PATCH `/api/driver/vehicles/:id`       – update specific vehicle
+     * DELETE `/api/driver/vehicles/:id`      – soft delete
+     * PATCH `/api/driver/vehicles/:id/set-primary` – mark primary
+   - The legacy single-vehicle endpoints and `/driver/vehicle` page must NOT crash and should be backward-compatible at MVP level.
+
+Your task:
+
+1) Investigate the current implementation:
+   - Open `server/routes/driver.ts` (or the equivalent driver router).
+   - Find the handlers for:
+       * `GET /api/driver/vehicle`
+       * `PUT or PATCH /api/driver/vehicle`
+       * the new plural endpoints under `/api/driver/vehicles`.
+   - Open the frontend page for `/driver/vehicle`:
+       * Likely `client/src/pages/driver/vehicle.tsx` or similar.
+       * Confirm which endpoint the page is calling on submit.
+
+2) Implement a backward-compatible fix for the `/driver/vehicle` flows so that the error:
+   `404: {"error":"No vehicle registered. Use POST to register."}`
+   no longer occurs in normal usage.
+
+You can choose one of these approaches (please document which one you implement in replit.md under a new `D1-VEH-COMPAT` section):
+
+Option A – Backend compatibility shim (preferred for now):
+
+   - In the `PUT /api/driver/vehicle` handler:
+       * Look up the current authenticated driver.
+       * Try to find the driver’s primary active vehicle:
+         `const existing = await prisma.vehicle.findFirst({ where: { driverId: driver.id, isPrimary: true, isActive: true } });`
+       * If `existing` **is found**:
+           - Update that record with the payload fields from the request.
+           - Return a normalized JSON response, for example:
+             `{ success: true, vehicle: updatedVehicle }`.
+       * If `existing` **is NOT found**:
+           - Treat this request as a CREATE instead of returning 404.
+           - Create a new `vehicle` record bound to this driver, with:
+               - `isPrimary: true`
+               - `isActive: true`
+               - other fields from the request (type, model, plate, etc.)
+           - Return 201/200 with `{ success: true, vehicle: newVehicle }`.
+       * Make sure the response structure is **never null**, so that the frontend can always call `response.json()` safely.
+
+   - In the `GET /api/driver/vehicle` handler:
+       * Return the driver’s primary vehicle (same `findFirst` condition as above).
+       * If no vehicle exists, return:
+         `status 200` with `{ success: true, vehicle: null }`
+         instead of a hard 404, so the UI can treat it as “no vehicle yet”.
+
+   - Keep using the new plural endpoints for future multi-vehicle UIs, but ensure the old single-vehicle endpoint is now safe and works for "first vehicle" registration and update.
+
+Option B – Frontend update to use new multi-vehicle APIs:
+
+   - On `/driver/vehicle` page:
+       * On initial load, call `GET /api/driver/vehicles`.
+       * If the list is empty:
+           - Render the form in “create mode” and on submit call `POST /api/driver/vehicles`.
+       * If there is at least one vehicle:
+           - Use the primary vehicle (or the first vehicle) to prefill the form.
+           - On submit call `PATCH /api/driver/vehicles/:id`.
+       * Normalize error handling so all failures show a clean error toast with the message from the JSON response.
+   - This also solves the 404, but please ensure no breaking changes for other driver pages.
+
+3) After implementing the fix:
+
+   - Run the backend and test with an actual driver session:
+       * Case 1: brand new driver with **no** vehicles:
+           - Visit `/driver/vehicle`, submit the form.
+           - Confirm:
+             - Vehicle row is created in the database.
+             - No red error toast appears.
+             - Subsequent visits show the vehicle prefilled.
+       * Case 2: driver WITH an existing vehicle:
+           - Change a field and save.
+           - Confirm that the update works and still no 404.
+
+   - Also confirm that the new multi-vehicle page `/driver/vehicles` (if present) still works and respects the primary vehicle constraint.
+
+4) Security and data integrity requirements (important, do not skip):
+
+   - Ensure all `/api/driver/vehicle*` endpoints:
+       * Require an authenticated driver (no anonymous access).
+       * Enforce ownership: a driver must never be able to read or modify another driver’s vehicles.
+   - Preserve the “single primary vehicle per driver” rule:
+       * When a primary vehicle is (created via the compat endpoint), make sure existing primary vehicles for that driver are demoted if necessary, or re-use the same row instead of creating duplicates.
+   - Do not weaken KYC or any existing authorization checks.
+
+5) Update `replit.md`:
+
+   - Add a section `D1-VEH-COMPAT` explaining:
+       * What the bug was (404 on `/driver/vehicle` even after registering).
+       * Which option you implemented (A or B).
+       * The exact endpoints and files modified.
+       * Any known limitations or future refactor notes (for example, plan to fully migrate drivers to `/driver/vehicles` later).
+
+Goal: After your changes, a real driver should be able to:
+   - Register their first vehicle from `/driver/vehicle`.
+   - Update that vehicle from the same page.
+   - Not see any 404 or confusing error toasts in the normal flow.

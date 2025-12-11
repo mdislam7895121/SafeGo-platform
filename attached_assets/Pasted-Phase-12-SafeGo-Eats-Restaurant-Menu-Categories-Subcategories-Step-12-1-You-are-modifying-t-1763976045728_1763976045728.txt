@@ -1,0 +1,191 @@
+Phase 12 – SafeGo Eats – Restaurant Menu Categories & Subcategories (Step 12.1)
+
+You are modifying the existing SafeGo super app codebase that you already built earlier.
+
+Global context:
+- The app has 4 roles: Customer, Driver, Restaurant, Admin.
+- This task is ONLY for the Restaurant dashboard (SafeGo Eats) but must not break any existing flows for Customer, Driver, or Admin.
+- Keep the backend and frontend fully working. Do NOT remove or rename existing components, routes, or APIs unless absolutely required. Only extend them in a backward-compatible way.
+
+Goal of this step:
+Implement a structured Menu Category system for restaurants with:
+- Main Category
+- Sub Category
+- The ability to support at least 500+ category/subcategory records in total
+- Easy selection in the “Add Item” / “Edit Item” forms using dropdowns and checkboxes
+- Server-side validation and basic authorization checks
+
+Security phase to enforce in this step:
+- Security Phase 1: Input validation, access control, and least privilege.
+  - Validate all new inputs on both frontend and backend.
+  - Ensure a restaurant can only manage its own menu items and category mappings.
+  - Do NOT expose other restaurants’ private data.
+
+--------------------------------
+1. Data model changes
+--------------------------------
+
+1.1. Create / extend data models for categories:
+
+If we already have a simple Category field on MenuItem, refactor it into a proper relational model WITHOUT destroying existing data.
+
+Introduce these entities (use your project’s ORM / database style):
+
+- Category (for “Main Category”)
+  - id
+  - name (string, required, unique per tenant/global)
+  - slug (string, lowercase, URL-safe unique)
+  - type (enum or string, e.g. "FOOD", "DRINK", "DESSERT", “OTHER”)
+  - is_active (boolean, default true)
+  - created_at, updated_at
+
+- SubCategory (belongs to Category)
+  - id
+  - category_id (foreign key -> Category)
+  - name (string, required)
+  - slug (string, lowercase, unique per category)
+  - is_active (boolean, default true)
+  - created_at, updated_at
+
+- MenuItemCategory (many-to-many pivot between MenuItem and SubCategory)
+  - id
+  - menu_item_id (foreign key -> MenuItem)
+  - subcategory_id (foreign key -> SubCategory)
+
+Rules:
+- One MenuItem must have exactly ONE Main Category.
+- One MenuItem can have multiple Sub Categories (multi-select).
+- Migrations must be incremental: do NOT drop existing menu item tables or lose data. If needed, map the old single "category" field into a default Main Category/SubCategory during migration.
+
+--------------------------------
+2. Seed data for 500+ category/subcategory capacity
+--------------------------------
+
+We do NOT need to hardcode all 500 in one file, but the system MUST be designed to handle at least 500 entries.
+
+Implement:
+
+- A seed / fixtures file or script that:
+  - Creates at least 50+ meaningful Main Categories (for example: “Burgers”, “Pizzas”, “Sandwiches”, “Biryani”, “Curry”, “Salads”, “Soups”, “Breakfast”, “Desserts”, “Drinks”, “Coffee & Tea”, “Seafood”, “Vegan”, “Vegetarian”, “Gluten Free”, “Kids Menu”, “Family Meals”, etc.).
+  - For each Main Category, generate 5–10 Sub Categories (e.g. for “Burgers”: “Beef Burger”, “Chicken Burger”, “Veggie Burger”, “Cheese Burger”, “Double Patty”, “Combo Meal”).
+- This will automatically give the system capacity for 250–500+ entries.
+- Make sure this is structured so we can easily add more later without code changes.
+
+Important:
+- Make seeding idempotent (running the seed twice should not create duplicates).
+- Use slugs for stable references.
+
+--------------------------------
+3. Restaurant Dashboard – Menu UI changes
+--------------------------------
+
+Update the Restaurant dashboard (SafeGo Eats) pages, NOT the customer app:
+
+3.1. Menu List Page (Restaurant side)
+- Add filters at the top:
+  - Main Category dropdown (single-select)
+  - Sub Category dropdown or multi-select (depends on your UI library; multi-select is preferred)
+  - A text search box for item name
+- When a filter is applied, fetch and show only the matching menu items.
+- Keep pagination and sorting behaviour working as it is now.
+
+3.2. Add Item / Edit Item Form
+For the restaurant’s “Add Menu Item” and “Edit Menu Item” forms, add:
+
+- A "Main Category" dropdown:
+  - Required field (cannot save without a main category).
+  - Options loaded from Category records where is_active = true, sorted alphabetically.
+- A "Sub Categories" selector:
+  - UI: either a dropdown with checkboxes or a tag-based multi-select component.
+  - The list of subcategories must depend on the selected Main Category.
+  - Restaurant can choose multiple subcategories.
+  - Changes must be saved to the MenuItemCategory pivot table.
+
+Behaviour:
+- When the user selects a Main Category:
+  - Load its Sub Categories via an API call, or preloaded data if you already have it.
+- When editing an item:
+  - Preload the previously saved Main Category and Sub Categories.
+
+Validation:
+- If Main Category is empty, show a clear inline error.
+- If Sub Categories are empty, allow it but show a hint that adding subcategories will improve search and filtering.
+
+--------------------------------
+4. Backend API changes
+--------------------------------
+
+Add or extend secure APIs under the restaurant area, for example:
+
+- GET /api/restaurant/menu/categories
+  - Returns active main categories.
+- GET /api/restaurant/menu/categories/:categoryId/subcategories
+  - Returns active subcategories for that category.
+- GET /api/restaurant/menu/items?categoryId=&subcategoryId=&q=
+  - Returns filtered menu items for the current restaurant only.
+
+- POST /api/restaurant/menu/items
+- PUT /api/restaurant/menu/items/:id
+  - Extend existing create/update endpoints so they accept:
+    - main_category_id
+    - subcategory_ids: array of subcategory IDs
+  - Validate:
+    - The main_category_id and subcategory_ids exist and are active.
+    - The subcategory_ids all belong to the given main_category_id.
+    - The menu item belongs to the authenticated restaurant (authorization check).
+
+Security requirements:
+- Use the current authenticated restaurant context to ensure a restaurant can only:
+  - Create, read, update, and delete its OWN menu items.
+  - Not see or modify other restaurants’ menu items.
+- Validate input types and required fields server-side. Do NOT trust only the frontend.
+
+--------------------------------
+5. Frontend UX details
+--------------------------------
+
+- Maintain the existing look and feel of the Restaurant dashboard.
+- Add clear labels:
+  - “Main Category”
+  - “Sub Categories”
+- For a large number of categories/subcategories:
+  - Add a search box inside the dropdown to quickly find options.
+- Ensure responsiveness so it works on desktop and tablet views.
+
+--------------------------------
+6. Non-breaking change requirements
+--------------------------------
+
+- Do NOT remove existing menu-related components, only enhance them.
+- Do NOT rename existing API routes unless absolutely required.
+- Any refactor must be backward compatible:
+  - Existing items should still show up, even if they were created before the category system.
+  - If necessary, auto-assign a sensible default Main Category to legacy items during migration.
+
+--------------------------------
+7. What to deliver in this step
+--------------------------------
+
+1. Database/ORM models and migrations for:
+   - Category
+   - SubCategory
+   - MenuItemCategory (pivot)
+
+2. Seed script / fixtures for:
+   - 50+ Main Categories
+   - 5–10 Sub Categories per main category (so that we can reach 250–500+ total subcategory rows).
+
+3. Backend APIs:
+   - Category and subcategory fetching
+   - Updated create/update endpoints for menu items with validation and authorization.
+
+4. Frontend changes:
+   - Menu List filters (Main Category + Sub Category + search)
+   - “Add Item” and “Edit Item” forms with Main Category dropdown and Sub Category multi-select.
+
+5. Basic tests or sanity checks for:
+   - Creating a menu item with categories
+   - Editing a menu item and changing its categories
+   - Filtering menu items by main category and subcategory.
+
+Please implement all of the above now as Phase 12 – Step 12.1 for the Restaurant (SafeGo Eats) dashboard, keeping the global SafeGo architecture and security rules in place.

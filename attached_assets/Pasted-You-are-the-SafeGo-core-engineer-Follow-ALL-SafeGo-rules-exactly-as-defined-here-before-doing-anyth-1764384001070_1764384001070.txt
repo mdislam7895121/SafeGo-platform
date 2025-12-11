@@ -1,0 +1,309 @@
+You are the SafeGo core engineer. Follow ALL SafeGo rules exactly as defined here before doing anything.
+
+────────────────────────
+1. SAFEGO GLOBAL RULES
+────────────────────────
+
+1.1 Core Roles (always present)
+- Customer (rider, eater, parcel sender/receiver)
+- Driver (rides, delivery, parcel)
+- Restaurant / Merchant (SafeGo Eats and future merchants)
+- Admin / Operations
+
+1.2 Global App Scope
+- One unified platform with these service modes:
+  - Ride-hailing
+  - Food delivery (SafeGo Eats)
+  - Parcel / Courier delivery
+  - Later: Business / Corporate travel
+- Shared account system and payment methods across all services.
+- Never break or remove existing modes; only extend safely.
+
+1.3 Country, KYC, Compliance
+- For USA (current focus, especially NYC):
+  - Riders: phone, email, minimal profile, payment method.
+  - Drivers: strong KYC (name, DOB, license number + state, TLC rules where applicable, SSN/ITIN or equivalent, address, background check, vehicle registration, insurance, bank info).
+  - TLC / HVFHV rules for NYC MUST remain intact (pricing, minimum pay, regulatory fees).
+- For Bangladesh:
+  - NID, driving license, local regulations (for later phases; do not mix into USA flows here).
+- Do NOT remove or weaken any existing KYC/KYB logic.
+
+1.4 Admin Panel – Mandatory Capabilities
+- Admin must be able to:
+  - View/search/filter riders, drivers, vehicles, trips, payouts, disputes.
+  - Configure pricing, commissions, promos, and surge / marketplace balancer parameters.
+  - Approve/deny driver onboarding and vehicle category approvals.
+  - View TLC regulatory reports, exports, and audit logs.
+- All sensitive admin actions MUST be logged in an immutable audit log.
+
+1.5 Core Collections / Data Models (must not be broken)
+- rides / trips
+- food_orders
+- deliveries (parcel / courier)
+- driver_profiles, driver_documents, driver_vehicles
+- customer_profiles, payment_methods
+- commissions / fees
+- regulatory_fees (TLC fees etc.)
+- payouts, earnings, adjustments
+- vehicle_categories and driver_category_eligibility
+- driver_category_preferences
+- promotions / discounts / coupons
+Keep all schema changes additive and backward-compatible.
+
+1.6 Commission, Fees, and Payout Logic
+- Base fares, time, distance, booking fees, taxes and regulatory fees MUST remain as previously implemented.
+- Regulatory TLC fees (congestion, airport, AVF, BCF, HVRF, state surcharge, long-trip, out-of-town, tolls, etc.) are pass-through to government and NON-COMMISSIONABLE.
+- Platform commission is applied on the commissionable base only (fare parts that are allowed, NOT on regulatory fees).
+- Driver earnings must be correctly computed from rider fare minus regulatory fees and platform commission plus incentives.
+- Do NOT change numeric TLC fee constants or commission rates in this task.
+
+1.7 NYC TLC & Cross-State Logic
+- TLC minimum pay engine must stay enforced.
+- TLC regulatory fee pipeline order must stay unchanged.
+- Cross-state fare engine (NY ↔ NJ/CT etc.) must remain exactly as is.
+- Do not modify cross-state overrides, long-trip, or out-of-town rules.
+
+1.8 AI Marketplace Balancer
+- Already implemented to manage:
+  - Surge pricing
+  - Service fee tuning
+  - Incentives
+  - Marketplace balance between riders, drivers, and profitability
+- You may use its outputs (e.g., surge factor, recommended margin), but MUST NOT change its algorithm in this task.
+
+1.9 Vehicle Categories (already live)
+- Categories:
+  - SafeGo X
+  - SafeGo Comfort
+  - SafeGo Comfort XL
+  - SafeGo XL
+  - SafeGo Black
+  - SafeGo Black SUV
+  - SafeGo WAV (Accessible)
+- Backend naming uses SAFEGO_* codes (SAFEGO_X, SAFEGO_COMFORT, etc.). Do NOT rename or change these codes.
+- Multi-category vehicle system, admin approvals, and driver category preferences are already implemented. Do NOT break dispatch logic.
+
+1.10 Driver Category Preferences
+- Drivers may choose which eligible categories they want to receive (except WAV which follows accessibility rules).
+- Dispatch must always respect:
+  - Vehicle eligibility
+  - Admin approval
+  - Driver preferences
+  - Accessibility constraints
+- Do NOT change these rules.
+
+1.11 Security & Access Control
+- All fare and promo calculations must run server-side.
+- No secrets or internal IDs should be exposed to the client.
+- All APIs must be authenticated and authorized for the correct role (customer/driver/admin).
+- Input must be validated and sanitized to prevent tampering with prices, promos, or categories.
+- Ride pricing must be tamper-proof: the final charged price must come from server-side calculations only.
+
+1.12 Implementation Discipline
+- No breaking changes.
+- Only additive, backward-compatible changes.
+- Keep unit/integration tests intact; add new tests for new behavior.
+- Document all important changes in replit.md (or equivalent project docs).
+- Reuse existing helpers, hooks, services, and styling patterns when possible.
+
+────────────────────────
+2. TASK: C6 – Rider Price Card Discount UI (Uber-style) + Professional Look
+────────────────────────
+
+Goal:
+Upgrade the CUSTOMER ride type price cards so that, like Uber, the rider clearly sees:
+- The final fare they will pay.
+- The original fare before discount.
+- How much they are saving from promos/discounts.
+This must be combined with a more professional, Uber-like visual presentation of the price cards and vehicle images.
+
+VERY IMPORTANT: 
+- The rider should NOT see platform commission here.
+- Commission and driver earnings remain internal or in separate breakdown views (driver/admin), not on the main rider price card.
+- This is a CUSTOMER-side cosmetic + discount presentation upgrade only; TLC fee and commission logic must remain unchanged.
+
+────────────────────────
+2.1 Pricing & Discount Data Model
+────────────────────────
+
+2.1.1 For each vehicle category option (SafeGo X, Comfort, Comfort XL, XL, Black, Black SUV, WAV), extend the pricing response to include:
+
+- originalFare: number        // fare before any rider promo/discount
+- discountAmount: number      // how much the rider is saving
+- finalFare: number           // final rider fare after discount
+- promoCode?: string | null   // e.g. "SAFE10"
+- promoLabel?: string | null  // e.g. "Promo applied" or "10% off"
+
+2.1.2 The relationship must be:
+- finalFare = originalFare - discountAmount
+- discountAmount >= 0
+- If no promo is applied:
+  - discountAmount = 0
+  - finalFare = originalFare
+  - promoCode and promoLabel may be null or omitted.
+
+2.1.3 All TLC regulatory fees, taxes, and pass-through items MUST stay in the pipeline as before. Promo/discount should be applied only where your existing business rules allow (for example on the rider total, or on eligible fare components). Do not modify that policy here; only expose the correct numbers.
+
+────────────────────────
+2.2 Rider Price Card UI – What to Show
+────────────────────────
+
+On the CUSTOMER "Select Ride Type" / ride options screen, for each category card (in the horizontal carousel on mobile, list/grid on desktop), show:
+
+2.2.1 Main price line:
+- Show finalFare in a large, bold font, e.g. "$35.13".
+- This is the ONLY amount the rider will actually pay.
+
+2.2.2 Original fare (if discounted):
+- If discountAmount > 0:
+  - To the right of the main price, show originalFare in smaller, grey, strikethrough text, e.g. "~~$41.76~~".
+- If discountAmount == 0:
+  - Do not show originalFare on the card.
+
+2.2.3 Savings line:
+- If discountAmount > 0:
+  - Under the price, show a green “You save” line, e.g.:
+    - "You save $6.63"
+  - Text should be short and clear. Use a visually distinct, positive color (e.g. green), and slightly bold.
+- If discountAmount == 0:
+  - Do not show the "You save" line.
+
+2.2.4 Promo badge:
+- If a promo is applied (discountAmount > 0 and promoCode or promoLabel is present):
+  - Show a small badge on the card or above the list, such as:
+    - "Promo applied"
+    - Or "SAFE10 – You save $6.63"
+  - Style the badge similarly to Uber: small, rounded, light green background, concise text.
+- If no promo is applied:
+  - No badge should appear.
+
+2.2.5 Other existing info must remain:
+- Category name (SafeGo X, Comfort, etc.) in bold.
+- Seats / capacity.
+- Trip duration (e.g. “30 min”).
+- ETA (from C5, if already implemented).
+- Any surge or “Popular” indicators that already exist.
+
+Do NOT add commission or driver share to these customer price cards. Those are internal or for driver/admin views.
+
+────────────────────────
+2.3 Visual & Layout Requirements (Professional Look)
+────────────────────────
+
+2.3.1 Card styling:
+- Keep existing card layout but enhance it:
+  - Soft card shadow
+  - Rounded corners
+  - Consistent internal padding
+- Do not change the existing carousel mechanics (swipe/scroll must remain smooth and functional).
+
+2.3.2 Typography hierarchy:
+- Category name: bold, clearly visible.
+- Final fare: largest, bold, main focus.
+- Original fare: smaller, grey, strikethrough; right-aligned next to final fare.
+- “You save $X.XX”: medium font, green, slightly bold.
+- Secondary info (ETA, duration, capacity) smaller and muted.
+
+2.3.3 Vehicle images:
+- Use the existing 2D/3D car images that are already wired in C4, but adjust sizing/position if needed so the card looks balanced with the new price/savings block.
+- Do NOT change image source URLs to anything external; use the assets already in the repo or added for SafeGo.
+
+2.3.4 Mobile vs Desktop:
+- Mobile:
+  - Cards remain in horizontal carousel with full-width or near full-width appearance.
+- Desktop:
+  - Cards may appear as a list or grid; ensure the new price/savings layout still looks clean.
+
+────────────────────────
+2.4 Backend Changes
+────────────────────────
+
+2.4.1 Identify the API used by the rider app to load category options and fares (the same one that currently returns prices for SafeGo X, Comfort, etc.).
+
+2.4.2 Extend that API’s response to include:
+- originalFare
+- discountAmount
+- finalFare
+- promoCode (optional)
+- promoLabel (optional)
+
+2.4.3 Implement the discount logic in a small, well-scoped module (or reuse existing promotion engine if present):
+- Validate promo applicability for:
+  - City/region
+  - Account status
+  - Time window
+  - Service type (ride, not Eats/Parcel in this flow)
+- Make sure the calculations are deterministic and testable.
+- Do not change existing TLC or commission calculations; only compute originalFare and discountAmount on top of the existing fare result.
+
+2.4.4 Security:
+- All promo and discount rules must be applied server-side.
+- The client must not be able to override promo amounts or originalFare.
+- Validate promo codes and prevent tampering.
+
+────────────────────────
+2.5 Frontend Changes
+────────────────────────
+
+2.5.1 Update the TypeScript types/interfaces for vehicle category options to include:
+- originalFare
+- discountAmount
+- finalFare
+- promoCode?
+- promoLabel?
+
+2.5.2 In the ride options screen:
+- Render the new pricing layout (final + original + savings) for each category card using the data from the API.
+- The card selection logic (already done in C3/C4) must continue to work exactly as before.
+
+2.5.3 In the fare summary / confirmation screen:
+- Ensure the same finalFare, originalFare, and discountAmount are displayed consistently:
+  - Final fare bold
+  - Original fare strikethrough (if discounted)
+  - “You save $X.XX” visible (if discounted)
+  - Promo badge displayed (if applied)
+- The total charged to the rider must always match finalFare.
+
+2.5.4 Do NOT show commission or driver payout in these customer views.
+
+────────────────────────
+2.6 Security & Tests
+────────────────────────
+
+2.6.1 Security (Phase 2 – Data Integrity & Output Validation):
+- Ensure that the discount and finalFare cannot be manipulated from the client.
+- Validate all promo inputs server-side.
+- Ensure pricing response is consistent and signed/validated as per existing patterns.
+
+2.6.2 Tests:
+- Add unit tests for the discount calculation module:
+  - No promo → finalFare == originalFare, discountAmount == 0.
+  - Valid promo → correct discountAmount and finalFare.
+  - Edge cases (e.g., 100% promo cap, min/max limits).
+- Add integration tests for the pricing API:
+  - Response includes originalFare, discountAmount, and finalFare per category.
+- Add UI tests or snapshots (if present) to confirm:
+  - Final + original + “You save” + promo badge render correctly.
+  - Cards without discounts do not show originalFare or “You save” lines.
+
+────────────────────────
+2.7 Execution Plan
+────────────────────────
+
+1) Analyze existing pricing and category options API and the rider options screen implementation.
+2) Implement backend discount/original/final fare fields in a backward-compatible way.
+3) Implement frontend price card layout changes for all 7 categories.
+4) Update fare summary to match the new representation.
+5) Add tests (backend + frontend) for discount display.
+6) Run full test suite, including TLC fare and commission tests, to ensure nothing broke.
+7) Update replit.md with a “C6 – Rider Price Card Discount UI” section describing:
+   - Data fields
+   - UI behavior
+   - How promos interact with fares.
+
+When you are done, the rider should see for each vehicle type:
+- Final price (big, bold),
+- Struck-through original price when discounted,
+- “You save $X.XX” when there is a discount,
+- A small promo badge if a promo is active,
+with no commission visible on the customer price cards, and all existing SafeGo logic untouched.

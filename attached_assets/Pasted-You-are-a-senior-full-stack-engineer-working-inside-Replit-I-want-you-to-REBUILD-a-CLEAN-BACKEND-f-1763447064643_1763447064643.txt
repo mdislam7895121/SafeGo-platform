@@ -1,0 +1,415 @@
+You are a senior full-stack engineer working inside Replit.
+
+I want you to REBUILD a CLEAN BACKEND from scratch for my SafeGo.global super-app.  
+Do NOT try to repair previous code. Create a fresh backend-only project using Node.js, TypeScript, Express, and Prisma (PostgreSQL).
+
+====================================================
+GLOBAL SAFEGO RULES (MUST RESPECT)
+====================================================
+
+SafeGo is a global super-app with:
+
+1) Four roles (never mix permissions):
+   - customer
+   - driver
+   - restaurant (merchant)
+   - admin
+
+2) Three services:
+   - ride-hailing
+   - food delivery
+   - parcel delivery
+
+3) Country-specific KYC (BD vs US):
+
+   For BANGLADESH (BD):
+   - For customers and drivers you must store:
+     • father_name
+     • date_of_birth
+     • present_address
+     • permanent_address
+     • nid_number
+     • nid_front_image_url
+     • nid_back_image_url
+     • emergency_contact_name
+     • emergency_contact_phone
+     • verification_status ("pending" | "approved" | "rejected")
+     • is_verified (boolean)
+
+   For UNITED STATES (US):
+   - For customers and drivers you must store:
+     • date_of_birth
+     • home_address
+     • emergency_contact_name
+     • emergency_contact_phone
+     • government_id_type
+     • government_id_last4
+     • driver_license_number (drivers only)
+     • driver_license_image_url (drivers only)
+     • driver_license_expiry (drivers only)
+     • ssn_last4 (drivers only, optional)
+     • verification_status
+     • is_verified
+
+4) Admin panel capabilities (BACKEND ONLY for now):
+   - Admin can:
+     • list customers, drivers, restaurants
+     • approve/reject KYC with rejection_reason
+     • block/unblock any user
+     • configure pricing, fees and commission percentages
+     • view and settle negative balances for drivers and restaurants
+
+5) Core collections (Prisma models) REQUIRED:
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must have:
+   - identity fields (customer_id, driver_id and restaurant_id where relevant)
+   - pickup/dropoff or source/destination addresses + lat/lng
+   - service_fare, safego_commission, driver_payout, restaurant_payout (where relevant)
+   - payment_method ("cash" | "online")
+   - timestamps (created_at, updated_at, completed_at)
+   - status with a full status flow (see below)
+   - rating and feedback fields (from customer and from driver)
+
+6) Commission & payout rules (MUST be encoded in schema and comments, minimal logic for now):
+
+   - If customer pays CASH for a ride:
+       • Driver receives full cash
+       • SafeGo commission becomes a negative balance
+         in driver_wallet_balance (to be settled weekly)
+
+   - If food order is CASH:
+       • Restaurant receives full cash
+       • SafeGo commission becomes negative balance
+         in restaurant_wallet
+
+   - If payment is ONLINE:
+       • SafeGo keeps commission automatically (no negative balance)
+
+   - Admin can mark negative balances as settled.
+
+7) Security rules:
+   - Customers CANNOT see driver documents (NID, license images, etc.).
+   - Drivers CANNOT see customer NID or sensitive KYC details.
+   - Restaurants CANNOT see other restaurants.
+   - Only admin can:
+       • change pricing
+       • change commission
+       • approve or reject KYC
+       • block/unblock users
+   - Each user can only edit their OWN profile.
+
+8) Status flows (must be represented at least as enums in Prisma):
+
+   - Rides:
+       requested → searching_driver → accepted → driver_arriving
+       → in_progress → completed OR cancelled_x
+
+   - Food orders:
+       placed → accepted → preparing → ready_for_pickup
+       → picked_up → on_the_way → delivered OR cancelled_x
+
+   - Parcels:
+       requested → searching_driver → accepted → picked_up
+       → on_the_way → delivered OR cancelled_x
+
+9) Onboarding:
+   - For each role (customer, driver, restaurant):
+       • basic info
+       • address
+       • country-specific KYC fields (BD vs US)
+       • emergency contact
+       • verification_status = "pending" by default
+       • user CANNOT use core services until admin approves (is_verified = true)
+
+10) Notifications: For now just model them in the DB (no push service yet):
+   - new ride/food/parcel alerts for drivers
+   - order/ride status updates for customers
+   - verification approval/rejection notifications
+
+====================================================
+YOUR TASK IN THIS STEP (BACKEND ONLY)
+====================================================
+
+1) Project setup
+   - Initialize a clean Node.js + TypeScript + Express backend in a `/server` directory.
+   - Set up Prisma with PostgreSQL.
+   - Add scripts:
+       "dev": run ts-node-dev or equivalent to start the Express server in watch mode.
+
+2) Prisma schema
+   - Create a `schema.prisma` with at least the following models:
+
+     model User {
+       id            String   @id @default(uuid())
+       email         String   @unique
+       passwordHash  String
+       role          String   // "customer" | "driver" | "restaurant" | "admin"
+       countryCode   String   // "BD" | "US" | others for future
+       isBlocked     Boolean  @default(false)
+       createdAt     DateTime @default(now())
+       updatedAt     DateTime @updatedAt
+
+       driverProfile     DriverProfile?
+       customerProfile   CustomerProfile?
+       restaurantProfile RestaurantProfile?
+       adminProfile      AdminProfile?
+     }
+
+     // BD + US KYC for drivers
+     model DriverProfile {
+       id                     String   @id @default(uuid())
+       userId                 String   @unique
+       fatherName             String?  // BD only
+       dateOfBirth            DateTime?
+       presentAddress         String?
+       permanentAddress       String?
+       nidNumber              String?  // BD only
+       nidFrontImageUrl       String?
+       nidBackImageUrl        String?
+       homeAddress            String?  // US only
+       governmentIdType       String?  // US only
+       governmentIdLast4      String?
+       driverLicenseNumber    String?
+       driverLicenseImageUrl  String?
+       driverLicenseExpiry    DateTime?
+       ssnLast4              String?
+       emergencyContactName   String
+       emergencyContactPhone  String
+       verificationStatus     String   @default("pending")
+       isVerified             Boolean  @default(false)
+
+       user           User         @relation(fields: [userId], references: [id])
+       vehicle        Vehicle?
+       stats          DriverStats?
+       driverWallet   DriverWallet?
+     }
+
+     model CustomerProfile {
+       id                    String   @id @default(uuid())
+       userId                String   @unique
+       fatherName            String?  // BD only
+       dateOfBirth           DateTime?
+       presentAddress        String?
+       permanentAddress      String?
+       nidNumber             String?
+       nidFrontImageUrl      String?
+       nidBackImageUrl       String?
+       homeAddress           String?
+       governmentIdType      String?
+       governmentIdLast4     String?
+       emergencyContactName  String
+       emergencyContactPhone String
+       verificationStatus    String   @default("pending")
+       isVerified            Boolean  @default(false)
+
+       user User @relation(fields: [userId], references: [id])
+     }
+
+     model RestaurantProfile {
+       id                    String   @id @default(uuid())
+       userId                String   @unique
+       restaurantName        String
+       address               String
+       verificationStatus    String   @default("pending")
+       isVerified            Boolean  @default(false)
+
+       user            User            @relation(fields: [userId], references: [id])
+       restaurantWallet RestaurantWallet?
+     }
+
+     model AdminProfile {
+       id     String @id @default(uuid())
+       userId String @unique
+
+       user User @relation(fields: [userId], references: [id])
+     }
+
+     model Vehicle {
+       id            String   @id @default(uuid())
+       driverId      String   @unique
+       vehicleType   String   // "SafeGo X" | "SafeGo Comfort" | "SafeGo XL" | etc.
+       vehicleModel  String
+       vehiclePlate  String
+       isOnline      Boolean  @default(false)
+       totalEarnings Decimal  @default(0)
+
+       driver DriverProfile @relation(fields: [driverId], references: [id])
+     }
+
+     model DriverStats {
+       id         String   @id @default(uuid())
+       driverId   String   @unique
+       rating     Decimal  @default(5.0)
+       totalTrips Int      @default(0)
+       createdAt  DateTime @default(now())
+
+       driver DriverProfile @relation(fields: [driverId], references: [id])
+     }
+
+     model DriverWallet {
+       id              String   @id @default(uuid())
+       driverId        String   @unique
+       balance         Decimal  @default(0)   // positive = SafeGo owes driver
+       negativeBalance Decimal  @default(0)   // SafeGo commission to be settled
+
+       driver DriverProfile @relation(fields: [driverId], references: [id])
+     }
+
+     model RestaurantWallet {
+       id              String   @id @default(uuid())
+       restaurantId    String   @unique
+       balance         Decimal  @default(0)
+       negativeBalance Decimal  @default(0)
+
+       restaurant RestaurantProfile @relation(fields: [restaurantId], references: [id])
+     }
+
+     // Rides
+     model Ride {
+       id                String   @id @default(uuid())
+       customerId        String
+       driverId          String?
+       pickupAddress     String
+       pickupLat         Float
+       pickupLng         Float
+       dropoffAddress    String
+       dropoffLat        Float
+       dropoffLng        Float
+       serviceFare       Decimal
+       safegoCommission  Decimal
+       driverPayout      Decimal
+       paymentMethod     String   // "cash" | "online"
+       status            String   // see ride status flow
+       customerRating    Int?
+       customerFeedback  String?
+       driverRating      Int?
+       driverFeedback    String?
+       createdAt         DateTime @default(now())
+       updatedAt         DateTime @updatedAt
+       completedAt       DateTime?
+
+       // foreign keys can be added later if needed
+     }
+
+     // Food orders
+     model FoodOrder {
+       id                String   @id @default(uuid())
+       customerId        String
+       restaurantId      String
+       driverId          String?
+       deliveryAddress   String
+       deliveryLat       Float
+       deliveryLng       Float
+       serviceFare       Decimal
+       safegoCommission  Decimal
+       restaurantPayout  Decimal
+       driverPayout      Decimal
+       paymentMethod     String
+       status            String   // see food status flow
+       customerRating    Int?
+       customerFeedback  String?
+       createdAt         DateTime @default(now())
+       updatedAt         DateTime @updatedAt
+       deliveredAt       DateTime?
+     }
+
+     // Parcel deliveries
+     model Delivery {
+       id                String   @id @default(uuid())
+       customerId        String
+       driverId          String?
+       pickupAddress     String
+       pickupLat         Float
+       pickupLng         Float
+       dropoffAddress    String
+       dropoffLat        Float
+       dropoffLng        Float
+       serviceFare       Decimal
+       safegoCommission  Decimal
+       driverPayout      Decimal
+       paymentMethod     String
+       status            String   // see parcel status flow
+       customerRating    Int?
+       customerFeedback  String?
+       createdAt         DateTime @default(now())
+       updatedAt         DateTime @updatedAt
+       deliveredAt       DateTime?
+     }
+
+     model Notification {
+       id        String   @id @default(uuid())
+       userId    String
+       type      String   // "ride_update" | "food_update" | "parcel_update" | "verification" | "admin"
+       title     String
+       body      String
+       isRead    Boolean  @default(false)
+       createdAt DateTime @default(now())
+     }
+
+   - Make sure the schema syntax is valid Prisma. Run a migration to create the tables.
+
+3) Minimal auth routes (only what we need now)
+   Implement these routes in Express:
+
+   - POST /api/auth/signup
+     Body: { email, password, role?, countryCode }
+     Behavior:
+       * If role is missing, default to "driver".
+       * Hash the password.
+       * Create User with correct role and countryCode.
+       * If role === "driver": create DriverProfile with verificationStatus="pending".
+       * If role === "customer": create CustomerProfile.
+       * If role === "restaurant": create RestaurantProfile.
+       * Never leave role undefined. Validate role before inserting.
+
+   - POST /api/auth/login
+     Body: { email, password }
+     Behavior:
+       * Verify password.
+       * If user isBlocked == true → return 403.
+       * Return a signed JWT with { userId, role, countryCode }.
+
+   - GET /api/driver/home  (protected)
+     Behavior:
+       * Use JWT to ensure role === "driver".
+       * Return:
+           - basic driver profile
+           - vehicle info
+           - stats (rating, totalTrips)
+           - wallet summary (balance, negativeBalance)
+
+   - PATCH /api/driver/status  (protected)
+     Body: { isOnline: boolean }
+     Behavior:
+       * Update Vehicle.isOnline.
+       * Return updated status.
+
+4) Admin KYC & blocking (only backend endpoints, no UI now)
+   Implement minimal admin routes:
+
+   - GET /api/admin/pending-kyc  → list users with verificationStatus="pending"
+   - PATCH /api/admin/kyc/:userId  → { verificationStatus, rejectionReason? }
+   - PATCH /api/admin/block/:userId → block or unblock user
+
+   Restrict these routes to role === "admin" using middleware.
+
+5) Implementation discipline
+   - Use proper TypeScript types.
+   - Use a single Express app in /server.
+   - Do NOT add React, frontend, or queryClient in this step.
+   - If any error like "Cannot read properties of undefined (reading 'role')" appears, fix the root cause (for example, by validating input and providing defaults), not by hiding the error.
+
+After you finish:
+   - Show me:
+     * final schema.prisma
+     * the main Express server file
+     * the auth routes file
+     * the driver home routes file
+     * the admin KYC routes file
+   - Confirm that:
+     * Prisma migrations run successfully,
+     * POST /api/auth/signup and /api/auth/login work,
+     * GET /api/driver/home and PATCH /api/driver/status work.

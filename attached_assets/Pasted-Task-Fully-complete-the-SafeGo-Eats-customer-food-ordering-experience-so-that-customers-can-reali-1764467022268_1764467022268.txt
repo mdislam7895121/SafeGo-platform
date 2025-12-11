@@ -1,0 +1,166 @@
+Task: Fully complete the SafeGo Eats (customer food ordering) experience so that customers can realistically browse restaurants, build a cart, place orders, track delivery, and get support — at the same quality level as SafeGo Ride.
+
+Constraints:
+- Do NOT break existing Ride or Parcel flows.
+- Reuse shared components, security patterns (Auth, KYC, ProtectedRoute, visibilityRules, Zod validation).
+- No fake UI that doesn’t work: every visible button or link in the Eats flow must have a real, working behavior.
+
+Codebase to reuse (examples, not exhaustive):
+- food-restaurants.tsx (browse/search)
+- food-restaurant-details.tsx (menu)
+- food-order.tsx / checkout components
+- order-confirmation.tsx, order-tracking components
+- activity.tsx / order history
+- profile.tsx, support pages, notifications, wallet, payments
+
+Goals and steps:
+
+1) Navigation and entry points
+- Ensure the “Eats/Food” tab in the main header/service tabs correctly routes to the food home page.
+- Bottom nav (Home, Activity, Wallet, Profile) must work the same way for Eats orders as for Rides.
+- From Activity/History, tapping a food order should open a detailed receipt/tracking view (not a dead link).
+
+2) Restaurant browse & search
+- Verify and polish:
+  - Restaurant listing page (sorting, search, filters).
+  - Distance/ETA and surge info display (if available).
+- Add basic filters:
+  - Cuisine type (e.g., American, Asian, Pizza, etc.) using existing data fields.
+  - “Open now” filter that hides closed restaurants based on hours.
+- Make sure closed restaurants are clearly marked and cannot be ordered from right now (with clear messaging).
+
+3) Menu and “Add to cart” behavior
+- Ensure each menu item has:
+  - Name, short description, price, availability status.
+  - “Add to Cart” button connected to a CartContext (no raw JSON editing).
+- Cart behavior when adding:
+  - If items from the same restaurant: update quantities, show toast notification, update cart badge count.
+  - If user tries to add from a different restaurant: show a confirmation dialog:
+    • “Your current cart is from Restaurant A. To order from Restaurant B, we need to clear your cart and start a new one.”
+    • Buttons: Cancel / Start new order from Restaurant B.
+  - On confirm: clear existing cart atomically, then add the new item and update UI.
+
+4) Cart & checkout page (modern DoorDash/UberEats pattern)
+- Integrate the cart into a dedicated checkout page:
+  - Item list with:
+    • Item image/name
+    • Unit price
+    • Quantity selector (+/–)
+    • Per-item total and remove button (trash icon)
+  - Order summary panel with:
+    • Subtotal
+    • Delivery fee
+    • Taxes/fees
+    • Surge or busy-area fees (if active)
+    • Promo code field (reuse existing promo logic, but validate correctly for food vs ride)
+    • Final total
+- Address + delivery information:
+  - Delivery address picker using the same Google Places component and delivery zone validation used for Eats previously.
+  - Show a clear “Out of zone” error if the address is outside allowed delivery area.
+- Payment:
+  - Reuse existing payment-methods.tsx and wallet/payment selection.
+  - Require a valid payment method before allowing “Place order”.
+
+5) Special instructions and dietary notes
+- Add per-item special instructions:
+  - Optional text field under each cart item, with character counter (e.g., 0/120).
+  - Store safely in the order payload and show in the order summary and driver/restaurant views (where appropriate).
+- Add order-level notes:
+  - “Delivery instructions” (gate code, door, floor, etc.)
+  - Validate max length, ensure no HTML injection (sanitize or escape where needed).
+
+6) Tips and fees (compliant behavior)
+- Implement a tipping UI on checkout and/or after delivery:
+  - Preset percentages (e.g., 10%, 15%, 20%) plus “Custom amount”.
+  - Tip must be clearly optional and separate from delivery fee and service fee.
+- Show tip as a separate line in the price breakdown in:
+  - Checkout page (if tip chosen before order)
+  - Final receipt (if tip chosen after delivery)
+- All monetary calculations must be consistent and avoid floating point errors (reuse any existing helpers).
+
+7) Order placement & status flow (food)
+- When “Place order” is pressed:
+  - Validate with Zod: cart not empty, valid address, payment method, KYC if required by configuration.
+  - Create a food order with a clear status machine:
+    • CREATED
+    • ACCEPTED_BY_RESTAURANT
+    • PREPARING
+    • PICKED_UP_BY_DRIVER
+    • EN_ROUTE
+    • DELIVERED
+    • COMPLETED
+    • CANCELLED (customer/restaurant/system)
+- Ensure history and tracking read from this status field, not hardcoded text.
+
+8) Real-time tracking & ETA (food)
+- Reuse the real-time tracking that was just added:
+  - Map with driver/courier marker and route polyline from restaurant to customer.
+  - ETA updates based on distance and traffic, same logic as Ride.
+- Add a visible status timeline component on the tracking page:
+  - One row per state: Accepted, Preparing, Picked up, On the way, Delivered.
+  - Highlight current step, show timestamps when steps complete.
+- No fake data: use the same simulation/telemetry engine that drives Ride tracking, or reuse existing food tracking implementation.
+
+9) Favorites and re-order
+- Implement restaurant favorites:
+  - Heart icon on restaurant cards and detail page.
+  - Tapping toggles favorite state for the logged-in customer only.
+  - Add a “Favorites” filter or dedicated section on the Food home page.
+- Reorder from history:
+  - On Activity/History, for completed food orders, show a “Order again” button.
+  - Clicking:
+    • Rebuilds a new cart from the previous order’s items (only if still available).
+    • If some items are unavailable, show a clear message listing unavailable items and exclude them.
+    • Then redirect user to checkout with the rebuilt cart.
+
+10) Customer support & safety integration
+- From an active food order:
+  - Add “Help with order” action that opens the existing Customer → Support chat, passing the food order ID and type.
+- From order history details:
+  - Same “Contact support” button for completed/cancelled food orders.
+- Security/privacy:
+  - Support agents and drivers must NOT see customer payment methods.
+  - Mask customer phone and address appropriately according to existing visibilityRules.ts.
+
+11) Validation, security and access control
+- Use Zod schemas for:
+  - Checkout form (address, payment method, delivery instructions).
+  - Special instructions fields.
+  - Tip amount (must be >= 0 and within a reasonable limit).
+- Make sure:
+  - Only authenticated customers can create/view food orders.
+  - A customer can only see their own orders and tracking, never others.
+  - No sensitive data (raw tokens, full card numbers) is logged to console or server logs.
+
+12) Mobile/desktop UX polish and test IDs
+- Confirm all Eats screens are fully responsive on mobile and desktop:
+  - Restaurant list
+  - Menu
+  - Cart/checkout
+  - Tracking
+  - Order history details
+- Add data-testid attributes to key elements for testing:
+  - food-home
+  - restaurant-card
+  - food-cart
+  - food-checkout
+  - food-tracking-map
+  - food-status-timeline
+  - food-favorite-toggle
+  - food-reorder-button
+
+13) Documentation and status table update
+- Run the architect review after implementing all changes.
+- Update the feature status table for “SECTION 2: SafeGo Eats – Customer”:
+  - Cart & Checkout → DONE (with notes on new behavior).
+  - Add to Cart from Menu → DONE.
+  - Restaurant Favorites → DONE.
+  - Any other relevant rows → updated with finalized notes.
+- At the end of the loop, post a short “How to test SafeGo Eats” checklist:
+  - How to browse, filter, and favorite restaurants.
+  - How to add items from one or more restaurants and handle cart switching.
+  - How to checkout with address, payment, tips, and special instructions.
+  - How to track the order in real-time and see the status timeline.
+  - How to reorder from history and contact support about a food order.
+
+Implement all of the above in a safe, incremental way without breaking existing working features, and keep security and data privacy aligned with the patterns already used in SafeGo Ride.

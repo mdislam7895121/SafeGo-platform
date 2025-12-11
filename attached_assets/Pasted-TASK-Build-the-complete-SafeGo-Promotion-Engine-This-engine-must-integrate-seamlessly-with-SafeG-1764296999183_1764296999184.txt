@@ -1,0 +1,228 @@
+TASK: Build the complete SafeGo Promotion Engine.  
+This engine must integrate seamlessly with SafeGo’s Pricing Engine, Route System, USA regulatory rules, and multi-route fare calculation.
+
+Your goal is to increase customer happiness while protecting company revenue at all times.  
+Implement ALL promo types and business-safe logic exactly as defined below.
+
+=========================================================
+PHASE: SafeGo Full Promotion System (Loss-Protected)
+=========================================================
+
+The Promotion Engine must include 3 layers:
+
+1) Psychological Pricing (Anchor Fare)
+2) Smart Discount Illusion (0–5% actual discount)
+3) High-Impact Promos (Limited, capped, business-safe)
+
+=========================================================
+1. ANCHORED PRICING (Psychological Low-Price Model)
+=========================================================
+
+For every fare estimation:
+anchor_fare = original_fare * 1.10
+
+Display anchor_fare with strikethrough:
+Example: ~$32.50~   →   $29.50
+
+Customer believes SafeGo is cheaper.  
+Company does NOT lose money — anchor is artificial.
+
+UI Requirements:
+- Strikethrough anchor price
+- Green “Promo Applied”
+- “You saved $X.XX”
+
+saved_amount = anchor_fare − final_fare
+
+=========================================================
+2. PROMO TYPES (ALL REQUIRED)
+=========================================================
+
+Implement ALL promo models below:
+
+---------------------------------------------------------
+A) PROMO_APPLIED (0% REAL discount)
+---------------------------------------------------------
+No actual discount.  
+Pure psychological promotion.
+
+final_fare = original_fare
+saved_amount = anchor_fare − final_fare
+
+UI Tag:
+"Promo Applied — You saved $X.XX"
+
+Purpose:
+Customer thinks they saved money.  
+Company has ZERO loss.
+
+---------------------------------------------------------
+B) SAVER PROMO (2–3% discount, low cost)
+---------------------------------------------------------
+Customer waits longer → gets small discount.
+
+final_fare = original_fare * 0.97   (3% off)
+
+Rules:
+- max_loss_cap = $5
+- cannot reduce below minimum_fare[type]
+- shown only on low-demand routes
+
+UI:
+“Saver — Save by waiting a little longer”
+
+---------------------------------------------------------
+C) FIRST_RIDE PROMO
+---------------------------------------------------------
+Strong promo only ONCE per user.
+
+temp_price = original_fare * 0.92  
+final_fare = max(temp_price, original_fare - 7)
+
+Rules:
+- max absolute discount = $7
+- only for user's first ride
+- must be logged in user profile
+
+UI:
+“Welcome discount applied — limited to your first ride”
+
+---------------------------------------------------------
+D) TIME-BASED PROMO (Off-Peak Only)
+---------------------------------------------------------
+Apply only during:
+- late nights
+- mid-day
+- weekdays off-peak
+
+discount = 2–4%
+final_fare = original_fare * (1 - discount)
+
+Company safe because off-peak demand is low.
+
+---------------------------------------------------------
+E) LOCATION-BASED PROMO (Low-Demand Zones)
+---------------------------------------------------------
+Only applied if pickup OR dropoff is in SafeGo-defined low-demand polygon.
+
+discount = 2–3%
+
+Purpose:
+Increase business in weak zones.
+
+---------------------------------------------------------
+F) PAYMENT-METHOD PROMO (Wallet/Cashback)
+---------------------------------------------------------
+“Pay with SafeGo Wallet and Save $3”
+
+But:
+discount is credited to wallet, not real cash outflow.
+
+Company loss = zero (closed-loop money).
+
+---------------------------------------------------------
+G) REWARD POINTS SYSTEM
+---------------------------------------------------------
+Points Formula:
+1 dollar spent = 1 point  
+100 points = $1 credit
+
+Psychology:  
+Customer feels they’re earning a lot,  
+Company cost is extremely small.
+
+---------------------------------------------------------
+H) DRIVER ARRIVAL GUARANTEE
+---------------------------------------------------------
+If driver arrives late:
+credit $1 to Wallet
+
+Extremely low cost because it rarely triggers.
+
+=========================================================
+3. COMPANY LOSS PROTECTION LAYER
+=========================================================
+
+Must enforce all rules:
+
+promo_max_percent = 5%  
+promo_max_amount = $7  
+promo_cooldown_per_user = 2 promo uses per week  
+promo_wallet_only = true for heavy promos  
+no promo allowed during surge > 1.3x  
+no promo allowed if fare < minimum_fare  
+no promo allowed if regulatory fees exceed threshold  
+
+Back-end MUST block invalid promos.
+
+=========================================================
+4. FINAL FARE CALCULATION ORDER (MUST FOLLOW)
+=========================================================
+
+1. calculate original_fare (base + miles + minutes + traffic + tolls + regulatory)
+2. generate anchor_fare = original_fare * 1.10
+3. apply promo rules
+4. enforce loss protection caps
+5. adjust rounding
+6. output:
+
+{
+  "anchor_fare": ...,
+  "original_fare": ...,
+  "final_fare": ...,
+  "promo_type": ...,
+  "saved_amount": ...,
+  "breakdown": {
+      base,
+      miles,
+      minutes,
+      traffic,
+      toll,
+      airport,
+      city_boundary,
+      promo_discount,
+      safego_fee
+  }
+}
+
+=========================================================
+5. UI REQUIREMENTS
+=========================================================
+
+- Anchor price strikethrough
+- Bold final fare
+- Green Promo tag
+- “You saved $X.XX”
+- Most riders choose this option badge
+- Limited-time banner
+- Promo badges per route:
+    • Saver
+    • Promo Applied
+    • First Ride
+    • Wallet Cashback
+
+=========================================================
+6. LOGGING & SECURITY
+=========================================================
+Log:
+- Promo type
+- Promo rules applied
+- Discount amount
+- Anchor fare
+- User eligibility
+- Loss prevention rule triggered (if any)
+- Promo abuse detection
+
+=========================================================
+7. MUST NOT BREAK
+=========================================================
+- Existing Pricing Engine
+- Regulatory fees
+- Multi-route fare engine
+- Driver payout logic
+
+=========================================================
+END OF TASK
+=========================================================
+
+Build the full Promo Engine with all rules above, fully integrated and production-ready.

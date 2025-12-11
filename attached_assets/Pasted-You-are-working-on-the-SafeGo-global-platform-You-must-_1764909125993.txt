@@ -1,0 +1,419 @@
+You are working on the SafeGo global platform.
+
+You must implement the **SafePilot** module: an internal AI-powered admin assistant for SafeGo Admin. SafePilot’s purpose is to reduce admin workload, reduce company cost, and improve safety, fraud detection, and operational decisions for both Bangladesh (BD) and USA (US).
+
+Follow these rules strictly:
+
+- DO NOT break existing SafeGo features.
+- DO NOT rename or remove existing fields, APIs, or routes.
+- Only ADD new tables, routes, components, and config.
+- Respect existing RBAC v2, audit logging, and environment separation.
+
+====================================
+1. SAFEGO CORE RULES (DO NOT CHANGE)
+====================================
+
+You MUST respect these existing invariants:
+
+1. Roles:
+   - customer
+   - driver
+   - restaurant (merchant / partner)
+   - admin
+   - (plus any existing: shop_partner, ticket/rental_partner, etc.)
+
+   Each has its own signup/onboarding and permissions. There is only a simple customer signup; all other roles are created via controlled onboarding flows after login. DO NOT change this.
+
+2. Services:
+   - ride-hailing
+   - food delivery (SafeGo Eats)
+   - parcel / delivery (and shop/ticket/rental flows)
+
+3. Country-specific KYC:
+
+   For Bangladesh (BD), the system already enforces:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID (number + front/back images)
+   - emergency contact details
+   - verification_status + is_verified
+
+   For United States (US):
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - drivers: driver license + image + expiry
+   - drivers: ssn_last4 (optional)
+   - verification_status + is_verified
+
+   SafePilot MUST NOT bypass or weaken these checks. It can only suggest actions that go through existing flows.
+
+4. Admin Panel:
+   - Admin can verify customers, drivers, restaurants.
+   - Admin can approve/reject KYC and see rejection_reason.
+   - Admin can update pricing, fees, commissions.
+   - Admin can block/unblock any user.
+   - Admin can manage payouts, see driver/restaurant negative balances.
+
+5. Collections:
+   - rides
+   - food_orders
+   - deliveries
+
+   These collections already have:
+   - customer_id, driver_id, restaurant_id, etc.
+   - addresses + geolocation
+   - fees + commission
+   - payment details
+   - timestamps
+   - full status flows
+   - rating + feedback
+
+   SafePilot must use these collections as data sources; do NOT modify their schema in a breaking way.
+
+6. Commission and payout logic:
+   - If customer pays CASH:
+     - Driver/restaurant gets cash
+     - SafeGo commission becomes negative balance in driver/restaurant wallet
+     - Admin can settle later.
+   - If payment is online:
+     - SafeGo keeps commission automatically.
+
+   SafePilot must respect this when explaining or suggesting financial actions.
+
+7. Security & Privacy:
+   - Customers cannot see driver documents.
+   - Drivers cannot see customer NID or sensitive info.
+   - Restaurants cannot see other restaurants.
+   - Only admin can change pricing, commission, verification, blocking.
+   - Users can only edit their own profile.
+   - SafePilot must fully respect RBAC and NEVER leak hidden data across roles.
+
+8. Status flows (do not change these):
+   - Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+   - Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+   - Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+SafePilot can read these states, summarize them, and suggest actions, but cannot invent new states.
+
+====================================
+2. HIGH-LEVEL GOAL OF SAFEPILOT
+====================================
+
+You must build **SafePilot** as an internal admin AI system that:
+
+- Reduces total admin workload by at least 50–60% by automating analysis and first-level triage.
+- Reduces company cost (unnecessary refunds, fraud payouts, inefficient incentives).
+- Increases safety and fraud detection speed.
+- Helps admins make correct decisions faster, using real data, not guesses.
+
+SafePilot is **ADMIN-ONLY**. It is not visible in customer or driver apps.
+
+====================================
+3. ARCHITECTURE OVERVIEW
+====================================
+
+Implement SafePilot as:
+
+1) A backend intelligence layer:
+   - Gathers context (current page, filters, selected entities).
+   - Fetches relevant data from existing tables (rides, food_orders, deliveries, payouts, complaints, ratings, violations, KYC, fraud flags, safety incidents, notification_rules, jobs, health checks, error logs).
+   - Runs rule-based analytics and simple risk scoring.
+   - Returns structured JSON suggestions and insights.
+
+2) A frontend SafePilot UI:
+   - Always accessible in the admin console.
+   - Provides:
+     - a chat-like interface,
+     - context-aware suggestions,
+     - quick buttons for admin actions,
+     - attractive but efficient UI.
+
+3) A logging + audit layer:
+   - Tracks which admin used SafePilot,
+   - Which suggestion they accepted,
+   - What actions were executed.
+
+You are NOT integrating external AI services. Implement rule-based analytics, templates, and simple scoring functions using existing data models. The “AI” here is smart logic and rules powered by data, not external LLM calls.
+
+====================================
+4. DATA MODEL EXTENSIONS
+====================================
+
+Add new tables/models (names may be adjusted to match existing conventions):
+
+1. SafePilotInteraction
+   - id
+   - adminId
+   - timestamp
+   - pageKey (e.g. "admin.drivers.list", "admin.rides.details")
+   - contextEntityType (e.g. "driver", "customer", "ride", "order", "payout")
+   - contextEntityId (nullable)
+   - question (string, nullable)
+   - responseSummary (string)
+   - suggestionsJson (JSON)
+   - selectedActionKey (nullable)
+   - countryCode
+   - riskLevel (LOW, MEDIUM, HIGH, CRITICAL)
+
+2. SafePilotConfig
+   - id
+   - key (string, unique)
+   - valueJson
+   - description
+   - isEnabled (boolean)
+   - updatedByAdminId
+   - updatedAt
+
+Use this for SafePilot rules: thresholds, risk scoring, etc.
+
+DO NOT change core domain tables (rides, food_orders, deliveries, users, wallets, payouts) except by adding **non-breaking** optional fields if absolutely needed.
+
+====================================
+5. BACKEND MODULES & ENDPOINTS
+====================================
+
+Implement a SafePilot backend service, for example:
+
+- `/api/admin/safepilot/context`
+- `/api/admin/safepilot/query`
+- `/api/admin/safepilot/suggest-actions`
+- `/api/admin/safepilot/run-action` (for safe, limited actions only)
+
+All must be admin-only and protected by existing JWT + RBAC.
+
+A. Context Endpoint (`GET /api/admin/safepilot/context`)
+
+Input:
+- pageKey
+- optional entities: driverId, customerId, restaurantId, rideId, orderId, deliveryId, etc.
+- countryCode (BD/US)
+
+Output:
+- high-level summary:
+  - metrics for this page (e.g. total drivers, blocked drivers, pending KYC, etc.)
+  - key alerts (e.g. “high cancellation rate in Dhaka in last 24h”)
+  - recommended filters or actions
+
+B. Query Endpoint (`POST /api/admin/safepilot/query`)
+
+Input:
+- adminId (from token)
+- pageKey
+- question (plain English question or command)
+- context (selected entities, countryCode, time range)
+
+Output (structured JSON):
+- answerText (short explanation)
+- insights[]:
+  - type (e.g. "risk", "performance", "cost", "safety")
+  - title
+  - detail
+  - metrics (key-value)
+- suggestions[]:
+  - key (identifier)
+  - label (e.g. "Open high-risk drivers list")
+  - actionType (NAVIGATE, FILTER, OPEN_PANEL, RUN_REPORT)
+  - payload (what to do)
+
+C. Suggested Actions Endpoint (`POST /api/admin/safepilot/suggest-actions`)
+
+Input:
+- specific context (e.g. driverId, or rideId, or complaintId)
+
+Output:
+- structured list of safe actions with:
+  - required permission
+  - description
+  - link/route to navigate admin
+  - NOT auto-executing anything dangerous.
+
+D. Optional Safe Action Runner (`POST /api/admin/safepilot/run-action`)
+
+- Only for SAFE, reversible operations (e.g. opening filtered lists, generating reports, NOT for banning users or changing money).
+- Any risky action must still take admin through existing UI/mutation flows.
+
+E. Logging
+
+Every call must create a SafePilotInteraction record.
+
+====================================
+6. PERMISSIONS & FEATURE FLAG
+====================================
+
+Add:
+
+- Feature flag: `safepilot_enabled` (default false; allow enabling per environment).
+- New permission scope: `admin.safepilot.use`
+- Only SUPER_ADMIN or an appropriate admin role with this permission can see SafePilot UI and call its APIs.
+
+Ensure:
+- If feature disabled → UI hidden, routes return 404/403.
+- If admin lacks permission → hide button and deny access.
+
+====================================
+7. SAFEPILOT UI — FRONTEND REQUIREMENTS
+====================================
+
+Implement for the Admin web app.
+
+1. SafePilot Launcher:
+   - A small floating button (bottom-right) labeled “SafePilot”.
+   - Visible on all admin pages when `safepilot_enabled` AND admin has permission.
+   - Clicking opens a right-side drawer (panel).
+
+2. SafePilot Drawer Layout:
+   Tabs or sections:
+   - “Overview” — page-aware summary and key insights.
+   - “Ask SafePilot” — text input where admin can type commands/questions.
+   - “Quick Actions” — buttons for common tasks on this page.
+   - “Automation Ideas” — suggestions for rules, alerts, or reports.
+
+3. Page-aware behavior:
+   On each major admin page, SafePilot must provide meaningful content:
+
+   - People & KYC:
+     - show counts: pending KYC, rejected, risky profiles.
+     - highlight unusual patterns (e.g. many BD NID mismatches).
+     - suggest bulk review strategies.
+
+   - Driver Management:
+     - list at-risk drivers (low rating + many complaints).
+     - suggest who to send training, who to monitor.
+
+   - Restaurant / Shop / Ticket Partners:
+     - highlight partners with late orders, poor ratings, cancellations.
+     - suggest actions (visit their dashboard, review payouts, check menu issues).
+
+   - Safety Center / Violations:
+     - aggregate safety incidents.
+     - show top-risk zones.
+     - suggest escalation flows.
+
+   - Ratings & Reviews:
+     - find fake-looking reviews.
+     - show drivers/customers with abnormal rating patterns.
+
+   - Refund Center:
+     - show refund volume.
+     - detect high refund reasons.
+     - suggest policy changes.
+
+   - Payouts & Finance:
+     - show abnormal payouts.
+     - detect negative balances.
+     - highlight drivers/restaurants with repeated payout issues.
+
+   - Operations / Jobs / Health:
+     - summarize job failures.
+     - summarize degraded services.
+     - recommend priority fixes.
+
+   - Releases & Publish:
+     - show open issues before promoting release.
+
+4. Chat-like interaction (Ask SafePilot):
+   - Text input + send button.
+   - Show conversation history in the panel.
+   - For each question:
+     - show SafePilot’s answer.
+     - show clickable suggested actions (e.g. “Open filtered list”).
+
+5. UX:
+   - Mobile responsive.
+   - Proper loading and error states.
+   - No unhandled promise rejections or console errors.
+
+====================================
+8. RISK & COST REDUCTION LOGIC (RULES)
+====================================
+
+Implement rule-based analytics (you can encode these as functions or configs):
+
+Examples:
+
+- High risk driver:
+  - low average rating (< 3.0)
+  - > X complaints in last Y days
+  - any safety violation flags
+
+- High risk customer:
+  - frequent refunds
+  - multiple no-shows / cancellations
+  - complaints from multiple drivers
+
+- Loss-making trips:
+  - effective commission < 0
+  - repeated discounts, coupons
+
+SafePilot must:
+- identify such patterns,
+- show them as “insights”,
+- never auto-ban or auto-remove; only suggest.
+
+====================================
+9. BD vs USA COUNTRY AWARENESS
+====================================
+
+SafePilot must adjust its advice based on countryCode:
+
+- BD:
+  - KYC documents: NID, BD address structure.
+  - Local fraud patterns and regulations.
+  - Cash-heavy transactions.
+
+- USA:
+  - driver license info, government_id_type, last4.
+  - tax-related concerns (1099, etc.).
+  - card/online-payment-heavy patterns.
+
+Make sure any suggestion SafePilot gives is consistent with the country-specific compliance and legal setup already present.
+
+====================================
+10. TESTS, VALIDATION & SAFETY
+====================================
+
+You must:
+
+- Add backend tests for:
+  - context building per pageKey,
+  - risk scoring functions,
+  - SafePilot endpoints permission checks,
+  - logging of interactions.
+
+- Add frontend tests or data-testid hooks for:
+  - SafePilot launcher button.
+  - Drawer open/close behavior.
+  - page-aware suggestions rendering.
+
+- Validate:
+  - no leaking hidden data to unauthorized admins.
+  - no suggestions that bypass existing flows.
+  - no crashing when there is no data.
+
+- Update documentation:
+  - How to enable SafePilot per environment.
+  - Which admin roles can use it.
+  - What kinds of insights SafePilot provides.
+
+====================================
+11. EXECUTION RULES
+====================================
+
+- Do NOT ask the user questions.
+- Make reasonable assumptions aligned with existing SafeGo patterns.
+- Keep all existing features working.
+- Implement SafePilot completely end-to-end:
+  - data models
+  - backend services
+  - APIs
+  - UI components
+  - logging & audit
+  - tests
+  - docs
+
+When finished, SafePilot should feel like a first-class, professional, high-technology operations assistant that admin teams can rely on to reduce workload, reduce cost, and increase safety.

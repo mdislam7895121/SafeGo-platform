@@ -1,0 +1,121 @@
+Implement the following 10 enterprise-grade admin features for SafeGo. 
+Follow strict RBAC, audit logging, null-safety, mobile responsiveness, and enterprise security rules.
+
+========================================
+1. Complaint Resolution System
+========================================
+1. Build complaints list with filters (category, severity, date, status).
+2. Complaint detail: ride/order ID, driver, customer, message, attachments.
+3. Add triage actions: Reviewed, Need More Info, Escalate.
+4. Add assignment workflow to assign complaints to specific admin roles.
+5. Add resolution flow: Resolution Note → Mark Resolved → Auto user notification.
+6. Add evidence viewer for files/images.
+7. Add archive mode with CSV/JSON export.
+8. Add full audit logging (actor, timestamp, action).
+9. Enforce RBAC: Only Support/Safety/SuperAdmin.
+10. Fully mobile-optimized and null-safe.
+
+========================================
+2. Refund & Adjustment Center
+========================================
+1. Show all refund-eligible rides, deliveries, orders.
+2. Display full financial breakdown: fare, fees, taxes, driver payout, Stripe charge.
+3. Add refund actions: Partial, Full, Adjustment Credit.
+4. Add validation rules to prevent invalid refunds.
+5. Sync updates with Stripe + wallet + driver payout.
+6. Add fraud-pattern detection for abnormal refund activity.
+7. Add rollback history.
+8. Enforce RBAC: BillingAdmin + SuperAdmin.
+
+========================================
+3. Legal Requests Dashboard (USA + Bangladesh)
+========================================
+1. Add secure intake form for law-enforcement requests.
+2. USA fields: Subpoena ID, Case ID, Agency.
+3. BD fields: GD Number, Police Station, IO Name.
+4. Workflow: Received → Verification → Processing → Delivered → Archived.
+5. Add secure evidence download with auto-expire links.
+6. Add tamper-proof audit logging.
+7. Add automatic request expiry system.
+8. Enforce RBAC: LegalAdmin + SuperAdmin.
+
+========================================
+4. Admin Communication Hub
+========================================
+1. Create announcement composer (title, message, image).
+2. Target groups: Customers, Drivers, Restaurants, All.
+3. Channels: Push Notification, SMS, Email, In-app banners.
+4. Add scheduling (send now or schedule).
+5. Add performance analytics (open, click, delivery).
+6. Add multi-language (EN/BN).
+7. Enforce RBAC: CommunicationAdmin + SuperAdmin.
+
+========================================
+5. Document Manager (KYC, Driver, Vehicle)
+========================================
+1. Show all documents for Customers, Drivers, Restaurants.
+2. Add states: Pending, Verified, Rejected.
+3. Add reject-reason system + re-upload request.
+4. Add expiry tracking with reminders.
+5. Add bulk approval.
+6. BD rules: NID mandatory. USA rules: DL + SSN verification.
+7. Add audit logging for all approvals.
+8. Enforce RBAC: VerificationAdmin + SuperAdmin.
+
+========================================
+6. Safety Incident Replay Tool
+========================================
+1. Load ride timeline with GPS snapshots.
+2. Display event markers: Speed spike, Hard brake, Route deviation.
+3. Add timeline scrubber synced to map.
+4. Add incident summary with severity.
+5. Export incident report as PDF.
+6. Enforce RBAC: SafetyAdmin + SuperAdmin.
+
+========================================
+7. Real-time Admin Map Control System
+========================================
+1. Real-time driver tracking map.
+2. Filters: online, offline, busy, idle, on-trip.
+3. Add demand heatmap.
+4. Show route polylines for active trips.
+5. Add driver emergency ping.
+6. Add geofence create/edit/delete tools.
+7. Enforce RBAC: OpsAdmin + SuperAdmin.
+
+========================================
+8. Email Template Editor
+========================================
+1. Templates: Ride Receipt, Refund Notice, Payout Summary, Verification.
+2. Add WYSIWYG editor with HTML preview.
+3. Add version control.
+4. Add test-send feature.
+5. Multi-language variants.
+6. Enforce RBAC: CommunicationAdmin + SuperAdmin.
+
+========================================
+9. SMS Template & Automation Engine
+========================================
+1. Add OTP, ride-status, and emergency-alert templates.
+2. Add variable placeholders: {name}, {otp}, {rideId}.
+3. Add delivery logs and error logs.
+4. Add routing rules per country (BD telecom, USA Twilio).
+5. Enforce RBAC: CommunicationAdmin + SuperAdmin.
+
+========================================
+10. Internal Admin Chat System
+========================================
+1. Add admin chat channels per department: Safety, Support, Finance, Ops.
+2. Add private message support.
+3. Add file/image sharing.
+4. Add admin tagging: @username.
+5. Add message read receipts.
+6. Add audit logging for compliance.
+7. Enforce RBAC: All Admins + SuperAdmin.
+
+========================================
+Deliverables:
+- All features must be integrated into existing admin UI.
+- Follow SafeGo security standards (RBAC, audit, input validation).
+- Ensure complete mobile optimization.
+- No breaking changes to existing features.

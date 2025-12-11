@@ -1,0 +1,130 @@
+Fix promo visibility in NEW customer design (UI only, no logic changes)
+
+Global safety rules:
+- Do NOT change:
+  - Promo / discount / commission calculation
+  - Fare engine, quote API, routes, DB schema or any backend function
+- You may ONLY update UI components and layout on the NEW customer booking experience.
+
+Goal:
+In the new /customer unified design, promotions are active in pricing, but the rider cannot SEE them. I want the UI to clearly show:
+1) there is an active SafeGo promo on this ride, and  
+2) how much the rider is saving, similar to Uber.
+
+Use existing quote / promo data only (e.g. originalFare, finalFare, discountAmount, discountPercent, promoName). Do not invent new fields.
+
+--------------------------------
+STEP 1 – Find where the new customer design reads promo data
+
+1. Locate the React/TSX component that renders the NEW /customer ride list (the SafeGo Ride tab with cards like “SafeGo X”, “SafeGo Comfort”, etc.).
+2. Identify how the price is currently coming from the quote object.
+3. Identify any existing properties such as:
+   - originalFare / baseFareBeforePromo
+   - discountedFare / totalFare
+   - discountAmount
+   - discountPercent
+   - promoName / promoType (e.g. “SafeGo Everyday Saver”)
+
+Do NOT change how these values are calculated. Just reuse them for UI.
+
+--------------------------------
+STEP 2 – Add a global promo strip under the address capsule
+
+On the NEW /customer page, when a promo is active for the current quote:
+
+1. Directly under the address capsule (the two-line pickup/dropoff capsule) and above “Choose a ride”, render a global promo strip:
+
+   - Full-width bar with:
+       background: #DCFCE7  (light SafeGo green)
+       text color: #166534
+       border-radius: 9999px
+       padding: 8–10px vertical, 16px horizontal
+
+   - Left content:
+       icon: green lightning or tag
+       bold label: `SafeGo Everyday Saver`
+       secondary text:
+         - If you have discountPercent: `• {discountPercent}% off your ride`
+         - If you only have discountAmount: `• You save ${discountAmount.toFixed(2)} on this ride`
+
+   - Right side:
+       small neutral text: `Applied automatically`
+       (Do NOT add a “Remove” button here unless there is already business logic for removing the promo. We only show that this promo is active.)
+
+2. Only show this strip when:
+   - There is an active promo in the quote for at least one ride option, AND
+   - discountAmount > 0 (or discountPercent > 0).
+
+3. On mobile:
+   - The promo strip must be fully visible and sit between the address capsule and the “Choose your ride” section.
+   - It must not push the map off-screen; use vertical stacking only.
+
+--------------------------------
+STEP 3 – Show savings clearly on each ride card
+
+In each ride option card (SafeGo X, SafeGo Comfort, SafeGo XL, etc.):
+
+1. Price area:
+   - Show the **discounted fare** as the main price in bold, large, black text.
+   - If originalFare > discountedFare:
+       - Show `originalFare` to the right or directly under the main price as:
+           - smaller font
+           - gray color (#6B7280)
+           - with strikethrough.
+
+2. Savings text:
+   - If discountAmount > 0 for that specific option, show a line under the price:
+       - Text: `You save $X.XX`
+         where X.XX = discountAmount for this option (to two decimals).
+       - Style:
+           color: #16A34A
+           font-size: small but readable
+           font-weight: 500
+
+3. Badges:
+   - Keep the existing “Popular” badge on SafeGo X.
+   - Keep or add a “Saver” badge on any option with a promo:
+       - Small pill with:
+           background: #BBF7D0
+           color: #166534
+           text: `Saver`
+   - Make sure badges, price, and savings line are visually balanced (no overlap, no wrapping into ugly lines).
+
+4. Important: If a specific ride type has **no** discount, then:
+   - Show only the normal price (no strikethrough, no “You save” text, no “Saver” badge) for that card.
+
+--------------------------------
+STEP 4 – Keep desktop + mobile consistent
+
+1. On desktop width:
+   - Global promo strip visible under the address capsule.
+   - Each card shows:
+       - discounted price
+       - original strikethrough price (when promo exists)
+       - “You save $X.XX” line (when promo exists)
+       - badges (Popular, Saver) as designed.
+
+2. On mobile width:
+   - Use the same information and styles, but adjust spacing so:
+       - No text is cut off
+       - No horizontal scrolling is needed inside the card
+       - The promo strip and “You save” lines remain readable.
+
+3. Confirm that route selection and fare summary screens still show the same discounted totals and that you did not touch the promo engine at all.
+
+--------------------------------
+STEP 5 – Testing
+
+1. Create or use a scenario where a SafeGo Everyday Saver promo is active.
+2. From `/customer`, enter pickup & dropoff and open the ride list.
+3. Verify:
+   - Global promo strip appears under the address capsule.
+   - Each discounted ride card clearly shows:
+       - discounted fare
+       - original strikethrough fare
+       - “You save $X.XX”
+       - “Saver” badge where applicable.
+4. Turn off promo (if such a state exists) and confirm:
+   - Global promo strip disappears.
+   - Cards no longer show strikethrough prices or “You save” lines.
+5. Report back which component(s) were updated and confirm no backend or pricing logic was modified.

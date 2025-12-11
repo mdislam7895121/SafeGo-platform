@@ -1,0 +1,59 @@
+Implement full cross-city, cross-state, and regulatory pricing rules for SafeGo rides. 
+No fee should be missing. Extend the fare engine with the following:
+
+1. Cross-City Surcharge (within same state)
+   - Trigger: pickupCity != dropoffCity AND pickupState == dropoffState
+   - Flat fee: $5
+   - Should NOT apply when cross-state surcharge is applied.
+
+2. Cross-State Surcharge
+   - Trigger: pickupState != dropoffState
+   - Flat fee: $10
+   - Overrides cross-city surcharge.
+
+3. Add Return Deadhead Charge (Uber-style)
+   - Trigger: cross-state ride OR trip exceeds service area
+   - Formula: excessReturnMiles × $0.25
+   - Add to fare breakdown under: returnDeadheadFee
+
+4. Add State Regulatory Fees (per state rules)
+   - New York: Black Car Fund fee = 2.5%
+   - New Jersey: Transportation Fee = $0.50
+   - Connecticut: Ride-share fee = $0.40
+   - Apply based on pickupState.
+   - Add to breakdown: regulatoryFees
+
+5. Airport Surcharge Override System
+   - Detect airport zones using airport codes or geo-polygons.
+   - If airport pickup or dropoff:
+       • Apply airportFee (variable per airport)
+       • DO NOT apply cross-city surcharge
+       • Cross-state surcharge remains unless airport rule overrides
+
+6. Border-Zone Special Rules
+   - If pickup or dropoff within defined border zones:
+       • Apply zoneFee = $3.00
+       • Add to breakdown: borderZoneFee
+
+7. Multi-State Trip Handling
+   - If route passes through multiple states:
+       • Apply surcharge only for final state
+       • Intermediate states ignored
+
+8. State-Based Minimum Fare Rules
+   - Use pickupState rules:
+       • NY minimum fare = $8
+       • NJ minimum fare = $7
+       • CT minimum fare = $6
+   - Override global minimum fare.
+
+9. Output all components in fare breakdown with explicit flags:
+   - crossCityApplied
+   - crossStateApplied
+   - regulatoryFeeApplied
+   - airportFeeApplied
+   - borderZoneFeeApplied
+   - returnDeadheadApplied
+   - stateMinimumFareApplied
+
+Ensure the pricing engine handles all priority/override logic correctly.

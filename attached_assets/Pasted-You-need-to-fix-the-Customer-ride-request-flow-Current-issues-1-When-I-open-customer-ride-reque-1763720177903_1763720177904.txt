@@ -1,0 +1,30 @@
+You need to fix the Customer ride request flow.
+
+Current issues:
+1. When I open /customer/ride-request I get a 404 “Page Not Found – Did you forget to add the page to the router?”
+2. When I submit the ride form from the customer app, I see a red toast: `500: {"error":"Failed to create ride request"}`.
+
+What I need:
+
+1. Inspect the frontend router (e.g. client/src/App.tsx or the main routes file) and:
+   - Add a proper route for the customer ride screen (for example `/customer/ride-request` or the path you think is best).
+   - Map that route to the existing Ride Details form component. If no dedicated component exists yet, create one in the proper folder (e.g. client/src/pages/customer/RideRequest.tsx) and move/reuse the current form code there.
+
+2. From the customer home screen:
+   - Make sure the “Request Ride” card/button navigates to this new ride request page instead of any missing route.
+   - Keep the UX simple: customer taps Request Ride → sees the Ride Details form → submits.
+
+3. Backend:
+   - Trace which API endpoint is called when the customer presses “Request Ride”.
+   - Fix the controller/service so that ride creation works and does not return `500 "Failed to create ride request"`.
+   - Validate inputs (addresses, optional latitude/longitude, fare, payment method) and return a clear error if something is invalid, but do NOT crash.
+   - Respect existing security rules: use the customer’s authenticated user id, apply jurisdiction filters, and do not break any RBAC logic.
+
+4. After implementing:
+   - Restart the app.
+   - From the customer app, start on the dashboard, go to the ride request screen, submit a test ride, and verify that:
+     * The request succeeds (no 500),
+     * The ride appears wherever rides are listed for the customer and for drivers (if implemented).
+   - Take a screenshot of the working customer ride request screen and the successful response.
+
+5. Very important: Do not change or break any existing Admin, Earnings, Payouts, Wallets, Analytics, or Tax & Fees behavior. Keep changes minimal, well-commented, and aligned with the existing SafeGo architecture.

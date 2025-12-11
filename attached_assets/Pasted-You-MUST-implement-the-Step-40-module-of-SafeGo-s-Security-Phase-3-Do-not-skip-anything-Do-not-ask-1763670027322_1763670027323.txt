@@ -1,0 +1,160 @@
+You MUST implement the Step 40 module of SafeGo's Security Phase 3.
+Do not skip anything. Do not ask for confirmation. Fully complete the entire step.
+
+STRICT REQUIREMENTS:
+• Do NOT break any existing UI or backend feature.
+• Do NOT remove or rename any table, field, or endpoint unless it is part of Step 40.
+• Do NOT interfere with Phase 4 or other roadmap steps.
+• Follow SafeGo security rules (masking, RBAC, access control, audit logs).
+
+====================================================
+STEP 40 OBJECTIVE — SECURE UX SURFACES (FULL)
+====================================================
+
+Implement secure UX surfaces across Admin, Driver, Customer, and Restaurant dashboards.
+This step does NOT require major backend refactoring — only secure UI integration and small supportive backend additions.
+
+You must implement:
+
+----------------------------------------------------
+(1) SECURITY STATUS BADGE (GLOBAL)
+----------------------------------------------------
+Add a small badge component that appears at the top-right of every profile page:
+• Driver profile page
+• Customer profile page
+• Restaurant profile page
+• Parcel sender/receiver profile pages
+• Admin profile page
+
+Badge states:
+• "Verified"
+• "Partially Verified"
+• "Unverified"
+• "Flagged"
+• "Suspended"
+
+Rules:
+• Use existing KYC + document + status fields.
+• BADGE MUST NOT reveal sensitive information (SSN/NID details).
+• Colors must follow existing theme.
+• Badge must appear consistently and not overlap other UI.
+
+----------------------------------------------------
+(2) SECURITY NOTES PANEL
+----------------------------------------------------
+Add a non-editable, read-only "Security Notes" section to the bottom of every profile:
+• Drivers (BD + USA)
+• Customers
+• Restaurants
+• Parcel participants
+
+Backend:
+• Use the existing `securityNotes` field from Phase 2.
+• No new table required.
+• READ-ONLY in the UI.
+• Only super-admin can edit via existing admin settings page (already built in Phase 2).
+
+----------------------------------------------------
+(3) SENSITIVE ACTION PROTECTION
+----------------------------------------------------
+Add lightweight UX protection (NO backend break):
+
+When admin attempts:
+• Change bank info
+• Change KYC result
+• Change status (block/suspend)
+• Change SSN/NID (masked)
+• Change driver payout settings
+• Change restaurant commission settings
+
+Show a modal:
+-------------------------------------
+"Security Confirmation Required"
+• Action summary
+• 'Confirm' button
+• 'Cancel' button
+-------------------------------------
+
+No 2FA yet (that's Phase 4).
+This is ONLY UX-level confirmation modal.
+
+----------------------------------------------------
+(4) SESSION REFRESH INDICATOR
+----------------------------------------------------
+Add a subtle indicator when session refresh is required:
+• After password change
+• After email/phone change
+• After bank info update
+
+UI requirement:
+• Non-intrusive banner at top:
+  "Your session has been updated. Please refresh."
+
+Do NOT auto logout.
+
+----------------------------------------------------
+(5) ACCOUNT TYPE LABELING
+----------------------------------------------------
+Add a clear, small label at the top of each profile:
+
+Driver (Bangladesh)
+Driver (USA)
+Driver (USA — New York)
+Customer (Bangladesh)
+Customer (USA)
+Restaurant (Bangladesh)
+Restaurant (USA)
+
+Rules:
+• Determined by country + region fields already existing.
+• NO new backend fields.
+• Small aesthetic label, not a large header.
+
+----------------------------------------------------
+(6) ACCESS CONTROL VISIBILITY (RBAC UI)
+----------------------------------------------------
+Hide all buttons, toggles, or actions the current admin role is NOT allowed to perform.
+
+Examples:
+• Support role cannot change commission.
+• KYC agent cannot access restaurant tax info.
+• Finance admin cannot modify user documents.
+
+Backend permissions already exist — just bind UI visibility.
+
+----------------------------------------------------
+(7) AUDIT LOG VISUAL HIGHLIGHTING
+----------------------------------------------------
+When a profile has any related audit events marked:
+• Failed login attempt
+• Suspicious activity
+• Document rejection
+• Account suspension
+
+Show a small red dot indicator on the profile tab.
+
+Do NOT fetch large data — use existing lightweight `/audit/summary` style query.
+
+----------------------------------------------------
+(8) STRESS-TESTING & VALIDATION
+----------------------------------------------------
+Before finishing Step 40:
+• Confirm no overlapping UI
+• Confirm mobile responsiveness stays correct
+• Confirm badge + label follow dark/light mode
+• Confirm no sensitive data leaks
+• Confirm all profile types have uniform layout
+
+----------------------------------------------------
+DELIVERABLES
+----------------------------------------------------
+Respond ONLY after completing:
+
+1. All UI components
+2. All conditional logic
+3. All security confirmations
+4. Integration with existing backend
+5. Full testing done
+
+Do NOT ask for clarification.
+Fully complete Step 40, exactly as written above.

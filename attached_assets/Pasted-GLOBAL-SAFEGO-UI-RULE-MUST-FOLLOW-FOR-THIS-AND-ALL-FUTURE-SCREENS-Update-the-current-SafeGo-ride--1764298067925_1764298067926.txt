@@ -1,0 +1,56 @@
+GLOBAL SAFEGO UI RULE (MUST FOLLOW FOR THIS AND ALL FUTURE SCREENS)
+
+Update the current SafeGo ride & promo UI so that it works perfectly on BOTH mobile and desktop web.
+
+Do NOT touch the pricing logic, promo math, or backend APIs. Only improve layout, responsiveness, and visual hierarchy.
+
+Requirements:
+
+1) Responsive Breakpoints
+   - Mobile: up to ~480px
+   - Tablet: ~768–1024px
+   - Desktop: 1280px and above
+
+2) Layout Behavior
+   - Mobile:
+     - Single-column layout.
+     - Map on top, then fare card, then promo details.
+     - Buttons full-width.
+   - Desktop:
+     - Two-column layout:
+       - Left: map and route selector.
+       - Right: fare breakdown, promo tags, payment method, CTA buttons.
+     - Keep a max-width container centered for large screens.
+
+3) Shared Components
+   - Use the same React components for mobile and desktop; only the layout/grid changes with CSS breakpoints.
+   - No duplicate markup for mobile vs desktop.
+
+4) Fare & Promo Card UI
+   - Mobile:
+     - Show final price big and bold at the top.
+     - Under it show: anchor price (strikethrough), “You saved $X.XX”, promo badge.
+   - Desktop:
+     - Same information, but arranged in a card with clearer sections:
+       - Top: ride type + ETA + price.
+       - Middle: promo info + savings.
+       - Bottom: detailed breakdown (expand/collapse).
+
+5) Technical Implementation
+   - Use the existing design system (buttons, cards, typography).
+   - Use CSS grid or flex with media queries (or existing tailwind/breakpoint system, if present).
+   - Do NOT hardcode pixel values per device; use sensible breakpoints.
+
+6) Testing
+   - Verify layout on:
+     - ~390px (iPhone)
+     - ~768px (iPad)
+     - ~1440px (laptop)
+   - Ensure nothing overflows, text doesn’t get cut, and cards don’t look cramped on desktop.
+
+7) No Logic Changes
+   - Do not change any pricing calculations.
+   - Do not change API contracts.
+   - Only change JSX/layout and styling for responsiveness.
+
+After changes, the same URL must look professional both on phone and on laptop/desktop.

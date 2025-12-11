@@ -1,0 +1,218 @@
+SAFEGO MASTER RULES (ALWAYS APPLY)
+
+1) Multi-role super-app:
+   - Roles: Customer, Driver, Restaurant, Admin.
+   - Services: Rides, Food Delivery, Parcel/Package.
+   - Every change must keep all 4 roles working: no breaking changes.
+
+2) Core data & collections:
+   - Rides, Food Orders, Deliveries as first-class collections.
+   - Payments, Payouts, Promotions, KYC, Support/Tickets are shared systems.
+   - Never hard-code IDs or emails; always use existing relations and helpers.
+
+3) Country & KYC rules:
+   - USA & Bangladesh KYC flows already exist.
+   - Never bypass KYC/verification checks.
+   - Reuse existing helpers like getVerifiedDriverProfile() if relevant.
+
+4) Admin panel rules:
+   - Admin views are for monitoring & configuration only.
+   - Do not change admin security or permissions.
+   - Any new navigation must respect existing access control.
+
+5) Commission & payout rules:
+   - Do not change payouts, fees, or promo math in this task.
+   - Earnings logic must remain exactly as is.
+
+6) Security rules:
+   - Use existing auth/guard middleware; do not create new insecure routes.
+   - No leaking internal IDs or sensitive data in query strings if avoidable.
+   - Validate all inputs and handle null/undefined responses safely.
+   - Never break existing login, KYC, or document upload flows.
+
+7) Status flows:
+   - Do not change ride/order/delivery state machines.
+   - Do not change ticket/support status flows.
+   - This task is ONLY about navigation to the existing driver help center.
+
+8) Onboarding & UX:
+   - Keep current UX structure for the driver dashboard.
+   - New UI must match existing design system (buttons, typography, colors).
+   - Mobile and desktop views must both work (responsive design).
+
+9) Implementation discipline:
+   - Read replit.md and existing code before changing anything.
+   - Make minimal, targeted changes.
+   - No schema changes, no new migrations for this task.
+   - Fix TypeScript/ESLint errors you introduce.
+   - Add safe null/undefined checks instead of assuming data is always present.
+
+10) Task completeness:
+   - Implement from start to finish in ONE pass.
+   - Include UI, routing, integration, and basic tests/checks.
+   - Do not leave TODOs.
+   - Do not ask the user questions; make reasonable, safe assumptions and complete the work.
+
+
+====================================================
+TASK D7-NAV: Add Driver Help Center link to driver sidebar
+====================================================
+
+Goal:
+The Driver Support & Help Center system is already implemented (D7). Now I want a professional, Uber/Lyft-style navigation entry so drivers can easily open the Help Center from their main driver UI.
+
+You must:
+- Add a "Help Center" (or "Support") navigation link for drivers.
+- Reuse the existing driver support/help routes and pages.
+- Keep everything consistent with the current driver sidebar and design.
+- Finish the implementation end-to-end in this task (no partial work).
+
+Please follow these steps carefully.
+
+--------------------------------
+1) Understand current driver layout and support routes
+--------------------------------
+1. Open replit.md and any driver architecture documentation to understand:
+   - Where the driver layout and sidebar are defined.
+   - What the current route is for the driver Help Center / Support page.
+
+2. In the client codebase, locate:
+   - The main driver layout component (e.g. something like:
+     - client/src/layouts/DriverLayout.tsx
+     - or client/src/components/driver/DriverSidebar.tsx
+     - or similar).
+   - The existing driver Help/Support page component and route, for example:
+     - /driver/support
+     - /driver/help-center
+     - /driver/help
+     (Whatever is ALREADY configured. DO NOT create a new route if one already exists.)
+
+3. Confirm how driver sidebar links are currently configured:
+   - Some JSON/array of navigation items, or
+   - Hard-coded list of <NavLink>/<Link> components.
+
+4. Confirm which router is in use (Next.js pages/app router, React Router, or custom).
+
+Do NOT change any route paths that are already in use. Only reuse them.
+
+--------------------------------
+2) Add driver Help Center navigation item (sidebar + optional header)
+--------------------------------
+Implement the following:
+
+1. In the driver sidebar/navigation configuration:
+   - Add a new navigation item:
+     - Label: "Help Center"
+     - Icon: Reuse an existing icon style (e.g., a question-mark, life-ring, or info icon) consistent with other sidebar items.
+     - Route: Use the EXISTING driver help/support route you found earlier.
+       Example route name (for illustration only):
+         path: "/driver/support" 
+       You must use the actual path from the codebase.
+
+2. If there is a top-right profile or overflow menu in the driver UI:
+   - Optionally add a secondary "Help Center" link there as well for better UX.
+   - Do not remove anything that already exists.
+
+3. Respect role-based access:
+   - Ensure the Help Center link only appears for authenticated drivers.
+   - Reuse the same auth guard / route protection used by other driver pages like:
+     - /driver
+     - /driver/vehicle
+     - /driver/wallet
+   - Do NOT expose this link in customer, restaurant, or admin sidebars.
+
+4. Active state & styling:
+   - When the driver is on the Help Center page, the sidebar item should show as active/highlighted, consistent with other routes.
+   - Use existing classes/utility functions (e.g., isActiveRoute, NavLink activeClassName, or tailwind variants).
+   - Check dark/light mode support if applicable and keep it consistent.
+
+--------------------------------
+3) Keep mobile and desktop UX professional
+--------------------------------
+1. If there is a mobile drawer / collapsed sidebar:
+   - Ensure the "Help Center" item also appears in the mobile nav.
+   - Test on the narrow viewport (Replit preview "mobile" mode) that:
+     - The item is visible.
+     - Tapping it navigates correctly to the Help Center page.
+     - There are no layout overflows or line breaks.
+
+2. Do NOT:
+   - Introduce new horizontal scroll on the sidebar.
+   - Change the order of existing core items in a way that confuses users.
+
+Recommended order example (only if it matches existing logic):
+   - Dashboard
+   - Opportunities / Promotions
+   - Earnings / Wallet
+   - Vehicle
+   - Documents / KYC
+   - Help Center
+   - Settings / Account
+
+If there is an established order in the current code, respect that and insert "Help Center" in the most logical place (usually near Settings or Documents).
+
+--------------------------------
+4) Integration & security checks
+--------------------------------
+1. Make sure Help Center route still:
+   - Uses the same auth checks as other driver routes.
+   - Does NOT show admin-only data.
+   - Does NOT leak any internal ticket IDs beyond what was already implemented.
+
+2. Ensure you do NOT:
+   - Touch database schema or migrations.
+   - Modify ticket status flows or support logic.
+   - Change any business rules around who can see which tickets.
+
+3. If you need to fetch driver tickets or help content when navigating from the sidebar:
+   - Reuse existing APIs/endpoints.
+   - Add null/undefined checks on responses (e.g. if (!data) show a safe empty state).
+
+--------------------------------
+5) Testing (must be done before you finish)
+--------------------------------
+Run through this test plan manually:
+
+1. Login as a driver user.
+2. From the Driver Dashboard:
+   - Confirm the sidebar shows a "Help Center" (or "Support") item.
+   - Click it:
+     - The Help Center / Support page should open.
+     - No 404 or "page not found".
+     - No console errors in the browser dev tools.
+
+3. From another driver page (e.g., /driver/vehicle or /driver/promotions):
+   - Click "Help Center" from the sidebar:
+     - Navigation should work instantly.
+     - Active state should move to the Help Center item.
+
+4. Mobile view:
+   - Open the driver app in mobile preview.
+   - Open the nav drawer.
+   - Tap "Help Center":
+     - Page opens correctly.
+     - Drawer closes as expected (if that is the current behavior for other items).
+
+5. Regression checks:
+   - Customer, Restaurant, and Admin sidebars must remain unchanged.
+   - No new TypeScript or lint errors.
+   - No failing build or runtime errors.
+
+--------------------------------
+6) Documentation
+--------------------------------
+1. Update replit.md (or the appropriate documentation file) with a short section:
+   - Document that:
+     - A driver "Help Center" navigation item exists in the driver sidebar.
+     - Which route it uses (e.g. /driver/support or the actual path you used).
+     - How it behaves on mobile vs desktop.
+   - Note that no schema/database changes were made.
+
+2. In your final message to the user, provide:
+   - A short summary of what files you changed (layouts/components/routes).
+   - A brief note that:
+     - Driver sidebar and mobile drawer now include a Help Center link.
+     - Navigation is role-safe and consistent with existing design.
+     - No other roles (customer/restaurant/admin) were modified.
+
+Make sure all of the above is fully implemented before you stop. Do NOT leave partial wiring or TODO comments.

@@ -1,0 +1,152 @@
+=============================
+SAFEGO GLOBAL MASTER RULES
+(Do NOT modify backend logic)
+=============================
+
+ROLES (4 distinct roles)
+- customer, driver, restaurant, admin
+
+SERVICES (all required)
+- ride-hailing, food delivery, parcel delivery
+
+KYC (country-specific, must stay)
+- BD: father_name, date_of_birth, present_address, permanent_address,
+      nid_number, nid_front_image, nid_back_image,
+      emergency_contact, verification_status, is_verified
+- US: date_of_birth, home_address, emergency_contact,
+      government_id_type, government_id_last4,
+      driver_license_number + image + expiry (drivers),
+      ssn_last4 (optional, drivers),
+      verification_status, is_verified
+
+ONBOARDING
+- multi-step: basic info → address → ID/KYC upload → emergency contact
+- set verification_status="pending" and block services until admin approves
+
+ADMIN PANEL (keep all)
+- verify customers/drivers/restaurants (approve/reject + rejection_reason)
+- block/unblock any user/restaurant
+- configure pricing/fees/commissions
+- manage payouts; view driver negative balance; view restaurant negative balance
+
+CORE COLLECTIONS (no schema changes)
+- rides, food_orders, deliveries:
+  - identity fields (customer_id, driver_id, restaurant_id…)
+  - addresses + geolocation
+  - fees + safego_commission
+  - payment details
+  - timestamps
+  - full status flows
+  - rating & feedback
+
+COMMISSION RULES (keep)
+- cash ride: driver gets cash, commission → negative driver_wallet_balance, weekly settlement
+- cash food: restaurant gets cash, commission → negative restaurant_wallet
+- online: SafeGo keeps commission automatically
+- admin can mark balances settled
+
+SECURITY
+- customers can’t see driver docs
+- drivers can’t see customer KYC
+- restaurants can’t see other restaurants
+- only admin can change pricing/commission/verification/blocking
+- users edit only their own profile
+
+STATUS FLOWS
+- rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- food_orders: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- deliveries: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+NOTIFICATIONS
+- trip/order alerts, status updates, verification decisions, payout reminders, admin notices
+
+MAP
+- do NOT change map tiles/engine, zoom, or markers.
+
+=====================================================
+TASK: Fix floating footer button positions on /driver/map
+=====================================================
+
+Goal:
+- We have 3 floating controls on top of the map:
+  1) LEFT  : trip-type selector button
+  2) CENTER: Go Online/Go Offline button
+  3) RIGHT : current-trip/menu button
+
+Currently:
+- The right button has moved to the left, overlapping the other button, and both dropped too low.
+
+We must:
+- place each button in its correct corner/center,
+- keep them on the same horizontal line,
+- and prevent overlap.
+
+-----------------------------------
+1) Ensure correct positioning context
+-----------------------------------
+- In the map content wrapper (the container to the right of the sidebar), set:
+    position: relative;
+- The 3 floating buttons must be children of this wrapper so that all positions are relative to the map area, not the whole window.
+
+-----------------------------------
+2) CENTER button (Go Online / Go Offline)
+-----------------------------------
+- Must be perfectly centered horizontally ABOVE the bottom of the MAP area.
+
+CSS / style for center button:
+- position: absolute;
+- bottom: 16px;
+- left: 50%;
+- transform: translateX(-50%);
+- z-index: high enough to float above the map controls.
+
+Do NOT change its logic or colors:
+- offline → green background, label "Go Online"
+- online → red background, label "Go Offline"
+
+-----------------------------------
+3) LEFT button (trip type selector)
+-----------------------------------
+- Must sit at the bottom-left of the map.
+
+CSS / style:
+- position: absolute;
+- bottom: 16px;
+- left: 16px;
+- z-index: same layer as center button.
+
+Do NOT change click behavior (it should still open the trip-type selector drawer).
+
+-----------------------------------
+4) RIGHT button (current trip / menu)
+-----------------------------------
+- Must sit at the bottom-right of the map (it should NOT move to the left).
+
+CSS / style:
+- position: absolute;
+- bottom: 16px;
+- right: 16px;
+- z-index: same layer as center button.
+
+Do NOT change its click behavior (it opens current trip info).
+
+-----------------------------------
+5) Prevent overlap and vertical drift
+-----------------------------------
+- All three buttons must use the SAME bottom offset (bottom: 16px) so they align on a single horizontal line.
+- Do NOT use margins that push them further down off-screen.
+- There must be NO extra wrapper that repositions the right button to the left (remove any flex layout that is grouping left + right into one container).
+- Each button should be absolutely positioned independently (left, center, right).
+
+-----------------------------------
+6) No other changes
+-----------------------------------
+- Do NOT create or remove any backend fields or APIs.
+- Do NOT touch KYC, admin, commission, status, or map logic.
+- Only fix the position of these 3 buttons so they appear as:
+
+   [ LEFT button ]        [ Go Online ]        [ RIGHT button ]
+
+all on one line near the bottom of the map, with no overlap.
+
+NO QUESTIONS. Apply exactly these layout fixes.

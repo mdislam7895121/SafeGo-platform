@@ -1,0 +1,326 @@
+[TASK 1 – SAFEGO BANGLADESH ONLINE PAYMENT INTEGRATION (IMPLEMENTATION STEPS)]
+
+You are now implementing the real, working Bangladesh online payment integration for SafeGo, using SSLCOMMERZ as the first gateway.
+
+You MUST:
+- Keep BD cash fully working.
+- Keep US Stripe fully working and untouched.
+- Implement a clean, modular gateway adapter for SSLCOMMERZ.
+- Wire it to rides, food_orders, and deliveries in a non-breaking way.
+
+Treat this as a start-to-finish implementation task.
+
+====================================================
+1) FEATURE FLAGS & ENVIRONMENT VARIABLES
+====================================================
+Add (or confirm) the following environment variables (names can be adjusted but must be consistent):
+
+- FEATURE_BD_ONLINE_PAYMENTS_ENABLED = false (default)
+- SSLCOMMERZ_STORE_ID_BD
+- SSLCOMMERZ_STORE_PASSWORD_BD
+- SSLCOMMERZ_SANDBOX_ENABLED_BD = true/false
+- SSLCOMMERZ_SUCCESS_URL_BD (public URL to return on success)
+- SSLCOMMERZ_FAIL_URL_BD
+- SSLCOMMERZ_CANCEL_URL_BD
+- SSLCOMMERZ_VALIDATION_URL_BD (if required by SSLCOMMERZ)
+
+Implementation rules:
+- If FEATURE_BD_ONLINE_PAYMENTS_ENABLED is false OR store credentials are missing:
+  - The BD online payment option MUST NOT appear in available payment methods.
+  - BD remains cash-only and current behavior is preserved.
+
+====================================================
+2) PAYMENT METHODS CATALOG – BD ENTRY
+====================================================
+Extend or create `payment_methods_catalog` as in earlier design.
+
+Insert/update an entry for BD:
+
+- country_code      = "BD"
+- service_type      = "global" (applies to rides, food, parcel)
+- method_code       = "sslcommerz_online"
+- display_name      = "Online Payment (Cards & Wallets)"
+- description       = "Pay securely with cards, mobile wallets, and bank accounts via SSLCOMMERZ."
+- provider          = "sslcommerz"
+- is_default_for_country = false (cash remains default initially)
+- is_active         = false initially (Admin will enable when ready)
+- sort_order        = 10
+
+Ensure BD also has a “cash” method in this catalog:
+- method_code       = "cash"
+- provider          = "cash"
+- is_active         = true
+- is_default_for_country = true (for now)
+
+====================================================
+3) ORDER FIELDS – ENSURE PAYMENT FIELDS ARE PRESENT
+====================================================
+Verify and, if needed, ADD the following fields to:
+
+- rides
+- food_orders
+- deliveries
+
+Fields (nullable, additive only):
+
+- payment_country_code (string)
+- payment_currency (string)
+- payment_method (string, e.g. "cash", "sslcommerz_online")
+- payment_provider (string, e.g. "cash", "sslcommerz")
+- payment_status (string enum: "not_required" | "pending" | "requires_action" | "authorized" | "captured" | "failed" | "refunded" | "cancelled")
+- payment_reference_id (string; SSLCOMMERZ transaction id/session id)
+- payment_metadata (JSON object; store gateway response safely)
+- is_commission_settled (boolean, default false)
+
+For existing BD orders, set sensible defaults:
+- payment_country_code = "BD" where applicable.
+- payment_method = "cash" for past BD orders.
+- payment_status = "not_required" or "pending" based on existing logic.
+
+Do NOT delete any pre-existing payment fields.
+
+====================================================
+4) SSLCOMMERZ GATEWAY ADAPTER MODULE (BACKEND)
+====================================================
+Create a dedicated module, e.g.:
+
+- File: `src/payments/providers/bdSslCommerzGateway.ts` (or similar path)
+- Class/Service: `BdSslCommerzGateway`
+
+4.1 Interface (pseudocode):
+
+interface BdSslCommerzGateway {
+  createCheckoutSession(params: {
+    orderType: "ride" | "food" | "delivery";
+    orderId: string;
+    customerId: string;
+    amount: number;
+    currency: "BDT";
+    customerPhone?: string;
+    customerEmail?: string;
+  }): Promise<{
+    redirectUrl: string;
+    providerReferenceId: string; // session or transaction id
+  }>;
+
+  handleCallback(payload: any): Promise<{
+    orderType: "ride" | "food" | "delivery";
+    orderId: string;
+    isSuccess: boolean;
+    providerStatus: string;
+    providerReferenceId: string;
+    providerRaw: any;
+  }>;
+}
+
+4.2 createCheckoutSession behavior:
+
+- Input:
+  - orderType, orderId, customerId, amount, currency="BDT"
+- Validate:
+  - amount > 0
+  - env vars and feature flag are correctly set
+- Build request payload as per SSLCOMMERZ docs:
+  - store_id, store_passwd from env
+  - total_amount = amount (BDT)
+  - currency = "BDT"
+  - tran_id = generated unique transaction id (e.g. "SGO-BD-{orderType}-{orderId}-{timestamp}")
+  - success_url = SSLCOMMERZ_SUCCESS_URL_BD
+  - fail_url = SSLCOMMERZ_FAIL_URL_BD
+  - cancel_url = SSLCOMMERZ_CANCEL_URL_BD
+  - customer details (name, phone, email, address)
+- Call SSLCOMMERZ init endpoint (sandbox or live depending on env).
+- On success:
+  - Return `redirectUrl` from gateway response.
+  - Set `providerReferenceId = tran_id` (or from response if provided).
+- On failure:
+  - Throw a clear exception; payment creation will fail.
+
+4.3 handleCallback behavior:
+
+- Accept full callback payload from SSLCOMMERZ.
+- Validate:
+  - Hash/signature according to SSLCOMMERZ docs (store_passwd / secret).
+- Determine:
+  - isSuccess based on status (e.g. "VALID" / "VALIDATED" → success).
+  - providerStatus = status field from payload.
+  - providerReferenceId = tran_id or val_id or similar.
+- Determine related order:
+  - Parse tran_id format (contains orderType + orderId).
+  - Extract orderType and orderId.
+- Return structured result.
+
+DO NOT trust the callback blindly – always validate signature/hash.
+
+====================================================
+5) PAYMENT ENGINE – BD BRANCH FOR ONLINE
+====================================================
+Extend the shared payment engine service, e.g. `PaymentService`, to support BD online via SSLCOMMERZ.
+
+5.1 Payment creation (checkout step):
+
+When a BD customer creates a ride/food_order/delivery AND selects payment_method="sslcommerz_online":
+
+- Set fields on the order:
+  - payment_country_code = "BD"
+  - payment_currency = "BDT"
+  - payment_method = "sslcommerz_online"
+  - payment_provider = "sslcommerz"
+  - payment_status = "pending"
+- Persist the order in DB (with service status still in pre-start or pending-state).
+- Call `BdSslCommerzGateway.createCheckoutSession(...)` with total amount.
+- Update order:
+  - payment_reference_id = providerReferenceId
+- Return to frontend:
+  - redirectUrl from the gateway.
+  - orderId & orderType.
+
+If any error occurs:
+- Do NOT start the service.
+- Return a safe error message to frontend (“Online payment initialization failed”).  
+- The frontend may allow user to fall back to cash.
+
+5.2 Callback handling:
+
+Create an endpoint, e.g.:
+
+- POST /api/payment/bd/sslcommerz/callback
+
+Behavior:
+
+- Extract payload from request.
+- Call `BdSslCommerzGateway.handleCallback(payload)` to validate and parse.
+- Fetch the order by (orderType, orderId).
+- If `isSuccess`:
+  - Set:
+    - payment_status = "captured"
+    - payment_reference_id = providerReferenceId
+    - payment_metadata = providerRaw
+  - Trigger commission and wallet logic for ONLINE BD payment:
+    - SafeGo keeps commission_amount.
+    - Driver/Restaurant earnings credited to wallet.
+    - is_commission_settled = true.
+  - Move service status into the proper next step (e.g. accepted / searching_driver etc., depending on existing logic).
+- If not success:
+  - payment_status = "failed" or "cancelled"
+  - Do NOT start the ride/order/delivery.
+- Persist changes and redirect or respond with a user-facing result page or JSON, according to architecture.
+
+====================================================
+6) COMMISSION & WALLET LOGIC – BD ONLINE VS CASH
+====================================================
+Maintain difference between:
+
+- BD CASH:
+  - Customer pays driver/restaurant directly.
+  - SafeGo commission → negative balance (driver_wallet_negative_balance / restaurant_wallet_negative_balance).
+- BD ONLINE (SSLCOMMERZ):
+  - Customer pays SafeGo via SSLCOMMERZ.
+  - SafeGo already has full fare in company merchant account.
+  - SafeGo keeps commission_amount.
+  - Driver/Restaurant get net earnings credited.
+
+6.1 Implementation for BD ONLINE:
+
+On successful payment capture (in callback):
+
+- Use existing fare breakdown to compute:
+  - safe_go_commission_amount
+  - driver_earnings / restaurant_earnings
+- Update:
+  - For ride:
+    - driver_wallet_balance += driver_earnings
+    - is_commission_settled = true
+  - For food order:
+    - restaurant_wallet_balance += restaurant_earnings
+    - is_commission_settled = true
+
+DO NOT increase negative balances for BD ONLINE orders.
+
+====================================================
+7) CUSTOMER UX IN BD – ONLINE PAYMENT OPTION
+====================================================
+Integrate BD online payment in the customer-facing flows.
+
+7.1 Payment options:
+
+When `GET /api/customer/payment/options` is called and:
+
+- customer.country_code == "BD"
+- FEATURE_BD_ONLINE_PAYMENTS_ENABLED == true
+- SSLCOMMERZ creds available
+- payment_methods_catalog for BD has sslcommerz_online with is_active = true
+
+Then return:
+
+- available_methods including:
+  - "sslcommerz_online"
+  - "cash"
+- default method:
+  - still “cash” initially unless configured otherwise.
+
+7.2 Checkout UI:
+
+On checkout screens for BD (rides, food, parcel):
+
+- Show:
+  - “Pay with: [Cash] (Change)”
+- If online available:
+  - Allow switching to “Online Payment (Cards & Wallets)”.
+- When user selects online and confirms:
+  - Call backend to create order + payment session.
+  - Redirect to SSLCOMMERZ `redirectUrl` as provided.
+- On success/fail return:
+  - Show appropriate success/failure screen.
+  - Only allow ride/food/parcel to progress if payment_status was updated to “captured”.
+
+====================================================
+8) TESTING – SANDBOX & REGRESSION
+====================================================
+Set:
+
+- FEATURE_BD_ONLINE_PAYMENTS_ENABLED = true (dev/sandbox only)
+- SSLCOMMERZ_SANDBOX_ENABLED_BD = true
+
+Test scenarios:
+
+1) BD Online – Ride:
+   - Create a ride with online payment.
+   - Complete sandbox flow in SSLCOMMERZ.
+   - Verify:
+     - payment_status="captured"
+     - service status moves correctly.
+     - driver_wallet_balance increased.
+     - is_commission_settled = true.
+     - No negative balance for this ride.
+
+2) BD Online – Food Order:
+   - Same checks, but for restaurant_wallet_balance.
+
+3) BD Cash (regression):
+   - Confirm existing ride/food cash flows behave exactly as before.
+   - Negative balances still used.
+
+4) US Stripe (regression):
+   - Confirm that US flows were not affected.
+
+====================================================
+9) DOCUMENTATION
+====================================================
+Add/update docs:
+
+1) docs/bd_online_payments_architecture.md
+   - Overview of SSLCOMMERZ integration.
+   - Env variables.
+   - Gateway adapter behavior.
+   - Callback endpoint description.
+   - Commission + wallet behavior for BD online vs BD cash.
+
+2) docs/payment_providers_overview.md
+   - List of providers:
+     - US: Stripe
+     - BD: SSLCOMMERZ (online), Cash
+   - Extension points for future gateways (bKash direct, Nagad direct, etc.).
+
+End of TASK 1.
+Implement as described, with all changes additive and non-breaking.

@@ -1,0 +1,168 @@
+STEP 45E – COMPLETE CUSTOMER NAVIGATION FIX  
+(HOME BUTTON + BACK TO RESTAURANTS BUTTON ACROSS ALL EATS SCREENS)
+
+You must follow ALL SafeGo Master Rules.  
+This is a navigation-only enhancement. No backend/commission/KYC logic may be altered.
+
+========================
+SAFEGO MASTER RULES (APPLY, DO NOT BREAK)
+========================
+
+- 4 roles: Customer, Driver, Restaurant, Admin — each fully separate.
+- 3 services: Ride, Food (Eats), Parcel — all must continue working globally.
+- BD KYC: father_name, date_of_birth, present_address, permanent_address, NID number+images, emergency contact, verification_status, is_verified.
+- US KYC: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, (drivers) license+image+expiry, optional ssn_last4, verification_status, is_verified.
+- Admin panel: verify users, reject with reason, edit pricing/commission, block/unblock, manage payouts, negative balances.
+- Collections: rides, food_orders, deliveries (identity fields, addresses, fees, payment, timestamps, status flows, ratings).
+- Status flows MUST remain identical.
+- Commission rules MUST remain untouched.
+- No redesign of Step 43 desktop Eats layout — only navigation controls may be added.
+- All changes MUST be additive and backward-compatible.
+
+========================
+A. ROUTE DEFINITIONS (DO NOT MODIFY NAMES)
+========================
+
+Customer Home route → `/customer`  
+Customer Eats Home (restaurant list + grid layout) → `/customer/food`
+
+These MUST remain the canonical routes.
+
+========================
+B. IMPLEMENT TWO GLOBAL NAV BUTTONS
+========================
+
+1) **CustomerHomeButton**
+   - Always takes customer to `/customer`
+   - Label: “Home”
+   - Small house icon
+   - Must work from:
+     - `/customer/food`
+     - restaurant detail
+     - item detail screen
+     - cart
+     - checkout
+     - order tracking
+     - order history
+   - Desktop: top-right  
+   - Mobile: header bar
+
+2) **BackToRestaurantsButton**
+   - Always takes customer to **/customer/food**
+   - Label: “Back to restaurants”
+   - Icon: arrow-left
+   - Must appear on:
+     - Restaurant detail page
+     - Item detail full screen (if used)
+     - Optional on cart (non-breaking)
+   - Behavior:
+     - This is NOT the Home button
+     - It does NOT go to `/customer`
+     - It specifically returns to the full restaurant list `/customer/food`
+
+========================
+C. WHERE BUTTONS MUST APPEAR
+========================
+
+===== 1) On `/customer/food` (Eats Landing) =====
+- Keep existing Step-43 grid layout untouched.
+- Show “Home” button on top-right → `/customer`.
+- DO NOT show BackToRestaurantsButton here.
+
+===== 2) On Restaurant Detail =====
+Show BOTH:
+- BackToRestaurantsButton → `/customer/food`
+- Home button → `/customer`
+
+===== 3) On Item Detail (full page) =====
+Show BOTH:
+- Back (previous) → restaurant detail  
+- BackToRestaurantsButton → `/customer/food`  
+- Home button → `/customer`
+
+===== 4) On Cart =====
+Show BOTH:
+- Back (to restaurant detail)
+- Home → `/customer`
+(Optional) BackToRestaurantsButton allowed but not required.
+
+===== 5) On Checkout =====
+- Show Home → `/customer`
+- Show Back → cart
+- MUST NOT break Step 44B order creation flow.
+
+===== 6) On Order Tracking =====
+- Show Home → `/customer`
+- Show Back → order history
+
+========================
+D. DO NOT BREAK STEP-43 DESKTOP EATS UI
+========================
+
+- “Popular Near You”  
+- “Top Rated”  
+- Horizontal carousels  
+- Cuisine chips + filters  
+
+These must remain EXACTLY as before.
+
+Only add navigation buttons in the header area of each screen.
+
+========================
+E. IMPLEMENT REUSABLE COMPONENTS
+========================
+
+Create two components (ADD-ONLY):
+
+1) `CustomerHomeButton`
+Props:
+- label (default “Home”)
+- icon (house)
+Action:
+- Navigate to `/customer`
+
+2) `BackToRestaurantsButton`
+Props:
+- label (default “Back to restaurants”)
+- icon (arrow-left)
+Action:
+- Navigate to `/customer/food`
+
+Add helper functions:
+- getCustomerHomeRoute() → returns `/customer`
+- getCustomerEatsHomeRoute() → returns `/customer/food`
+
+========================
+F. CONFIGURATION SUPPORT
+========================
+
+Add optional config fields:
+- showCustomerHomeButton = true
+- showBackToRestaurantsButton = true
+- customerHomeRoute = "/customer"
+- customerEatsHomeRoute = "/customer/food"
+
+Do NOT override defaults unless configured.
+
+========================
+G. TEST CASES (MANDATORY)
+========================
+
+1) Click Eats → loads `/customer/food` with grid UI.  
+2) Click any restaurant → detail opens; “Back to restaurants” works → `/customer/food`.  
+3) Item detail → back returns to restaurant; “Back to restaurants” returns to `/customer/food`.  
+4) Checkout → Home goes to `/customer`.  
+5) Order tracking → Home goes to `/customer`.  
+6) Desktop layout remains perfect: no shift, no broken grid.
+
+========================
+FINAL REQUIREMENT
+========================
+
+Deliver Step 45E so that:
+
+- Customers ALWAYS find a clear way to go back to `/customer` (Home).
+- Customers ALWAYS find a clear way to return to `/customer/food` (restaurant list).
+- Navigation is intuitive, consistent, and visible on every Eats screen.
+- All SafeGo rules stay untouched.
+- No existing layout (Step-43) is modified, only enhanced with navigation controls.

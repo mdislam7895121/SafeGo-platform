@@ -1,0 +1,271 @@
+SAFEGO CORE RULES (DO NOT BREAK)
+
+1) Roles (must always exist and stay separate)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   BD-only extra roles (additive, not replacing):
+   - Shop Partner (BD small shops / e-store operator)
+   - Ticket & Rental Operator (BD intercity + rentals)
+
+   Each role must keep:
+   - Own signup requirements and KYC
+   - Own dashboard and permissions
+   - Own status flows
+   - No mixed access between roles.
+
+2) Global services (must always work together)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+   BD extensions:
+   - BD Shop Partner e-store (DoorDash-style)
+   - BD Ticket & Rental (bus/train/launch + car rentals)
+
+3) Country-specific KYC (must not be broken)
+
+   Bangladesh (BD) mandatory:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID (number + front/back images)
+   - emergency contact details
+   - verification_status + is_verified
+
+   United States (US) mandatory:
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - (drivers) driver license + image + expiry
+   - (drivers) ssn_last4 (optional)
+   - verification_status + is_verified
+
+4) Admin panel (must keep all capabilities)
+   - Verify customers, drivers, restaurants, BD shop partners, BD ticket operators
+   - Approve/reject KYC with rejection_reason
+   - Update pricing, fees, commissions
+   - Block/unblock any user
+   - Manage payouts
+   - View and settle driver negative balance
+   - View and settle restaurant negative balance
+   - View BD-specific expansion stats
+
+5) Core collections (never remove, only extend)
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must include:
+   - Identity fields (customer_id, driver_id, restaurant_id where applicable)
+   - Pickup/dropoff addresses + geolocation
+   - Fees + commissions
+   - Payment details (method, txn ids for online)
+   - Timestamps (created_at, updated_at, completed_at, cancelled_at)
+   - Full status flow
+   - Rating and feedback fields
+
+6) Commission & payout rules (must remain intact)
+   - CASH ride:
+     * Driver receives full cash
+     * SafeGo commission becomes negative balance in driver_wallet_balance
+     * Driver settles weekly; admin can mark paid
+   - CASH food order:
+     * Restaurant receives full cash
+     * SafeGo commission becomes negative balance in restaurant_wallet
+   - Online payment:
+     * SafeGo keeps commission automatically
+   - Admin can settle and mark balances as paid.
+
+7) Security rules (must always be enforced)
+   - Customers cannot see driver documents (NID, license, etc.)
+   - Drivers cannot see customer NID or any sensitive KYC fields
+   - Restaurants cannot see other restaurants’ data
+   - BD Shop Partners cannot see other partners’ internal data
+   - Ticket/Rental operators cannot see private data of others
+   - Only Admin can change pricing, commission, verification, blocking
+   - Users can update only their own profile
+   - Region guards: BD-only roles only for countryCode="BD"
+
+8) Status flows (must not be broken)
+
+   Rides:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+   Food:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+   Parcel:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+   BD shops and BD tickets can extend with their own internal statuses, but must not break the above.
+
+9) Onboarding (all roles)
+   - Multi-step:
+     * Basic info
+     * Address
+     * ID/KYC upload (country-specific)
+     * Emergency contact
+     * verification_status = "pending"
+   - Block access to full dashboard until Admin approves.
+   - For BD Shop Partner and BD Ticket Operator, enforce BD KYC (including father_name, NID, etc.)
+
+10) Notifications
+   - New ride alerts for drivers
+   - Order status updates
+   - Parcel status updates
+   - Verification approval/rejection
+   - Important admin notifications
+   - BD expansion specific alerts (e.g., new shop partner, new ticket operator)
+
+11) Backward compatibility
+   - Do NOT rename or remove existing fields, APIs, or routes.
+   - Only ADD new fields/endpoints/components if needed.
+   - Any change must be non-breaking for all existing roles and flows.
+
+====================================================
+TASK: FIX /shop-partner/setup INFINITE LOADING FOR BD SHOP PARTNER AND MAKE IT DEMO-READY
+====================================================
+
+Context:
+- Admin user showed that c2c@gmail.com (country BD) previously got stuck as Shop Partner with no completed setup.
+- You removed the old Shop Partner entry and “reset their role”.
+- However, when visiting /shop-partner/setup in Preview, the page still shows an infinite loading spinner and never shows the actual 3-step Bangla shop setup wizard.
+- Screenshot: /shop-partner/setup is permanently stuck with a centered blue spinner.
+
+Goal:
+1) Make /shop-partner/setup robust so it never stays on an infinite loading screen.
+2) For a BD user WITHOUT a completed shop_partner record, it must always show the full step-1 setup wizard in Bangla.
+3) For a BD user WITH a completed shop_partner record and approved KYC, it must redirect to the Shop Partner dashboard (not to a blank screen).
+4) Keep all SafeGo rules above intact for all roles and countries.
+
+Implementation steps (start to finish):
+
+1. Reproduce the bug
+   - Log in as: c2c@gmail.com (BD)
+   - Ensure this user currently has:
+     * role includes "shop_partner" OR is being treated as pending Shop Partner (your current logic)
+     * No fully completed shop_partner profile.
+   - Visit /shop-partner/setup and confirm:
+     * UI shows only a loading spinner
+     * No errors in the UI, but page never resolves.
+
+2. Inspect frontend code for Shop Partner setup
+   - Open the relevant files (names approximate, adapt to your repo):
+     * client/src/app/shop-partner/setup/page.tsx (or similar route file)
+     * Any shared hook such as client/src/lib/useShopPartner.ts or useCurrentShopPartner.ts
+     * Any route guard component, e.g. ShopPartnerGuard
+   - Identify:
+     * Where "loading" state is set.
+     * Under what conditions loading stays true and never flips to false.
+     * What happens when the backend returns 404, null, or an error for the shop partner.
+
+   Target behavior:
+   - If the fetch throws or returns null/undefined and the user is BD:
+     * loading must end
+     * show the step-1 setup wizard (shop creation form) instead of keeping the spinner.
+
+3. Inspect backend API used by the setup page
+   - Open the backend route the setup page calls, e.g.:
+     * /api/shop-partner/me
+     * /api/shop-partner/setup
+     * /api/shop-partner/profile
+   - Confirm what it returns in these cases:
+     * user has NO shop_partner record
+     * user has a record but incomplete
+     * user has a record and KYC is pending
+     * user has a record and KYC is approved
+
+   Required behavior:
+   - When NO shop_partner exists for the current user:
+     * Return a structured JSON like:
+       { exists: false }
+       NOT a 500 error and NOT a generic 404 that leaves frontend stuck.
+   - Only when there is a real server error, return 5xx; frontend must handle it gracefully.
+
+4. Fix the frontend loading logic
+   - In the setup page component:
+     * Ensure you have three clear states:
+       1) isLoading: true → show spinner
+       2) loaded && !shopPartnerExists → show 3-step setup wizard (Bangla)
+       3) loaded && shopPartnerExists → redirect to dashboard or show “setup complete” screen.
+
+   - Add explicit error handling:
+     * If the API call throws, catch it and treat it as “no shopPartner yet” (exists=false) for this BD test environment.
+     * Log the error to console for debugging but DO NOT keep the user on the spinner.
+
+   - Make sure React hook dependencies (e.g., useEffect with allCities or similar) are properly memoized so no infinite re-render loop keeps resetting loading state.
+
+5. Ensure BD-only guard works correctly
+   - Inspect ShopPartnerGuard (or similar middleware) for /shop-partner/* routes.
+   - Requirements:
+     * Only allow access if user.countryCode === "BD".
+     * If user is BD but has no shop_partner record:
+       - /shop-partner/setup must be accessible (show setup wizard).
+       - Other shop_partner routes (like /shop-partner/dashboard) may redirect to setup.
+     * If user is NOT BD, redirect them away (e.g., to /customer), do NOT show a stuck spinner.
+
+6. Fix role/verification routing consistency
+   - Confirm the post-login path logic (getPostLoginPath or similar) handles shop_partner the same way as ticket_operator:
+     * If role === "shop_partner" and verification_status is "pending" or there is no shopPartner profile:
+       - redirect to /shop-partner/onboarding or /shop-partner/setup (your chosen route).
+     * If role === "shop_partner" and verification_status is "approved":
+       - redirect to /shop-partner/dashboard.
+
+   - Make sure this logic never sends the user to a route that only shows a spinner.
+
+7. Add small demo data for Shop Partner (non-breaking)
+   - Add a single demo Shop Partner in Dhaka via seed script or admin tools so that:
+     * Customer BD storefront (/customer/bd-shops) can show at least one shop and a few products as a demo.
+   - Do NOT hard-code credentials; use seeded data consistent with existing demo structure.
+   - This is only to ensure that once the shop_partner setup works, the customer app can show working e-store behavior for testing.
+
+8. Testing checklist (must complete)
+   - Scenario A: New BD user becomes Shop Partner
+     * Create a fresh BD user (email: demo-shop1@example.com).
+     * Assign or let them select Shop Partner BD role according to existing flow.
+     * Log in and visit /shop-partner/setup:
+       - EXPECT: 3-step Bangla setup wizard appears (no infinite spinner).
+       - Complete basic shop info → submit.
+       - After submission and KYC pending, they should see appropriate “waiting for approval” state.
+     * Approve them from Admin → KYC Approvals → Shop Partners.
+     * Log in again:
+       - EXPECT: Redirect to Shop Partner dashboard, not setup spinner.
+
+   - Scenario B: Existing user c2c@gmail.com
+     * Ensure DB has either:
+       - A valid shop_partner record for c2c@gmail.com, OR
+       - No record at all (and you test both cases).
+     * Visit /shop-partner/setup:
+       - If no record → wizard appears.
+       - If record exists & approved → redirect to dashboard.
+
+   - Scenario C: Non-BD user
+     * For a US user, visiting /shop-partner/setup should:
+       - Redirect away (e.g., /customer) with no spinner.
+       - Never expose any BD-specific KYC fields.
+
+9. Keep everything backward-compatible
+   - Do NOT rename or delete any existing Prisma models, fields, or API routes.
+   - Only add:
+     * Safer null/404 handling in the APIs
+     * Clear loading/error handling in the frontend
+     * Optional demo seed data for shops
+   - Ensure Driver, Restaurant, Ticket Operator and core Customer flows are unaffected.
+
+10. Report back (internally)
+   - Once done, summarize:
+     * What caused the infinite loading on /shop-partner/setup
+     * Which files were changed
+     * How the new fallback logic works
+     * How to reproduce the fixed behavior for:
+       - New BD shop partner
+       - Existing c2c@gmail.com user
+       - Non-BD user.
+
+Implement all of the above in one complete pass so that the BD Shop Partner setup is fully usable and demo-ready, and the loading spinner bug cannot trap the user again.

@@ -1,0 +1,284 @@
+You are the SafeGo platform development agent. Follow these rules strictly. Do not skip or relax any rule. Your work must always be PRODUCTION-READY in a single pass.
+
+────────────────────────────────
+SAFEGO GLOBAL RULES (ALWAYS APPLY)
+────────────────────────────────
+
+1) Core roles (must ALWAYS be respected)
+- customer (rider / eater / parcel sender / e-shop buyer)
+- driver (rides + parcel delivery)
+- restaurant (SafeGo Eats merchant)
+- admin (company staff and ops)
+Additional BD roles already in the project:
+- ticket_operator (BD)
+- shop_partner (BD e-shop)
+
+Every feature must respect role-based access:
+- No customer feature exposed to driver/merchant.
+- No merchant feature exposed to customers.
+- Admin panel is ALWAYS protected and never callable without proper admin auth.
+
+2) Global app surfaces (all must keep working)
+- Ride: searching locations, fare preview, car selection, booking, live map, driver assignment, trip status flow.
+- Eats: restaurant discovery, menu, cart, checkout, order tracking.
+- Parcel: pickup/dropoff, package details, courier assignment, tracking.
+- E-Shop BD: shops, products, cart, checkout, order history.
+Any work you do must NOT break existing surfaces for any role or country.
+
+3) Country + KYC rules
+- US users: must remain untouched in this task (no BD-specific KYC applied to US flows).
+- BD users:
+  - Shop Partner KYC requires: ownerName, fatherName, dateOfBirth, NID number, presentAddress, permanentAddress, emergencyContactName, emergencyContactPhone.
+  - Ticket Operator and Drivers have their own KYC but do NOT change them in this task.
+- Never auto-approve or bypass KYC without explicit instruction.
+
+4) Admin panel invariants
+- Admin must be able to:
+  - See all users, filter by role and country.
+  - Review KYC for drivers, restaurants, shop partners, ticket operators.
+  - Approve/Reject with audit trail.
+  - See shops/products/orders lists for BD e-shop.
+- Do not remove or weaken any admin ability. If you add fields, make sure admin views stay consistent.
+
+5) Data & collections (conceptual)
+You must preserve and use proper collections/tables such as:
+- users
+- rides
+- food_orders
+- deliveries / parcels
+- tickets / rentals
+- shops (including BD shop partners)
+- shop_products
+- shop_orders
+- payouts / commissions / earnings
+
+Any new fields for this task must be:
+- Backward compatible.
+- Properly defaulted.
+- Validated on both frontend and backend.
+
+6) Commission, payouts, and stock logic
+- Do not break or bypass existing:
+  - Commission calculation.
+  - Partner earnings.
+  - Stock levels and hasUnlimitedStock handling.
+- Demo data can be used, but must follow the same logic as real data.
+
+7) Security rules (MANDATORY)
+For ALL code you touch:
+- Use proper authentication and authorization.
+- Never trust client input. Validate and sanitize on backend.
+- Protect against:
+  - IDOR (never use plain user IDs without checking ownership/role).
+  - Injection (SQL/NoSQL, command, etc.).
+  - File upload abuse (for this task especially).
+- Enforce per-user access: a shop_partner may only see and modify their own shop and images.
+- Do not leave debug endpoints or unguarded routes.
+
+8) Status flows (must remain consistent)
+Do NOT change global status flows (rides, orders, deliveries) in this task.
+If you add any new flags/fields, integrate them without breaking:
+- ride status
+- food order status
+- shop order status
+
+9) One-pass, production-ready requirement
+- You must deliver a COMPLETE implementation in ONE go.
+- No TODOs, no “stub” functions, no “for later” comments.
+- After changes, you must:
+  - Rebuild / restart as needed.
+  - Manually test with realistic data and a BD shop_partner account.
+  - Fix any errors you see in logs or UI before declaring completion.
+
+When you say the task is done, the feature must be genuinely ready to publish for real end-users.
+
+────────────────────────────────
+TASK: FIX SHOP PARTNER ONBOARDING STEP-3 IMAGE UPLOAD (LOGO + BANNER)
+────────────────────────────────
+
+Context:
+- Route: /shop-partner/onboarding (multi-step wizard for BD shop_partner).
+- Step 1: Shop information + type + address.
+- Step 2: Delivery settings.
+- Step 3: Shop logo and banner image.
+- Currently, step 3 shows the UI, but:
+  - The “লোগো তুলুন” and “ব্যনার তুলুন” buttons do NOT open camera or file picker on mobile (iOS).
+  - Sometimes “All information complete” message appears, but submit fails with validation errors.
+  - Images are not properly saved or attached to the onboarding payload.
+
+Goal:
+Make the entire step-3 image flow (logo + banner) WORKING END-TO-END on mobile and desktop, with secure backend handling, previews, validation, and correct final submit.
+
+Do EVERYTHING below in ONE pass.
+
+────────────────
+A. FRONTEND: IMAGE INPUT + BUTTONS
+────────────────
+
+1) Implement fully functional file inputs
+- For both logo and banner, create/verify hidden `<input type="file">` elements with:
+  - `accept="image/*"`
+  - `capture="environment"` or `capture="camera"` for mobile camera support.
+- Use React refs (or equivalent) so that when user clicks:
+  - “লোগো তুলুন” → triggers logo input click.
+  - “ব্যনার তুলুন” → triggers banner input click.
+- Ensure this works on:
+  - iOS Safari
+  - Android Chrome
+  - Desktop browsers
+- Make sure clicks are triggered inside user-initiated events only (onClick handlers), not async callbacks, so iOS allows the picker.
+
+2) Add loading and disabled states
+- While an image upload is in progress:
+  - Show a small spinner/“Uploading…” near the relevant button.
+  - Disable the respective button to prevent duplicate uploads.
+- If upload fails, re-enable the button and show an error message.
+
+3) Implement preview components
+- When the user selects a logo:
+  - Show a thumbnail/preview in the “দোকানের লোগো” box.
+- When the user selects a banner:
+  - Show a wide preview in the “দোকানের ব্যনার” box.
+- Add a small “পরিবর্তন করুন” / “Change” button which re-opens the file picker and replaces the image.
+
+4) State management
+- Keep image metadata in state, e.g.:
+  - `logo: { file, previewUrl, uploadedUrl }`
+  - `banner: { file, previewUrl, uploadedUrl }`
+- After successful upload, only `uploadedUrl` is required for final submission, but preview must continue working (use the URL returned from backend).
+
+────────────────
+B. BACKEND: IMAGE UPLOAD ENDPOINT
+────────────────
+
+5) Create/verify a dedicated upload endpoint
+- Endpoint example (adjust to the project’s structure):
+  - `POST /api/shops/upload-image`
+- Requirements:
+  - Accept multipart/form-data.
+  - Params:
+    - `file` (required image)
+    - `type` in { "logo", "banner" } (required)
+    - `shopId` OR derive shop_partner context from auth (preferred: derive from logged-in user and their shop).
+  - Use existing auth middleware to enforce that only:
+    - an authenticated shop_partner can upload images for their own shop.
+    - admins may optionally upload/replace images for any shop (only if needed for moderation).
+
+6) Validation and security
+- Enforce:
+  - Allowed mimetypes: image/jpeg, image/png, image/webp.
+  - Max size: 2 MB.
+- If validation fails, return:
+  - 400 with a safe JSON message (no stack traces).
+- Sanitize filename and never trust client filename as path.
+- If storage system already exists (local disk, S3, etc.), reuse it in a secure way.
+- Store the image and return a public (or signed) URL like:
+  - `{ url, type }`
+
+7) Data model
+- Make sure the shop record can store:
+  - `logoUrl` (string)
+  - `bannerUrl` (string)
+- If fields don’t exist, add them in a backward-compatible way and default to null.
+
+────────────────
+C. INTEGRATE UPLOAD WITH ONBOARDING FORM
+────────────────
+
+8) Hook frontend to backend
+- In Step 3:
+  - On file selection:
+    - Immediately call `/api/shops/upload-image` with the selected file and `type`.
+    - On success, update state with `uploadedUrl`.
+- Do NOT wait until the final “আবেদন জমা দিন” click to upload raw files. Files must be uploaded during Step 3, and final submit should only send URLs.
+
+9) Final submit payload
+- When user clicks “আবেদন জমা দিন”:
+  - Collect all onboarding data from Step 1 + Step 2 + Step 3:
+    - Shop info (name, type, address, etc.)
+    - Owner KYC fields
+    - Delivery settings
+    - `logoUrl`
+    - `bannerUrl`
+  - Send to the existing onboarding create/update endpoint.
+- On backend, validate that:
+  - `logoUrl` and `bannerUrl` are non-empty strings and look like valid URLs.
+
+────────────────
+D. VALIDATION & ERROR MESSAGES
+────────────────
+
+10) Frontend validation rules (Step 3)
+- Step 3 cannot be considered “complete” unless:
+  - `logo.uploadedUrl` is set.
+  - `banner.uploadedUrl` is set.
+- If user tries to submit without images:
+  - Show a clear message in Bengali:
+    - For logo: “দোকানের লোগো যোগ করুন।”
+    - For banner: “দোকানের ব্যনার যোগ করুন।”
+- Replace the generic “দয়া করে সব তথ্য পূরণ করুন।” error with field-specific messages for images.
+
+11) Backend validation
+- If logoUrl or bannerUrl missing on final submit:
+  - Return a 400 with a clear JSON error that the frontend can display.
+- Ensure this does not break existing shops that might already have data; only apply strict requirement for NEW onboarding flows.
+
+────────────────
+E. MOBILE COMPATIBILITY & UX
+────────────────
+
+12) iOS/Android checks
+- Specifically test on iOS (Safari):
+  - Tapping “লোগো তুলুন” opens camera/file picker.
+  - After taking a photo or choosing from gallery, upload starts and preview updates.
+- Same for “ব্যনার তুলুন”.
+- Ensure no double tap or long delay is required; a normal tap must work.
+
+13) UX details
+- If an image is uploading and user navigates back to previous step and returns, the partially uploaded state must not break the page. Either:
+  - Keep the uploaded preview and URL, or
+  - Cancel and show a clear state that no image has yet been uploaded.
+
+────────────────
+F. TEST PLAN (YOU MUST EXECUTE THIS)
+────────────────
+
+Before you say the task is finished, you MUST perform the following manual tests yourself:
+
+1) New BD Shop Partner onboarding
+- Log out.
+- Sign up as a BD shop_partner (new email).
+- Complete:
+  - Step 1: Shop info (e.g., মুদি দোকান).
+  - Step 2: Delivery settings.
+  - Step 3:
+    - Upload logo via camera (new photo).
+    - Upload banner via gallery (existing photo).
+- Click “আবেদন জমা দিন”.
+- Confirm:
+  - No validation error appears.
+  - Onboarding completes successfully.
+  - You are redirected to the correct post-onboarding screen.
+
+2) Data verification
+- Check the database / admin panel:
+  - The new shop shows both logo and banner URLs.
+- Visit customer side `/customer/bd-shops` and open that shop, verify logo/banner display if the customer shop UI uses them.
+
+3) Regression checks
+- Existing shop partners must still be able to:
+  - View and, if allowed, update their images.
+- Customer storefront:
+  - Still lists shops and products correctly.
+- US flows must remain unaffected.
+
+If any bug appears in these tests, FIX IT before considering the task done.
+
+────────────────
+OUTPUT FORMAT
+────────────────
+
+When you finish, respond with:
+- A short summary of what you changed (frontend + backend).
+- Confirmation that you ran all tests in the test plan above and their results.
+- Any follow-up suggestions to further harden image handling (rate limiting, content-type sniffing, etc.).

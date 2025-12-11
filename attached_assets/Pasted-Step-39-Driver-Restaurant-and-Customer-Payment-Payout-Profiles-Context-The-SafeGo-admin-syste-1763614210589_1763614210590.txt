@@ -1,0 +1,296 @@
+Step 39 – Driver, Restaurant, and Customer Payment & Payout Profiles
+
+Context
+The SafeGo admin system already has:
+- Wallet balances and settlements for drivers and restaurants
+- Commission and settlement analytics
+- Strong RBAC, audit logging, and global settings
+
+However, driver, restaurant, and customer profiles are missing a proper Payment / Payout section. This step must add a secure, production-ready payment profile layer without breaking any existing wallet or settlement flows.
+
+High-Level Goals
+1. Add a reusable payout account model for drivers and restaurants, wired to the existing wallet/settlement system.
+2. Add a read-only payment method section for customers (tokenized cards, etc.).
+3. Surface these in admin profiles:
+   - Driver details → “Payout Information”
+   - Restaurant details → “Payout Information”
+   - Customer details → “Payment Methods”
+4. Enforce strict security:
+   - Sensitive values encrypted at rest
+   - Only masked values shown in UI
+   - Admin-only write access, RBAC + audit logging for all changes
+
+Important Constraints
+- Do NOT break any existing behavior for:
+  - Rides, food orders, parcels
+  - Wallet balances and settlements
+  - Existing KYC and document flows
+- Do NOT expose raw card PAN, bank account numbers, SSN, NID, or any secrets in UI, logs, or audit.
+- Do NOT change existing settlement logic (commission calculations, etc.). This step only attaches payout destinations.
+- Keep schema changes additive and backward compatible (new tables/columns only).
+- No emojis in any new UI or copy.
+
+1. Data Model – Payout Accounts (Drivers & Restaurants)
+
+Create a reusable PayoutAccount model/table that can be attached to both drivers and restaurants.
+
+Suggested fields (adapt to existing ORM and naming conventions):
+
+- id (primary key, UUID or existing style)
+- ownerType (enum: "driver", "restaurant")
+- ownerId (FK to driver/restaurant id; string or UUID)
+- countryCode (e.g., "BD", "US")
+- payoutType (enum: "mobile_wallet", "bank_account", "stripe_connect", "manual")
+- provider (nullable string; e.g., "bkash", "nagad", "bank", "stripe")
+- displayName (short label shown in UI, non-sensitive)
+- accountHolderName (string, non-sensitive)
+- maskedAccount (string, masked version only, e.g., "*****1234")
+- encryptedDetails (TEXT/JSON, encrypted blob using existing encryption helper)
+  - This can hold routing/account number etc., but must NOT be readable without decryption logic.
+- isDefault (boolean)
+- status (enum: "pending_verification", "active", "inactive")
+- createdAt, updatedAt (timestamps)
+
+Security rules:
+- Always store full bank account / mobile wallet number only inside encryptedDetails, never in plain text columns.
+- maskedAccount should contain only safe representation (last 3–4 digits).
+- No card PAN or CVV ever stored here.
+
+Country-specific usage:
+- Bangladesh:
+  - payoutType: "mobile_wallet" or "bank_account"
+  - provider: "bkash", "nagad", or "bank"
+- United States:
+  - payoutType: "bank_account" or "stripe_connect"
+  - provider: "bank" or "stripe"
+  - Stripe-specific integration can store the stripe account id in encryptedDetails and a human safe label in displayName.
+
+If the existing wallet/settlement model already has any payoutReference or similar field, do NOT remove it. Instead:
+- Optionally add a nullable payoutAccountId FK to wallets if it fits cleanly.
+- But keep settlement logic working even when payoutAccountId is null.
+
+2. Data Model – Customer Payment Methods (Read-Only for Admin)
+
+Create a PaymentMethod model/table (if not already present) for customers:
+
+- id (primary key)
+- customerId (FK to user/customer)
+- provider (e.g., "stripe")
+- providerMethodId (token/id from PSP, safe to store)
+- brand (e.g., "Visa", "Mastercard")
+- last4 (string)
+- expMonth (number)
+- expYear (number)
+- isDefault (boolean)
+- status (enum: "active", "inactive")
+- createdAt, updatedAt
+
+Security rules:
+- Never store full card number or CVV.
+- Admin UI is read-only for these methods in this step. No editing from admin panel.
+
+3. Backend Services – Payout Logic
+
+Create a reusable payout service module (follow existing layering):
+
+Example: server/services/payoutService.ts
+
+Core operations:
+- createPayoutAccount(ownerType, ownerId, input)
+- updatePayoutAccount(id, input)
+- setDefaultPayoutAccount(ownerType, ownerId, payoutAccountId)
+- listPayoutAccounts(ownerType, ownerId)
+- getDefaultPayoutAccount(ownerType, ownerId)
+
+Validation:
+- Use existing validation/Zod infrastructure.
+- Validate required fields by country and payoutType:
+  - BD mobile_wallet requires provider in ["bkash","nagad"] and a valid phone/number format.
+  - BD bank_account requires bank name and account number.
+  - US bank_account requires routing + account number.
+  - stripe_connect may require stripeAccountId only.
+- Ensure only one default payout account per owner (enforce in code and/or DB constraint).
+
+Encryption:
+- Use the existing encryption helper used for SSN or sensitive values.
+- Before saving, pack sensitive details into an object and encrypt into encryptedDetails.
+- maskedAccount is derived once on create/update and stored separately.
+
+Audit logging:
+- For each create/update/default change, call the existing logAuditEvent helper:
+  - actionType: "PAYOUT_ACCOUNT_CREATED", "PAYOUT_ACCOUNT_UPDATED", "PAYOUT_ACCOUNT_SET_DEFAULT"
+  - entityType: "driver" or "restaurant"
+  - entityId: ownerId
+  - metadata: { payoutType, provider, countryCode, status, isDefault }
+- Never put raw account numbers in metadata.
+
+4. Backend APIs – Admin Access
+
+Add or extend admin-only endpoints:
+
+Driver payout endpoints (examples, adjust routing to style you use now):
+- GET    /api/admin/drivers/:driverId/payout-accounts
+- POST   /api/admin/drivers/:driverId/payout-accounts
+- PATCH  /api/admin/payout-accounts/:id
+- POST   /api/admin/drivers/:driverId/payout-accounts/:id/set-default
+
+Restaurant payout endpoints:
+- GET    /api/admin/restaurants/:restaurantId/payout-accounts
+- POST   /api/admin/restaurants/:restaurantId/payout-accounts
+- PATCH  /api/admin/payout-accounts/:id
+- POST   /api/admin/restaurants/:restaurantId/payout-accounts/:id/set-default
+
+Customer payment methods (read-only):
+- GET    /api/admin/customers/:customerId/payment-methods
+
+Security:
+- All these routes must:
+  - Require admin auth.
+  - Respect RBAC (e.g., capability MANAGE_PAYOUTS).
+  - Log audit events on create/update/default operations.
+
+Response format should include:
+- id
+- payoutType / provider
+- displayName
+- maskedAccount
+- status
+- isDefault
+- countryCode
+- createdAt
+- updatedAt
+Never return decrypted sensitive details.
+
+5. Admin UI – Profile Enhancements
+
+A) Driver Profile Page
+
+On the existing driver details page (/admin/drivers/:id):
+
+1) Add a new section/card: “Payout Information”
+   - Location: Below Wallet information, above any logs/secondary sections.
+   - Content:
+     - List of payout accounts for this driver in a table:
+       - Columns: Provider, Type, Masked Account, Country, Status, Default, Created
+       - Allow marking one account as default (button).
+     - Button “Add payout account” opens a modal.
+
+2) “Add / Edit Payout Account” modal:
+   - Fields:
+     - Country (read-only if derived from driver, or dropdown if appropriate)
+     - Payout type (mobile_wallet / bank_account / stripe_connect based on country)
+     - Provider (bkash/nagad/bank/stripe etc.)
+     - Account holder name
+     - Account number / wallet number (input, but never displayed again fully after save)
+     - Bank name, routing number where applicable
+     - Checkbox “Set as default payout account”
+   - Client-side validation aligned with backend rules.
+   - On save:
+     - Calls appropriate admin API.
+     - On success, refreshes the driver payout list.
+
+3) Read-only hint:
+   - Show a short note: “Payout details are securely encrypted. Only masked identifiers are displayed here.”
+
+B) Restaurant Profile Page
+
+On restaurant details page (/admin/restaurants/:id):
+
+- Mirror the same “Payout Information” section behavior as drivers:
+  - Table of payout accounts (typically bank accounts).
+  - Add/edit modal.
+  - Default payout account selection.
+- Support country-specific fields (BD vs US) similar to driver.
+
+C) Customer Profile Page – Payment Methods
+
+On customer details page (/admin/customers/:id):
+
+- Add “Payment Methods” card (read-only for now):
+  - Table columns:
+    - Brand (Visa/Mastercard/etc.)
+    - Last4
+    - Expiry (MM/YY)
+    - Provider (Stripe, etc.)
+    - Default (yes/no)
+    - Status
+  - No admin actions for adding/removing in this step; purely informational.
+- If no methods:
+  - Display a neutral empty state: “No saved payment methods for this customer.”
+
+UI Consistency:
+- Use existing admin design system (cards, tables, buttons).
+- No emojis.
+- Respect existing spacing, typography, and responsive layout patterns.
+
+6. Security & Compliance
+
+Verify the following:
+
+- RBAC:
+  - Only admins with appropriate capability (e.g., MANAGE_PAYOUTS) can create/update payout accounts.
+  - Other admins can have read-only or no access depending on existing roles.
+
+- Data protection:
+  - Sensitive details are always encrypted at rest.
+  - API responses and UI show only maskedAccount and non-sensitive fields.
+  - Audit logs have no raw account numbers; only safe metadata.
+
+- Logging:
+  - All payout account create/update/default actions are captured by the audit trail added in Step 37.
+  - Authentication and permission failures do not leak any sensitive info.
+
+- Backward compatibility:
+  - Existing drivers/restaurants with no payout accounts still work as before.
+  - Wallet settlement continues to function even if payoutAccountId is null.
+  - No changes to commission math or settlement calculations.
+
+7. Testing Plan
+
+Create a manual test script and run it end-to-end:
+
+1) Driver – Bangladesh:
+   - Pick a BD driver.
+   - Add a mobile_wallet payout account with provider=bkash.
+   - Mark as default.
+   - Verify:
+     - It appears in the Driver Payout Information table.
+     - maskedAccount shows only last few digits.
+     - Audit log entry exists with actionType=PAYOUT_ACCOUNT_CREATED.
+
+2) Driver – USA:
+   - Pick a US driver.
+   - Add a bank_account payout account.
+   - Optionally add a second account and mark the new one as default.
+   - Verify only one default account remains.
+   - Confirm no raw account numbers are visible in UI or in audit logs.
+
+3) Restaurant:
+   - Pick a restaurant with commission activity.
+   - Add a bank payout account.
+   - Confirm it shows in restaurant Payout Information table and default flag works.
+
+4) Customer:
+   - Use a customer that has at least one payment method (from existing payment integration).
+   - Navigate to their profile and confirm:
+     - Payment Methods table shows brand, last4, expiry, provider.
+     - No full card number is visible.
+
+5) Security checks:
+   - Try accessing payout endpoints without admin auth → blocked.
+   - Try with a non-privileged admin role (if available) → enforce RBAC rules.
+   - Confirm audit log shows relevant events and no sensitive metadata.
+
+Documentation:
+- Update replit.md to document:
+  - PayoutAccount and PaymentMethod models
+  - Admin endpoints
+  - UI behavior on driver/restaurant/customer profiles
+  - Security guarantees (encryption, masking, RBAC, audit)
+
+Final Acceptance Criteria
+- Drivers and restaurants have a clearly visible, secure “Payout Information” section in admin.
+- Customers have a read-only “Payment Methods” section.
+- All sensitive financial data is encrypted and never exposed in UI or logs.
+- No existing wallet, settlement, ride, food, or parcel features are broken.
+- Architect review should be able to mark this step as production-ready.

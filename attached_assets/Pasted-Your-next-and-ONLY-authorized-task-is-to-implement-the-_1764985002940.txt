@@ -1,0 +1,179 @@
+Your next and ONLY authorized task is to implement the complete SafeGo Parcel System (Domestic Bangladesh + International), strictly following ALL SafeGo Master Rules, Security Rules, Role Isolation, KYC Rules (BD & US), Status Flow Rules, Commission Logic, and Non-Breaking Architecture requirements.
+
+You MUST NOT modify or rename any existing schema, routes, or modules. Only ADD new fields, components, APIs, and flows.
+
+====================================================
+PHASE 1 — DATA MODEL EXTENSION (NON-BREAKING)
+====================================================
+Update the "deliveries" collection with the following fields:
+
+parcel_type
+weight_kg
+volumetric_weight
+chargeable_weight
+delivery_zone (same_city, inside_division, outside_division, remote)
+fragile (boolean)
+cod_enabled (boolean)
+cod_amount
+pickup_required (boolean)
+pickup_address
+pickup_geo
+dropoff_address
+dropoff_geo
+international (boolean)
+destination_country
+destination_zone
+fuel_surcharge_percentage
+remote_surcharge
+base_delivery_charge
+total_delivery_charge
+payment_method (cash, online)
+commission_amount
+driver_payout
+status (requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x)
+timestamps (created_at, updated_at)
+
+Do NOT modify any ride or food collections.
+
+====================================================
+PHASE 2 — PARCEL PRICING ENGINE (BD + INTERNATIONAL)
+====================================================
+Implement a unified pricing engine where price is calculated as:
+
+1. Determine chargeable weight:
+   chargeable_weight = max(actual_weight, volumetric_weight)
+
+2. Domestic pricing:
+   Use Bangladesh market-based slabs:
+      0–1kg: 100/120/140/160 tk (by zone)
+      1–2kg: 120/150/170/200 tk
+      2–5kg: 150/180/220/260 tk
+      5–10kg: 250/280/320/380 tk
+   Zone types:
+      same_city
+      inside_division
+      outside_division
+      remote
+
+3. International pricing:
+   Determine destination zone:
+      zone1: India/Nepal/Bhutan
+      zone3: UAE/KSA/Qatar/Oman
+      zone5: UK
+      zone6: USA/Canada
+   Base sample rates:
+      0.5kg: 1500/2500/3500/5000+ tk
+      1kg: 2000/3200/4500/6000+ tk
+      2kg: 3000/4500/6500/8000–12000 tk
+      5kg: 7000/9000/14000/20000–30000 tk
+   Add:
+      fuel_surcharge_percentage
+      security_surcharge (300–600)
+      remote_area_charge (800–1500)
+
+4. Delivery speed add-ons:
+      regular: +0
+      quick: +30 tk
+      express: +60 tk
+      super_express: +120 tk
+
+5. COD fee (if enabled):
+      cod_fee = max(10 tk, cod_amount * 0.008)
+
+6. Fragile surcharge:
+      +30 tk domestic
+      +10% international
+
+7. Final total:
+      total_delivery_charge = base_charge + add-ons + fees
+
+====================================================
+PHASE 3 — COMMISSION & PAYOUT RULES
+====================================================
+For CASH:
+   Driver receives all cash.
+   SafeGo commission becomes NEGATIVE BALANCE in driver_wallet.
+   Admin can weekly settle driver balance.
+
+For ONLINE:
+   Commission is auto-deducted.
+
+For INTERNATIONAL parcels:
+   Commission = % based on destination zone.
+   Driver payout = domestic pickup fee + delivery assistance fee.
+
+Restaurants DO NOT participate in parcel flow.
+
+====================================================
+PHASE 4 — FRONTEND IMPLEMENTATION (Customer, Driver, Admin)
+====================================================
+Customer App:
+   - Parcel create form
+   - Weight input
+   - Dimensions (for volumetric weight)
+   - Domestic/international selection
+   - Speed selection
+   - Fragile option
+   - COD option
+   - Live price calculation
+   - Pickup scheduling
+   - Tracking page with full status flow
+
+Driver App:
+   - Accept/Reject parcel job
+   - Pickup instructions
+   - COD handling
+   - Delivery confirmation with photo
+   - Earnings visible
+
+Admin Panel:
+   - View all parcels
+   - Pricing overrides
+   - Commission settings
+   - Fuel surcharge settings
+   - International zone rate settings
+   - Remote area zone editor
+   - Settlement system for drivers
+
+====================================================
+PHASE 5 — STATUS FLOW ENGINE
+====================================================
+Parcel statuses MUST follow:
+
+requested  
+searching_driver  
+accepted  
+picked_up  
+on_the_way  
+delivered  
+cancelled_customer  
+cancelled_driver  
+cancelled_admin  
+
+Notifications must fire on every transition.
+
+====================================================
+PHASE 6 — KYC & SECURITY RULES
+====================================================
+Do NOT modify any existing KYC flow.
+Do NOT expose customer or driver sensitive documents.
+Drivers cannot see customer KYC.
+Customers cannot see driver license or NID.
+Admin ONLY sees verification_status and rejection_reason.
+
+====================================================
+PHASE 7 — FULL QA VALIDATION
+====================================================
+Test:
+- Domestic flows (same city, division, remote)
+- International flows (all zones)
+- COD payments
+- Express delivery
+- Cancelled deliveries
+- Negative balance driver logic
+- Pickup scheduling
+- Mobile + desktop UI
+- Admin panel stability
+
+When ALL tests pass:
+Return: “SafeGo Parcel System — PRODUCTION READY”

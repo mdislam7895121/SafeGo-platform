@@ -1,0 +1,97 @@
+Please redesign the SafeGo Eats Restaurant Online/Offline toggle button as a pure UI enhancement. Do NOT change any backend logic, routing, APIs, or KYC rules. Keep all SafeGuard rules fully enforced. This must be visually improved only.
+
+CONTEXT:
+This toggle controls whether the restaurant is accepting orders. It currently sits under the restaurant header. We want a clearer, larger, more touch-friendly button that matches the design spec below.
+
+COMPONENT TO UPDATE:
+- Update the existing component that renders the Online/Offline toggle in the restaurant portal header (for example: /client/src/pages/restaurant/components/OnlineStatusToggle.tsx or equivalent). Do not rename the component or move it to a different file.
+
+PLACEMENT:
+- The button must remain in the restaurant header area, centered under the restaurant identity block:
+    Line 1: SafeGo Eats brand and navigation
+    Line 2: Restaurant name, verified badge, ID, location
+    Line 3: NEW Online/Offline pill toggle (centered horizontally)
+    Line 4: Search bar
+- Do not change the alignment of other header elements. No layout shifts beyond what is required to fit the new toggle.
+
+FULL REDESIGN SPECIFICATION:
+
+1. OVERALL SIZE & SHAPE
+   - Height: 46px
+   - Border-radius: 9999px (pill / capsule)
+   - Horizontal padding: 20px on left and right
+   - Ensure minimum tap target: at least 44px in both dimensions on mobile
+
+2. ICON & LABEL
+   - Use a power icon (on/off) inside the button.
+   - Icon size: 22px
+   - Space between icon and label text: 12px
+   - Label text: "Online" when active, "Offline" when inactive
+   - Label font size: 15–16px, medium/semibold weight
+   - Use high contrast colors for accessibility.
+
+3. COLOR STATES
+
+   ONLINE STATE:
+   - Background: #0CCE6B (SafeGo Green)
+   - Text color: #FFFFFF
+   - Icon color: #FFFFFF
+   - No border
+   - Add a subtle glow or soft box-shadow to indicate active status.
+   - Example: box-shadow: 0 0 12px rgba(12, 206, 107, 0.5)
+
+   OFFLINE STATE:
+   - Background: #E5E7EB (neutral gray)
+   - Text color: #374151 (dark gray)
+   - Icon color: #374151
+   - Border: 1px solid #D1D5DB
+   - No glow in offline state.
+
+4. INTERACTION & ACCESSIBILITY
+   - Use role="switch" on the button element.
+   - aria-checked must reflect the current online state: true when Online, false when Offline.
+   - Keep all existing click handlers and state wiring; only wrap them in the new UI.
+   - Keyboard support:
+       - Button must be focusable via Tab.
+       - Pressing Enter or Space should toggle the state (using the existing handler).
+   - Focus ring:
+       - When focused, show a 2px outline around the pill:
+         outline: 2px solid #4B9EFF;
+         outline-offset: 3px;
+   - Add smooth transitions (150–200ms) on:
+       - background-color
+       - color
+       - box-shadow
+       - a very light scale transform on press/active (for example, scale(0.98) while active)
+
+5. RESPONSIVE BEHAVIOR
+   - The button must look good on mobile, tablet, and desktop.
+   - The pill width may grow or shrink with content, but:
+       - Text must never wrap onto a second line.
+       - Icon and label must stay on a single row.
+   - Center the button horizontally in its header row on all breakpoints.
+   - Ensure the new button does not push the search bar or other elements out of place. If needed, adjust only local spacing within the header container.
+
+6. DO NOT DO
+   - Do NOT change the logic that decides whether the restaurant is online or offline.
+   - Do NOT change any API calls or backend behavior.
+   - Do NOT modify routing or URLs.
+   - Do NOT rename files or exported component names.
+   - Do NOT alter KYC or verification gating. If the restaurant cannot go online due to missing KYC or business docs, keep the existing logic exactly as-is.
+   - Do NOT change any other parts of the restaurant dashboard layout beyond the minimal spacing needed around this button.
+
+7. AFTER IMPLEMENTATION, PLEASE VERIFY
+   - Test the toggle on:
+       - Desktop
+       - Tablet (dev tools responsive mode)
+       - Mobile width
+   - Confirm:
+       - Click/tap toggles the state correctly.
+       - Keyboard (Tab + Enter/Space) toggles the state correctly.
+       - Focus ring appears correctly and is clearly visible.
+       - No text wrapping inside the button.
+       - Surrounding header and dashboard cards do not shift or break.
+   - Take and save a screenshot of the new toggle in ONLINE state on mobile viewport and desktop viewport.
+   - Confirm that all previous pages that show this header (dashboard, orders, menu management, staff management, payouts, documents, support) still render correctly with no regressions.
+
+This task is strictly a visual and accessibility enhancement of the Online/Offline toggle button for the SafeGo Eats restaurant portal. Keep all existing business rules, APIs, and security/SafeGuard constraints fully intact.

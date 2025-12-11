@@ -1,0 +1,446 @@
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Star, Award, TrendingUp, Check, Trophy } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+interface Tier {
+  id: string;
+  name: string;
+  color: string;
+  description: string;
+  requiredPoints: number;
+  displayOrder: number;
+  benefits: { id: string; text: string }[];
+}
+
+interface PointsData {
+  hasNoTier: boolean;
+  currentTier: Tier | null;
+  totalPoints: number; // 90-day status points
+  lifetimePoints: number; // All-time points
+  lastEarnedAt: string | null;
+  nextTier: {
+    id: string;
+    name: string;
+    requiredPoints: number;
+    color: string;
+    description: string;
+  } | null;
+  progressPercentage: number;
+  pointsToNextTier: number;
+  allTiers: {
+    id: string;
+    name: string;
+    requiredPoints: number;
+    color: string;
+    description: string;
+    displayOrder: number;
+    isCurrentTier: boolean;
+    isUnlocked: boolean;
+    benefits: { id: string; text: string }[];
+  }[];
+  cycleStatus: {
+    daysRemaining: number;
+    daysElapsed: number;
+    totalDays: number;
+    cycleProgress: number;
+    cycleEndDate: string;
+  } | null;
+}
+
+export default function DriverPoints() {
+  const { data, isLoading, error } = useQuery<PointsData>({
+    queryKey: ["/api/driver/points"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="p-6 max-w-4xl mx-auto space-y-6">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="bg-background min-h-screen flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground mb-2">Failed to load points data</p>
+            <p className="text-sm text-muted-foreground">
+              {error ? "Please try again later" : "Unable to connect to the server"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const { hasNoTier, currentTier, totalPoints, lifetimePoints, nextTier, progressPercentage, pointsToNextTier, allTiers, cycleStatus } = data;
+
+  return (
+    <div className="bg-background min-h-screen">
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
+        {/* Current Status Card - Shows "No Tier Yet" or Current Tier */}
+        {hasNoTier ? (
+          <Card className="border-2 border-muted">
+            <CardContent className="p-8">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <Star className="h-8 w-8 text-muted-foreground" />
+                    <h1 className="text-3xl font-bold text-foreground">
+                      No Tier Yet
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Earn 1000 points to unlock {nextTier?.name} tier
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-4 py-2"
+                  data-testid="badge-total-points"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  {totalPoints} points
+                </Badge>
+              </div>
+
+              {/* Progress to Blue Tier */}
+              {nextTier && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Progress to {nextTier.name} tier
+                    </span>
+                    <span 
+                      className="font-semibold"
+                      style={{ color: nextTier.color }}
+                    >
+                      {pointsToNextTier} points needed
+                    </span>
+                  </div>
+                  <Progress
+                    value={progressPercentage}
+                    className="h-3"
+                    data-testid="progress-next-tier"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {Math.round(progressPercentage)}% complete ({totalPoints}/{nextTier.requiredPoints})
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : currentTier ? (
+          <Card 
+            className="border-2"
+            style={{ 
+              borderColor: currentTier.color,
+              "--tier-color": currentTier.color
+            } as React.CSSProperties}
+          >
+            <CardContent className="p-8">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <Award 
+                      className="h-8 w-8" 
+                      style={{ color: currentTier.color }}
+                    />
+                    <h1 
+                      className="text-3xl font-bold"
+                      style={{ color: currentTier.color }}
+                    >
+                      {currentTier.name} Tier
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground">{currentTier.description}</p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-4 py-2"
+                  style={{ borderColor: currentTier.color, color: currentTier.color }}
+                  data-testid="badge-total-points"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  {totalPoints} points
+                </Badge>
+              </div>
+
+              {/* Progress to Next Tier */}
+              {nextTier && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Progress to {nextTier.name} tier
+                    </span>
+                    <span 
+                      className="font-semibold"
+                      style={{ color: nextTier.color }}
+                    >
+                      {pointsToNextTier} points needed
+                    </span>
+                  </div>
+                  <Progress
+                    value={progressPercentage}
+                    className="h-3"
+                    data-testid="progress-next-tier"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {Math.round(progressPercentage)}% complete
+                  </p>
+                </div>
+              )}
+
+              {!nextTier && (
+                <div className="bg-muted p-4 rounded-lg flex items-center justify-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  <p className="text-sm font-medium">You have reached the highest tier!</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* 90-Day Cycle Status */}
+        {cycleStatus && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                90-Day Points Cycle
+              </CardTitle>
+              <CardDescription>
+                Points reset every 90 days. Earn consistently to maintain your tier!
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-4 bg-background rounded-lg">
+                  <div className="text-3xl font-bold text-primary">{cycleStatus.daysRemaining}</div>
+                  <div className="text-sm text-muted-foreground">days remaining</div>
+                </div>
+                <div className="text-center p-4 bg-background rounded-lg">
+                  <div className="text-3xl font-bold">{totalPoints}</div>
+                  <div className="text-sm text-muted-foreground">status points</div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Cycle Progress</span>
+                  <span className="font-medium">{cycleStatus.cycleProgress}% ({cycleStatus.daysElapsed}/{cycleStatus.totalDays} days)</span>
+                </div>
+                <Progress value={cycleStatus.cycleProgress} className="h-2" />
+              </div>
+
+              <div className="bg-muted p-3 rounded-lg space-y-2">
+                <p className="text-xs font-medium">How It Works:</p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Points earned in the last 90 days count toward your tier</li>
+                  <li>Lifetime points ({lifetimePoints}) are saved for your records</li>
+                  <li>Maintain 1000+ points to keep Blue tier, 1500+ for Gold, 2500+ for Premium</li>
+                  <li>Points reset every 90 days - keep earning to stay in your tier!</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tier Roadmap */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Tier Roadmap</CardTitle>
+            <CardDescription>Track your progress across all tiers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {allTiers.map((tier, index) => {
+                const isCurrentTier = tier.isCurrentTier;
+                const isUnlocked = tier.isUnlocked;
+
+                return (
+                  <div
+                    key={tier.name}
+                    className={`flex items-center gap-4 p-4 rounded-lg border ${
+                      isCurrentTier ? "border-2" : "border"
+                    }`}
+                    style={
+                      isCurrentTier
+                        ? { 
+                            borderColor: tier.color,
+                            backgroundColor: `${tier.color}10`
+                          }
+                        : undefined
+                    }
+                    data-testid={`tier-${tier.name.toLowerCase()}`}
+                  >
+                    <div
+                      className="flex items-center justify-center h-12 w-12 rounded-full flex-shrink-0"
+                      style={{
+                        backgroundColor: isUnlocked ? `${tier.color}20` : undefined,
+                      }}
+                    >
+                      {isUnlocked ? (
+                        <Check 
+                          className="h-6 w-6"
+                          style={{ color: tier.color }}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground font-semibold">{index + 1}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 
+                          className="font-semibold"
+                          style={{ color: isUnlocked ? tier.color : undefined }}
+                        >
+                          {tier.name}
+                        </h3>
+                        {isCurrentTier && (
+                          <Badge 
+                            variant="outline"
+                            style={{ borderColor: tier.color, color: tier.color }}
+                          >
+                            Current
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {tier.requiredPoints} points required
+                      </p>
+                    </div>
+                    {isUnlocked ? (
+                      <Check className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    ) : (
+                      <span className="text-sm text-muted-foreground flex-shrink-0">Locked</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Current Tier Benefits */}
+        {currentTier && !hasNoTier && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Your Benefits</CardTitle>
+              <CardDescription>Perks you enjoy at {currentTier.name} tier</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {currentTier.benefits.length > 0 ? (
+                <div className="space-y-3">
+                  {currentTier.benefits.map((benefit) => (
+                    <div
+                      key={benefit.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted"
+                      data-testid={`benefit-${benefit.id}`}
+                    >
+                      <Check 
+                        className="h-5 w-5 flex-shrink-0 mt-0.5"
+                        style={{ color: currentTier.color }}
+                      />
+                      <p className="text-sm">{benefit.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No benefits available for this tier
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Show Next Tier Benefits for drivers with no tier */}
+        {hasNoTier && nextTier && allTiers.find(t => t.id === nextTier.id) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Unlock {nextTier.name} Tier Benefits</CardTitle>
+              <CardDescription>Earn {pointsToNextTier} more points to unlock these perks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {allTiers.find(t => t.id === nextTier.id)?.benefits.length ?? 0 > 0 ? (
+                <div className="space-y-3">
+                  {allTiers.find(t => t.id === nextTier.id)?.benefits.map((benefit) => (
+                    <div
+                      key={benefit.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted opacity-70"
+                      data-testid={`benefit-${benefit.id}`}
+                    >
+                      <Check 
+                        className="h-5 w-5 flex-shrink-0 mt-0.5"
+                        style={{ color: nextTier.color }}
+                      />
+                      <p className="text-sm">{benefit.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No benefits information available
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* How to Earn Points */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">How to Earn Points</CardTitle>
+            <CardDescription>Complete trips to accumulate loyalty points</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 flex-shrink-0">
+                <TrendingUp className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold mb-1">Complete Trips</h4>
+                <p className="text-sm text-muted-foreground">
+                  Earn 10 points for every ride you complete. The more trips you complete, the faster you climb
+                  tiers and unlock better benefits.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-muted p-4 rounded-lg">
+              <h4 className="font-semibold mb-2 text-sm">Tips for Earning More Points</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary flex-shrink-0 mt-0.5">•</span>
+                  <span>Maintain a high acceptance rate to get priority access to trips</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary flex-shrink-0 mt-0.5">•</span>
+                  <span>Complete trips consistently to maximize your points</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary flex-shrink-0 mt-0.5">•</span>
+                  <span>Provide excellent service to earn 5-star ratings</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary flex-shrink-0 mt-0.5">•</span>
+                  <span>Stay active during peak hours for bonus opportunities</span>
+                </li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

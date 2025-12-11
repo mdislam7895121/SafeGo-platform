@@ -1,0 +1,238 @@
+/* SafeGo Premium Header - Uber/Apple Grade */
+
+/* ============================================
+   HEADER CONTAINER
+   ============================================ */
+
+.sg-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 180ms ease-out;
+}
+
+.sg-header--scrolled {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+.sg-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (min-width: 768px) {
+  .sg-header-inner {
+    padding: 14px 24px;
+    gap: 24px;
+  }
+}
+
+/* ============================================
+   LOGO PILL
+   ============================================ */
+
+.sg-logo-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0a5cff, #3d8bff);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(10, 92, 255, 0.25);
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+  flex-shrink: 0;
+}
+
+.sg-logo-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(10, 92, 255, 0.32);
+}
+
+@media (min-width: 768px) {
+  .sg-logo-pill {
+    padding: 6px 16px;
+    font-size: 18px;
+  }
+}
+
+/* ============================================
+   DESKTOP NAVIGATION
+   ============================================ */
+
+.sg-nav {
+  display: none;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .sg-nav {
+    display: flex;
+  }
+}
+
+.sg-nav-link {
+  position: relative;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  text-decoration: none;
+  padding: 4px 0;
+  opacity: 0.85;
+  transition: opacity 140ms ease-out;
+}
+
+.sg-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0a5cff, #3d8bff);
+  transition: width 180ms ease-out;
+}
+
+.sg-nav-link:hover {
+  opacity: 1;
+}
+
+.sg-nav-link:hover::after {
+  width: 100%;
+}
+
+/* ============================================
+   DESKTOP AUTH BUTTONS
+   ============================================ */
+
+.sg-auth {
+  display: none;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .sg-auth {
+    display: flex;
+  }
+}
+
+.sg-login-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 140ms ease-out;
+}
+
+.sg-login-link:hover {
+  opacity: 1;
+}
+
+.sg-signup-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: #0a5cff;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(10, 92, 255, 0.35);
+  transition: background 140ms ease-out, transform 140ms ease-out, box-shadow 140ms ease-out;
+}
+
+.sg-signup-btn:hover {
+  background: #0952e0;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(10, 92, 255, 0.45);
+}
+
+/* ============================================
+   HAMBURGER MENU BUTTON
+   ============================================ */
+
+.sg-hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 48px;
+  height: 48px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-right: -8px;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+@media (min-width: 768px) {
+  .sg-hamburger {
+    display: none;
+  }
+}
+
+.sg-hamburger-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #0f172a;
+  border-radius: 2px;
+  transition: all 250ms ease-out;
+}
+
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
+
+.dark .sg-header {
+  background: rgba(15, 23, 42, 0.88);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .sg-header--scrolled {
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+.dark .sg-nav-link {
+  color: #e2e8f0;
+}
+
+.dark .sg-nav-link::after {
+  background: linear-gradient(90deg, #60a5fa, #93c5fd);
+}
+
+.dark .sg-login-link {
+  color: #e2e8f0;
+}
+
+.dark .sg-hamburger-bar {
+  background: #e2e8f0;
+}

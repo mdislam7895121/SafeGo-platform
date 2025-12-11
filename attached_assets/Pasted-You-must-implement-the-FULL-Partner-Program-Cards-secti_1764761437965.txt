@@ -1,0 +1,192 @@
+You must implement the FULL Partner Program Cards section on /customer (BD only) using the following partnerItems array:
+
+const partnerItems = [
+  {
+    kind: "driver_ride",
+    title: "রাইড শেয়ার ড্রাইভার",
+    description: "যাত্রী নিয়ে শহরের ভেতরে যাতায়াত সেবা দিন।",
+    icon: <RideIcon />,
+  },
+  {
+    kind: "driver_delivery",
+    title: "ডেলিভারি ড্রাইভার",
+    description: "খাবার ও পার্সেল ডেলিভারি করে আয় করুন।",
+    icon: <DeliveryIcon />,
+  },
+  {
+    kind: "restaurant",
+    title: "রেস্টুরেন্ট পার্টনার",
+    description: "SafeGo দিয়ে আপনার খাবার অনলাইনে বিক্রি করুন।",
+    icon: <RestaurantIcon />,
+  },
+  {
+    kind: "shop_partner",
+    title: "দোকান পার্টনার",
+    description: "মুদিখানা, ইলেকট্রনিক্স বা অন্যান্য দোকান অনলাইনে তুলুন।",
+    icon: <ShopIcon />,
+  },
+  {
+    kind: "ticket_operator",
+    title: "টিকিট ও রেন্টাল অপারেটর",
+    description: "বাস, লঞ্চ ও গাড়ি ভাড়া ও কল সেন্টার পরিচালনা করুন।",
+    icon: <TicketIcon />,
+  },
+];
+
+=========================================
+TASK: Build this entire Partner Program Section
+=========================================
+
+1) Placement:
+Place the new section **immediately below the car-type cards (“Available rides”)** on `/customer`.
+
+Order:
+Pickup/Dropoff
+→ Map
+→ Available Rides (car cards)
+→ ⭐ NEW SECTION: Partner Programs
+→ Rest of page
+
+Show this section ONLY if:
+user.country === "BD"
+Else: hide completely (no API calls).
+
+=========================================
+2) Section UI (Bangla)
+=========================================
+
+Title:
+"SafeGo Partner Programs"
+
+Subtitle:
+"আপনার SafeGo একাউন্ট থেকে আয় করতে চাইলে নিচের যেকোনো অপশন নির্বাচন করুন।"
+
+=========================================
+3) Grid Layout
+=========================================
+
+Use responsive layout:
+- Mobile: 1 column
+- Tablet: 2 columns
+- Desktop: 3 columns
+Gap: 16px
+Margin-top: 24px
+
+Container class suggestion:
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+
+=========================================
+4) CARD DESIGN
+=========================================
+
+Each partner card MUST follow SafeGo premium styling:
+
+BASE CARD:
+- bg-white
+- rounded-xl (16px)
+- p-5
+- shadow-sm
+- relative
+- transition: transform, shadow
+- hover: scale-[1.02]
+
+SIDE GLOW (hairline neon glow on left & right):
+Use absolutely positioned gradient divs:
+
+Left:
+<div className="absolute left-0 top-0 h-full w-[2px] bg-gradient-to-b from-[#3A8BFF66] to-[#3A8BFF22] blur-[2px]" />
+
+Right:
+<div className="absolute right-0 top-0 h-full w-[2px] bg-gradient-to-b from-[#3A8BFF66] to-[#3A8BFF22] blur-[2px]" />
+
+TITLE:
+- text-[17px]
+- font-bold
+- text-gray-900
+
+DESCRIPTION:
+- text-[14px]
+- text-gray-500
+- mt-1
+
+ICON:
+- size 40px
+- mb-3
+
+=========================================
+5) STATUS BADGES
+=========================================
+
+Fetch status from:
+GET /api/bd/partner/summary
+
+Map:
+
+not_started       → bg-gray-200 text-gray-800
+draft             → bg-yellow-200 text-gray-900
+kyc_pending       → bg-yellow-200 text-gray-900
+setup_incomplete  → bg-blue-200 text-gray-900
+ready_for_review  → bg-blue-200 text-gray-900
+live              → bg-green-200 text-gray-900
+rejected          → bg-red-200 text-gray-900
+
+Render as:
+<span className="absolute top-3 right-3 px-2 py-[2px] text-[12px] font-semibold rounded-full">
+  STATUS_TEXT
+</span>
+
+=========================================
+6) CARD BUTTON
+=========================================
+
+Button label mapping:
+not_started → "শুরু করুন"
+live → "ড্যাশবোর্ড দেখুন"
+everything else → "চালিয়ে যান"
+
+Button design:
+- Full width
+- bg-[#007BFF]
+- text-white
+- font-bold
+- rounded-lg
+- py-2
+- mt-4
+- hover:bg-[#0069d9]
+
+On click:
+POST /api/bd/partner/start
+Body: { partnerKind: item.kind }
+
+On success:
+Redirect → response.nextUrl
+
+Handle errors with Bangla toast:
+- 401/403 → "লগইন করুন বা এই সেবা আপনার অঞ্চলের জন্য নয়।"
+- 400/422 → server Bangla message
+- 500 → "সিস্টেমে সমস্যা হচ্ছে, আবার চেষ্টা করুন।"
+
+=========================================
+7) SECURITY
+=========================================
+
+S1: Check login + BD country
+S2: Validate partnerKind
+S3: Isolation (partner profile = only this user)
+S4: Log "PARTNER_ONBOARDING_STARTED"
+S5: Rate-limit calls
+
+=========================================
+8) FINAL CHECKLIST — MUST PASS
+=========================================
+
+✓ Section visible only for BD users  
+✓ Partner cards load with correct status  
+✓ Thin side-glow visible  
+✓ Bold title visible  
+✓ Button works, API works  
+✓ Redirect goes to correct onboarding  
+✓ No breakage in car cards, map, ride UI  
+✓ US users never see this section  
+
+Implement ALL of the above in one complete pass.

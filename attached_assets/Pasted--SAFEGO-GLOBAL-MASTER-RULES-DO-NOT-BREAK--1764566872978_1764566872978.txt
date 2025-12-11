@@ -1,0 +1,250 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK)
+====================================
+
+ROLES (4 distinct roles)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role:
+- Separate signup + KYC
+- Separate dashboard
+- Separate permissions
+- No cross-role private data access
+
+SERVICES (must always exist)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+====================================
+KYC & COUNTRY RULES
+====================================
+
+Drivers have a country field that is derived from KYC:
+- For BD drivers: country = "BD"
+  - Required: father_name, date_of_birth, present_address, permanent_address,
+    nid_number, nid_front_image_url, nid_back_image_url,
+    emergency_contact_name, emergency_contact_phone,
+    verification_status, is_verified.
+- For US drivers: country = "US"
+  - Required: date_of_birth, home_address,
+    emergency_contact_name, emergency_contact_phone,
+    government_id_type, government_id_last4,
+    driver_license_number, driver_license_image_url, driver_license_expiry,
+    ssn_last4 (optional),
+    verification_status, is_verified.
+
+Onboarding:
+- Multi-step: basic info → address → ID/KYC upload (BD/US rules) → emergency contact.
+- After submit: verification_status = "pending".
+- Driver cannot receive rides/food/parcel until Admin approves.
+
+====================================
+ADMIN PANEL CAPABILITIES
+====================================
+Admin can:
+- Approve/reject KYC for customers, drivers, restaurants (with rejection_reason).
+- Block/unblock any user or restaurant.
+- Configure pricing, fees, commissions per country and per service.
+- Manage payouts:
+  - view driver negative balance and restaurant negative balance.
+  - settle balances and mark paid.
+
+====================================
+CORE COLLECTIONS (NO BREAKING CHANGES)
+====================================
+
+1) rides
+   - customer_id, driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng, dropoff_lat, dropoff_lng
+   - service_type (must match one of the configured trip types)
+   - fare_amount, tax_amount
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method (cash/online)
+   - status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address (+geo), delivery_address (+geo)
+   - items, subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount, restaurant_payout_amount
+   - payment_method
+   - status:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+3) deliveries
+   - customer_id, driver_id
+   - pickup_address (+geo), dropoff_address (+geo)
+   - package_description, package_size
+   - delivery_fee
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+====================================
+COMMISSION & PAYOUT RULES
+====================================
+1) Ride – CASH:
+   - Driver receives full cash.
+   - SafeGo commission → negative driver_wallet_balance.
+   - Driver must settle weekly; admin marks as paid.
+
+2) Food order – CASH:
+   - Restaurant receives full cash.
+   - SafeGo commission → negative restaurant_wallet_balance.
+
+3) ONLINE payments:
+   - SafeGo collects the full payment.
+   - safego_commission_amount stays with SafeGo automatically.
+   - Driver/restaurant receives only net payout.
+
+4) Admin can settle balances and mark paid.
+
+====================================
+SECURITY RULES
+====================================
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer KYC or sensitive info.
+- Restaurants cannot view other restaurants.
+- Only Admin can change pricing, commissions, verification_status and block/unblock users.
+- Users can update only their own profile.
+
+====================================
+STATUS FLOWS (UNCHANGED)
+====================================
+
+Rides:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+Food:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+
+Parcel:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+====================================
+NOTIFICATIONS
+====================================
+- New ride / food / parcel alerts for drivers.
+- Order and parcel status updates.
+- Verification approved/rejected.
+- Important admin notifications.
+
+====================================
+TASK: COUNTRY-SPECIFIC TRIP TYPE VISIBILITY FOR DRIVER TRIP PREFERENCES
+====================================
+
+Screen: `/driver/map` → Trip selector bottom-left button → “Trip Preferences” grid.
+
+Goal:
+- Split trip types into two market profiles:
+  - US drivers see only US-valid trip types.
+  - BD drivers see BD-specific vehicle types and services.
+- Keep all collections and service_type values backward-compatible.
+
+------------------------------------
+1) Define master configuration for all trip types
+------------------------------------
+Create a **central config** for trip types used in the driver UI, without changing DB schemas:
+
+Example (TypeScript):
+
+```ts
+type TripServiceConfig = {
+  id: string;            // internal key, used in service_type (e.g. "safego_go")
+  label: string;         // display name
+  icon: ReactNode;       // existing icon component
+  category: "ride" | "food" | "parcel";
+  enabledCountries: ("US" | "BD")[];   // markets where this service is visible
+};
+
+export const TRIP_SERVICES: TripServiceConfig[] = [
+  {
+    id: "safego_go",
+    label: "SafeGo Go",
+    icon: <GoIcon />,
+    category: "ride",
+    enabledCountries: ["US", "BD"],
+  },
+  {
+    id: "safego_x",
+    label: "SafeGo X",
+    icon: <XIcon />,
+    category: "ride",
+    enabledCountries: ["US", "BD"],
+  },
+  {
+    id: "safego_xl",
+    label: "SafeGo XL",
+    icon: <XlIcon />,
+    category: "ride",
+    enabledCountries: ["US", "BD"],
+  },
+  {
+    id: "safego_premium",
+    label: "SafeGo Premium",
+    icon: <PremiumIcon />,
+    category: "ride",
+    enabledCountries: ["US", "BD"],
+  },
+  {
+    id: "safego_cng",
+    label: "SafeGo CNG",
+    icon: <CngIcon />,
+    category: "ride",
+    enabledCountries: ["BD"],         // BD only
+  },
+  {
+    id: "safego_bike",
+    label: "SafeGo Bike",
+    icon: <BikeIcon />,
+    category: "ride",
+    enabledCountries: ["BD"],         // BD only (for now)
+  },
+  {
+    id: "safego_moto",
+    label: "SafeGo Moto",
+    icon: <MotoIcon />,
+    category: "ride",
+    enabledCountries: ["BD"],         // BD only
+  },
+  {
+    id: "safego_pet",
+    label: "SafeGo Pet",
+    icon: <PetIcon />,
+    category: "ride",
+    enabledCountries: ["US", "BD"],
+  },
+  {
+    id: "safego_eats",
+    label: "SafeGo Eats",
+    icon: <EatsIcon />,
+    category: "food",
+    enabledCountries: ["US", "BD"],
+  },
+  {
+    id: "safego_parcel",
+    label: "SafeGo Parcel",
+    icon: <ParcelIcon />,
+    category: "parcel",
+    enabledCountries: ["US", "BD"],
+  },
+];

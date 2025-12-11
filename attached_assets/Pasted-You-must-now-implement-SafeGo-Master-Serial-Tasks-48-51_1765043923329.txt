@@ -1,0 +1,146 @@
+You must now implement SafeGo Master Serial Tasks 48–51 (Final Pre-Launch System Readiness Layer) in ONE unified, non-breaking update. All SafeGo Master Rules remain fully enforced.
+
+=====================================================================
+SECTION 0 — SAFEGO MASTER RULE ENFORCEMENT
+=====================================================================
+You must NOT modify or break:
+• KYC flows (BD/US)
+• ride/food/parcel status flows
+• pricing, commission, tax logic
+• fraud prevention system
+• settlement/finance engine
+• security hardening layer
+• rating/reputation engine
+• data rights & retention system
+• admin permissions model
+
+All new features must be ADDITIVE, non-destructive, and fully backward compatible.
+
+=====================================================================
+SECTION 1 — TASK SET (48–51)
+=====================================================================
+
+---------------------------------------------------------------------
+TASK 48 — Global Payment Gateway Health Check
+---------------------------------------------------------------------
+Create a new module: **paymentHealthEngine.ts**
+
+Implement:
+• periodic checks (every 10 minutes)
+• test ping to:
+    - bkash sandbox endpoint
+    - nagad sandbox endpoint
+    - stripe test endpoint
+• verify:
+    - API credentials
+    - response time
+    - error rate
+• store checks in:
+    payment_health_logs table
+
+Admin Panel → “System Health Center”:
+• show green/yellow/red indicators
+• show last 20 logs
+
+---------------------------------------------------------------------
+TASK 49 — Notification System Health Check
+---------------------------------------------------------------------
+Create notificationHealthEngine.ts
+
+Perform:
+• SMS gateway ping (Twilio / local sender)
+• Email SMTP ping
+• Push notification service ping
+• latency + failure logging
+
+Store in:
+notification_health_logs table
+
+Admin Panel:
+• Independent page “Notification Health”
+• Show message queue depth
+• Show error reasons
+• Auto-alert if >5 failures in a row
+
+---------------------------------------------------------------------
+TASK 50 — Map Service Health & Load Testing
+---------------------------------------------------------------------
+Create mapHealthEngine.ts
+
+Verify:
+• Mapbox/Google API availability
+• Geocoding latency
+• Reverse geocoding stability
+• Route cost calculation
+• Autocomplete suggestion speed
+
+Add table:
+map_health_logs
+
+Perform load tests:
+• 100 simulated route requests  
+• store average latency  
+• mark system as degraded if >2 seconds latency
+
+Admin Panel:
+• New tab “Map Engine Health”
+
+---------------------------------------------------------------------
+TASK 51 — UAT Pass + Admin Training + Launch Readiness Certificate
+---------------------------------------------------------------------
+Create new object model:
+uat_reports  
+uat_checklist_items  
+uat_signoff_records
+
+Flow:
+1. System generates UAT checklist:
+    - KYC flows
+    - Ride booking
+    - Delivery booking
+    - Food ordering
+    - Partner onboarding
+    - Finance + settlement
+    - Fraud system tests
+    - Security layer tests
+    - Notification layer tests
+    - Rating engine tests
+    - Data export/delete tests
+
+2. Admin tests each checklist item manually  
+3. Admin marks items as PASS/FAIL  
+4. When all tasks PASS:
+    - generate Launch Readiness Certificate (PDF or JSON)
+    - store in launch_certificates table
+
+Admin Panel:
+• new page “Launch Readiness Center”
+• shows checklist, score, pass/fail summary
+
+=====================================================================
+SECTION 2 — DATABASE ADDITIONS (NON-BREAKING)
+=====================================================================
+Add tables:
+• payment_health_logs  
+• notification_health_logs  
+• map_health_logs  
+• uat_reports  
+• uat_checklist_items  
+• uat_signoff_records  
+• launch_certificates
+
+=====================================================================
+SECTION 3 — VALIDATION REQUIREMENTS
+=====================================================================
+Before finishing:
+• Ensure no changes break existing routes  
+• Ensure no false failures in health engines  
+• Ensure admin-only visibility  
+• Ensure readiness certificate cannot be generated unless ALL tests pass  
+
+=====================================================================
+SECTION 4 — COMPLETION MESSAGE
+=====================================================================
+When done, return:
+
+“Tasks 48–51 (SafeGo Final Pre-Launch System Readiness) fully implemented. SafeGo is now ready for production launch.”

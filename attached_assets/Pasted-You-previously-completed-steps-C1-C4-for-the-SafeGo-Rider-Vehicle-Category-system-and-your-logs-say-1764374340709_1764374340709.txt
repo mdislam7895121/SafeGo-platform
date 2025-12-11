@@ -1,0 +1,88 @@
+You previously completed steps C1–C4 for the SafeGo Rider Vehicle Category system, and your logs say:
+
+- C1: Core ride flow integration
+- C2: Rider Vehicle Category Pricing with 7 categories (SAFEGO_X, COMFORT, COMFORT_XL, XL, BLACK, BLACK_SUV, WAV)
+- C3: Driver availability indicators in the ride options screen
+- C4: Accessibility and global integration, using useFareCalculation and useCategoryAvailability, and passing rideTypeCode into the ride request.
+
+However, in the live mobile UI the rider still does NOT see any vehicle selection cards.
+
+Current behavior (bug):
+
+1. On the customer web app, I open the Home tab.
+2. Pickup: 182 Sutter Ave, Brooklyn, NY.
+3. Dropoff: any address (for example 170-21 Jamaica Ave, Queens, or even Connecticut, USA).
+4. I tap "See prices".
+5. The app shows the "Plan your ride" screen with:
+   - Map
+   - Estimated fare (single amount)
+   - Route choices (Fastest, etc.)
+   - "Request ride" button
+
+But there is **no horizontal vehicle list or cards** for SafeGo X, Comfort, Comfort XL, XL, Black, Black SUV, WAV. I can’t choose a vehicle type at all. There is no carousel, no listbox, no badges – nothing visible.
+
+What I want:
+
+1. On the "Plan your ride" / rider options screen (the one that appears after "See prices"):
+   - Directly UNDER the "Estimated fare" section and BEFORE the route choices,
+   - Show a horizontally scrollable list (on mobile) of vehicle options:
+     - SafeGo X
+     - SafeGo Comfort
+     - SafeGo Comfort XL
+     - SafeGo XL
+     - SafeGo Black
+     - SafeGo Black SUV
+     - SafeGo WAV
+   - Each option must show:
+     - Vehicle name
+     - Price for this trip (with its own category multiplier)
+     - ETA or a short label (e.g., "4–6 min")
+     - Any surge / availability badges you already implemented in C3/C4.
+   - One option is selected by default (SafeGo X). Tapping another card updates the selected category and fare.
+
+2. When I tap "Request ride":
+   - The selected category’s rideTypeCode must be included in the ride request payload, exactly as you described in C4.
+   - Same-state NYC TLC rules and cross-state fare engine logic must continue to work as before. No regulatory or commission logic should be broken.
+
+3. Desktop web:
+   - Keep the listbox / option pattern you implemented for accessibility, but make sure at least one option is visible and clearly selectable.
+   - The desktop behavior must be consistent with mobile: changing the selected vehicle updates the fare and the rideTypeCode.
+
+4. Empty / edge cases:
+   - If no drivers are available for a given category (based on useCategoryAvailability), that category card should be disabled with a clear label like “Unavailable” or “No drivers nearby”.
+   - WAV must remain locked and only shown as available when your rules say so.
+   - There must always be at least one selectable category as long as any driver is available in the area.
+
+Implementation instructions:
+
+1. Inspect the current rider options page:
+   - client/src/pages/rider/ride/options.tsx (or the equivalent file you are using)
+   - Check where the VehicleCategoryCard / VehicleCategoryCarousel (or similar component) is rendered.
+   - If it is not rendered at all, add the component into this screen between the Estimated fare section and the route list.
+
+2. Wiring and state:
+   - Confirm that the selected vehicle category state is owned by the options page and passed into useFareCalculation so that the price on screen reflects the chosen category.
+   - Confirm that when I tap a vehicle card, both:
+     - selectedCategory state changes
+     - rideTypeCode passed into the ride request body is updated.
+
+3. Styling and layout:
+   - For mobile: make sure the container is visible above the "Choose route" section and not hidden by overflow, display, or flex bugs.
+   - Verify in the mobile preview that I can swipe the cards left/right.
+   - For desktop: ensure the listbox options are visible in one column or row and clearly clickable.
+
+4. Tests:
+   - Add/update tests to cover:
+     - Default selection of SAFEGO_X.
+     - Switching between categories updates the fare and rideTypeCode.
+     - A category with no drivers is disabled.
+     - Cross-state trips still use the correct pricing when a category is selected.
+
+When you are done:
+
+- Restart the app, open the rider options page, and take a screenshot that clearly shows the 7 vehicle categories visible under Estimated fare.
+- Summarize exactly what was changed (files, components, and important logic).
+- Confirm that:
+  - NYC TLC rules still apply correctly for NYC-only trips.
+  - Cross-state fare engine still works.
+  - Driver category preferences (driver choosing which categories to serve) are respected by dispatch.

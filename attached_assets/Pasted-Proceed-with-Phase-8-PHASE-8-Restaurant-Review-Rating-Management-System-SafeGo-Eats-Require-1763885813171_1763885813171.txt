@@ -1,0 +1,151 @@
+Proceed with Phase 8.
+
+PHASE 8 – Restaurant Review & Rating Management System (SafeGo Eats)
+
+Requirements:
+- Additive only. No breaking changes to food_orders, analytics, payouts, promotions, or staff.
+- Maintain RBAC, BD/US KYC rules, restaurant_id scoping.
+- Customer privacy and security must be preserved.
+- Only restaurants can view ratings for their own restaurant.
+- Admin can moderate reviews globally.
+
+----------------------------------------------------
+1. Customer Review Flow
+----------------------------------------------------
+Eligibility:
+- Customer can leave a rating + review ONLY after order status = "delivered".
+
+New endpoint:
+POST /api/customer/reviews
+Fields:
+- order_id
+- restaurant_id
+- rating (1–5)
+- review_text (optional)
+- images[] (optional)
+- created_at
+
+Validation:
+- Must match customer_id from token
+- Order must belong to customer
+- Order must be delivered
+- One review per order
+- No editing after submission (immutable)
+
+----------------------------------------------------
+2. Restaurant Review Dashboard (/restaurant/reviews)
+----------------------------------------------------
+Features:
+- List of all reviews for the restaurant
+- Filters:
+  - rating (1–5)
+  - has photos
+  - date range
+  - order type (delivery/pickup)
+- Columns:
+  - customer masked name (e.g., "S**** M.")
+  - rating
+  - review text
+  - images
+  - order date
+  - created_at
+
+Stats summary:
+- Average rating (last 30 days + all time)
+- Rating distribution (1★–5★)
+- Top praised items (via food_orders.item_ids)
+- Top complaint categories (optional text analysis)
+
+----------------------------------------------------
+3. Customer Profile Page Additions
+----------------------------------------------------
+Add:
+- “My Reviews” section
+- Ability to view past reviews (read-only)
+- No editing or deletion allowed
+
+Endpoint:
+GET /api/customer/reviews/my
+
+----------------------------------------------------
+4. Public Restaurant Rating Integration
+----------------------------------------------------
+Add rating to:
+- Restaurant listing
+- Restaurant detail page
+- Menu page header
+
+Data:
+- avg_rating
+- total_reviews
+- last_30_day_rating
+
+----------------------------------------------------
+5. Admin Review Moderation Panel
+----------------------------------------------------
+Admin can:
+- View all reviews (global)
+- Filter by:
+  - rating
+  - restaurant
+  - flagged
+  - has photos
+- Force-hide inappropriate reviews
+- Restore hidden reviews
+- Add admin flag with reason
+
+Endpoints:
+- GET /api/admin/reviews
+- POST /api/admin/reviews/:id/hide
+- POST /api/admin/reviews/:id/restore
+- POST /api/admin/reviews/:id/flag
+
+All actions audit logged.
+
+----------------------------------------------------
+6. Backend Endpoints (Add-only)
+----------------------------------------------------
+Customer:
+- POST /api/customer/reviews
+- GET /api/customer/reviews/my
+
+Restaurant:
+- GET /api/restaurant/reviews
+- GET /api/restaurant/reviews/stats
+
+Admin:
+- GET /api/admin/reviews
+- POST /api/admin/reviews/:id/hide
+- POST /api/admin/reviews/:id/restore
+- POST /api/admin/reviews/:id/flag
+
+----------------------------------------------------
+7. Security & RBAC
+----------------------------------------------------
+- Customer can only review their own delivered orders.
+- Restaurant can only view reviews of THEIR restaurant_id.
+- STAFF can view reviews (if owner grants can_view_analytics or can_manage_orders).
+- Admin has review moderation only. Cannot modify ratings.
+- Mask customer identities for restaurants and admins.
+
+----------------------------------------------------
+8. Frontend UI
+----------------------------------------------------
+Customer:
+- Review submission modal (post-delivery)
+- “My Reviews” tab
+
+Restaurant:
+- Reviews dashboard
+- Stats summary widgets
+- Review detail modal
+- Filters + pagination
+
+Admin:
+- Global review moderation table
+- Hide/restore/flag actions
+- Full audit log display
+
+----------------------------------------------------
+Finish Phase 8 completely before moving to Phase 9.
+----------------------------------------------------

@@ -1,0 +1,74 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS ENFORCE)
+
+1. ROLES (strict separation)
+   - Customer
+   - Driver
+   - Restaurant
+   - Admin
+   Each has its own onboarding, KYC rules, dashboard, permissions, and allowed actions.
+
+2. SERVICES
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+   All features must support all three.
+
+3. COUNTRY-SPECIFIC KYC (BD vs US)
+   BD:
+     father_name, date_of_birth, present_address, permanent_address,
+     NID number + front/back images, emergency_contact, verification_status, is_verified
+   US:
+     date_of_birth, home_address, emergency_contact,
+     government_id_type, government_id_last4,
+     drivers: license_number + image + expiry, optional ssn_last4,
+     verification_status, is_verified
+   Sensitive documents must be viewable by admin ONLY.
+
+4. ADMIN EXCLUSIVE CONTROL
+   Admin can:
+     approve/reject KYC (with rejection_reason),
+     block/unblock users,
+     view & settle driver/restaurant negative balances,
+     set commissions & pricing,
+     manage payouts.
+   No other role can override admin authority.
+
+5. CORE COLLECTIONS (NEVER rename/remove)
+   rides, food_orders, deliveries
+   Must always include:
+     identity fields, location, geolocation, payment, fees & commission,
+     timestamps, and full status flows.
+
+6. COMMISSION & WALLET RULES (NEVER modify)
+   Cash ride → driver keeps cash; platform commission = driver negative wallet
+   Cash food → restaurant keeps cash; commission = restaurant negative wallet
+   Online → platform receives full; partner gets net wallet payout
+   Admin can mark settlements manually.
+
+7. SECURITY RULES
+   - Customers cannot see driver documents.
+   - Drivers cannot see customer KYC or home address history.
+   - Restaurants cannot see other restaurants' data.
+   - No sensitive data exposed in logs.
+   - Only admin can change verification, payouts, blocking, pricing.
+
+8. STATUS FLOWS (must remain unchanged)
+   Ride:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled
+   Food:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled
+   Parcel:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled
+
+9. ONBOARDING LOCK
+   No user may access core features until verification_status = approved.
+
+10. NOTIFICATIONS
+   Every new event must integrate into FCM + WebSockets without breaking existing flows.
+
+11. NON-BREAKING RULE
+   - Only ADD new fields/tables/routes.
+   - Never rename/remove existing API or schema.
+   - Everything must remain backward compatible.
+
+END OF MASTER RULES.

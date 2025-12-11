@@ -1,0 +1,86 @@
+Follow all SafeGo Master Rules and implement D10: Driver Getting Started Page (Web Version).
+
+GOAL:
+Create a complete Driver “Getting Started / Onboarding Checklist” page under route /driver/getting-started that matches Uber’s professional onboarding style and works on mobile and desktop. This page must show the full driver onboarding progress, list all required steps, show statuses, and allow the driver to continue each pending item.
+
+REQUIREMENTS:
+
+1) ROUTE
+Create and connect route:
+- /driver/getting-started
+- Sidebar item: “Getting Started”
+- Must open this new page.
+
+2) PAGE HEADER
+Add:
+- Title: “Getting Started”
+- Subtitle: “Complete these steps to begin driving with SafeGo.”
+- Hero-style welcome section with subtle background.
+
+3) PROGRESS SUMMARY
+Add a progress bar and summary:
+- “X of 12 steps completed”
+- Auto-calculated from the checklist items
+- Large progress bar at top
+
+4) CHECKLIST ITEMS (All Web UI Only)
+Add the following items exactly, each as a card with:
+- Title
+- Short description
+- Status badge: Completed / Pending
+- Action button: Continue / Upload / Verify
+- Icons for visual clarity
+- Must update progress dynamically
+
+Checklist items:
+1. Profile Picture
+2. Full Name & Basic Info
+3. Phone Number Verification
+4. Date of Birth
+5. Driver License (State, Number, Expiry)
+6. TLC License (NYC only)
+7. SSN (masked) with show/hide
+8. Residential Address
+9. Emergency Contact
+10. Background Check Status
+11. Bank Information (for payouts)
+12. Training Required Modules (auto-read from D9 completion state)
+
+5) TRAINING MODULE STATUS
+Integrate from D9:
+- Read required modules count and completed count
+- Show badge: “Required for Activation”
+- Show button: “View Training Videos” → goes to /driver/tutorials
+
+6) UI/UX STYLE
+- Uber-style clean layout
+- Card-based checklist
+- Responsive for mobile
+- Proper spacing, typography, visual hierarchy
+- Consistent with driver UI theme
+
+7) LOGIC REQUIREMENTS
+- No backend writes
+- Store completion visually only
+- Dynamic progress calculation
+- Every card must reflect:
+  - completed
+  - pending
+  - incomplete
+- Action buttons should navigate to the correct pages:
+  - Profile → /driver/profile
+  - License → /driver/documents
+  - Bank → /driver/payouts
+  - Training → /driver/tutorials
+  - Background Check → /driver/background-check
+
+8) SECURITY RULES
+- Do not expose raw PII
+- Mask SSN
+- Don’t log sensitive fields
+- Access only for authenticated drivers
+
+9) FINALIZE
+Create the full page, hook the sidebar, ensure navigation works, test mobile layout, and finish everything end-to-end.
+
+Complete this task fully.

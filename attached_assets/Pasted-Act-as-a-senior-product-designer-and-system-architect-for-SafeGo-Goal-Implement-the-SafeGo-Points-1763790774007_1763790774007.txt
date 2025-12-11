@@ -1,0 +1,112 @@
+Act as a senior product designer and system architect for SafeGo.
+
+Goal: Implement the SafeGo Points system using ONLY four tiers with the following order:
+1. Blue (500–999)
+2. Gold (1000–1999)
+3. Premium (2000–2999)
+4. Diamond (3000+)
+
+Important: Premium must always appear BEFORE Diamond in all UI tables, API responses, admin pages, tier ladders, and calculation logic.
+
+There is NO Basic tier.  
+Drivers below 500 points must be considered “no tier yet”.
+
+Follow all existing SafeGo conventions:
+- Four roles: customer, driver, restaurant, admin
+- Keep all existing KYC, payouts, rides, food, and delivery logic untouched
+- Do not break any existing URLs or layouts
+- Follow clean, white, Uber-style UI with left-aligned layout
+- Do not touch wallet, fare logic, or payouts
+
+-----------------------------
+DRIVER UI REQUIREMENTS
+-----------------------------
+
+Route: /driver/points  
+Sidebar label: SafeGo Points
+
+If total_points < 500:
+- Show state “You have not unlocked a tier yet”
+- Show message “Earn 500 points to unlock Blue tier”
+- Progress bar 0–500
+
+If total_points >= 500:
+- Show current tier
+- Show progress bar to next tier
+- Show total points
+- Show tier ladder table in EXACT order:
+    Blue → Gold → Premium → Diamond
+
+Tier ranges:
+- Blue: 500–999
+- Gold: 1000–1999
+- Premium: 2000–2999
+- Diamond: 3000+
+
+Include activity ledger (date, event, reference, points delta).
+
+-----------------------------
+BACKEND LOGIC
+-----------------------------
+
+Tables to use:
+- driver_points_summary
+- driver_points_ledger
+- points_tiers
+- points_rules
+
+Seed the default four tiers with this order_index:
+- Blue: order_index = 1
+- Gold: order_index = 2
+- Premium: order_index = 3
+- Diamond: order_index = 4
+
+Tier calculation:
+- Select all active tiers for the country (fallback global)
+- Sort tiers by order_index ascending
+- Choose the highest tier where total_points >= min_points
+- If total_points < 500 → current_tier = null
+
+This ensures Premium is ALWAYS before Diamond.
+
+-----------------------------
+ADMIN PANEL REQUIREMENTS
+-----------------------------
+
+Add “SafeGo Points” in admin.
+Include:
+1. Tier Management
+2. Rules Management
+3. Driver Overview
+
+Tier table must show:
+- Blue  
+- Gold  
+- Premium  
+- Diamond  
+in this exact order.
+
+No Basic tier.
+
+Admins may NOT reorder tiers manually.  
+Premium must remain before Diamond permanently.
+
+-----------------------------
+SECURITY RULES
+-----------------------------
+
+- Drivers can only view their own points & ledger
+- Admin changes require audit logging
+- No conversion of points to money
+- Wallet remains untouched
+
+-----------------------------
+DONE
+-----------------------------
+
+Implement all pages, API endpoints, backend logic, migrations, and UI updates to reflect this tier order.
+
+Report back with:
+- What changed
+- How tiers are calculated
+- How the ordering is enforced everywhere

@@ -1,0 +1,175 @@
+You are building the SafeGo Eats Restaurant Dashboard (V1).  
+Follow SafeGo global rules:  
+– No breaking existing driver/passenger systems  
+– No emojis  
+– Dynamic, scalable, secure architecture  
+– Clean UI like Uber Eats Restaurant Manager  
+– Fully responsive mobile + tablet + web  
+
+====================================================
+PHASE 1 — RESTAURANT DASHBOARD CORE STRUCTURE (V1)
+====================================================
+
+Create the full restaurant dashboard with the following required modules:
+
+1) Top Navigation Bar  
+   - SafeGo Eats Logo  
+   - Location selector  
+   - Notification icon  
+   - Profile menu (Restaurant Owner Name, Settings, Logout)
+
+2) Sidebar Navigation (Left)  
+   1. Home  
+   2. Orders  
+   3. Menu Management  
+   4. Promotions  
+   5. Payouts  
+   6. Insights  
+   7. Ratings & Reviews  
+   8. Store Settings  
+   9. Support  
+
+This sidebar must be dynamic, collapsible, and identical in feel to Uber Eats Manager.
+
+----------------------------------------------------
+MODULE A — HOME PAGE (Overview)
+----------------------------------------------------
+Home dashboard must include:
+- Order summary cards:
+   • Live Orders  
+   • Completed Today  
+   • Cancelled Orders  
+   • Scheduled Orders  
+- Real-time incoming orders list  
+- Basic analytics preview:
+   • Today’s Revenue  
+   • Weekly Trend  
+   • Cancel Rate  
+- “Start Receiving Orders” toggle  
+- Store Status indicator (Open / Closed)
+
+----------------------------------------------------
+MODULE B — ORDERS PAGE (Full Order Management)
+----------------------------------------------------
+Create 4 tabs:
+1. Live  
+2. Scheduled  
+3. Completed  
+4. Cancelled  
+
+Each order card must show:
+- Order ID  
+- Time  
+- Items count  
+- Customer name  
+- Delivery address  
+- Courier (optional)  
+- Total price  
+
+Order Actions:
+- Accept  
+- Reject  
+- Mark as Preparing  
+- Mark as Ready  
+- Handover to Courier  
+
+----------------------------------------------------
+MODULE C — MENU MANAGEMENT
+----------------------------------------------------
+This must support **at least 500+ items** without lag.
+
+Features to build:
+- Create Category  
+- Create Item  
+- Add Photo  
+- Add Description  
+- Add Variants (size, spice level, toppings)  
+- Add Add-ons  
+- Item Availability toggle  
+- Price editing  
+- Out of Stock option  
+- Bulk Upload (CSV import)
+
+----------------------------------------------------
+MODULE D — PROMOTIONS
+----------------------------------------------------
+Admin + Restaurant owner can create:
+- Discounts  
+- Free delivery  
+- Buy 1 Get 1  
+- Time-limited offers  
+- Featured items  
+
+Each promotion must have:
+- Title  
+- Start/End time  
+- Discount type  
+- Activation switch
+
+----------------------------------------------------
+MODULE E — PAYOUTS
+----------------------------------------------------
+Restaurant payout page must include:
+- Current balance  
+- Next payout date  
+- Payout history table  
+- Add payout method  
+   • Bank  
+   • Debit card  
+   • Checking/Savings  
+- Failed payout alerts  
+- Downloadable statement
+
+----------------------------------------------------
+MODULE F — INSIGHTS (Analytics)
+----------------------------------------------------
+Charts required:
+- Daily sales  
+- Weekly revenue  
+- Best-selling items  
+- Order heatmap  
+- Peak hours graph  
+
+Charts must be lightweight and fast.
+
+----------------------------------------------------
+MODULE G — RATINGS & REVIEWS
+----------------------------------------------------
+Restaurant owner can see:
+- Customer ratings  
+- Written reviews  
+- Average score  
+- Filter by week/month  
+- Reply option (optional)
+
+----------------------------------------------------
+MODULE H — STORE SETTINGS
+----------------------------------------------------
+Settings must include:
+- Restaurant Info (name, address, phone, email)  
+- Hours of Operation  
+- Holidays / Closed days  
+- Food preparation time  
+- Delivery radius  
+- Tax information (country-specific)
+
+----------------------------------------------------
+MODULE I — SUPPORT PAGE
+----------------------------------------------------
+Restaurant can:
+- Contact SafeGo Support  
+- Live chat (Phase 3 AI + Human hybrid system)  
+- Read FAQ  
+- Raise an issue  
+
+----------------------------------------------------
+REQUIREMENTS:
+----------------------------------------------------
+✔ All pages must be clean, professional, Uber-level polished  
+✔ No unfinished buttons  
+✔ No dead pages  
+✔ All buttons must work  
+✔ Responsive UI  
+✔ Secure API interactions  
+✔ Phase-1 must be a working base dashboard  
+✔ Then we’ll continue to Phase-2 after completion  

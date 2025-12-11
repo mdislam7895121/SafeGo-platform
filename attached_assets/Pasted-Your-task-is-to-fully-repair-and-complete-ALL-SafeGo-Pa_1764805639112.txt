@@ -1,0 +1,145 @@
+Your task is to fully repair and complete ALL SafeGo Partner Onboarding systems so that 
+ALL partner roles can successfully create accounts, upload documents, complete their KYC, 
+and appear correctly in the Admin dashboard for verification.
+
+Follow all SafeGo Master Rules strictly.
+
+------------------------------------------------------
+A) Fix ALL partner onboarding flows (BD + US rules)
+------------------------------------------------------
+1. Customer-only signup must remain unchanged.
+2. Partner onboarding must create partner profiles linked to the logged-in customer.
+3. Implement + fix the following onboarding flows for four partner roles:
+   - Ride-share driver
+   - Delivery driver (food + parcel)
+   - Restaurant partner
+   - Shop partner
+4. Apply full country-specific KYC rules:
+   BD: father_name, dob, present_address, permanent_address, NID number + images,
+       emergency_contact, verification_status
+   US: dob, home_address, emergency_contact, gov_id_type, gov_id_last4,
+       (drivers only) driver_license + image + expiry, ssn_last4 optional,
+       verification_status
+
+------------------------------------------------------
+B) Fix missing database records + mismatched schemas
+------------------------------------------------------
+1. Verify Prisma schemas for all partner tables.
+2. Ensure partner profile is created automatically at onboarding step 1.
+3. Restaurant, Shop, Driver must all save:
+   - owner_id (customer id)
+   - country
+   - status (pending/approved/rejected)
+   - verification_status
+   - all KYC fields
+   - all uploaded image paths
+4. Fix any broken or missing relationships in:
+   - drivers
+   - restaurants
+   - shops
+   - ticket_operators
+5. Ensure new records appear instantly in Admin onboarding overview.
+
+------------------------------------------------------
+C) Fix ALL image upload issues
+------------------------------------------------------
+1. Create or repair upload endpoints:
+   - /api/driver/upload
+   - /api/restaurant/upload-image
+   - /api/shop/upload-image
+2. Ensure secure token-based uploadWithAuth works for:
+   - logos
+   - banners
+   - menu photos
+   - shop product photos
+   - driver license photos
+3. Remove the “Only shop partners can upload images” error.
+4. Ensure restaurant + shop branding pages use REAL FILE UPLOAD,
+   not URL input fields.
+
+------------------------------------------------------
+D) Complete Admin Oversight System
+------------------------------------------------------
+Admin must see EVERYTHING:
+1. Onboarding overview:
+   - Drivers
+   - Restaurants
+   - Shops
+   - Ticket Operators
+   (show pending, approved, rejected, total)
+
+2. Admin detail view must display full partner data:
+   - KYC fields
+   - uploaded images
+   - business documents
+   - payout info
+   - current status
+
+3. Admin must be able to:
+   - Approve
+   - Reject (with rejection_reason)
+   - Block / Unblock
+   - View negative balance
+   - View payouts
+
+4. Fix the issue where:
+   “Restaurant not found”
+   is displayed because DB mapping is incomplete.
+
+------------------------------------------------------
+E) Ensure partner workflows are fully usable end-to-end
+------------------------------------------------------
+Complete flows:
+
+DRIVER (BD + US)
+- Start onboarding
+- Fill personal info
+- Upload required documents
+- Add vehicle info
+- Submit for review
+- Driver appears in Admin list
+- Admin verification fully works
+
+RESTAURANT
+- Restaurant profile
+- Menu setup
+- Branding uploads
+- Business documents
+- Bank/payout setup
+- KYC
+- Admin sees full restaurant and can approve
+
+SHOP PARTNER
+- Shop profile
+- Branding uploads
+- Add products with REAL image upload
+- KYC
+- Admin sees full shop and can approve
+
+TICKET OPERATOR (if enabled)
+- Operator profile
+- Documents
+- Pricing setup
+- Admin verification
+
+------------------------------------------------------
+F) Final validation
+------------------------------------------------------
+Before completing:
+1. Test a BD driver onboarding from start to finish.
+2. Test a US driver onboarding from start to finish.
+3. Test a full Restaurant onboarding including logo + banner upload.
+4. Test Shop onboarding including product upload.
+5. Verify ALL partner types show in Admin dashboard.
+6. Verify Admin can open every detail page without “not found”.
+7. Confirm no image upload errors remain.
+
+------------------------------------------------------
+G) Deliverables
+------------------------------------------------------
+When finished, provide:
+1. Summary of fixes
+2. Updated schema list
+3. Updated endpoints list
+4. Confirmation that all onboarding flows are fully working
+5. Instructions to test again on production preview

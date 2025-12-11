@@ -1,0 +1,339 @@
+AGENT:
+
+Goal:
+Make ALL partner onboarding flows in SafeGo (drivers, delivery, restaurant, shop, tickets) EASY, SMOOTH, and ERROR-FREE for real users, from account creation to admin approval — with ZERO confusing errors — while strictly following SafeGo Master Rules and without breaking any existing features.
+
+Partners must be able to sign up, upload documents, complete all steps, and wait for approval without hitting technical issues.
+
+==================================================
+A) SAFEGO MASTER RULES (ALWAYS APPLY)
+==================================================
+
+1) Roles (4 distinct roles, never mixed):
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   Each role must have:
+   - its own onboarding flow
+   - its own dashboard
+   - its own permissions
+   - its own KYC/verification
+   - its own status flows
+
+2) Core services:
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+3) Country-specific KYC (MANDATORY branching):
+
+   Bangladesh (BD):
+     - father_name
+     - date_of_birth
+     - present_address
+     - permanent_address
+     - NID_number
+     - NID_front_image
+     - NID_back_image
+     - emergency_contact_name
+     - emergency_contact_phone
+     - verification_status
+     - is_verified
+
+   United States (US):
+     - date_of_birth
+     - home_address
+     - emergency_contact_name
+     - emergency_contact_phone
+     - government_id_type
+     - government_id_last4
+     - (drivers) driver_license_number + driver_license_image + driver_license_expiry
+     - (drivers) ssn_last4 (optional)
+     - verification_status
+     - is_verified
+
+4) Admin panel capabilities (must stay intact):
+   - verify customers, drivers, merchants (restaurant/shop/tickets)
+   - approve/reject KYC (store rejection_reason)
+   - update pricing, fees, commissions
+   - block/unblock any user/partner
+   - manage payouts and mark settlements
+   - view driver negative balances
+   - view restaurant/shop negative balances
+
+5) Mandatory collections:
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must keep:
+   - identity fields (customer_id, driver_id, restaurant_id, shop_id where needed)
+   - pickup/dropoff addresses + geolocation
+   - price, fees, commission
+   - payment details
+   - timestamps
+   - full status flow
+   - rating & feedback
+
+6) Commission rules:
+   - Cash ride: driver keeps cash; SafeGo commission becomes negative driver_wallet_balance; driver settles weekly.
+   - Cash food: restaurant keeps cash; SafeGo commission becomes negative restaurant_wallet.
+   - Online payment: SafeGo keeps commission automatically.
+   - Admin can settle/mark paid.
+
+7) Security rules:
+   - Customers cannot see driver documents.
+   - Drivers cannot see customer NID or sensitive info.
+   - Restaurants/shops cannot see other merchants’ internals.
+   - Only Admin can change pricing, commissions, verification_status, blocking.
+   - Users can update only their own profile.
+   - No sensitive documents or IDs in logs or raw error messages.
+
+8) Status flows:
+   Rides:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer/driver/admin
+
+   Food:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer/restaurant/admin
+
+   Parcel:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer/driver/admin
+
+9) Onboarding rule:
+   - Public signup is CUSTOMER-ONLY.
+   - All partner roles (driver, delivery, restaurant, shop, tickets) are created AFTER login through dedicated onboarding flows.
+   - New partner profiles start with verification_status="pending" and is_verified=false.
+
+10) Notifications:
+   - new ride alerts for drivers
+   - food / shop order updates
+   - parcel status updates
+   - verification approval/rejection
+   - important admin messages
+
+==================================================
+B) WHAT YOU MUST FIX — PARTNER ONBOARDING UX
+==================================================
+
+You must audit and fix EVERY partner onboarding flow so partners never hit confusing errors, never get stuck, and always know what to do next.
+
+Partner types:
+
+- Driver (ride)
+- Driver (delivery: food + parcel)
+- Restaurant partner (SafeGo Eats)
+- Shop partner (BD only)
+- Tickets partner (BD only)
+
+You must ensure:
+
+1) Clear entry from Customer app
+   - From /customer “SafeGo Partner Programs”:
+     - BD: show 5 partner cards (ride driver, delivery driver, restaurant, shop, tickets)
+     - US: show 3 partner cards (ride driver, food+parcel delivery driver, restaurant)
+   - Each card’s “Start” button must:
+     - If not logged in: redirect to /login with returnTo parameter so they come back to the correct onboarding.
+     - If logged in: navigate directly to correct onboarding route:
+         /partner/driver/ride/start
+         /partner/driver/delivery/start
+         /partner/restaurant/start
+         /partner/shop/start
+         /partner/tickets/start
+     - No generic red “system error” banners for valid clicks.
+
+2) Simple, consistent stepper UI
+   For ALL partner types:
+   - Show a clear progress stepper: Step 1, Step 2, …, Done.
+   - Each step has:
+     - title
+     - short explanation
+     - fields
+     - Back / Continue buttons
+   - “Continue” is disabled until required fields are filled.
+
+3) Auto-save and resume
+   - Whenever partner presses Continue, the current step data is saved to the DB.
+   - If they refresh or come back later, onboarding resumes from last incomplete step.
+   - Provide a “Save & exit” option where appropriate.
+   - Never lose their typed data on validation errors.
+
+4) Clean validation and error messages
+   - All required fields must show inline validation messages (not just red toast).
+   - Do NOT show raw JSON or technical messages.
+   - For each field show short, human-friendly messages:
+     - Example: “NID number is required”, “Upload your license image”, etc.
+   - Use localization:
+     - Bangla copy for BD.
+     - English copy for US.
+   - Show a top-level summary only when necessary, not for every small error.
+
+5) Authentication and session handling
+   - All onboarding routes must require an authenticated customer session.
+   - If token expired:
+     - Show: “Session expired. Please sign in again.”
+     - Redirect to login with returnTo back to same onboarding step.
+   - After login, user returns directly to their previous step.
+
+6) File & image uploads (critical pain point)
+   You must fix ALL upload endpoints used inside onboarding:
+
+   - Driver: profile photo, vehicle photos, NID images (BD), license images (US)
+   - Restaurant: logo, banner, menu-item images, business documents
+   - Shop: logo, banner, product images, business docs
+   - Tickets partner: logo and any docs
+
+   Requirements:
+   - Use a shared uploadWithAuth() helper on frontend:
+       - always attaches Authorization header
+       - handles multipart/form-data
+       - interprets 401 / 403 / 400 / 500 errors
+   - Backend uses a shared UploadService:
+       - validates ownership (partner belongs to current customer)
+       - validates allowed partner_type (shop, restaurant, driver, tickets)
+       - validates size and mime type
+       - stores files securely, saves URL to DB
+
+   - 401 → prompt login again (session expired)
+   - 403 → show: “You’re not allowed to upload images for this business.”
+   - 400 (size/type) → show specific message.
+   - 5xx → “Something went wrong. Please try again.”
+   - Never show messages like:
+       “Access token required”
+       “Only shop partners can upload images”
+       or any raw JSON.
+
+7) Country-specific KYC steps (BD vs US)
+   - For BD partners:
+     - At some step, require all BD KYC fields (father_name, NID, address, emergency contact, etc.).
+     - Enforce NID images upload for BD where applicable.
+   - For US drivers:
+     - Require driver_license_number, driver_license_image, driver_license_expiry.
+     - government_id_type + government_id_last4.
+   - For US restaurants:
+     - business_name, business_address, tax_id_last4 if applicable.
+
+   Show explanations and small hints so partners understand why data is needed and how it will be used.
+
+8) Final review + submission screen
+   - Last step for each partner type should show:
+     - Key info summary (non-sensitive)
+     - Uploaded docs checklist (logos/docs marked as “uploaded”)
+     - Terms/agreements (if present)
+   - “Submit for review” button:
+     - sets status = "pending_review"
+     - verification_status = "pending"
+     - is_verified = false
+   - Show confirmation:
+     - BD Bangla copy
+     - US English copy
+     - Example:
+       - “Your application has been submitted and is pending review. We’ll notify you when it’s approved.”
+
+9) Clear state after submission
+   - After submission, if partner opens onboarding URL again:
+     - Do NOT reset steps.
+     - Show read-only view with “pending review” banner.
+   - If verification_status = "approved":
+     - redirect to the relevant partner dashboard (driver, restaurant, shop, tickets).
+   - If verification_status = "rejected":
+     - show rejection_reason with instructions.
+
+10) Partner dashboards must be reachable
+   After approval:
+   - Driver onboarding → driver dashboard (ride/delivery)
+   - Restaurant onboarding → restaurant dashboard (orders)
+   - Shop onboarding → shop dashboard (orders/products)
+   - Tickets onboarding → tickets dashboard
+
+   Links from confirmation and from user menu must work.
+
+11) Admin review experience
+   - Ensure Admin can see all submitted partner applications:
+     - pending drivers
+     - pending restaurants
+     - pending shops
+     - pending tickets partners
+   - Admin must be able to:
+     - view KYC data + document thumbnails
+     - approve or reject with rejection_reason
+   - Approval/unapproval must trigger notifications to partner.
+
+12) Notifications for partner onboarding
+   Implement or connect notifications:
+
+   - On submission:
+     “Your SafeGo partner application has been submitted and is pending review.”
+
+   - On approval:
+     “Your SafeGo partner account is approved. You can now start receiving orders/rides.”
+
+   - On rejection:
+     “Your application was rejected. Reason: <rejection_reason>. You can update your information and resubmit.”
+
+   Language:
+   - Bangla text for BD accounts.
+   - English text for US accounts.
+
+==================================================
+C) UX POLISH AND MOBILE READINESS
+==================================================
+
+1) Mobile-first layout
+   - All onboarding pages must be fully usable on small screens:
+     - No clipped content
+     - Buttons visible without horizontal scroll
+     - Stepper readable
+
+2) Buttons & CTAs
+   - Use consistent labels:
+     - “Back” / “Continue” / “Submit application”
+   - Disable “Continue” when form invalid.
+
+3) Inline hints
+   - For complex inputs (NID, license number, bank account), show short placeholder or helper text.
+
+==================================================
+D) NON-BREAKING REQUIREMENTS
+==================================================
+
+While improving partner onboarding:
+
+- Do NOT rename or remove any DB fields, routes, or APIs.
+- Do NOT break rides, food_orders, or deliveries collections.
+- Do NOT change commission logic or admin permissions.
+- Only add:
+   - helper functions
+   - better validation
+   - improved UI messages
+   - missing upload endpoints where necessary.
+
+All changes must be backward compatible.
+
+==================================================
+E) SELF-TEST FLOWS (YOU MUST EXECUTE)
+==================================================
+
+You must manually (via tests) complete these flows without ANY unexplained errors:
+
+1) BD – new customer → click Ride Driver card → complete driver onboarding with BD KYC → submit → admin approves → driver dashboard opens.
+
+2) BD – new customer → click Shop Partner card → complete shop onboarding (logo + banner upload included) → submit → admin approves → shop dashboard opens.
+
+3) BD – new customer → click Restaurant Partner card → complete restaurant onboarding (all steps) → submit → admin approves → restaurant dashboard opens.
+
+4) US – new customer → click Ride Driver card → US driver onboarding with license upload → submit → admin approves → driver dashboard opens.
+
+5) US – new customer → click Restaurant Partner card → onboarding → approval → dashboard.
+
+6) Confirm:
+   - No “Access token required” errors.
+   - No “Only shop partners can upload images”.
+   - No raw JSON in error toasts.
+   - Session expiry leads to login and resume, not lost data.
+
+Only when ALL of these user journeys are smooth, understandable, and error-free, consider the partner onboarding work complete.

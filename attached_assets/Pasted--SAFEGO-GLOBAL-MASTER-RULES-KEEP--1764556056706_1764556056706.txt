@@ -1,0 +1,125 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (KEEP)
+====================================
+(Backend logic must NOT change.)
+
+ROLES (4 separate):
+- Customer, Driver, Restaurant, Admin
+
+SERVICES:
+- Ride-hailing, Food delivery, Parcel delivery
+
+BD KYC (all roles):
+- father_name, date_of_birth, present_address, permanent_address,
+  nid_number, nid_front_image, nid_back_image,
+  emergency_contact, verification_status, is_verified
+
+US KYC (all roles):
+- date_of_birth, home_address, emergency_contact,
+  government_id_type, government_id_last4,
+  driver_license_number + image + expiry (drivers),
+  ssn_last4 (optional, drivers),
+  verification_status, is_verified
+
+ONBOARDING:
+- Steps: basic info → address → ID/KYC upload → emergency contact
+- Set verification_status="pending"; block rides/food/parcel until admin approves.
+
+ADMIN PANEL (must stay):
+- Approve/reject KYC (with rejection_reason) for customers/drivers/restaurants
+- Block/unblock any user
+- Configure pricing/fees/commissions
+- Manage payouts, view & settle driver negative balance, restaurant negative balance
+
+COLLECTIONS (no schema change):
+- rides, food_orders, deliveries with:
+  identity fields, pickup/dropoff + geo,
+  fees + safego_commission, payment_method,
+  timestamps, full status flow, rating & feedback.
+
+COMMISSION:
+- Cash ride → driver keeps cash; commission → negative driver_wallet_balance; weekly settlement.
+- Cash food → restaurant keeps cash; commission → negative restaurant_wallet.
+- Online → SafeGo keeps commission automatically; payouts are net.
+
+SECURITY:
+- Customers can’t see driver docs.
+- Drivers can’t see customer KYC.
+- Restaurants can’t see other restaurants.
+- Only admin can change pricing/commissions/verification/blocking.
+- Users edit only their own profile.
+
+STATUS FLOWS:
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+NOTIFICATIONS:
+- Trip/order alerts, status updates, verification decisions, payout reminders, admin messages.
+
+MAP:
+- Do NOT change map engine, tiles, zoom controls, or markers.
+
+==================================================
+TASK: Remove visible “Loading” overlay on driver map
+==================================================
+
+Context:
+- On /driver/map, when the driver toggles Go Online/Go Offline or the map refreshes,
+  a “Loading” text appears in the center of the map.
+- We previously removed the full black screen. Now we must also remove this obvious “Loading” text,
+  to match Uber-style behavior.
+
+Goal:
+- The driver should NOT see any “Loading” text or big loading overlay.
+- The map must stay visible and feel continuous.
+- At most, we can show a very subtle indicator (e.g. spinner inside the Go Online button), but nothing on the map center.
+
+-----------------------------------
+1) Remove “Loading” text from map
+-----------------------------------
+- Find the component that renders the “Loading” text in the middle of the map area
+  (example: `<div className="loading">Loading</div>` or similar).
+- For the /driver/map screen:
+  - Do NOT render this “Loading” label at all.
+  - Do NOT show any full or semi-transparent overlay with that text.
+
+Result:
+- When trips/position are refreshing, map stays visible with no big “Loading” word.
+
+-----------------------------------
+2) Replace with ultra-light feedback (button only)
+-----------------------------------
+- When the Go Online / Go Offline button is waiting for the API response:
+  - Option A (preferred): show a small spinner INSIDE the button,
+    or temporarily dim the button (reduced opacity) but keep the map untouched.
+  - Option B: keep the button static but disable further clicks until API resolves.
+
+Rules:
+- No global overlay.
+- No text “Loading” anywhere on the map.
+- The driver must still see the map clearly at all times.
+
+-----------------------------------
+3) Keep map mounted during refresh
+-----------------------------------
+- Ensure that while fetching driver status or trips, the map component is not unmounted.
+- Do not conditionally replace the map with any “Loading” placeholder.
+- Data should refresh in the background while the existing map view stays on screen.
+
+-----------------------------------
+4) Error handling (without hiding UI)
+-----------------------------------
+- If API fails when toggling online/offline:
+  - Show a toast error (e.g., “Could not update status. Please try again.”).
+  - Revert button state if needed.
+  - Do NOT show any loading text or overlay on the map.
+
+-----------------------------------
+5) Non-breaking guarantee
+-----------------------------------
+- Do NOT touch any DB schema, collections, or API contracts.
+- Do NOT change commission, KYC, admin or matching logic.
+- Only remove the “Loading” overlay/text and adjust UX as described.
+
+NO QUESTIONS. Implement these changes so that the driver never sees a “Loading” label on the map, and the Go Online transition feels instant like Uber.

@@ -1,0 +1,84 @@
+You are working on my SafeGo admin panel. We are still on Step 49 (Analytics & Earnings Security Hardening) — do NOT start Step 50 yet. I only want you to fix the remaining payout / reconciliation bugs without breaking any of the existing functionality.
+
+Context
+- App: SafeGo multi-country ride/food/parcel platform
+- Admin role: SUPER_ADMIN (full access)
+- RBAC, jurisdiction filtering, and demo data are already implemented and must remain intact.
+- Demo mode: tsx scripts/run-demo-mode.ts enable has already been run, and analytics/earnings/wallets dashboards are working correctly.
+
+Current status
+1) Analytics Dashboard (/admin/analytics) is working with RBAC, null-safe patterns, and demo data.
+2) Earnings & Analytics Dashboard (/admin/earnings) is working with RBAC, correct wallet alignment, and demo data.
+3) Wallets page (/admin/wallets) is now working and shows driver/restaurant wallets with balances.
+4) Payouts pages still have issues:
+   - Payout Requests (/admin/payouts/requests) was previously a blank white screen.
+   - Reconciliation Reports (/admin/payouts/reports) shows a 500 error when generating a report.
+
+Bug to fix (Reconciliation Reports)
+When I go to:
+- Admin → Payouts → Reconciliation Reports
+and click "Generate Report", I get a red error banner with a 500 response. The error text (from the banner) includes:
+
+"Report generation failed
+500: { "error": "Invalid `prisma.foodOrder.findMany()` invocation ...
+Unknown argument `completedAt`. ... FoodOrderWhereInput ... }"
+
+So the reconciliation service is trying to use a `completedAt` field in prisma.foodOrder.findMany(), but this field does not exist in the FoodOrder model. The date fields are named differently in the Prisma schema (for example deliveredAt, createdAt, or some other name). Because of this, report generation crashes instead of returning data.
+
+Your tasks
+1) Locate the reconciliation logic for payouts:
+   - server/services/reconciliationService.ts
+   - any related routes under server/routes (for payouts/reports)
+   - any helper functions used only for payout reconciliation
+
+2) Fix the Prisma query errors:
+   - Replace any usage of `completedAt` (or other invalid field names) with the correct existing date field names from the Prisma schema for:
+     - Food orders
+     - Ride trips
+     - Parcel deliveries
+   - Make sure all where clauses only use valid fields that actually exist in the Prisma models (FoodOrder, Trip, ParcelDelivery, Payout, Wallet, etc.).
+   - Keep status filters consistent (e.g., delivered/completed only) so that reconciliation reports only include finalized orders/payouts.
+
+3) Keep RBAC and jurisdiction filtering fully enforced:
+   - SUPER_ADMIN: can see all reconciliation data across all jurisdictions.
+   - COUNTRY_ADMIN (US): only NYC + San Francisco demo data.
+   - COUNTRY_ADMIN (BD): only Dhaka demo data.
+   - CITY_ADMIN: only their assigned city.
+   - Do NOT weaken or remove any RBAC filters that were already added in Step 49.
+   - Ensure demo data marked with isDemo is handled correctly and does not mix with real data.
+
+4) Fix the Payout Requests page if still broken:
+   - Check /admin/payouts/requests backend endpoints:
+     - Validate that the Prisma queries for payout requests use correct field names and relations.
+     - Ensure the page no longer shows a blank white screen and properly lists demo payout requests (from the demo data generator).
+
+5) Error handling and safety:
+   - If there is no data for a given period, return an empty but well-structured response instead of throwing.
+   - Use the same defensive patterns that were already used for analytics and earnings:
+     - safeNumber, safeArray, safeString helpers (where appropriate).
+     - No null/undefined crashes.
+   - Any new code must follow the existing security patterns (RBAC, jurisdiction filters, and isDemo isolation).
+
+6) Frontend behavior:
+   - Reconciliation Reports page should:
+     - Successfully generate a report when I click "Generate Report" (no 500 error).
+     - Show a clear summary of payout reconciliation data (based on whatever structure you already designed).
+     - Handle empty states gracefully, with a friendly message if there is no data.
+   - Payout Requests page should:
+     - Load without a blank white screen.
+     - Show the list of payout requests coming from demo data (if any), filtered by RBAC/jurisdiction.
+
+Acceptance criteria
+- No more 500 errors when generating reconciliation reports.
+- No "Unknown argument `completedAt`" or similar Prisma errors anywhere in the server logs.
+- /admin/payouts/reports loads correctly, and "Generate Report" works with demo data and RBAC.
+- /admin/payouts/requests loads correctly and no longer shows a blank white page.
+- All existing analytics, earnings, wallets, and demo-mode features continue working with zero regressions.
+- All changes are documented in replit.md under Step 49, including:
+  - Root cause for the `completedAt` error.
+  - The exact fix (field name adjustments, query updates).
+  - Any added defensive/validation patterns.
+
+Very important
+- Stay strictly within Step 49: this is a bugfix for payouts/reconciliation only.
+- Do NOT start any part of Step 50 or add new features beyond what is needed to make payouts and reconciliation reports fully functional and secure.

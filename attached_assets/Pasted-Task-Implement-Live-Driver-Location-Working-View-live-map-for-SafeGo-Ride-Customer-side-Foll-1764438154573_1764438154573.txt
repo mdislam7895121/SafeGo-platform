@@ -1,0 +1,140 @@
+Task: Implement Live Driver Location + Working "View live map" for SafeGo Ride (Customer side)
+
+Follow ALL existing SafeGo rules:
+- Do NOT touch pricing, promos, commission, payouts, or dispatch logic.
+- Do NOT expose any driver earnings or internal IDs to the customer.
+- Keep all existing booking, route selection, and ride-confirmation flows intact.
+- Keep the unified layout responsive (desktop + mobile) and device-friendly.
+
+Where to work:
+- Main file: client/src/pages/customer/unified-booking.tsx
+- If there is already a ride tracking / "Driver is on the way" section, extend it instead of creating a second page.
+- If there is a separate component for the ride details or map (e.g., RideTrackingPanel, RideMap, LiveMap, etc.), reuse and refactor instead of duplicating logic.
+
+Goal
+- When a ride is in “Driver on the way / en route to pickup” status, the customer must be able to:
+  1) Tap/click the "View live map" link / button and actually see a live-updating map.
+  2) See the driver’s current position moving along the route toward pickup (simulated or real).
+  3) Use this consistently on desktop and mobile, without breaking any existing flows.
+
+Part 1 – Wire up the "View live map" action
+1. Find the JSX for the “Your driver is on the way” section where the customer sees:
+   - Driver name (e.g., “John D.”)
+   - Car model and color
+   - Plate number
+   - Pickup ETA and distance
+   - The “View live map” link/button
+2. Make sure the “View live map” control is a real interactive component:
+   - On desktop:
+     - Clicking “View live map” should scroll or focus the existing route map on the right and highlight the driver marker.
+   - On mobile:
+     - Clicking “View live map” should open a full-width, bottom sheet or full-screen modal with the map and live driver marker.
+3. Implement a simple React state to track whether the live map is open:
+   - Example: const [isLiveMapOpen, setIsLiveMapOpen] = useState(false);
+   - Toggle this state from the “View live map” control.
+
+Part 2 – Live driver position (frontend behaviour)
+Assume the backend already exposes some trip / driver position state, or we can simulate from existing route data. Implement the frontend with a clean abstraction so we can plug in a real API later.
+
+1. Create or reuse a dedicated component, e.g.:
+
+   - components/customer/RideLiveMap.tsx
+   - Responsibilities:
+     - Render the map.
+     - Show pickup pin.
+     - Show destination pin.
+     - Show polyline for the route if available.
+     - Show a driver marker that updates over time.
+
+2. Data model:
+   - The RideLiveMap component should receive props like:
+     - pickup: { lat, lng }
+     - dropoff: { lat, lng }
+     - driverPosition: { lat, lng } | null
+     - routePolyline or equivalent if already in state.
+   - On the unified-booking page, reuse the same coordinates you already use for the main map and ETA calculation so we don’t duplicate logic.
+
+3. Driver position updates:
+   - If there is already a backend endpoint or subscription for driver location, use it:
+     - Poll every 5–10 seconds using setInterval or a React hook that cleans up when component unmounts.
+     - NEVER hard-code any secret keys in the frontend.
+   - If there is no real backend yet, create a simple simulation:
+     - Interpolate points along the existing route polyline between pickup and dropoff.
+     - Move the driver marker step by step along this path every few seconds.
+     - Keep this logic clearly separated so it can be swapped with a real API later.
+
+4. Map interaction:
+   - When live map is visible:
+     - Center the map so both the driver and the relevant point (pickup or current section of route) are visible.
+     - Add a “Follow driver” behaviour: by default, pan the map so the driver stays roughly centered after each position update.
+     - Let the user pinch/zoom or drag; if they manually drag far away, temporarily pause auto-follow until they tap a small “Re-center” control.
+
+Part 3 – Desktop vs mobile behaviour
+1. Desktop:
+   - Keep the existing layout: left panels for route and ride details, right side map.
+   - When user clicks “View live map”:
+     - Smooth-scroll the right map into view (if needed) and briefly highlight the driver marker (e.g., small pulse effect or larger size for a second).
+     - Do NOT change the layout structure.
+   - Make sure the map always shows:
+     - driver marker
+     - pickup marker
+     - route polyline
+
+2. Mobile:
+   - When user taps “View live map”:
+     - Open a full-screen modal (or a tall bottom sheet) that contains only:
+       - A header: “Live driver location”
+       - A close icon / “Back” text.
+       - The map with live driver marker and route.
+     - Keep the confirm / cancel ride buttons OUTSIDE this modal (in the main ride detail screen), so ride actions aren’t broken.
+   - When the modal closes, cleanly stop any intervals or subscriptions for driver location to avoid memory leaks.
+
+Part 4 – State and safety rules
+1. The live map should only show when the ride has a status like:
+   - DRIVER_ASSIGNED / EN_ROUTE_TO_PICKUP
+   - or similar existing status value.
+2. If the ride is in “searching for driver” or “no driver yet”:
+   - “View live map” should be disabled or hidden.
+   - Show a tooltip or subtle text like “Live map available after a driver is assigned.”
+3. If driverPosition is null or temporarily unavailable:
+   - Show a loading indicator over the map (“Updating driver location…”).
+   - Do NOT crash or show blank content.
+4. Visibility rules:
+   - Show only driver first name + initial (e.g., “John D.”), rating, car model, color, and plate.
+   - Do NOT display any driver earnings, commission, or internal driver IDs anywhere in the customer UI.
+
+Part 5 – Implementation details
+1. Use existing map library and map token configuration. Do NOT expose keys in the JSX or commit them in plain text.
+2. Reuse the same theme tokens (colors, spacing, fonts) you used for the new unified booking design:
+   - Buttons and text should match the rest of SafeGo.
+   - No new ad-hoc inline styles unless absolutely necessary. Prefer classNames / existing utility styles.
+3. Make sure all JSX tags are properly closed to avoid syntax errors like:
+   - “Expected corresponding JSX closing tag for <div>”
+   - After each edit, run the app locally and verify there are no TypeScript/JSX compile errors.
+
+Part 6 – Testing and verification
+On DESKTOP:
+1) Start a new ride flow, choose route, choose a ride, confirm ride.
+2) When the “Your driver is on the way” screen appears:
+   - Confirm that:
+     - “View live map” scrolls you to the right-side map and highlights the driver marker.
+     - The driver marker moves over time (simulated or real).
+     - No layout shift happens and other elements (route cards, ride cards, confirm/cancel controls) still work.
+
+On MOBILE preview (e.g., iPhone 15 / similar viewport):
+1) Open the same customer ride flow.
+2) On the “Your driver is on the way” screen:
+   - Tap “View live map”.
+   - Verify:
+     - A full-screen or tall bottom-sheet modal appears with the live map.
+     - Driver pin is visible and moves over time.
+     - There is a clear way to close the modal and return to the ride details.
+3) Scroll down and confirm:
+   - Confirm button still works.
+   - Fare details panel can still be expanded/collapsed.
+   - Route selection pills (Fastest / other routes) still behave as before.
+
+Finally:
+- Summarize exactly what you changed (files and main components).
+- Confirm that no pricing logic, commission, promo calculation, or dispatch code was modified.
+- Confirm that driver earnings and commission data are NOT visible anywhere in the customer UI.

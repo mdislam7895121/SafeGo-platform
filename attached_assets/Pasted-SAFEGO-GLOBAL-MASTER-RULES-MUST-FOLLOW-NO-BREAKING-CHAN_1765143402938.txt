@@ -1,0 +1,189 @@
+SAFEGO GLOBAL MASTER RULES (MUST FOLLOW, NO BREAKING CHANGES)
+
+A) ROLES – keep 4 separate roles
+1. customer
+2. driver
+3. restaurant (merchant)
+4. admin
+
+Each role keeps its own:
+- signup/onboarding flow
+- KYC/verification rules
+- dashboard
+- permissions
+- status flows
+
+Public signup is CUSTOMER ONLY.  
+Drivers/restaurants/admins onboard after login.  
+Never mix role access or KYC data between roles.
+
+B) SERVICES – always support 3
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+Any change must NOT break existing ride/food/parcel flows.
+
+C) COUNTRY-SPECIFIC KYC
+
+C.1 Bangladesh (BD) driver KYC fields (must exist, do not rename/delete):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified
+
+C.2 United States (US) base KYC:
+- date_of_birth
+- home_address (street, city, state, zip)
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+C.3 US DRIVERS extra:
+- driver_license_number
+- driver_license_state
+- driver_license_expiry
+- driver_license_front_image_url
+- driver_license_back_image_url
+- ssn_last4 (optional)
+- TLC zone (NYC 5 boroughs):
+  - tlc_license_number
+  - tlc_license_expiry
+  - tlc_license_front_image_url
+  - tlc_license_back_image_url
+  - any existing TLC training/medical/exam/drug-test fields
+
+Do NOT rename or delete these fields. Only ADD new ones if needed.
+
+D) ADMIN PANEL – must stay working
+Admin must still:
+- verify customers/drivers/restaurants
+- approve/reject KYC, view rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view negative balances for drivers and restaurants
+
+E) CORE COLLECTIONS – keep rides, food_orders, deliveries
+Each collection must keep:
+- identity (customer_id, driver_id, restaurant_id…)
+- addresses + geolocation
+- fees + commission breakdown
+- payment details (cash/online, transaction_id, method)
+- status timestamps
+- rating and feedback
+
+F) COMMISSION & PAYOUT RULES
+1. Ride CASH:
+   - Driver keeps full cash.
+   - SafeGo commission becomes negative driver_wallet_balance.
+   - Driver settles weekly.
+
+2. Food CASH:
+   - Restaurant keeps cash.
+   - Commission becomes negative restaurant_wallet.
+
+3. ONLINE:
+   - SafeGo keeps commission automatically.
+
+4. Admin can settle balances and mark them paid.
+
+G) SECURITY
+- Customers cannot see driver documents (NID, license, TLC).
+- Drivers cannot see customer KYC/NID.
+- Restaurants cannot see other restaurants.
+- Only admin can change pricing, commission, verification, blocking.
+- Users can update only their own profile.
+
+H) STATUS FLOWS – keep intact
+Rides:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+I) ONBOARDING
+- Public signup = simple customer account.
+- Partners onboard after login: basic info → address → KYC → emergency contacts.
+- verification_status starts "pending"; access blocked until admin approves.
+
+J) NOTIFICATIONS
+Keep notifications for:
+- new ride alerts
+- food/parcel updates
+- KYC approval/rejection
+- important admin messages
+
+All changes must be ADDITIVE and NON-BREAKING.
+
+=====================================================
+CONTEXT: V1 REMOVED FROM ROUTES, V2 IS ACTIVE
+=====================================================
+
+You already:
+- Removed V1 from routing so `/partner/driver/register?type=ride` uses ONLY the V2 driver onboarding.
+- Updated some bindings with `{...field}`.
+
+Current bug (verified now):
+
+- On `/partner/driver/register?type=ride`:
+  - After completing Personal Information and clicking Next:
+    - Driver License fields are EMPTY (good).
+    - BUT when I click/tap "Driver License Number" and type, NOTHING appears.
+    - The field focuses, but keystrokes do not change the value.
+
+So the inputs are rendered but effectively READ-ONLY.  
+We need you to **simplify** the driver license inputs in V2 to pure HTML inputs directly bound to React Hook Form, with NO shadcn FormControl / Radix Slot wrappers.
+
+ONLY V2 needs this change. V1 must remain unused but intact in the codebase.
+
+=====================================================
+TASK: REPLACE V2 DRIVER LICENSE INPUTS WITH PURE HTML INPUTS
+=====================================================
+
+1) Open the V2 driver onboarding file used for `/partner/driver/register?type=ride`, e.g.:
+   - `client/src/pages/partner/driver-registration-v2.tsx`
+   or the file where the V2 driver onboarding component lives.
+
+2) Find the JSX for the Driver License step that renders:
+   - Driver License Number
+   - License Issuing State
+   - License Expiration Date
+
+Right now these likely use shadcn `Input` + `FormControl` wrappers.
+
+We want to temporarily replace them with **plain HTML elements** wired directly to React Hook Form like this:
+
+-------------------------------------------------
+2.1 DRIVER LICENSE NUMBER (TEXT INPUT)
+-------------------------------------------------
+
+Replace the current license number input with something equivalent to:
+
+```tsx
+<Controller
+  name="driver_license_number"
+  control={control}
+  render={({ field }) => (
+    <input
+      type="text"
+      id="license-number-field"
+      autoComplete="off"
+      {...field}
+      className="w-full rounded-md border px-3 py-2 text-sm" // reuse your existing classes
+    />
+  )}
+/>

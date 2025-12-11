@@ -1,0 +1,265 @@
+Your next and ONLY authorized task is to design and implement the full Ride Pricing Engine for SafeGo, with a focus on Bangladesh, while keeping US logic consistent with SafeGo Master Rules.
+
+You MUST:
+- Follow ALL SafeGo Master Rules: 4 roles (Customer, Driver, Restaurant, Admin), 3 services (rides, food_orders, deliveries), KYC for BD+US, commission logic, security rules, status flows, onboarding, notifications.
+- NOT rename or delete any existing fields, routes, or collections.
+- ONLY add new fields and modules (non-breaking).
+- Respect the rule: In the USA, no sector may allow cash payments; rides in the US must be ONLINE PAYMENT ONLY. In Bangladesh, both cash and online are allowed.
+
+====================================================
+PHASE 0 — SCOPE AND CONSTRAINTS
+====================================================
+Scope: Implement ride fare logic for Bangladesh, and ensure that:
+- Bangladesh rides use a configurable market-based fare model.
+- US rides keep or use a similar engine but ONLY with online payment.
+- Food and parcel pricing systems remain untouched.
+
+Collections that must remain intact:
+- rides
+- food_orders
+- deliveries
+
+Do not modify their existing identity, KYC, or status fields. Only add pricing-related fields if needed.
+
+====================================================
+PHASE 1 — DATA MODEL EXTENSION (RIDES)
+====================================================
+Extend the existing "rides" collection with the following NON-BREAKING fields (add-only):
+
+- country_code (e.g., "BD", "US")
+- city_code (e.g., "DHK", "NYC")
+- vehicle_type (e.g., "bike", "car_economy", "car_premium", "cng")
+- distance_km (numeric)
+- duration_min (numeric)
+- city_zone (e.g., "core_city", "suburb", "remote")
+- base_fare (numeric)
+- distance_fare (numeric)
+- time_fare (numeric)
+- booking_fee (numeric)
+- surge_multiplier (numeric, default 1.0)
+- night_multiplier (numeric, default 1.0)
+- total_fare (numeric)
+- fare_currency (string, "BDT" or "USD")
+- fare_breakdown (JSON object with full detail)
+- customer_payment_method (cash, online)
+- driver_earnings (numeric)
+- safego_commission (numeric)
+
+DO NOT remove any existing status, customer_id, driver_id, or timestamps.
+
+====================================================
+PHASE 2 — RIDE PRICING CONFIG STORE
+====================================================
+Create a new configuration source/table (e.g., ride_pricing_rules) to store city and vehicle-specific fare rules.
+
+Fields for ride_pricing_rules:
+
+- id
+- country_code ("BD" or "US")
+- city_code ("DHK", "CTG", etc.)
+- vehicle_type ("bike", "car_economy", etc.)
+- base_fare (minimum starting charge)
+- per_km_rate
+- per_min_rate
+- minimum_fare
+- booking_fee
+- night_start_hour (e.g., 22)
+- night_end_hour (e.g., 06)
+- night_multiplier (e.g., 1.2)
+- peak_multiplier (default 1.0)
+- peak_time_ranges (optional JSON)
+- active (boolean)
+- created_at, updated_at
+
+Seed Bangladesh default rules (example, can be adjusted from Admin):
+
+Dhaka (DHK), bike:
+- base_fare: 30 BDT
+- per_km_rate: 18 BDT
+- per_min_rate: 1 BDT
+- minimum_fare: 60 BDT
+- booking_fee: 5 BDT
+- night_multiplier: 1.2
+
+Dhaka (DHK), car_economy:
+- base_fare: 50 BDT
+- per_km_rate: 25 BDT
+- per_min_rate: 2 BDT
+- minimum_fare: 120 BDT
+- booking_fee: 10 BDT
+- night_multiplier: 1.3
+
+Other cities can be seeded at slightly lower rates.
+
+For the US:
+- Define rules in USD, but DO NOT enable cash at any point.
+
+====================================================
+PHASE 3 — FARE CALCULATION SERVICE
+====================================================
+Implement a pure, reusable service/function:
+
+calculateRideFare(input) → FareResult
+
+Input:
+- country_code
+- city_code
+- vehicle_type
+- pickup_geo, dropoff_geo
+- estimated_distance_km
+- estimated_duration_min
+- request_timestamp
+- customer_payment_method (cash or online)
+- speed_option (normal, priority)
+
+Steps:
+1. Load the active ride_pricing_rules for the given country, city, vehicle_type.
+2. Compute:
+   base_component = base_fare
+   distance_component = per_km_rate * distance_km
+   time_component = per_min_rate * duration_min
+   subtotal = base_component + distance_component + time_component + booking_fee
+
+3. Apply night/peak multipliers for Bangladesh:
+   - If time is within night window → subtotal *= night_multiplier
+   - If time within peak_time_ranges → subtotal *= peak_multiplier
+
+4. Enforce minimum_fare (Bangladesh):
+   if subtotal < minimum_fare → subtotal = minimum_fare
+
+5. Set currency:
+   - BDT for Bangladesh
+   - USD for US
+
+6. Commission and driver earnings:
+   - safego_commission = subtotal * commission_rate (vehicle-specific or city-specific)
+   - driver_earnings = subtotal - safego_commission
+
+7. Payment Method Rules:
+   - If country_code == "US": 
+         customer_payment_method MUST be "online"
+         Reject "cash" option with a clear error.
+   - If country_code == "BD":
+         Allow both "cash" and "online"
+         Apply standard SafeGo commission logic:
+            * If cash: driver receives cash, safego_commission goes to negative driver_wallet_balance.
+            * If online: commission is kept by SafeGo; driver_earnings go to driver_wallet.
+
+8. Return FareResult with:
+   - total_fare
+   - fare_currency
+   - base_component, distance_component, time_component, booking_fee
+   - night_multiplier, peak_multiplier, final_multiplier
+   - safego_commission, driver_earnings
+
+Ensure the service is side-effect free (no DB writes) and can be used both for estimate and finalization.
+
+====================================================
+PHASE 4 — API ENDPOINTS
+====================================================
+Create or extend the following endpoints (authenticated customer):
+
+1) GET /api/rides/fare-estimate
+   Query/body:
+   - pickup, dropoff, vehicle_type, country_code, city_code, speed_option
+   Behavior:
+   - Use calculateRideFare with estimated distance/time
+   - Return fare range (e.g., +/- 10%) and detailed breakdown
+
+2) POST /api/rides/request
+   Body:
+   - pickup, dropoff, vehicle_type
+   - chosen_payment_method
+   - speed_option
+   - previous_estimate_id or fare snapshot
+
+   Behavior:
+   - Recalculate fare for safety
+   - Attach pricing fields to rides record
+   - Enforce US no-cash rule
+   - Initialize ride with correct status flow:
+        requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+
+For drivers:
+- Ensure they see:
+   - total_fare
+   - safego_commission
+   - their earnings (driver_earnings)
+But DO NOT show customer full profile beyond allowed data, and DO NOT expose customer KYC.
+
+====================================================
+PHASE 5 — CUSTOMER & DRIVER UI INTEGRATION
+====================================================
+Customer Ride Booking Screen (Bangladesh):
+- Show:
+   - vehicle_type options
+   - estimated fare range in BDT
+   - clear label: "Estimated Fare"
+   - payment method choices: cash, online
+- If country_code == "US": hide cash option completely.
+
+Driver App:
+- Show:
+   - expected driver earnings
+   - total trip fare
+   - clear indication of cash vs online
+- For cash trips in BD:
+   - Display message: “Collect cash from customer; commission will be settled weekly via wallet.”
+
+Ensure responsive design is preserved (mobile and desktop) and no existing layout is broken.
+
+====================================================
+PHASE 6 — ADMIN PANEL: RIDE PRICING CONFIG
+====================================================
+In the Admin Panel, add a dedicated "Ride Pricing" configuration page.
+
+Capabilities (Super Admin only):
+- View all ride_pricing_rules (BD and US)
+- Filter by country, city, vehicle_type
+- Create new rule (add-only)
+- Edit existing rule values (base_fare, per_km_rate, etc.)
+- Activate/deactivate rules
+- Configure:
+   - commission_rate per city/vehicle
+   - night window and multiplier
+   - peak windows and multiplier
+
+Security:
+- Only Admin with proper role can change pricing and commission.
+- Drivers, customers, restaurants cannot access this page.
+
+====================================================
+PHASE 7 — COMMISSION & WALLET INTEGRATION
+====================================================
+Ensure that the ride pricing engine integrates correctly with existing commission logic:
+
+- Cash ride in Bangladesh:
+   - driver_wallet_balance decreases by safego_commission (negative balance if needed).
+   - Admin panel shows driver negative balances.
+
+- Online ride in Bangladesh and all rides in US:
+   - SafeGo keeps commission in platform account.
+   - driver_wallet_balance increases by driver_earnings.
+
+DO NOT change the rules for food_orders or deliveries.
+
+====================================================
+PHASE 8 — QA AND VALIDATION
+====================================================
+Before marking this feature complete, run full QA:
+
+- Bangladesh:
+   - Bike and car rides in Dhaka with both cash and online.
+   - Night rides and peak time rides.
+   - Very short distance (minimum fare) and long distance.
+- USA:
+   - Online-only rides, verify that cash is rejected.
+- Confirm:
+   - rides collection stores correct pricing fields.
+   - No 500 errors.
+   - No broken customer or driver screens.
+   - food_orders and deliveries are unaffected.
+   - KYC and role isolation rules are unchanged.
+
+Only when all tests pass CLEANLY, report:
+“Bangladesh Ride Pricing Engine (with BD/US rules) — PRODUCTION READY.”

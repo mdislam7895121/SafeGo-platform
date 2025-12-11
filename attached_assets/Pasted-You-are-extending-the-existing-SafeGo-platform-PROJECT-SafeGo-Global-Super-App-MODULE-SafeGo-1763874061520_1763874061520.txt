@@ -1,0 +1,205 @@
+You are extending the existing SafeGo platform.
+
+PROJECT: SafeGo – Global Super App  
+MODULE: SafeGo Eats – Restaurant Dashboard  
+PHASE: 2 – Restaurant Orders Management System (non-breaking extension of Phase 1 navigation)
+
+Absolute constraints:
+- DO NOT remove or rename any existing fields, APIs, routes, or components.
+- DO NOT break the existing SafeGo features (rides, food, parcel, wallets, KYC, admin).
+- Phase 1 navigation for the restaurant (sidebar, drawer, topbar, branding) must continue to work exactly as before.
+- Only ADD new components, routes, backend handlers, and schema fields (additive changes only).
+
+====================================================
+1. ROLES – SCOPE AND ACCESS
+====================================================
+
+SafeGo has 4 roles. Respect strict access boundaries:
+
+1. Customer
+   - Can place rides, food_orders, and deliveries.
+   - Can see only their own orders and rides.
+   - Cannot access restaurant dashboard or other users’ data.
+
+2. Driver
+   - Can accept rides and parcel deliveries.
+   - For food_orders, drivers only see:
+     - pickup_restaurant_summary (name, branch, pickup address, geo)
+     - delivery_address_summary (city, street, map)
+     - order_id, items_count, total_amount, payment_type, cash_to_collect
+   - Must NOT see any restaurant internal data (profit, commission, KYC, etc).
+   - Must NOT see customer government IDs or sensitive documents.
+
+3. Restaurant (Merchant)
+   - OWNER (full control) and STAFF (limited)
+   - Can manage only their own food_orders.
+   - Cannot access other restaurants or any KYC documents of customers/drivers.
+
+4. Admin
+   - Can verify/reject KYC, manage payouts, commissions, block/unblock users.
+   - Can view all restaurants, orders, rides, deliveries.
+
+====================================================
+2. GLOBAL SERVICES (Ride / Food / Parcel)
+====================================================
+
+SafeGo features (must remain unchanged):
+
+1. Ride-hailing → rides collection
+   Status flow:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+2. Food delivery → food_orders collection
+   Status flow:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+   Phase 2 expands this module only on restaurant-side.
+
+3. Parcel delivery → deliveries collection
+   Status flow:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+These three services must all keep working without disruption.
+
+====================================================
+3. COUNTRY-SPECIFIC RESTAURANT KYC (BD vs US)
+====================================================
+
+BD (Bangladesh) Restaurant Owner requirements:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number + front/back images
+- emergency contact
+- verification_status
+- is_verified
+
+US (United States) Restaurant Owner requirements:
+- date_of_birth
+- home_address
+- emergency contact
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+Dashboard access rule:
+- If is_verified = false → show “Verification Pending”
+- If verification_status = rejected → show banner with rejection_reason
+
+====================================================
+4. ORDERS MODULE – NEW RESTAURANT PAGES
+====================================================
+
+Add new pages under SafeGo Eats (using Phase 1 navigation):
+
+1. /restaurant/orders/overview
+   - Today totals, revenue, commission, live counters
+   - status tabs: Live, Pending, Completed, Cancelled
+
+2. /restaurant/orders/live
+   - Real-time board with columns:
+     placed / accepted / preparing / ready_for_pickup / picked_up / on_the_way
+
+3. /restaurant/orders/all
+   - Paginated full order list
+   - Filters: status, date, payment, delivery type, search by order_code
+
+4. /restaurant/orders/:order_id
+   - Full order details
+   - Items, customer masked info, driver masked info
+   - financial summary: subtotal, tax, delivery_fee, commission, net_amount
+   - OWNER: full status change
+   - STAFF: only accepted ↔ preparing ↔ ready_for_pickup
+
+5. /restaurant/orders/cancellations
+   - All cancelled_x orders
+   - who_cancelled + reason
+
+6. PayoutSummaryWidget (add to overview + home)
+   - restaurant_wallet_balance (can be negative)
+   - unsettled_commission_total
+   - next_settlement_due_date
+
+====================================================
+5. COMMISSION & PAYOUT RULES
+====================================================
+
+Cash orders:
+- Customer pays restaurant directly.
+- SafeGo commission becomes negative balance in restaurant_wallet.
+- Restaurant settles weekly.
+
+Online orders:
+- SafeGo keeps commission automatically.
+- No negative balance added.
+
+Admin:
+- Can settle balances.
+- Can adjust commission rates.
+- Can see negative balances.
+
+====================================================
+6. BACKEND ENDPOINTS (ADD ONLY)
+====================================================
+
+Add these:
+
+1. GET /api/restaurant/orders/overview  
+2. GET /api/restaurant/orders/live  
+3. GET /api/restaurant/orders  
+4. GET /api/restaurant/orders/:order_id  
+5. POST /api/restaurant/orders/:order_id/status  
+6. POST /api/restaurant/orders/:order_id/issue  
+
+All enforce:
+- restaurant_id match
+- OWNER/STAFF only
+- valid status transitions
+
+====================================================
+7. AUDIT LOGGING
+====================================================
+
+Every status update MUST log to:
+
+security_audit_log:
+- actor_id
+- actor_role
+- restaurant_id
+- order_id
+- previous_status
+- new_status
+- timestamp
+
+====================================================
+8. NOTIFICATIONS
+====================================================
+
+Trigger notifications on:
+- status updates (customer, driver, restaurant)
+- new order for a restaurant
+- admin verification approval/rejection
+
+====================================================
+9. ADMIN PANEL EXTENSIONS
+====================================================
+
+Add sections:
+- AdminFoodOrdersList (all food orders)
+- Restaurant KYC review (BD/US fields)
+- Commission + payout settlement
+- Block/unblock restaurant
+
+====================================================
+10. IMPLEMENTATION CHECKLIST
+====================================================
+
+- Add new menu routes under existing navigation
+- Enforce KYC gating
+- Add backend endpoints
+- Keep rides & parcel untouched
+- Add audit logs
+- Add notification triggers
+- Add payouts summary widget
+- All changes must be additive, never breaking

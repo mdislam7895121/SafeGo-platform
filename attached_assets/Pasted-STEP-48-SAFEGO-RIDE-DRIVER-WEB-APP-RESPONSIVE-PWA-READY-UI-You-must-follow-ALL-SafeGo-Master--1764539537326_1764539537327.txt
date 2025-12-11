@@ -1,0 +1,450 @@
+STEP 48 – SAFEGO RIDE DRIVER WEB APP (RESPONSIVE + PWA-READY UI)
+
+You must follow ALL SafeGo Master Rules and Security Roadmap.
+All changes must be ADD-ONLY and fully backward-compatible with Steps 42–47.
+Do NOT rename or remove any existing models, fields, APIs, or routes.
+
+====================================================
+SAFEGO MASTER RULES (ALWAYS ACTIVE)
+====================================================
+
+ROLES (strict separation):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role MUST have:
+- Separate signup & onboarding
+- Country-specific KYC (BD vs US)
+- Its own dashboard
+- Its own permissions
+- Its own status flows
+NEVER mix access between roles.
+
+SERVICES (3 major services – must be preserved):
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+Country-specific KYC (already defined – DO NOT BREAK):
+
+Bangladesh (BD) – all roles must support:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status ("pending" | "approved" | "rejected")
+- is_verified (boolean)
+
+United States (US):
+
+All users:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+US drivers (extra required fields):
+- driver_license_number
+- driver_license_image
+- driver_license_expiry
+- ssn_last4 (optional)
+- driver_background_check_status
+
+Only Admin can approve/reject KYC and set verification_status / is_verified.
+
+ADMIN PANEL – REQUIRED POWERS (must continue to work):
+- Verify customers, drivers, restaurants (approve/reject with rejection_reason)
+- View KYC details (not visible to other roles)
+- Configure pricing, fees, commissions (now including Step 47 commissionConfig)
+- Block/unblock any user and see blocked_reason
+- Manage payouts & settlements using wallet engine (drivers & restaurants)
+- View driver_negative_balance and restaurant_negative_balance
+- View audit logs for verification, blocking, pricing, payouts, overrides
+
+CORE COLLECTIONS (existing – DO NOT rename or remove):
+1) rides
+2) food_orders
+3) deliveries
+
+Each must continue to have:
+- identity fields: customer_id, driver_id, restaurant_id (where applicable)
+- addresses + geolocation (pickup/dropoff lat/lng etc.)
+- finance fields:
+  - total_amount_charged_to_customer
+  - platform_commission_amount
+  - driver_earnings_amount (if applicable)
+  - restaurant_earnings_amount (for food_orders)
+  - payment_method
+  - payment_status
+- timestamps (created_at, updated_at, accepted_at, completed_at, cancelled_at…)
+- complete status flow
+- rating and feedback fields
+
+COMMISSION & WALLET RULES (Step 47 – MUST respect):
+
+- Commission configuration:
+  - BD: restaurant 12%, driver 10%
+  - US: restaurant 15%, driver 10%
+
+- Cash rides:
+  - Driver receives full cash from customer.
+  - SafeGo commission becomes negative balance in driver wallet.
+- Cash food orders:
+  - Restaurant receives full cash.
+  - Commission becomes negative balance in restaurant wallet.
+- Online payments:
+  - SafeGo keeps commission automatically.
+  - Driver/restaurant earnings go to wallets.available_balance.
+- Admin can settle balances via wallet_transactions with full audit logs.
+
+SECURITY RULES (must be enforced in all new UI/API):
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer government IDs or NID.
+- Restaurants cannot view other restaurants or their balances.
+- Only Admin can:
+  - change pricing/commission configs,
+  - change verification_status,
+  - block/unblock users.
+- Users may update only their own profile data (non-admin safe fields).
+- Sensitive fields (government_id_last4, ssn_last4) must always be masked.
+
+STATUS FLOWS (do not break):
+
+rides.status:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed
+  OR cancelled_by_customer / cancelled_by_driver / cancelled_by_admin.
+
+food_orders.status:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+  OR cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin.
+
+deliveries.status:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered
+  OR cancelled_by_customer / cancelled_by_driver / cancelled_by_admin.
+
+ONBOARDING (for drivers – must be respected):
+- Multi-step flow: basic info → address → KYC → emergency contact.
+- verification_status = "pending", is_verified = false by default.
+- Block access to ride/food/parcel work until Admin approval.
+- Blocked drivers cannot go online.
+
+NOTIFICATIONS (extend but do not remove):
+- New ride alert for drivers.
+- New order/parcel updates.
+- Verification approval/rejection notifications.
+- Important admin notifications (e.g. high negative balance).
+
+IMPLEMENTATION RULES:
+- All changes for Step 48 are ADD-ONLY.
+- No renaming/removing existing fields, APIs, UI routes.
+- New endpoints/components must be added in a backward-compatible way.
+- If uncertain, prefer new wrapper APIs over changing existing ones.
+
+====================================================
+STEP 48 – GOAL
+====================================================
+
+Build a full **Ride Driver Web App UI** (responsive + PWA-ready) so drivers can:
+
+- Go online/offline for ride-hailing.
+- View incoming ride requests.
+- Accept or reject rides.
+- Navigate to pickup and dropoff locations.
+- Update ride status through the full lifecycle.
+- See basic wallet summary (using Step 47 wallet engine).
+- Use the same UI on mobile (smartphone browser), tablet, and desktop.
+
+This is ONLY for the DRIVER role, and must not affect customer, restaurant, or admin UIs.
+
+====================================================
+PHASE 1 – DRIVER APP SHELL & NAVIGATION (WEB)
+====================================================
+
+Create/extend a standalone Driver Web App section, e.g.:
+
+- Route: /driver
+- Tabs or sidebar:
+  - Home
+  - Rides
+  - Deliveries (existing food delivery/parcel – link only, no deep changes)
+  - Wallet
+  - Profile & KYC
+  - Settings / Help
+
+Driver Home Screen:
+- Show:
+  - Driver name, profile photo (optional)
+  - Country & city
+  - Verification status (badge: Pending / Verified / Rejected)
+  - Big toggle: "Go Online" / "Go Offline" for rides
+  - Mini cards:
+    - Today’s rides (count + earnings estimate)
+    - This week’s rides (count)
+    - Negative balance (if any) from wallet engine (masked if 0)
+
+Rules:
+- If driver is blocked OR not verified:
+  - Show clear message:
+    "You cannot go online until your account is approved."
+  - Disable "Go Online" toggle.
+
+====================================================
+PHASE 2 – RIDE REQUEST INBOX (NEW UI)
+====================================================
+
+Create a **DriverRideRequestsScreen** for ride-hailing:
+
+- When driver is ONLINE:
+  - Poll periodically OR use existing event mechanism to fetch:
+    - ride requests assigned to this driver,
+    - OR "broadcast" requests for nearby drivers (depending on existing implementation).
+
+Suggested API (ADD-ONLY if not present):
+  - GET /driver/rides/requests
+    Returns a list of pending ride offers visible to this driver.
+
+For each ride request card show:
+- Pickup location (short address)
+- Dropoff location (short address)
+- Distance / ETA (if available)
+- Estimated fare / driver earning
+- Payment type (Cash or Online)
+- Customer rating (if available)
+
+Actions per card:
+- "Details" → opens RideRequestDetailScreen
+- "Accept"   → calls POST /driver/rides/accept
+- "Reject"   → calls POST /driver/rides/reject
+
+When driver accepts a ride:
+- Update rides.status from searching_driver to accepted.
+- Assign driver_id (if not already set).
+- Redirect to Active Ride Screen.
+
+====================================================
+PHASE 3 – RIDE REQUEST DETAILS
+====================================================
+
+Create **DriverRideRequestDetailScreen**:
+
+Display:
+- Pickup address (with "open in Maps" link)
+- Dropoff address (with "open in Maps" link)
+- Map (using existing map provider; Mapbox recommended)
+- Estimated distance and duration
+- Fare breakdown:
+  - total_amount_charged_to_customer
+  - platform_commission_amount (masked or summarized)
+  - driver_earnings_amount
+- Payment method (Cash / Online)
+- Safety notes (if any)
+- Customer name (first name only) and rating.
+
+Buttons:
+- Accept Ride
+- Reject Ride
+- Back to Requests
+
+====================================================
+PHASE 4 – ACTIVE RIDE WORKFLOW UI
+====================================================
+
+Create **DriverActiveRideScreen**:
+
+It must handle the complete ride lifecycle:
+
+Stages (mapped to backend status):
+
+1) "Navigate to pickup"
+   - rides.status = accepted
+   - Show:
+     - Customer pickup location + map.
+     - Button: "I have arrived".
+
+2) "Arrived at pickup"
+   - On tap "I have arrived":
+     - rides.status = driver_arriving (if separate) or stays accepted.
+   - Show:
+     - Button: "Start Trip" (only when customer onboard).
+
+3) "Trip in progress"
+   - On "Start Trip":
+     - rides.status = in_progress
+   - Show:
+     - Live map with driver’s current location and route to dropoff.
+     - Dropoff address and ETA.
+     - Payment method + note:
+       - If cash: "Customer will pay cash at the end of trip."
+       - If online: "Fare will be charged automatically."
+
+4) "Trip completed"
+   - On "End Trip":
+     - rides.status = completed
+     - Trigger Step 47 wallet/commission logic.
+   - Show summary:
+     - Distance/time (if available)
+     - Driver earnings
+     - Payment status (Cash received / Online paid)
+     - Button: "Go back to Home" and "View Ride History".
+
+Implementation details:
+
+- Use existing ride status endpoints; if missing, ADD-ONLY helper endpoints:
+  - POST /driver/rides/status  { ride_id, status }
+  - POST /driver/rides/location { ride_id, lat, lng }
+- Ensure all status changes are atomic and validated (driver must own the ride; ride must not be cancelled/completed already).
+
+====================================================
+PHASE 5 – RIDE HISTORY & RECEIPTS
+====================================================
+
+Create **DriverRideHistoryScreen**:
+
+- API: GET /driver/rides/history?pagination...
+- Show:
+  - Date/time
+  - Pickup → Dropoff short summary
+  - Fare
+  - Payment method
+  - Status (completed / cancelled_x)
+- Filters:
+  - Last 7 days
+  - Last 30 days
+  - By payment method (cash/online)
+
+Allow a simple RideDetail popup:
+- Route summary
+- Earnings & commission breakdown (NO SafeGo internal margin, only driver side info).
+- Rating (if given by customer).
+
+====================================================
+PHASE 6 – DRIVER WALLET SUMMARY (READ-ONLY)
+====================================================
+
+Re-use Step 47 wallet engine.
+
+Create **DriverWalletScreen**:
+
+- Show:
+  - available_balance
+  - negative_balance
+  - total_earnings
+  - last payout date (if present)
+- Show last 10 wallet_transactions:
+  - date
+  - type (ride_earning, cash_commission_debit, payout, manual_adjustment…)
+  - amount
+- Optional Button: "Request payout" (only creates a request record; actual payout is Admin only).
+
+Rules:
+- Driver can view ONLY their own wallet.
+- All changes to balances remain controlled by wallet engine & Admin; driver has no direct edit.
+
+====================================================
+PHASE 7 – PWA & MOBILE UX (Driver Ride)
+====================================================
+
+Adjust the Driver Web App to be PWA-friendly:
+
+- Provide manifest for driver app scope (if not already present):
+  - name: "SafeGo Driver"
+  - short_name: "SafeGo Driver"
+  - icons (multiple sizes)
+  - start_url: "/driver"
+  - display: "standalone"
+  - background_color + theme_color (match SafeGo brand).
+
+- Ensure:
+  - On small screens (<768px), layouts use single-column mobile UI with large touch targets.
+  - On larger screens, show richer layout (e.g. map + info side-by-side).
+  - Navigation bar is easy to use with thumb (bottom bar or clear header).
+
+Push/notification behavior:
+- If push infrastructure is present, show notification for new ride requests.
+- If not, implement polling every N seconds while driver is online.
+
+====================================================
+PHASE 8 – SECURITY & NEGATIVE BALANCE GUARDRAILS
+====================================================
+
+Apply SafeGo Security Roadmap (Application Security Phase):
+
+- All driver routes require authenticated driver session.
+- Check is_verified and blocked flags on:
+  - going online
+  - accepting rides
+- If driver_negative_balance exceeds configured threshold:
+  - Optionally block new CASH rides but allow ONLINE rides; read threshold from config.
+  - Show clear non-technical explanation banner to driver.
+- Log all security-sensitive events:
+  - login
+  - go online/offline
+  - accept/reject ride
+  - status changes (start/end trip)
+- Never show customer government_id or sensitive PII to driver.
+
+====================================================
+PHASE 9 – DEMO MODE & CUSTOMIZATION
+====================================================
+
+Add configuration block, ADD-ONLY:
+
+driverRideConfig = {
+  enableRideDemoMode: true,
+  ridePollingIntervalSeconds: 10,
+  mobileBreakpointPx: 768,
+  maxNearbyRequestRadiusKm: 5,
+  negativeBalanceCashRideBlockThreshold: {
+    BD: 2000,   // example
+    US: 100
+  }
+}
+
+Demo mode behavior (no real money):
+- If enableRideDemoMode = true:
+  - Provide a "Demo Rides" section where a driver can simulate:
+    - receiving fake ride offers,
+    - accepting,
+    - navigating (simulated),
+    - completing rides.
+  - Use mock data but still run through the UI flow for training.
+
+====================================================
+PHASE 10 – NON-BREAKING GUARANTEE
+====================================================
+
+You MAY:
+- Add new driver UI screens/routes/components.
+- Add new READ/WRITE APIs specifically for driver ride UI (e.g. /driver/rides/requests, /driver/rides/history).
+- Add config blocks (driverRideConfig, PWA manifest entries).
+
+You MUST NOT:
+- Rename or delete existing models, fields, routes.
+- Change existing customer/restaurant/admin behavior.
+- Change existing commission percentages or wallet core logic.
+
+====================================================
+FINAL OUTPUT FOR STEP 48
+====================================================
+
+Deliver a complete, demo-ready, and customizable Ride Driver Web App UI with:
+
+- Online/offline toggle.
+- Ride request inbox (list + detail view).
+- Active ride workflow (pickup → in_progress → complete).
+- Ride history.
+- Wallet summary (read-only).
+- Mobile-first responsive design and PWA support.
+- Configurable behavior using driverRideConfig.
+- Full adherence to SafeGo security, KYC, commission, and status flow rules.

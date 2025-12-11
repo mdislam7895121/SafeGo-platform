@@ -1,0 +1,80 @@
+# STEP 01 — Enable BD-Only Shop Partner Role + Routing + Access Guard
+# (SafeGo full rules preserved, non-breaking, Bangladesh-only feature flag)
+
+You must activate the Bangladesh-only Shop Partner role in the SafeGo system
+WITHOUT modifying any existing roles or backend flows.
+
+===================================================
+A) ROLE ACTIVATION (BD ONLY)
+===================================================
+1. Add “Shop Partner” as a selectable role ONLY for Bangladesh users.
+2. Do NOT show this role anywhere for US users.
+3. Use existing country detection logic:
+   if user.country == "BD": show Shop Partner role
+   else: hide completely.
+
+4. Shop Partner must follow the SAME onboarding stages required by SafeGo rules:
+   - Basic info
+   - Address
+   - BD KYC requirements (father_name, DOB, present_address,
+     permanent_address, NID number + front/back, emergency contact)
+   - verification_status = "pending"
+   - is_verified = false
+
+5. Do NOT modify or break Customer, Driver, Restaurant, Admin flows.
+
+===================================================
+B) ROLE-BASED ROUTING (MANDATORY)
+===================================================
+After login:
+- If BD user role == Shop Partner:
+  redirect to:  /shop-partner/dashboard
+
+- Add a route guard:
+  Only verified Shop Partners OR pending Shop Partners accessing setup wizard
+  may see pages inside /shop-partner/*
+
+- US users or any non-Shop-Partner must be fully blocked from these routes.
+
+===================================================
+C) CREATE SHOP PARTNER DASHBOARD SHELL (EMPTY FOR NOW)
+===================================================
+Create the frontend shell structure for Shop Partner:
+
+Routes:
+- /shop-partner/dashboard
+- /shop-partner/setup
+- /shop-partner/products
+- /shop-partner/orders
+- /shop-partner/wallet
+- /shop-partner/profile
+
+These pages can be empty shells for now, but MUST exist with clean routing.
+
+===================================================
+D) BANGLA LANGUAGE FRAMEWORK
+===================================================
+Enable a Bangla UI mode ONLY for Shop Partner screens.
+
+Rules:
+- Every Shop Partner page must use Bangla text by default.
+- Implement a simple localization wrapper:
+  t_bn("দোকান সেটআপ"), t_bn("পণ্য যোগ করুন"), etc.
+
+Content will be added later; for now just activate the Bangla language mode.
+
+===================================================
+E) SECURITY & ISOLATION
+===================================================
+- Shop Partners cannot access Customer, Driver, Restaurant or Admin dashboards.
+- No other role may access /shop-partner/* routes.
+- Must follow SafeGo security rules.
+
+===================================================
+F) DO NOT CHANGE ANY EXISTING BACKEND API
+===================================================
+You may only add frontend routing + role guard.
+
+===================================================
+END OF STEP 01
+===================================================

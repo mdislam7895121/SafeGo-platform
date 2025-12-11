@@ -1,0 +1,81 @@
+Step 34 – Add US state filter (New York focus) to Driver Management list
+
+Context:
+- Admin driver list page: /admin/drivers
+- Current filters: search by email, country (All Countries / Bangladesh / United States), status, verification
+- USA driver identity already supports a "state" field (e.g., NY for New York).
+- New York drivers have extra TLC requirements on the detail page, but the list view cannot yet filter NY drivers.
+
+Goal:
+Extend the existing Driver Management filters so that admins can easily filter United States drivers by state, starting with New York (NY), without breaking any existing behavior.
+
+Requirements:
+
+1. New "State" filter (conditional)
+   - Add a new dropdown filter labeled "State" in the Search & Filters row on /admin/drivers.
+   - This dropdown should:
+     - Be visible only when the country filter = "United States".
+     - Be hidden/disabled when country is "All Countries" or "Bangladesh".
+
+2. State filter options
+   - Default option: "All States".
+   - At minimum include:
+     - "All States"
+     - "New York (NY)"
+   - Implementation should be future-proof so more US states can be added later without structural changes.
+
+3. Filtering behavior
+   - When Country = "United States" AND State = "All States":
+     - Show all US drivers (regardless of their state value).
+   - When Country = "United States" AND State = "New York (NY)":
+     - Show only drivers where:
+       - driver.countryCode (or equivalent field) = "US"
+       - AND driver.state (or equivalent) = "NY"
+   - When Country is "Bangladesh" or "All Countries":
+     - Ignore the state filter and hide it from the UI.
+
+4. URL & query parameters
+   - Keep the same pattern used for existing filters (country, status, verification).
+   - Add a new query parameter for the state filter (for example: &state=NY or &state=all).
+   - Ensure:
+     - URL is updated when the state filter changes.
+     - Filters are restored from the URL on page load (so deep links/bookmarks keep working).
+
+5. UI/UX consistency
+   - Match existing filter styling, spacing, and responsive layout.
+   - State dropdown should not push content out of alignment on smaller screens.
+   - On mobile, it should stack neatly with the other filters.
+
+6. Backend / data access
+   - Prefer reusing the existing driver list query and extend it with an optional "state" condition.
+   - Do NOT change any database schema or existing fields.
+   - If some USA drivers do not yet have a state set:
+     - They must still appear when "All States" is selected.
+     - They must NOT appear when "New York (NY)" is selected (unless their state is explicitly NY).
+
+7. Non-breaking & security
+   - No changes to role-based access control or protected routes.
+   - No changes to commission, wallet, or KYC logic.
+   - Confirm:
+     - No regressions for BD drivers.
+     - No regressions in existing US driver listing and filters.
+   - Keep all changes backward compatible with existing data.
+
+8. Verification checklist
+   - Test 1: Country = All Countries → State filter hidden → all drivers load as before.
+   - Test 2: Country = Bangladesh → State filter hidden → only BD drivers load.
+   - Test 3: Country = United States, State = All States → all US drivers visible.
+   - Test 4: Country = United States, State = New York (NY) → only NY drivers visible.
+   - Test 5: Refresh the page with filters set → filters restored from URL and results preserved.
+   - Test 6: Quick sanity check that /admin/drivers still works correctly with other filters (status, verification).
+
+9. Documentation
+   - Update replit.md (or existing admin docs) briefly describing:
+     - The new State filter.
+     - How to filter New York drivers.
+     - Notes that this is currently only used for US drivers and is optional.
+
+Please implement this as a safe, incremental change:
+- No breaking schema changes.
+- No impact on Steps 26–33 (Parcel Management, Identity, Document uploads, Wallet/Commission).
+- Keep the code clean and consistent with existing filter implementation.

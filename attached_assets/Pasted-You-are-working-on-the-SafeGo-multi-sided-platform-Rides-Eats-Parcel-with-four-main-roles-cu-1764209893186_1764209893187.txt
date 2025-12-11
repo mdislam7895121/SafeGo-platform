@@ -1,0 +1,175 @@
+You are working on the SafeGo multi-sided platform (Rides + Eats + Parcel), with four main roles: customer, driver, restaurant/merchant, and admin. The system already has driver and restaurant portals, payouts, KYC, security hardening Phase 1 & 2, and most D-series driver features implemented.
+
+GLOBAL SAFEGO RULES (ALWAYS RESPECT, NO BREAKING CHANGES)
+1. Roles & Apps
+   - Driver Web App (NY rides + Eats + future parcel)
+   - Customer App (later)
+   - Restaurant Dashboard (SafeGo Eats)
+   - Admin Panel (global control, but DO NOT modify admin in this task)
+2. Core Domain Collections (DB)
+   - rides, ride_requests, ride_offers
+   - food_orders, menus, menu_items, restaurant_settings
+   - deliveries (parcel – future)
+   - payouts, wallets, transactions, incentives, trust_scores, driver_documents, driver_vehicles, notifications, audit_logs
+3. Security & Compliance (already in place, DO NOT BREAK)
+   - Security Hardening Phase 1: HTTP security headers (HSTS, CSP, CORS), rate limiting on sensitive routes, password verification for payout changes.
+   - Security Hardening Phase 2: OTP service, device/session security, tamper-proof audit logs, payout 2FA, environment checks.
+   - All new endpoints must:
+     • Require authenticated user with correct role
+     • Use existing auth/session middleware
+     • Log important changes to audit_logs
+     • Never leak PII (mask SSN, tokens, internal IDs)
+4. KYC & Country-specific Logic (NY/US for driver & restaurant)
+   - Keep existing KYC flows intact (SSN, driver’s license, TLC, documents).
+   - Do NOT relax any validation; you may add extra validation if needed.
+5. Existing Driver Features (D-series – DO NOT REIMPLEMENT)
+   - D14: Driver Settings & Preferences Center (notification, trip, earnings, safety, language)
+   - D15: Driver Chat Support, help center routes
+   - D16: Driver Wallet & payout methods
+   - D17: Trip history & earnings breakdown
+   - D18: Performance & ratings dashboard
+   - D19: Incentives & milestones
+   - D20: Safety Center, SOS & quick support
+   - D21–D22: Trust score, profile fields validation, enhanced security
+   - Header/navigation integration for /driver is already done; do NOT touch that except where explicitly required for this task.
+6. Restaurant Side (C-series)
+   - C-1 Restaurant home/status dashboard is implemented and verified.
+   - For this task, focus on C-3 only; do not create new admin features.
+
+TASK CONTEXT: C-3 DRIVER ACTIVE TRIP SCREEN (NOW ADD SAFEGO MAP + MULTI-MAP OPTIONS)
+The earlier audit showed C-3 “Driver Active Trip Screen” and “Real-time Map/Navigation” are NOT implemented. We must now implement a full Uber-style active trip experience with our own SafeGo in-app map, plus external map options, without breaking any existing driver or restaurant flows.
+
+BUSINESS REQUIREMENT
+1. When a driver has an active trip (after accepting a ride), they should see an “Active Trip Screen” inside the driver app showing:
+   - Live map with:
+     • Driver location
+     • Pickup marker
+     • Dropoff marker
+     • Route polyline (current leg: to pickup or to dropoff)
+   - Trip status & ETA:
+     • Status steps: ACCEPTED → ARRIVING → ARRIVED → STARTED → COMPLETED
+     • ETA to pickup or dropoff, distance, and basic trip info.
+   - Passenger card:
+     • Passenger first name
+     • Pickup address (short)
+     • Dropoff address (short)
+     • Call button (opens tel: link)
+     • Quick safety shortcut (opens existing Safety Center / SOS screen)
+   - Action buttons:
+     • “Arrived” (only after driver is near pickup)
+     • “Start Trip” (after Arrived)
+     • “End Trip” (after Start Trip)
+2. SafeGo Map requirements (in-app map like Uber):
+   - Implement a reusable <SafeGoMap /> component under client/src/components/maps/SafeGoMap.tsx (or a similar logical path).
+   - Internally use one main provider (e.g. Mapbox or an existing map service already configured in the project) BUT:
+     • All labels/UI should be branded as “SafeGo Map” (NOT Mapbox/Google in the UI).
+     • The map component should accept props:
+       - center (lat, lng)
+       - zoom
+       - driverLocation
+       - pickupLocation
+       - dropoffLocation
+       - activeLeg ("to_pickup" | "to_dropoff")
+       - onMapReady? callback
+     • Draw markers for:
+       - Driver
+       - Pickup
+       - Dropoff
+     • Draw a route polyline for the active leg if route coordinates are available.
+   - If live routing/ETA API is not configured, implement a well-structured placeholder:
+     • Show static sample route and ETA (e.g., “ETA 12 min” with TODO comments).
+     • Keep all code structured so that plugging in a real routing API later is easy.
+3. External Map Options & Driver Preference:
+   - Drivers must be able to choose which external map app they use for turn-by-turn navigation, while still seeing SafeGo Map inside the app.
+   - Implement a new driver preference field in the existing driver settings/preferences domain:
+     • Field name: preferredNavigationApp
+     • Allowed values: "safego_only", "google_maps", "apple_maps", "waze", "default"
+     • For web: treat "default" as system default (e.g. a generic maps link).
+   - Integrate this preference in:
+     a) Driver Settings & Preferences Center (D14) – add a “Navigation Preferences” section, but keep the layout consistent with existing tabs/cards.
+     b) Active Trip Screen:
+        - Show a small “Navigation” control, e.g. a button with dropdown:
+          • “Open in SafeGo Map” (no external app)
+          • “Open in Google Maps”
+          • “Open in Apple Maps”
+          • “Open in Waze”
+        - The default selection should come from preferredNavigationApp.
+        - When the driver taps “Open Navigation”, open the external app via a deep-link URL with the correct coordinates for pickup or dropoff, e.g.:
+          • Google Maps: https://www.google.com/maps/dir/?api=1&destination=lat,lng
+          • Apple Maps (if applicable): maps://?daddr=lat,lng
+          • Waze: https://waze.com/ul?ll=lat,lng&navigate=yes
+        - If the driver chooses “SafeGo Map only”, keep them inside the app and do not open an external link.
+4. Trip Status & Backend Logic:
+   - Create or reuse an API/controller for active driver trip, such as:
+     • GET /api/driver/trips/active  → returns current active trip for authenticated driver OR null.
+     • POST /api/driver/trips/{id}/status  → change status between ACCEPTED/ARRIVING/ARRIVED/STARTED/COMPLETED, with proper validation and audit logging.
+   - Ensure:
+     • Only the assigned driver can update their trip.
+     • Status transitions are validated (cannot go from ACCEPTED directly to COMPLETED).
+     • All status changes are logged to audit_logs with:
+       - driverId, tripId, previousStatus, newStatus, timestamp, ip/session info.
+   - Use existing auth middleware and DB client (Prisma or equivalent).
+5. Real-time Updates:
+   - If a WebSocket / real-time mechanism already exists in the project, hook the Active Trip Screen into it to receive:
+     • Location updates (for future passenger-side view)
+     • Trip status updates
+   - If such infrastructure is NOT present, implement client-side polling as a fallback:
+     • Poll GET /api/driver/trips/active every 10–15 seconds while the screen is open.
+     • Make sure polling stops on unmount to avoid memory leaks.
+6. Driver UI/UX Details (C-3 focus, do NOT touch admin)
+   - Create or update an appropriate page such as:
+     • client/src/pages/driver/trip/active.tsx
+       OR
+     • client/src/pages/driver/trips/active.tsx
+     (Use the existing routing conventions in the project; do NOT invent a new pattern.)
+   - Integrate this page under the existing /driver layout and header (which now has the drawer, notifications bell, and language selector).
+   - Ensure the sidebar drawer behavior remains correct on mobile (open when tapping hamburger, close when navigating to the active trip page).
+   - On the active trip page show:
+     • Top section: status chip + ETA (“Arriving in 5 min”, “On trip – 12 min remaining”).
+     • Middle: SafeGo Map (full width, fixed height).
+     • Bottom: passenger card + main action button(s) + navigation options.
+   - Handle empty state:
+     • If there is no active trip, show a friendly message:
+       “You don’t have an active trip right now.”
+       and a button to go back to /driver/home or equivalent.
+7. Validation & Error Handling
+   - If the API returns an error (e.g., 403, 404, or validation error), show:
+     • A non-technical error banner, not raw JSON.
+   - Handle driver not meeting KYC or safety requirements:
+     • If driver is blocked/suspended, the active trip endpoint should respond accordingly and the UI should show a clear message (but this is optional for now; add TODO comments if full logic is not available).
+8. Security Requirements for this Task
+   - Reuse existing middlewares and security layers from Phase 1 & 2.
+   - Any new environment variables (for map provider keys) must:
+     • Use server-side env handling, never hard-coded keys in client bundle.
+     • For the SPA, expose only the minimal public keys if required by the map library.
+   - Escape user-provided text before rendering into map popups or labels to avoid XSS.
+   - Ensure that deep-link URLs for external maps are built from validated coordinates, not arbitrary query strings coming from user input.
+9. Non-Goals (DO NOT DO in this task)
+   - Do NOT modify admin panel.
+   - Do NOT change restaurant dashboards beyond what’s needed for this C-3 driver active trip feature.
+   - Do NOT re-implement trust_score, performance dashboards, or wallet.
+   - Do NOT add bug bounty, SIEM, or anomaly detection integrations here – those are separate security phases already planned.
+10. Implementation Style
+   - Use existing tech stack (React/TypeScript, styling system, Prisma, API routing conventions).
+   - Keep changes incremental and backward-compatible.
+   - Write clear, self-documenting code with short comments where behavior is non-obvious.
+   - After coding, run:
+     • Type checks
+     • Lint (if configured)
+     • Existing test suite (if present)
+   - Finally, manually test on the Replit preview:
+     • Driver with an active trip can:
+       - See SafeGo Map with markers.
+       - Change trip statuses in the correct order.
+       - Open navigation in their preferred external map app.
+       - Update navigation preference from the Settings center.
+
+TASK SUMMARY
+Implement the full C-3 Driver Active Trip Screen with:
+- SafeGo in-app map component (SafeGo Map)
+- Multi-map navigation options (SafeGo only, Google, Apple, Waze)
+- Trip status flow and backend APIs
+- Clean, mobile-friendly UI integrated into existing /driver layout
+- No admin changes, no breaking of existing D-series and C-1 features.
+
+Now implement all of the above in one complete pass.

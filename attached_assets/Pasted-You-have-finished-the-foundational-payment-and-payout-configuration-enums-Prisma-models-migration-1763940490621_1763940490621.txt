@@ -1,0 +1,86 @@
+You have finished the foundational payment and payout configuration (enums, Prisma models, migrations, and seed data for Bangladesh and USA). Now continue the implementation and make the system usable for real restaurants, without breaking any existing features.
+
+Follow these rules strictly:
+- Do NOT remove or rename existing models, enums, or tables
+- Do NOT break any existing restaurant, driver, or customer flows
+- Keep all KYC, RBAC, and audit logging rules active (Full SafeGuard)
+- Reuse existing design system, layouts, and responsive rules
+
+Your tasks now:
+
+1) Backend services – payment & payout configs
+- Create secure backend services to expose:
+  - Available customer payment methods for a given country + service (FOOD only for now)
+  - Available payout rails for restaurants for a given country
+  - Restaurant-specific payout methods (linked to RestaurantPayoutMethod)
+- Endpoints (example, adjust to existing structure):
+  - GET /api/config/payment/customer?country=BD&service=FOOD
+  - GET /api/config/payout/restaurant?country=BD
+  - GET /api/restaurants/me/payout-methods
+  - POST /api/restaurants/me/payout-methods (create new payout method)
+  - PATCH /api/restaurants/me/payout-methods/:id (update / disable)
+- Enforce:
+  - Auth + RBAC (OWNER only, no staff)
+  - Country-specific validation for account fields
+  - KYC gating: some payout rails require completed KYC
+  - Full audit logging (who changed what, when)
+
+2) Restaurant UI – Payout methods (Payouts & Finance section)
+- In the Restaurant portal, under “Payouts & Finance”, add:
+  - “Payout Methods” main page:
+    - List all configured payout methods for this restaurant
+    - Show: method type, last 4 digits / masked ID, status (Active / Pending / Disabled), country
+    - CTA buttons: “Add payout method”, “Edit”, “Disable”
+  - “Add payout method” drawer / form:
+    - Country selector (auto-filled from restaurant country if possible)
+    - Dynamic form fields based on payout rail:
+      - For Bangladesh (bKash, Nagad, Rocket, bank transfer, cash)
+      - For USA (Bank account / ACH, Stripe Connect, etc.)
+    - Validation and helper texts for each field
+    - KYC warning if required KYC is not completed
+  - “Manage payout methods” button from Dashboard card should link here.
+
+3) Restaurant UI – Customer payment capabilities (read-only for now)
+- On a “Payment Settings” or “Customer Payment Options” page (in Payouts & Finance or Store Settings):
+  - Show which customer payment methods are available in this restaurant’s country:
+    - For BD: bKash, Nagad, Rocket, Cash on Delivery
+    - For USA: Cards (Visa, Mastercard, Amex), Apple Pay, Google Pay
+  - For now, make this page informational (read-only), with a small note:
+    - “Customer payment methods are managed at the SafeGo platform level. Future versions may allow fine-grained controls here.”
+  - Make sure this page is fully responsive and matches the new R-ENHANCE layout.
+
+4) Online / Offline button (Go Online capsule)
+- Update the restaurant status button to use the new capsule design:
+  - Larger size than current one (slightly taller and wider)
+  - Left side: power icon
+  - Right side: label text
+- States:
+  - ONLINE:
+    - Background: dark (#111 or similar)
+    - Border: 2px solid green
+    - Icon + text: green
+    - Text label: “Online”
+  - OFFLINE:
+    - Background: dark (#111 or similar)
+    - Border: 2px solid red
+    - Icon + text: red
+    - Text label: “Offline”
+- Behavior:
+  - Clicking toggles restaurant availability for FOOD orders only
+  - Must respect all existing KYC/verification rules before allowing Online
+  - Add data-testid attributes for testing.
+
+5) Testing and safety
+- Add data-testid attributes for all new forms, buttons, and API calls.
+- Test flows:
+  - From a clean restaurant account, add a payout method for BD.
+  - Add a payout method for USA.
+  - Toggle Online / Offline and verify that status is stored correctly and reflected in the backend.
+- Make sure nothing breaks:
+  - Existing payout summary card on the Dashboard must remain functional.
+  - Existing orders, menu, and support flows must work as before.
+
+When you are done, give me:
+- A bullet-point summary of all changes (backend + frontend)
+- Any new environment variables or config that I need to set
+- A short test checklist so I can verify payment and payout flows myself.

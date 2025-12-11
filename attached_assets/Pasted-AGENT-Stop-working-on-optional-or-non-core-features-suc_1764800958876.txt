@@ -1,0 +1,75 @@
+AGENT:
+
+Stop working on optional or non-core features such as gamified badges, rewards, notification sound customization, or any enhancements that are not part of the SafeGo Master Rules.
+
+Immediately switch to completing ONLY the remaining SafeGo CORE modules.
+
+Your task now is to FINISH all remaining production-critical SafeGo features, end-to-end, with ZERO missing parts, exactly following SafeGo Master Rules, and without breaking any existing functionality.
+
+Focus ONLY on the following REQUIRED modules:
+
+1. Complete e-Shop system (Bangladesh only)
+   - Customer shop browsing
+   - Product listings
+   - Cart + checkout
+   - Shop order creation → deliveries mapping
+   - Shop partner onboarding + KYC + documents
+   - Shop dashboard (orders, inventory, payouts)
+   - Admin verification + commission + settlement
+   - All logo/banner/product image uploads (fix 401/403)
+   - Shop-specific notifications
+
+2. Complete Restaurant partner flow
+   - All onboarding steps (menu, branding, docs, payout, KYC)
+   - Logo + banner upload fixes
+   - Menu item photo uploads
+   - Restaurant dashboard (orders, preparation flow)
+   - Delivery assignment for restaurant orders
+   - Commission, payouts, negative balance logic
+
+3. Complete Ride and Parcel driver flow
+   - Driver onboarding (BD + US differences)
+   - Vehicle photos, license/NID uploads
+   - Driver dashboard (earnings, trips, deliveries)
+   - Accept trip, live status, completion flow
+   - Commission logic for cash/online
+
+4. Complete customer flows
+   - Ride booking end-to-end
+   - Food ordering end-to-end
+   - Parcel delivery end-to-end
+   - Shop ordering end-to-end
+   - All notifications (status updates, arrival, delivery)
+
+5. Fix ALL uploads everywhere
+   - Ensure uploadWithAuth() is used in EVERY endpoint  
+   - No more “Access token required” or “Only shop partners can upload images”
+   - File size, mime, auth, partner type validation
+
+6. Finish admin panel requirements
+   - KYC verification for all roles
+   - Commission configuration
+   - Payout management
+   - Negative balance settlement
+   - Block/unblock user
+
+7. Fix all Prisma schema alignment issues for:
+   - rides
+   - food_orders
+   - deliveries
+   - shop_orders
+   - payouts
+   - wallet tables
+
+8. After implementing all fixes, run COMPLETE end-to-end tests:
+   - Customer→Restaurant→Driver delivery flow
+   - Customer→Shop→Driver delivery flow
+   - Customer→Ride→Driver flow
+   - Driver and partner KYC submission→Admin approval
+   - Commission and payout workflows
+
+Do NOT implement any non-core features.
+Do NOT add optional enhancements.
+Do NOT modify schemas in a breaking way.
+
+Only complete all required SafeGo core features until the entire system is fully demo-ready, bug-free, and production aligned.

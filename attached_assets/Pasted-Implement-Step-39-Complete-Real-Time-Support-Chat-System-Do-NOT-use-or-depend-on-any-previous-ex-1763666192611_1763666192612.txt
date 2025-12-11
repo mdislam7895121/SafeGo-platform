@@ -1,0 +1,171 @@
+Implement Step 39: Complete Real-Time Support Chat System  
+Do NOT use or depend on any previous experimental chat code.  
+Start fresh using this specification only.
+
+===========================
+SYSTEM REQUIREMENTS
+===========================
+
+1. DATABASE MODELS (Prisma)
+Create three new models:
+
+Model: SupportConversation
+- id (uuid)
+- userId (driver/customer/restaurant)
+- userType (“driver” | “customer” | “restaurant”)
+- adminId (AdminProfile reference)
+- createdAt
+- updatedAt
+
+Model: SupportMessage
+- id (uuid)
+- conversationId (fk)
+- senderType (“user” | “admin”)
+- messageType (“text” | “image” | “file”)
+- body (string | null)
+- attachmentId (fk | null)
+- read (boolean)
+- createdAt
+
+Model: SupportAttachment
+- id (uuid)
+- conversationId
+- fileName
+- fileType
+- fileSize
+- secureStoragePath (do NOT store direct URL)
+- createdAt
+
+INDEXING:
+- SupportMessage: conversationId + createdAt
+- SupportConversation: userId + userType + createdAt
+
+---------------------------
+
+2. BACKEND SERVICES
+
+Create complete service layer:
+- createConversation(userId, userType)
+- listUserConversations(userId)
+- listAdminConversations()
+- sendMessage(conversationId, senderType, body?)
+- uploadAttachment(conversationId, file)
+- markAsRead(messageId)
+
+All file uploads must use existing signed-document-url infrastructure  
+(NO direct file URLs allowed).
+
+Integrate with existing audit logging:
+- Log: SUPPORT_MESSAGE_SENT
+- Log: SUPPORT_CONVERSATION_CREATED
+- Log: SUPPORT_ATTACHMENT_UPLOADED
+
+---------------------------
+
+3. REAL-TIME WEBSOCKET INFRASTRUCTURE
+
+Create brand-new WS module:
+- Each conversation = its own room
+- Only conversation participants allowed
+- Admin automatically joins all conversations
+- On message → broadcast to room
+- On read update → broadcast to room
+
+Security:
+- Authenticate WS connections using JWT
+- Match sender identity with conversation participant rules
+- Prevent cross-user socket access
+
+---------------------------
+
+4. ADMIN DASHBOARD (Frontend)
+
+Route: /admin/support-chat
+
+UI requirements:
+- Left panel: list of all conversations (search, filter by userType)
+- Center panel: full chat view
+- Right panel: user details (pulled from DriverProfile/CustomerProfile/RestaurantProfile)
+- Support file attachments with preview/download
+- Show unread counts
+- Auto-scroll to latest message
+- Realtime updates via WebSocket
+
+Permissions:
+- Only admins with SUPPORT_CHAT permission can access
+- Respect RBAC everywhere
+
+---------------------------
+
+5. USER INTERFACES (DRIVER + CUSTOMER + RESTAURANT)
+
+Add “Support Chat” entry:
+Driver App → Menu → Support Chat  
+Customer App → Help → Chat Support  
+Restaurant App → Help → Chat Support
+
+UI Requirements:
+- Show conversation list
+- Chat window with messages + attachments
+- Realtime updates
+- Attachment uploads (image, pdf)
+- Mobile responsive
+
+---------------------------
+
+6. GLOBAL SETTINGS
+
+Create new tab:
+Admin → Settings → Support
+
+Fields:
+- maxAttachmentSizeMB
+- allowedAttachmentTypes
+- autoAssignAdmin (true/false)
+Store in settings table following existing pattern.
+
+---------------------------
+
+7. SECURITY REQUIREMENTS
+
+Mandatory:
+- All messages sanitized
+- No PII in logs
+- Attachments served only using signed URLs
+- Strict RBAC
+- WebSocket auth required
+- Prevent impersonation
+- Validate file types & sizes
+
+---------------------------
+
+8. TESTING
+
+Perform automated tests:
+- API tests for conversation + messaging
+- WebSocket messaging tests
+- Attachment validation tests
+- Permission tests
+- Admin UI integration tests
+
+---------------------------
+
+9. DOCUMENTATION
+
+Update replit.md:
+- Data model diagrams
+- API endpoints
+- WebSocket usage
+- Admin UI + user UI usage
+- Security notes
+- Migration steps
+
+===========================
+
+Deliverables:
+- Fully working real-time chat system
+- Admin dashboard
+- User-facing chat interfaces
+- Secure file uploads
+- No regressions or broken flows
+- Architect approval required before marking complete

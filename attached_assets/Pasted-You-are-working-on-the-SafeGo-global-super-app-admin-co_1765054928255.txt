@@ -1,0 +1,400 @@
+You are working on the SafeGo global super-app admin console. Follow ALL of these SafeGo master rules and implementation constraints. Do NOT skip or simplify anything.
+
+====================================================
+SAFEGO MASTER RULES (ALWAYS ACTIVE)
+====================================================
+
+1) ROLES (4 distinct roles – never mix access)
+- Customer
+- Driver
+- Restaurant/Merchant
+- Admin
+
+Each role must have its own:
+- Signup/onboarding requirements
+- KYC/verification rules
+- Dashboard
+- Permissions and visibility rules
+- Status flows
+
+Customers must NEVER see admin tools or back-office controls.
+Drivers/Restaurants must NEVER see each other’s internal data.
+Only Admin can manage platform-level configuration.
+
+2) GLOBAL APP LOGIC (3 core services – always present)
+SafeGo always supports these services:
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+All designs, flows and admin tools must be compatible with ALL THREE services across all supported countries.
+
+3) COUNTRY-SPECIFIC KYC (BD vs US)
+You must always respect country-specific onboarding fields.
+
+BANGLADESH (BD) mandatory fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front & back images)
+- emergency contact details
+- verification_status + is_verified flag
+
+UNITED STATES (US) mandatory fields:
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license_number + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified flag
+
+Never remove, rename, or break these fields.
+
+4) ADMIN PANEL – MANDATORY CAPABILITIES
+Admin panel must always allow:
+- View and verify customers (BD + US)
+- View and verify drivers (BD + US)
+- View and verify restaurants/merchants (BD + US)
+- Approve/reject KYC with rejection_reason
+- Update pricing, fees, and commissions (per country + per service)
+- Block/unblock any user (all roles)
+- Manage payouts and settlement cycles
+- View driver negative balance
+- View restaurant negative balance
+
+Do NOT remove any of these capabilities. Only extend.
+
+5) CORE COLLECTIONS (3 required: rides, food_orders, deliveries)
+These collections already exist. You MUST NOT break them.
+
+For each of:
+- rides
+- food_orders
+- deliveries
+
+There must always be:
+- Identity fields (customer_id, driver_id, restaurant_id where applicable)
+- Addresses + geolocation (pickup, dropoff, restaurant, etc.)
+- Fees + commission fields
+- Payment details (cash vs online, payment_status)
+- Timestamps for full lifecycle
+- Complete status flows
+- Rating and feedback fields
+
+6) COMMISSION & PAYOUT LOGIC
+Never break these rules:
+
+If customer pays CASH for a ride:
+- Driver receives full cash
+- SafeGo commission becomes NEGATIVE BALANCE in driver_wallet_balance
+- Driver must settle weekly
+- Admin can view and settle this in the admin console
+
+If food order is CASH:
+- Restaurant receives all cash
+- SafeGo commission becomes NEGATIVE BALANCE in restaurant_wallet
+- Admin can view and settle this in the admin console
+
+If payment is ONLINE:
+- SafeGo keeps commission automatically
+- Wallet balances are updated accordingly
+
+Admin can always mark a balance as settled and record settlement timestamps.
+
+7) SECURITY RULES
+- Customers cannot view driver documents (NID, license, etc.)
+- Drivers cannot view customer NID or other sensitive KYC data
+- Restaurants cannot view other restaurants’ data or balances
+- Only admins can change:
+  - pricing
+  - commissions
+  - verification_status / is_verified
+  - blocking/unblocking of any user
+- Any user can update ONLY their own profile (limited safe fields)
+- Admin tools must clearly indicate when a section is “Super Admin only”
+
+8) STATUS FLOWS (must remain complete)
+Rides:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+Food orders:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+Parcels:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+Do NOT remove or rename these states. You may only extend with additional metadata (e.g., timestamps, reason codes).
+
+9) ONBOARDING FLOWS
+Each user type must have multi-step onboarding:
+
+For Customers (global simple signup):
+- Basic info (name, email, phone, password, country)
+- Address
+- Emergency contact
+- Country-specific KYC (BD / US rules above)
+- verification_status = "pending" at first
+- Block full usage until admin approves KYC (where required by design)
+
+For Drivers and Restaurants:
+- Created via separate “partner onboarding” flows after login
+- Multi-step: basic info → business info → documents → bank/payout details → emergency contact → KYC upload
+- verification_status = "pending" until admin approval
+
+10) NOTIFICATIONS (system-wide)
+The platform must support notifications for:
+- New ride alerts for drivers
+- Order status updates for customers, drivers, and restaurants
+- Parcel status updates
+- Verification approval/rejection (with rejection_reason)
+- Critical admin notifications (system issues, negative balance reminders, etc.)
+
+====================================================
+CURRENT TASK: ENTERPRISE TOOLS + INTELLIGENCE LAYER BACK BUTTONS
+====================================================
+
+Context from the latest screenshots:
+- Admin console exists with sections such as:
+  - People & KYC Center (Admin > People & KYC)
+  - Enterprise / Security tools: Safety Center, Fraud Alerts, Threat Center, Activity Logs, Access Reviews
+  - Configuration: Feature Flags, Global Settings, Releases & Publish, Settings
+  - Intelligence layer: revenue-analytics, payouts-reports, and other analytics/reporting pages
+- The agent has already updated payouts-reports and revenue-analytics with a minimal header design.
+- Many Enterprise tools and Intelligence layer pages still:
+  - Have NO “Back” button
+  - Have inconsistent or missing page header layout
+  - Some routes (e.g. /admin/safety-center) show a 404 “Did you forget to add the page to the router?”
+
+Your job now is to FULLY audit and fix this, without breaking any existing routes or logic.
+
+====================================================
+NON-BREAKING IMPLEMENTATION RULES
+====================================================
+
+1. Do NOT rename or remove existing:
+   - routes
+   - components
+   - APIs
+   - database schemas
+   - collections
+   - status values
+
+2. You may ONLY:
+   - add new components
+   - add new route entries that use existing patterns
+   - add new props to existing components (optional / backward-compatible)
+   - add new buttons and layout elements
+   - create new minimal page implementations for missing routes
+
+3. The admin sidebar structure and URLs must remain the same.
+   Just make the pages work and be user friendly.
+
+====================================================
+STEP 1 – INVENTORY OF ENTERPRISE TOOLS + INTELLIGENCE LAYER
+====================================================
+
+1. Scan the admin frontend codebase and list all pages under:
+   - Enterprise / Security tools group in the sidebar:
+     - Safety Center
+     - Fraud Alerts
+     - Threat Center
+     - Activity Logs
+     - Access Reviews
+   - Configuration group:
+     - Feature Flags
+     - Global Settings
+     - Releases & Publish
+     - Settings
+   - Intelligence layer / analytics and payout pages:
+     - revenue-analytics
+     - payouts-reports
+     - any other analytics, reports, dashboards under the same section
+
+2. For each page, identify:
+   - Route path (e.g. /admin/safety-center, /admin/feature-flags, /admin/releases, /admin/settings, /admin/revenue-analytics, /admin/payouts-reports, etc.)
+   - Top-level React (or framework) component used to render it
+   - Whether it currently shows:
+     - a page title
+     - breadcrumbs
+     - a back button
+     - 404 “Page Not Found”
+
+3. Summarize this inventory in comments or a short markdown note inside the repo (e.g. docs/admin-nav-inventory.md) so future work understands the structure. Do NOT remove it.
+
+====================================================
+STEP 2 – DEFINE A REUSABLE PAGE HEADER WITH BACK BUTTON
+====================================================
+
+1. Find the shared admin layout and header components (for example: AdminLayout, AdminPageHeader, or similar).
+2. Create or extend a reusable PageHeader component that supports:
+   - props.title (string)
+   - props.subtitle / description (optional)
+   - props.backTarget (optional: a route path to navigate to, e.g. "/admin", "/admin/people-kyc")
+   - props.backLabel (optional: visible label such as "Back to Security", "Back to Admin home")
+3. The Back button must:
+   - be visible at the top-left of the page content area (below the global navbar, above filters/tabs)
+   - use the router (e.g. Link component or navigate("/admin/...")) rather than relying solely on browser history
+   - be keyboard accessible (focusable, Enter/Space activates)
+   - have an ARIA label like “Go back to [target name]”
+4. Style guidelines:
+   - Match the minimal header design already used on payouts-reports and revenue-analytics
+   - Maintain a clean, professional admin look on both desktop and mobile
+   - Do NOT break responsiveness or existing layouts
+
+Do NOT change colors, theme tokens, or typography system-wide, unless there is an existing design token for this Back button.
+
+====================================================
+STEP 3 – APPLY BACK BUTTONS TO ENTERPRISE / SECURITY TOOLS
+====================================================
+
+For each Enterprise/Security page:
+
+- Safety Center
+- Fraud Alerts
+- Threat Center
+- Activity Logs
+- Access Reviews
+
+Do the following:
+
+1. Ensure each page uses the shared PageHeader component with:
+   - title = the page name (e.g. "Safety Center")
+   - subtitle = short description (reuse any existing text such as "Manage safety controls and incident workflows" if present)
+   - backTarget = "/admin" OR the most appropriate parent route for Security tools if one exists
+   - backLabel = "Back to Admin Home" or "Back to Security" (choose one consistent label across all Security pages)
+
+2. If the route currently returns a 404 (like /admin/safety-center):
+   - Add the missing route entry in the admin router configuration.
+   - Create a minimal SafetyCenterPage component that:
+     - Renders the PageHeader with a working back button
+     - Includes placeholder content sections such as:
+       - “Incident overview” placeholder
+       - “Safety policies” placeholder
+       - “Coming soon – full Safety Center tools”
+   - DO NOT implement deep business logic here. Just make the page render correctly with a working header.
+
+3. Verify:
+   - Navigating from the sidebar to any Security tool page shows:
+     - correct title
+     - back button
+     - no 404
+   - Clicking the back button returns to the correct parent without breaking URL or state.
+
+====================================================
+STEP 4 – APPLY BACK BUTTONS TO CONFIGURATION PAGES
+====================================================
+
+For each configuration page:
+- Feature Flags
+- Global Settings
+- Releases & Publish
+- Settings (including sub-tabs: My Profile, General, Theme, KYC Rules, Commission, Tax & Fees, Settlement, Notifications, Security)
+
+1. Ensure the top of each page uses PageHeader with:
+   - A consistent title (e.g. "Feature Flags", "Global Settings", "Releases & Publish", "Settings")
+   - Short subtitle based on existing design copy
+   - backTarget:
+     - For Feature Flags, Global Settings, Releases & Publish: probably "/admin"
+     - For Settings sub-tabs: backTarget should be the root admin route or settings landing route (depending on existing navigation patterns)
+   - backLabel = "Back to Admin Home" OR "Back to Settings" consistently per section.
+
+2. Do NOT remove:
+   - existing tabs
+   - forms
+   - toggles
+   - configuration options
+   You are only inserting the page header and back button above the rest of the content.
+
+3. Confirm:
+   - All configuration pages now have a visible back button
+   - The previous functionality (forms, lists, flags, etc.) still works
+
+====================================================
+STEP 5 – APPLY BACK BUTTONS TO INTELLIGENCE LAYER PAGES
+====================================================
+
+For all Intelligence / analytics / payout pages, including but not limited to:
+- revenue-analytics
+- payouts-reports
+- any additional analytics dashboards or reports already present
+
+1. Standardize the use of PageHeader:
+   - For revenue-analytics:
+     - title = "Revenue Analytics"
+     - subtitle = short explanation of the dashboard
+     - backTarget = "/admin" OR the Intelligence overview route if such a parent exists
+     - backLabel = "Back to Admin Home" or "Back to Intelligence"
+   - For payouts-reports:
+     - title = "Payouts & Reports" (or existing title)
+     - subtitle = existing explanation
+     - backTarget and backLabel consistent with revenue-analytics
+
+2. If there are any intelligence pages without a header yet:
+   - Wrap them in the Admin layout and use PageHeader at the top.
+   - Ensure charts/tables start BELOW the header.
+
+3. Make sure the minimal header design (already implemented on two pages) is reused for ALL Intelligence layer pages. No copy-pasted inconsistent markup – use a shared component.
+
+====================================================
+STEP 6 – PERMISSIONS & SECURITY CHECK
+====================================================
+
+1. Confirm that:
+   - Only admin / super admin roles can access Enterprise tools, Configuration, and Intelligence pages.
+   - Back buttons do NOT navigate to any route that non-admin roles should never see.
+
+2. If there is a notion of “Super Admin only” for Feature Flags and Releases:
+   - Ensure that label is still shown (e.g. “Super Admin Only” badge at the top right).
+   - Back button remains visible but does NOT bypass existing access control.
+
+Do NOT change any role permission logic. Just ensure UI respects it.
+
+====================================================
+STEP 7 – TEST FLOW END-TO-END
+====================================================
+
+Using an admin account:
+
+1. From the main admin dashboard:
+   - Navigate to each Enterprise tool from the sidebar.
+   - Confirm:
+     - Page loads successfully (no 404)
+     - Title + subtitle render correctly
+     - Back button is visible and clickable
+     - Back button returns to the intended parent (Admin home or appropriate section)
+
+2. From the Configuration group:
+   - Open Feature Flags, Global Settings, Releases & Publish, Settings (and all Settings sub-tabs).
+   - Confirm same behavior.
+
+3. From the Intelligence/analytics group:
+   - Open revenue-analytics.
+   - Open payouts-reports.
+   - Confirm same behavior.
+
+4. Test on:
+   - Desktop width
+   - A smaller viewport (tablet/mobile)
+   Confirm the back button is still accessible, not overlapped, and not off-screen.
+
+5. Log any discovered issues as comments, and fix them in this same pass if they are related to:
+   - missing headers
+   - missing back buttons
+   - 404 for expected admin pages
+
+====================================================
+DELIVERABLES
+====================================================
+
+1. Updated shared PageHeader (or equivalent) component supporting backTarget & backLabel.
+2. All Enterprise/Security, Configuration, and Intelligence layer pages wired to this header with working back buttons.
+3. A working Safety Center page at /admin/safety-center (no more 404), with a minimal but correct layout and back button.
+4. A short summary in comments or a markdown note describing:
+   - Which pages were updated
+   - Which routes were added (if any)
+   - Confirmation that no existing APIs, DB schemas, or core SafeGo business rules were modified.
+
+Do all of this in one complete, non-breaking implementation pass.

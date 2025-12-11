@@ -1,0 +1,246 @@
+READ THIS CAREFULLY. YOU HAVE NOT FIXED THE BUG.
+
+My screenshot STILL shows this behavior:
+
+- After I complete Personal Information and click “Next”:
+  - On the Driver License step, the field "Driver License Number" is pre-filled with my name (e.g. "md islam").
+  - The "License Expiration Date" is pre-filled with a date (e.g. 12/23/1987).
+- I did NOT type those values on the Driver License step.
+
+This proves that:
+- Either form state from Personal Info is still being mapped into Driver License, OR
+- The driver license fields are still sharing the same "name" as personal info fields, so the browser autofill is treating them as the same.
+
+You said the root cause was `useId()` IDs and that you added explicit IDs.  
+**That is not enough.** IDs are only part of the problem. The bug is still present.
+
+Now I need you to do a strict, step-by-step fix.
+
+================================================
+0. SAFEGO MASTER RULES (MUST KEEP, DON’T BREAK)
+================================================
+(Short version, do NOT change any of these.)
+
+1) Roles: customer, driver, restaurant, admin  
+   - Separate onboarding, KYC, dashboards, permissions, status flows.  
+   - Public signup is customer-only; drivers onboard after login.
+
+2) Services: ride-hailing, food delivery, parcel delivery  
+   - Do not break any existing ride/food/parcel flow.
+
+3) Country-specific KYC:
+   - BD KYC fields stay intact (father_name, NID, etc).  
+   - US driver KYC must keep:
+     - date_of_birth, home_address, emergency contacts
+     - government_id_type, government_id_last4
+     - driver_license_number/state/expiry + images
+     - optional ssn_last4
+     - TLC fields for NYC zone.
+   - Do NOT rename/remove any of these.
+
+4) Admin panel, collections (rides/food_orders/deliveries), commission & payout rules, security rules, status flows, onboarding and notifications all must remain as-is.
+
+All your changes must be additive and NON-BREAKING.
+
+================================================
+1. CONFIRM WHICH COMPONENT / ROUTE IS LIVE
+================================================
+
+1.1 Open the routing for `/partner/driver/register` (and `?type=ride`).
+
+- Find the EXACT component that is rendered for this path.  
+- I want **only the V2 driver onboarding component** to be used here, NOT any legacy V1 component.
+
+If the router still imports something like:
+
+- `legacy/driver-registration-v1.tsx`
+
+then you MUST:
+
+- Stop using the legacy component for this route.
+- Route `/partner/driver/register` to the V2 component only.
+
+Do NOT delete legacy code, but DO NOT use it in this route.
+
+================================================
+2. REMOVE ANY STATE MAPPING BETWEEN STEPS
+================================================
+
+2.1 In the V2 driver onboarding container (the one with tabs: Personal Information → Driver License → Vehicle Details → NYC Compliance):
+
+- Search for ANY code that copies values from Personal Info into Driver License fields, for example:
+
+  - `setValue("driver_license_number", getValues("full_legal_name"))`
+  - `setValue("driver_license_expiry", getValues("date_of_birth"))`
+  - `setValue("driver_license_state", getValues("home_address.state"))`
+
+or any other combination where driver_license_* fields are assigned from personal info.
+
+2.2 REMOVE all such mappings.
+
+2.3 Check `defaultValues` or `initialValues` for the form:
+
+- For a **NEW** onboarding flow, Driver License fields must start as:
+
+  - `driver_license_number: ""`
+  - `driver_license_state: ""`
+  - `driver_license_expiry: ""`
+  - `driver_license_front_image: null`
+  - `driver_license_back_image: null`
+
+Ensure there is no code that sets these from personal info.
+
+2.4 Check any `useEffect` that runs when changing steps:
+
+- If an effect runs on entering the Driver License step and calls `setValue` on driver license fields with values from step 1, remove that part for NEW onboarding.
+
+================================================
+3. MAKE FIELD NAMES **DIFFERENT** BETWEEN STEPS
+================================================
+
+THIS IS CRITICAL. You fixed IDs, but the browser mainly uses the `name` attribute for autofill.
+
+3.1 Personal Information step:
+- Confirm the fields use names like:
+
+  - `name="full_legal_name"`
+  - `name="date_of_birth"`
+  - `name="home_address.street"`
+  - `name="home_address.state"`
+  - `name="home_address.zip"`
+
+3.2 Driver License step (V2):
+- The fields MUST use different names:
+
+  - `name="driver_license_number"`
+  - `name="driver_license_state"`
+  - `name="driver_license_expiry"`
+
+Make sure:
+
+- These names are **not** reused anywhere in the Personal Information step.
+- These names are the same ones used in the validation schema and payload.
+
+3.3 Also ensure IDs are different:
+
+- Personal info IDs: `personal-full-legal-name`, `personal-date-of-birth`, etc.
+- Driver license IDs: `license-number-field`, `license-expiry-field`, `license-state-field`.
+
+But most important: the `name` props MUST be unique and correct.
+
+================================================
+4. HARD-DISABLE BROWSER AUTOFILL ON DRIVER LICENSE FIELDS
+================================================
+
+4.1 In the Driver License form section:
+
+- Wrap it with:
+
+  `<form autoComplete="off"> ... </form>`
+
+(or equivalent setting in your form component).
+
+4.2 For each Driver License input, set explicit attributes:
+
+- Driver License Number input:
+
+  - `name="driver_license_number"`
+  - `id="license-number-field"`
+  - `autoComplete="off"`
+  - `inputMode="text"`
+
+- License Issuing State select:
+
+  - `name="driver_license_state"`
+  - `id="license-state-field"`
+  - `autoComplete="off"`
+
+- License Expiration Date input:
+
+  - `name="driver_license_expiry"`
+  - `id="license-expiry-field"`
+  - `type="date"`
+  - `autoComplete="off"`
+
+4.3 If you are using shadcn or a wrapper, confirm these attributes propagate to the **actual HTML `<input>` / `<select>`**.
+
+================================================
+5. VALIDATION & “NEXT” BUTTON
+================================================
+
+5.1 Validation schema (Zod/Yup) keys must match:
+
+- `driver_license_number`
+- `driver_license_state`
+- `driver_license_expiry`
+
+5.2 The Controllers / register calls must use those exact names:
+
+- `<Controller name="driver_license_number" ... />`
+- `<Controller name="driver_license_state" ... />`
+- `<Controller name="driver_license_expiry" ... />`
+
+5.3 The "Next" button must depend on DRIVER LICENSE fields, not personal info:
+
+- It should be enabled when:
+
+  - driver_license_number is non-empty  
+  - driver_license_state is selected  
+  - driver_license_expiry is set  
+  - (and images uploaded, if required)
+
+================================================
+6. MANDATORY MANUAL TEST
+================================================
+
+After you finish coding:
+
+6.1 Hard refresh the app in the browser (so new JS loads).
+
+6.2 Go to `/partner/driver/register?type=ride`.
+
+6.3 Fill the Personal Information step completely. Click “Next”.
+
+EXPECTED:
+
+- On the Driver License step:
+  - Driver License Number input is EMPTY.
+  - License Issuing State is EMPTY.
+  - License Expiration Date is EMPTY.
+
+If ANY of these is pre-filled, then:
+
+- The bug is NOT fixed.
+- You must continue debugging (mapping or names) and NOT claim success.
+
+6.4 Then:
+
+- Manually type a fake license number.
+- Select a state.
+- Choose an expiration date.
+- Upload dummy images if required.
+- Confirm:
+
+  - Error messages disappear when fields are valid.
+  - The Next button becomes active.
+  - Clicking Next moves to the Vehicle Details step.
+
+================================================
+7. REPORT CLEARLY
+================================================
+
+When you’re truly done, your report MUST include:
+
+1) Which file and function were responsible for the pre-filled License Number and Expiration Date.
+2) What state-mapping or name/id issue you found and removed.
+3) The final `name` and `id` values for:
+   - full_legal_name
+   - date_of_birth
+   - driver_license_number
+   - driver_license_state
+   - driver_license_expiry
+4) Confirmation that:
+   - After Personal Info → Next, all Driver License fields start empty.
+   - Only manual user input fills them.
+   - Next button works after valid input.
+   - All SafeGo rules and flows remain intact.

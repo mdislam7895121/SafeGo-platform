@@ -1,0 +1,265 @@
+STEP 45G – CUSTOMER EATS RESTAURANT BACK BUTTON (RETURN TO /customer/food) + OPTIONAL HOME BUTTON
+
+You must follow ALL SafeGo Master Rules.  
+This step is a small, ADD-ONLY UI/navigation fix in the Customer app (SafeGo Eats).  
+Do NOT modify any backend logic, KYC, commissions, wallets, or status flows.
+
+====================================
+SAFEGO MASTER RULES (OBEY, DO NOT BREAK)
+====================================
+
+ROLES – 4 separate roles:
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must keep its own:
+- signup & onboarding
+- country-specific KYC
+- dashboard
+- permissions
+- status flows
+
+SERVICES – 3 core services:
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+KYC – BANGLADESH (BD) mandatory fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status ("pending" | "approved" | "rejected")
+- is_verified (boolean)
+
+KYC – UNITED STATES (US) mandatory fields:
+For all users:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+For US drivers (extra):
+- driver_license_number
+- driver_license_image
+- driver_license_expiry
+- ssn_last4 (optional)
+- driver_background_check_status
+
+ADMIN PANEL – must remain able to:
+- view & verify customers/drivers/restaurants
+- approve/reject KYC with rejection_reason
+- configure pricing, fees, commissions (rides, food_orders, deliveries)
+- block/unblock any user with reason + timestamps
+- manage payouts & settlements
+- view driver_negative_balance and restaurant_negative_balance
+- mark balances as settled
+- view audit logs for KYC, blocking, pricing, payouts
+
+CORE COLLECTIONS (CANNOT be renamed/removed):
+1) rides
+2) food_orders
+3) deliveries
+
+Each keeps:
+- identity fields (customer_id, driver_id, restaurant_id, admin_id)
+- addresses + lat/lng
+- financial fields (base_price, distance_fee, service_fee, platform_commission_amount,
+  driver_earnings_amount, restaurant_earnings_amount, total_amount_charged_to_customer,
+  payment_method, payment_status)
+- timestamps (created_at, updated_at, accepted_at, completed_at, cancelled_at)
+- status following allowed lifecycle
+- rating & feedback fields
+
+COMMISSION & PAYOUT RULES (do NOT change):
+- Cash ride → driver gets full cash; commission becomes driver_negative_balance.
+- Cash food order → restaurant gets full cash; commission becomes restaurant_negative_balance.
+- Online payment → SafeGo keeps commission automatically; pays out net.
+- Admin can settle balances and adjust wallets with audit logging.
+
+SECURITY RULES:
+- Customers cannot see driver/restaurant KYC docs.
+- Drivers cannot see customer KYC/government IDs.
+- Restaurants cannot see other restaurants’ data/balances.
+- Only Admin can modify verification_status, is_verified, pricing, commissions, blocking.
+- Users may update only their own profile.
+- Sensitive IDs must be masked (last4) when shown.
+
+STATUS FLOWS (must remain):
+rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_*  
+food_orders: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_*  
+deliveries: requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_*
+
+ONBOARDING:
+- multi-step, ends with verification_status="pending", is_verified=false until Admin approves.
+
+NOTIFICATIONS:
+- new rides for drivers, food orders for restaurants, parcel updates, verification decisions, important admin alerts.
+
+SECURITY FOCUS FOR THIS STEP:
+- Only Customer role UI changes.
+- No new data exposure.
+- No cross-role navigation.
+
+DESKTOP LAYOUT CONSTRAINT:
+- Do NOT change the Step 43 desktop layout of `/customer/food` (filters + “Popular Near You” + “Top Rated” grid).
+- Only add small navigation buttons; no layout rewrites.
+
+================================================
+STEP GOAL – ADD VISIBLE BACK BUTTON ON RESTAURANT DETAIL
+================================================
+
+User requirement:
+
+1) From `/customer/food`, customer taps any restaurant card (e.g. “Dhaka Curry Kitchen”).
+2) They enter the restaurant detail page (`/customer/food/restaurant/:id` or similar).
+3) If they don’t like the menu, they must see a CLEAR button to:
+   - go back to the full restaurant list (`/customer/food`).
+4) Optional: they should also be able to go back to Customer Home (`/customer`) via a Home button.
+
+Currently, there is no obvious back button on the restaurant page.
+
+================================================
+A. ROUTES INVOLVED (DO NOT RENAME)
+================================================
+
+- Customer Home: `/customer`
+- Customer Eats Home (restaurant list/grid): `/customer/food`
+- Restaurant detail: `/customer/food/restaurant/:id` (or the existing equivalent – use current route).
+
+
+================================================
+B. NEW COMPONENTS – ADD-ONLY
+================================================
+
+Create two simple components in the Customer app:
+
+1) `CustomerHomeButton`
+   - Props:
+     - label (default "Home")
+   - Behavior:
+     - On click → navigate to `/customer`.
+
+2) `BackToRestaurantsButton`
+   - Props:
+     - label (default "Back to restaurants")
+   - Behavior:
+     - On click → navigate to `/customer/food`.
+
+These components must:
+
+- Use existing button styles (colors, typography) so they look native to SafeGo.
+- Have enough size for easy click/tap.
+- Be safe on both mobile and desktop.
+
+================================================
+C. WHERE TO RENDER THESE BUTTONS
+================================================
+
+1) **Restaurant Detail Screen** (highest priority)
+
+On the main restaurant detail screen (the one in the user’s screenshot with banner image + categories sidebar), add:
+
+- At top-left of the content area (under the global top bar):
+  - `BackToRestaurantsButton`  
+    - label: "Back to restaurants"
+    - ALWAYS visible when a restaurant is opened.
+- Optionally on the same header row (top-right or near filters):
+  - `CustomerHomeButton`  
+    - label: "Home"
+
+Behavior:
+- `Back to restaurants` → ALWAYS goes to `/customer/food`.
+- `Home` → ALWAYS goes to `/customer`.
+
+Do NOT rely only on browser history; call the router with explicit routes.
+
+2) **Item Detail Screen (if full page, not just modal)**
+
+If there is a full-page item detail view:
+
+- Show:
+  - A simple back control to restaurant (existing behavior if present).
+  - `BackToRestaurantsButton` (optional but recommended) → `/customer/food`.
+  - `CustomerHomeButton` → `/customer`.
+
+3) Other Eats screens (optional, non-breaking):
+
+- Cart, Checkout, Order Tracking can keep their current nav; adding Home is allowed but NOT required in this step.
+
+This step’s MUST-have: restaurant detail page shows a visible “Back to restaurants” button that routes to `/customer/food`.
+
+================================================
+D. RESPONSIVE BEHAVIOR
+================================================
+
+- Desktop:
+  - Buttons should appear in the header row for the restaurant detail, not overlapping text.
+- Mobile:
+  - Buttons can be in the top app bar or just under it.
+  - Tap target ≥ 44x44 px.
+
+No new horizontal scroll should be introduced.
+
+================================================
+E. CONFIGURATION & DEMO
+================================================
+
+Add optional config entries (ADD-ONLY):
+
+- showCustomerHomeButtonOnRestaurant = true
+- showBackToRestaurantsButton = true
+- customerHomeRoute = "/customer"
+- customerEatsHomeRoute = "/customer/food"
+
+Defaults must match the above routes.
+
+For demo:
+
+- Open `/customer/food`, choose a restaurant, confirm:
+  - “Back to restaurants” appears and works.
+  - (If enabled) “Home” appears and works.
+
+================================================
+F. TEST CASES (MANDATORY)
+================================================
+
+1) From `/customer/food`, click a restaurant:
+   - Restaurant detail opens.
+   - “Back to restaurants” button is clearly visible.
+
+2) Click “Back to restaurants”:
+   - Route = `/customer/food`.
+   - Restaurant grid/list is visible.
+   - No errors.
+
+3) From restaurant detail, click “Home” (if rendered):
+   - Route = `/customer`.
+   - Tabs `Ride | Eats | Parcel` still work.
+
+4) Confirm:
+   - No changes to rides/parcel UX.
+   - No backend/API/commission behavior changed.
+   - KYC/security rules unaffected.
+
+================================================
+FINAL REQUIREMENT
+================================================
+
+Deliver Step 45G so that:
+
+- Every restaurant detail page in the Customer Eats flow shows a clear “Back to restaurants” button that returns to `/customer/food`.
+- Optionally, a “Home” button returns to `/customer`.
+- Behavior works on both mobile and desktop.
+- All SafeGo Master Rules, collections, and financial logic remain intact and unchanged.

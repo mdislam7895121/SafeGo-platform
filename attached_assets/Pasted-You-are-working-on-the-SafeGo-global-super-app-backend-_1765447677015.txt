@@ -1,0 +1,420 @@
+You are working on the SafeGo global super-app backend and admin platform.
+
+Your job in this task:  
+ADD Shop Partner and Ticket Partner modules in a non-breaking way, fully aligned with all existing SafeGo master rules.  
+You must NOT break or change existing Ride/Food/Parcel systems, payments, or onboarding flows.  
+All changes must be additive only.
+
+────────────────────────────────
+SAFEGO MASTER RULES (ALWAYS ENFORCE)
+────────────────────────────────
+1) Roles – four distinct roles:
+   - Customer
+   - Driver
+   - Restaurant/Merchant
+   - Admin
+
+   New modules (Shop & Ticket) must reuse this pattern:
+   - Shop Partner = a specialized Merchant role
+   - Ticket Partner = another specialized Merchant role
+
+   Each role must have:
+   - its own onboarding flow (multi-step, partner-only after login)
+   - its own dashboard
+   - clear permissions and data access
+   - status flags (active, blocked, pending_verification, etc.)
+
+   Do NOT merge roles or let one role see another’s private data.  
+   New Shop/Ticket partners must follow the same isolation rules as Restaurants.
+
+2) Global services – these 3 core services already exist and must keep working:
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+   In this task you are ADDING:
+   - Shop orders (physical goods)
+   - Ticket bookings (transport/event tickets)
+
+   But all new logic must respect and integrate with the existing three services where appropriate (e.g., parcel delivery used for shop shipping).
+
+3) Countries – support at least:
+   - Bangladesh ("BD")
+   - United States ("US")
+
+   All onboarding, pricing, and KYC logic must branch correctly by country.
+
+4) Country-specific KYC (must remain intact):
+
+   BANGLADESH (BD) mandatory fields:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID_number
+   - NID_image_front
+   - NID_image_back
+   - emergency_contact_name
+   - emergency_contact_phone
+   - verification_status ("pending" | "verified" | "rejected" | "need_more_info")
+   - is_verified (boolean)
+
+   UNITED STATES (US) mandatory fields:
+   - date_of_birth
+   - home_address
+   - emergency_contact_name
+   - emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - For drivers:
+     - driver_license_number
+     - driver_license_image
+     - driver_license_expiry
+     - ssn_last4 (optional)
+   - verification_status ("pending" | "verified" | "rejected" | "need_more_info")
+   - is_verified (boolean)
+
+   For Shop/Ticket partners:
+   - They are merchants; reuse the merchant KYC pattern already used for Restaurants.  
+   - Do NOT remove or rename any KYC fields; add shop/ticket-specific fields only as optional add-ons.
+
+5) Onboarding model (DO NOT CHANGE):
+   - Customer signup is simple and global (email/password/etc).
+   - All partners (drivers, restaurants, shop partners, ticket partners, rentals, etc.) are created later through separate onboarding flows AFTER login.
+   - Onboarding is multi-step:
+     1) Basic business info
+     2) Address & service areas
+     3) Country-specific KYC documents
+     4) Emergency contact / support contact
+   - Access to operate is blocked until Admin approves (verification_status = "verified", is_verified = true).
+
+6) Admin panel – existing capabilities must stay:
+   Admin can:
+   - verify customers, drivers, restaurants (and now shop/ticket partners)
+   - approve/reject KYC
+   - set rejection_reason
+   - block/unblock any user (customer, driver, restaurant, shop, ticket)
+   - manage pricing, fees, commissions globally
+   - manage payouts
+   - view driver_wallet_balance and restaurant_wallet_balance including negative
+   - view negative balances and settle them
+
+   In this task you must EXTEND Admin so it can:
+   - see and manage Shop Partners
+   - see and manage Ticket Partners
+   - view shop_orders and ticket_bookings finance summaries
+
+   Do NOT remove or change existing admin sections; only add new sections/tabs/cards.
+
+7) Core collections (must remain, only extended):
+   - rides
+   - food_orders
+   - deliveries
+
+   These already contain:
+   - customer_id, driver_id, restaurant_id (where applicable)
+   - pickup/dropoff, geo, fees, commission, payment details, timestamps, ratings, etc.
+
+   For this task:
+   - You may ADD the following NEW collections:
+
+     a) shop_orders  
+     b) ticket_bookings  
+
+   - Each new collection must include analogous fields:
+     - customer_id
+     - merchant_id (shop_partner_id or ticket_partner_id)
+     - optionally driver_id (for deliveries or ride linkage)
+     - order_type (e.g. "shop" or "ticket")
+     - items / line_items
+     - addresses (for shop deliveries)
+     - fees & safego_commission_amount
+     - merchant_earnings_amount
+     - payment_method, payment_gateway, payment_status, payment_reference, currency, paid_at
+     - timestamps: created_at, updated_at, completed_at
+     - rating & feedback fields (customer_rating, customer_feedback)
+
+8) Commission & payout rules (must apply to new modules too):
+
+   1. If customer pays CASH:
+      - Merchant (Restaurant or Shop) receives all cash.
+      - SafeGo commission becomes negative balance in merchant_wallet (restaurant_wallet or shop_wallet).
+      - Merchant must settle later; Admin can mark settled.
+
+   2. If payment is ONLINE:
+      - SafeGo keeps its commission automatically.
+      - Merchant wallet only shows their net earnings (no new negative balance for that order).
+
+   3. For ride drivers:
+      - Existing rules stay unchanged (driver_wallet_balance negative for cash; online = commission auto-kept).
+
+   Apply these exact rules to:
+   - shop_orders (shop_wallet_balance)
+   - ticket_bookings (ticket_partner_wallet), but note: many tickets may be online-only; negative-balance logic for CASH must still be available but disabled where cash is not allowed.
+
+   In US, for now:
+   - Cash is disabled (US customers must pay online via Stripe).
+   - This applies to shop_orders_US and ticket_bookings_US too.
+
+9) Security rules:
+   - Customers cannot view other customers’ KYC or merchant documents.
+   - Drivers cannot view customer NID or sensitive KYC.
+   - Restaurants cannot see other restaurants; shops cannot see other shops; ticket partners cannot see other ticket partners.
+   - Only Admin can:
+     - change pricing, commission
+     - approve/reject KYC
+     - block/unblock users
+   - Users can update only their own profile.
+   - Payment secrets live only in environment/config, never exposed.
+
+10) Status flows (must still be used and extended):
+
+   Rides:
+   - requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_*
+
+   Food orders:
+   - placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_*
+
+   Parcel deliveries:
+   - requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_*
+
+   For new collections, reuse and adapt these patterns instead of inventing entirely new status shapes.
+
+11) Notifications:
+   - New ride alert for driver (already exists).
+   - Order updates (food, parcel) – keep working.
+   - For this task, add:
+     - New shop order notifications (to shop partner + assigned driver if using delivery).
+     - New ticket booking notifications to ticket partners (and optionally to customer).
+   - Payment success/failure messages must work for shop_orders and ticket_bookings.
+   - Verification approval/rejection messages must work for new partners.
+
+12) Architecture:
+   - Single shared backend with all business logic.
+   - Frontends (customer apps, partner dashboards, landing pages) must call backend APIs only.
+   - Landing/marketing pages cannot contain pricing/commission logic.
+
+13) Security roadmap phase:
+   This is an “Expansion of Merchant Services” phase:
+   - Reuse all existing authentication, KYC, and payment security.
+   - Ensure new partner types use same verification guards (cannot operate before verified).
+
+────────────────────────────────
+TASK SCOPE: SHOP PARTNER & TICKET PARTNER MODULES
+────────────────────────────────
+
+A) DATA MODEL – NON-BREAKING EXTENSIONS
+────────────────────────────────
+1. Add new partner types to the partner/merchant model:
+   - kind: "restaurant" | "shop_partner" | "ticket_partner"
+   - Any existing enums must be extended, not changed.
+
+2. New collections:
+
+   a) shop_orders
+      - Fields (add at minimum):
+        - id
+        - customer_id
+        - shop_partner_id (merchant_id)
+        - optional driver_id (for delivery fulfillment)
+        - country ("BD" | "US")
+        - items: array of { product_id, name, quantity, unit_price, total_price }
+        - subtotal_amount
+        - delivery_fee_amount
+        - service_fee_amount
+        - safego_commission_amount
+        - merchant_earnings_amount
+        - payment_method, payment_gateway, payment_status, payment_reference, currency, paid_at
+        - delivery_address, delivery_lat, delivery_lng
+        - status:
+          - placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+          - or cancelled_* variants
+        - timestamps: created_at, updated_at, completed_at
+        - rating fields.
+
+   b) ticket_bookings
+      - Fields (at minimum):
+        - id
+        - customer_id
+        - ticket_partner_id (merchant_id)
+        - country ("BD" | "US")
+        - ticket_type ("bus" | "train" | "launch" | "flight" | "event" | "movie" | ...)
+        - route_or_event_id
+        - seat_info (optional)
+        - travel_or_event_datetime
+        - quantity
+        - total_amount
+        - safego_commission_amount
+        - partner_earnings_amount
+        - payment_method, payment_gateway, payment_status, payment_reference, currency, paid_at
+        - status:
+          - booked → confirmed → completed
+          - or cancelled_* variants
+        - timestamps: created_at, updated_at, completed_at
+        - rating fields.
+
+   - Migrations:
+     - No existing data may be broken.
+     - Create new collections with proper indexes but no destructive changes.
+
+B) ONBOARDING FLOWS (SHOP & TICKET PARTNERS)
+────────────────────────────────
+1. Shop Partner Onboarding
+   - Multi-step flow under an authenticated customer account (partner mode).
+   - Steps:
+     1) Basic business info (shop name, category, contact phone/email).
+     2) Business address, service area, and country-specific options:
+        - BD: district, thana, area.
+        - US: state, city, ZIP.
+     3) KYC upload (reuse merchant KYC model from restaurant).
+     4) Emergency/support contact.
+   - After submit:
+     - verification_status = "pending"
+     - Admin must approve; until then partner cannot publish products or receive orders.
+
+2. Ticket Partner Onboarding
+   - Same structure but with ticket-specific fields:
+     - operator_name (e.g., bus company, event organizer)
+     - ticket_types supported
+     - routes or venues.
+
+   - Same KYC + approval rules as above.
+
+3. Admin views:
+   - Add read/write sections for:
+     - Shop Partners list + details + KYC review
+     - Ticket Partners list + details + KYC review
+   - Admin must be able to:
+     - change verification_status
+     - set rejection_reason
+     - block/unblock partner.
+
+C) SHOP ORDER FLOW (CUSTOMER SIDE & PARTNER SIDE)
+────────────────────────────────
+1. Customer:
+   - Endpoints (or extend existing ones):
+     - GET /api/shop/catalog (list shops & products, country-filtered)
+     - POST /api/shop/orders (create a new shop order)
+   - Logic:
+     - Validate partner is verified and active.
+     - Calculate totals & commission.
+     - BD:
+       - Allow cash + SSLCommerz online.
+     - US:
+       - Online-only via Stripe.
+
+2. Shop Partner:
+   - Dashboard:
+     - View incoming orders (status: placed).
+     - Accept or reject:
+       - POST /api/shop/orders/{id}/accept
+       - POST /api/shop/orders/{id}/reject
+     - After accept:
+       - Prepare → mark as ready_for_pickup.
+     - If delivery enabled:
+       - Trigger parcel/driver assignment using existing delivery engine.
+
+3. Integration with deliveries:
+   - When shop order requires delivery:
+     - Create a linked delivery record referencing shop_order_id.
+     - Use the existing parcel/driver matching flow.
+   - Keep ride/parcel logic untouched; only add optional linkage to shop_orders.
+
+4. Payment & commission:
+   - For cash:
+     - shop gets full cash.
+     - safego_commission_amount added as negative to shop_wallet_balance.
+   - For online:
+     - safego_commission_amount retained by SafeGo.
+     - net amount added to shop_wallet_balance.
+
+D) TICKET BOOKING FLOW
+────────────────────────────────
+1. Customer:
+   - Endpoints:
+     - GET /api/tickets/routes-or-events
+     - POST /api/tickets/book
+   - Behavior:
+     - Validate partner is verified and active.
+     - Compute total_amount and commission.
+     - BD:
+       - Cash allowed (future physical outlet pickup).
+     - US:
+       - Online-only (Stripe).
+
+2. Ticket Partner:
+   - Dashboard:
+     - View bookings (booked/pending).
+     - Confirm or cancel:
+       - POST /api/tickets/{id}/confirm
+       - POST /api/tickets/{id}/cancel
+   - Completed bookings:
+     - status = "completed"
+     - tickets assumed delivered electronically (no deliveries link required for now).
+
+3. Payments:
+   - Online:
+     - Stripe/SSLCommerz integration reused.
+   - Cash (where allowed, e.g., BD offline payment later):
+     - commission recorded as negative ticket_partner_wallet balance.
+
+E) ADMIN PANEL EXTENSIONS (READ + BASIC ACTIONS)
+────────────────────────────────
+1. New Admin pages:
+   - Shop Orders:
+     - Filter by date, partner, country, status, payment_status.
+   - Ticket Bookings:
+     - Same style of filters.
+   - Wallet summary per merchant type:
+     - restaurant_wallet_balance
+     - shop_wallet_balance
+     - ticket_partner_wallet_balance
+     - negative balances for cash orders.
+
+   Actions:
+   - Only settlement/payout marking and blocking/unblocking partners.
+   - Do NOT change commission formulas here.
+
+F) SECURITY & PRIVACY ENFORCEMENT
+────────────────────────────────
+- Ensure all new APIs are properly authenticated and authorized:
+  - Customers can only see their own orders/bookings.
+  - Shop/Ticket partners see only their own data.
+  - Drivers see only delivery-related info they need.
+  - Admin has full read/write control.
+- Reuse existing middleware and permission checks wherever possible.
+
+G) NON-BREAKING IMPLEMENTATION REQUIREMENTS
+────────────────────────────────
+- Do NOT rename or remove:
+  - existing collections (rides, food_orders, deliveries)
+  - any existing fields
+  - any existing routes or React pages.
+- Only ADD:
+  - new collections: shop_orders, ticket_bookings
+  - new partner kinds: shop_partner, ticket_partner
+  - new APIs under /api/shop/... and /api/tickets/...
+  - new admin pages and partner dashboards.
+- Keep Bangladesh and US payment integrations (SSLCommerz, Stripe) fully working and unchanged.
+
+H) DELIVERABLES
+────────────────────────────────
+At the end, provide:
+
+1. A concise summary of:
+   - New collections (schemas) and how they relate to existing rides/food_orders/deliveries.
+   - All new/updated endpoints for:
+     - Shop orders
+     - Ticket bookings
+     - Admin management.
+
+2. A manual test plan:
+   - BD shop order with cash.
+   - BD shop order with SSLCommerz.
+   - US shop order with Stripe.
+   - BD ticket booking with (stubbed) cash or online.
+   - US ticket booking with Stripe.
+   - Admin KYC approval for shop/ticket partners.
+   - Wallet/commission behavior.
+
+3. A list of files/modules changed or created and why each change is guaranteed to be backward-compatible with existing SafeGo features.

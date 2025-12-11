@@ -1,0 +1,99 @@
+You fixed most of the D1 image and account issues, but one critical bug remains on the driver side.
+
+Context:
+- App: SafeGo (multi-role: customer, driver, restaurant, admin)
+- Environment: This is the DRIVER web app, logged in as a driver.
+- Page: /driver/account/manage and /driver/kyc-documents
+- Recent work: You already fixed:
+  - Driver account settings mutations (name, address, etc.) that were throwing "Cannot read properties of null (reading 'json')" by normalizing API response handling.
+  - KYC document uploads for driver documents on /driver/kyc-documents (license, insurance, vehicle docs).
+- KYC document uploads are now working.
+- However, driver profile photo uploads still fail from the Manage Account flow.
+
+Current bug (high priority):
+- On /driver/account/manage:
+  - When the driver clicks "Change Photo" and selects an image, the upload fails.
+  - The toast shows: "Failed to upload photo – Access token required".
+- On /driver/kyc-documents:
+  - All required KYC documents upload successfully after your previous fixes.
+  - Only the **profile photo** upload is failing with "Access token required".
+
+What this strongly suggests:
+- The KYC document upload endpoints are correctly wired to the current driver auth/session model.
+- The **Manage Account → Profile Photo** upload is still using an older or inconsistent pattern:
+  - Possibly expecting a separate "access token" field in the multipart/form-data.
+  - Or not sending the proper Authorization/cookie to the backend.
+  - Or calling a different upload endpoint with outdated auth middleware.
+
+Your tasks:
+
+1. Locate the driver profile photo upload flow
+   - Frontend files to inspect (paths approximate, adjust to actual structure):
+     - `client/src/pages/driver/account/manage.tsx`
+     - Any shared upload utilities used by the driver manage-account page (for example: `client/src/utils/upload.ts`, `client/src/components/common/ImageUpload.tsx`, etc.).
+   - Backend files to inspect:
+     - `server/middleware/upload.ts`
+     - `server/routes/driver.ts`
+     - Any upload-related controller or service that handles profile photo uploads for drivers.
+   - Also compare with the working driver KYC uploads on `/driver/kyc-documents`:
+     - `client/src/pages/driver/kyc-documents.tsx` (or similar)
+     - Its corresponding backend route(s) that are already working correctly.
+
+2. Unify the auth/authorization handling
+   - Make sure the **profile photo upload** uses the same, current auth model as:
+     - Driver KYC uploads, and
+     - Restaurant uploads (which are already working).
+   - Do NOT require a legacy explicit "access token" field in the multipart body.
+   - The upload endpoint should rely on the normal authenticated driver session (cookie/JWT/standard headers that are already in use elsewhere).
+   - If any upload middleware or route is still checking for a separate access token, remove that requirement and replace it with the standard SafeGo auth used in other authenticated driver endpoints.
+
+3. Normalize API response and error handling
+   - Ensure the profile photo upload endpoint:
+     - Returns a consistent JSON response shape similar to other upload endpoints:
+       - On success: `{ success: true, url: "<publicImageUrl>", ... }`
+       - On failure: `{ success: false, message: "reason here" }` with an appropriate HTTP status.
+   - On the frontend:
+     - The driver manage-account page should:
+       - Interpret the JSON response safely (no assumptions that `response` or `response.json` is non-null).
+       - Show success toast when the upload works.
+       - Show a meaningful error message if the user is not authenticated, the file is too large, or the type is invalid.
+     - IMPORTANT: The frontend must NOT assume a `status` or `json` property on a null response. All network failures should be guarded with null checks, matching the pattern you used to fix the previous `"Cannot read properties of null (reading 'json')"` error.
+
+4. Keep backward compatibility and security
+   - Do not change the working KYC document upload behavior.
+   - Do not break any restaurant upload flows or other driver endpoints.
+   - Respect existing KYC and RBAC rules:
+     - Only the authenticated driver should be able to upload or update their own profile photo.
+     - Ensure ownership checks are enforced server-side (use existing helper functions like `getVerifiedDriverProfile()` if available).
+   - File validation:
+     - Enforce max 5MB.
+     - Restrict to JPG/PNG.
+     - Sanitize filenames and avoid path traversal risks (reuse the existing secure upload middleware you previously configured).
+
+5. Testing requirements
+   - Using the existing driver test account (the one currently logged in in the preview):
+     - Go to `/driver/account/manage`.
+     - Change profile photo with a valid JPG/PNG under 5MB.
+     - Confirm:
+       - No "Access token required" error appears.
+       - The toast shows a success message.
+       - The avatar/profile photo updates on:
+         - The Manage Account page.
+         - The driver dashboard header avatar (if applicable).
+     - Go to `/driver/kyc-documents` and verify:
+       - Existing document uploads still work as before.
+       - If there is a profile photo upload in the KYC section, it must also work without "Access token required".
+   - Test an unauthenticated scenario (if easy to simulate) to confirm:
+     - The endpoint properly returns an unauthorized error with a safe JSON response (no null/undefined crashes), and the UI shows a clean error state.
+
+6. Documentation
+   - Update `replit.md` under the D1 section to clearly document:
+     - The final driver profile photo upload endpoint(s) and request format.
+     - The authentication model used (standard driver auth, no separate access token).
+     - Any important limitations or TODOs deferred to later D1 security-hardening phases.
+
+Acceptance criteria:
+- Driver profile photo upload from `/driver/account/manage` works end-to-end for an authenticated driver.
+- No more "Access token required" or `"Cannot read properties of null (reading 'json')"` errors when updating driver profile information or profile photo.
+- KYC documents and restaurant uploads remain fully functional.
+- All changes are incremental and do NOT introduce breaking changes to other parts of the SafeGo platform.

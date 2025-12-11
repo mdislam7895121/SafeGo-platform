@@ -1,0 +1,135 @@
+You are auditing the backend for the SafeGo platform in this Replit project (ReplitBackend).
+
+Do NOT change any code yet.  
+Do NOT add or remove any endpoints.  
+Your ONLY job is to read the entire backend and produce a precise, structured AUDIT REPORT.
+
+========================================
+A. Map the current backend structure
+========================================
+1. List all REST endpoints with:
+   – HTTP method (GET/POST/PUT/DELETE)
+   – Full route path (e.g. /api/rides, /api/auth/login, /api/admin/drivers)
+   – A one-line description of what each endpoint does
+
+2. List all main data models / entities:
+   – Ride, Driver, User, Admin, Restaurant, Delivery, etc.
+   – For each model, list the important fields (id, status, region, pricing fields, etc.)
+
+3. Identify which endpoints are meant for:
+   – Customer app (ride booking, tracking, trip history)
+   – Driver app (accept trip, start trip, complete trip)
+   – Admin panel (approve KYC, adjust pricing, see analytics)
+   – Other (if any)
+
+========================================
+B. Ride Status & Lifecycle audit
+========================================
+For the RIDE flow (not delivery only):
+
+1. Show the full lifecycle as the backend understands it:
+   – e.g. REQUESTED → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED → CANCELLED
+
+2. For each transition:
+   – Which endpoint changes the status?
+   – What business rules are applied (if any)?
+   – Does it update driver location, ETA, or pricing?
+
+3. Clarify how the backend returns ride status to the client:
+   – Which endpoint is used to poll or fetch status? (e.g. GET /api/rides/:id or /status)
+   – What fields are returned for:
+     * pickup coordinates
+     * dropoff coordinates
+     * driver coordinates
+     * encoded polyline (if any)
+     * total fare and currency
+
+4. Point out any inconsistencies:
+   – Hardcoded values
+   – Missing fields that the frontend will need
+   – Status values that are defined but never used
+
+========================================
+C. Region, currency, and pricing rules
+========================================
+1. Detect where region/country is handled in the backend (US vs BD vs others):
+   – Is there a region field on Ride/User/Driver?
+   – Is there any per-region pricing config?
+
+2. Explain how base fare, distance fare, and time fare are calculated:
+   – Which functions or files contain the pricing logic?
+   – Are any values hardcoded (e.g. USD only, fixed multipliers)?
+
+3. Explain how currency is represented:
+   – Is there a currency code or symbol field?
+   – Can the backend differentiate between “$” and “৳”, or is it only one currency?
+
+4. Highlight all potential problems:
+   – Any assumptions that will break in Bangladesh or multi-country usage
+   – Any mixing of pricing logic inside controllers instead of a central service
+
+========================================
+D. Admin + Auth integration
+========================================
+1. Authentication:
+   – Is there a login/signup flow? Which routes?
+   – What type of auth is used (JWT, sessions, mock, none)?
+   – Are there any middlewares for auth/role checking?
+
+2. Admin:
+   – Which routes are clearly “admin-only”?
+   – Are there endpoints for:
+     * Approving drivers
+     * Approving restaurants
+     * Viewing platform statistics
+     * Adjusting pricing or promotions
+
+3. Security gaps:
+   – Endpoints that should require auth but currently do not
+   – Any sensitive operations that can be called without verification
+
+========================================
+E. Integration with existing SafeGo frontend
+========================================
+Assume the SafeGo HTML Codebase project (another Replit project) is the main landing + customer UI.
+
+1. Identify which backend endpoints should be used by:
+   – /ride booking page (to get price estimates and create rides)
+   – /ride tracking page (to fetch ride status + polyline)
+   – future login/signup pages
+   – admin console (already designed in a separate UI)
+
+2. For each of those flows (Ride booking, Ride tracking, Trip history):
+   – List the exact endpoints and response fields that the frontend will need.
+   – Point out anything missing in the backend that would block a clean integration.
+
+========================================
+F. Output format
+========================================
+Produce the final audit report in this exact structure:
+
+1. BACKEND MAP
+   – Bullet list of all endpoints + their purpose
+   – Bullet list of all main models + key fields
+
+2. RIDE / STATUS / MAP DATA
+   – How ride status works now
+   – How coordinates and polylines are provided
+   – Any missing or inconsistent parts
+
+3. REGION & PRICING
+   – How region and currency are handled
+   – How pricing is calculated
+   – Risks or limitations for multi-country (US + Bangladesh) use
+
+4. ADMIN & AUTH
+   – What exists
+   – What is missing
+   – Where security must be improved
+
+5. INTEGRATION RECOMMENDATIONS
+   – Concrete list: which endpoints the SafeGo landing page (/ride) should call
+   – What changes or additions will be required later (but DO NOT implement them now)
+
+DO NOT edit any source files in this run.  
+Your job is analysis only.

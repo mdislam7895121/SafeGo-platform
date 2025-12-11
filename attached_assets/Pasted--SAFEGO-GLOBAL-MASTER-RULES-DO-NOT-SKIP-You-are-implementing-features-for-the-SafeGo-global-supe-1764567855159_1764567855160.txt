@@ -1,0 +1,360 @@
+[SAFEGO GLOBAL MASTER RULES – DO NOT SKIP]
+
+You are implementing features for the SafeGo global super-app.
+
+A) ROLES (ALWAYS 4 ROLES, NEVER MIX PERMISSIONS)
+1. Customer
+2. Driver
+3. Restaurant (Merchant)
+4. Admin
+
+Each role MUST have:
+- Separate signup requirements
+- Country-specific KYC verification
+- Separate dashboards
+- Separate permissions
+- Separate status flows
+
+No role can access another role’s private area. No “shared” dashboards.
+
+B) GLOBAL APP LOGIC (ALWAYS)
+SafeGo supports these 3 core services in all countries:
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+All backend logic, UI navigation, and DB updates must preserve support for these three services.
+
+C) COUNTRY-SPECIFIC KYC (BD vs US – MANDATORY)
+
+For every signup / profile model, branch logic by country_code: "BD" or "US".
+
+BANGLADESH (BD) REQUIRED FIELDS:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status: "pending" | "approved" | "rejected"
+- is_verified: boolean
+
+UNITED STATES (US) REQUIRED FIELDS:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type (e.g. "state_id", "passport")
+- government_id_last4
+- For drivers only:
+  - driver_license_number
+  - driver_license_image_url
+  - driver_license_expiry
+  - ssn_last4 (optional, nullable)
+- verification_status: "pending" | "approved" | "rejected"
+- is_verified: boolean
+
+D) ADMIN PANEL (ALWAYS PRESENT)
+Admin must be able to:
+- View and verify customers
+- View and verify drivers
+- View and verify restaurants
+- Approve/reject KYC with rejection_reason
+- Block/unblock any user (customer/driver/restaurant)
+- Update pricing, fees, commissions (per service & per country)
+- Manage payouts
+- View driver negative balance
+- View restaurant negative balance
+All of these must remain intact and backward-compatible.
+
+E) CORE COLLECTIONS (MUST EXIST AND BE USED)
+
+1) rides
+- ride_id
+- customer_id
+- driver_id
+- pickup_address, pickup_lat, pickup_lng
+- dropoff_address, dropoff_lat, dropoff_lng
+- service_type (e.g. "SafeGo X", "SafeGo XL", "SafeGo Comfort", "SafeGo Black", etc.)
+- country_code
+- base_fare
+- distance_fare
+- time_fare
+- surge_multiplier
+- safego_commission_amount
+- driver_earnings_amount
+- payment_method ("cash" | "card" | "wallet")
+- transaction_id (nullable for cash)
+- status: requested | searching_driver | accepted | driver_arriving | in_progress | completed | cancelled_by_customer | cancelled_by_driver | cancelled_by_system
+- created_at, updated_at, completed_at
+- customer_rating_for_driver, driver_rating_for_customer (nullable)
+- feedback_text (optional)
+
+2) food_orders
+- order_id
+- customer_id
+- restaurant_id
+- driver_id (nullable until assigned)
+- items[]
+- delivery_address + geolocation
+- restaurant_payout_amount
+- safego_commission_amount
+- payment_method
+- status: placed | accepted | preparing | ready_for_pickup | picked_up | on_the_way | delivered | cancelled_by_customer | cancelled_by_restaurant | cancelled_by_system
+- timestamps, ratings, feedback
+
+3) deliveries (parcels)
+- delivery_id
+- customer_id
+- driver_id
+- pickup_address + geo
+- dropoff_address + geo
+- parcel_type, weight, notes
+- pricing, commission, payment_method
+- status: requested | searching_driver | accepted | picked_up | on_the_way | delivered | cancelled_by_customer | cancelled_by_driver | cancelled_by_system
+- timestamps, ratings, feedback
+
+F) COMMISSION & PAYOUT RULES (MUST NOT CHANGE)
+
+1. If customer pays CASH for a ride:
+   - Driver receives full cash from customer.
+   - SafeGo commission is recorded as a negative balance in driver_wallet_balance.
+   - Driver must settle weekly or on admin-defined schedule.
+
+2. If food order is CASH:
+   - Restaurant receives all cash from customer.
+   - SafeGo commission becomes negative balance in restaurant_wallet.
+
+3. If payment is ONLINE:
+   - SafeGo automatically keeps its commission before paying out.
+
+4. Admin can settle balances and mark them as paid. This must remain available in the admin panel.
+
+G) SECURITY RULES
+
+- Customers cannot see ANY driver documents (NID, license, SSN last4).
+- Drivers cannot view customer NID/government ID details.
+- Restaurants cannot view other restaurants’ data.
+- Only admin can:
+  - change pricing
+  - change commission
+  - change verification_status
+  - block/unblock users
+- Users can only update their own profile fields (except verification flags and admin-only fields).
+
+H) STATUS FLOWS (DO NOT BREAK)
+
+Ride:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+Food:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+
+Parcel:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+I) ONBOARDING (ALL ROLES)
+
+Each user type (customer, driver, restaurant) must have multi-step onboarding:
+1. Basic info
+2. Address
+3. ID/KYC upload (BD vs US rules)
+4. Emergency contact
+5. verification_status = "pending"
+6. Block access to core actions (taking rides, receiving orders, etc.) until admin approves.
+
+J) NOTIFICATIONS (ALWAYS)
+
+- New ride alert for drivers (only if online and allowed for that trip type)
+- Order updates for food delivery
+- Parcel updates
+- Verification approval / rejection (with reason)
+- Important admin notifications (policy changes, payouts, etc.)
+
+All existing SafeGo features must remain: do not rename or remove fields or APIs. Only ADD new fields and UI behavior.
+
+=====================================================================
+TASK: US DRIVER TRIP PREFERENCE CARDS (RIDE TYPES, COMPACT UI)
+=====================================================================
+
+Goal:
+Update the US driver "Trip Preferences" panel so that:
+- It shows the full list of US ride-hailing categories:
+  1) SafeGo X
+  2) SafeGo Comfort
+  3) SafeGo XL
+  4) SafeGo Comfort XL
+  5) SafeGo Black
+  6) SafeGo Black SUV
+  plus any existing US ride types like SafeGo Go, SafeGo Premium, etc.
+- Cards are compact, professional (as per the compact spec).
+- Cards are NOT hard-auto-selected forever. The driver can turn individual trip types ON/OFF.
+- The driver’s choices are persisted in the database and used by the matching engine when assigning rides.
+- BD drivers only see BD-specific services; US-only categories must NOT appear for BD.
+
+Scope:
+- Only change the driver trip preference UI and related driver preference data model.
+- Do NOT break ride assignment, rides collection, status flows, or existing APIs.
+- This change applies to US drivers (country_code = "US"). BD logic remains intact.
+
+1) DATA MODEL (BACKEND)
+
+Extend the driver profile (or driver_settings) model with:
+- allowed_ride_types_us: string[]
+- allowed_ride_types_bd: string[]   // already used or prepared for BD
+- Example enum values for US:
+  - "SAFEGO_GO"
+  - "SAFEGO_X"
+  - "SAFEGO_COMFORT"
+  - "SAFEGO_XL"
+  - "SAFEGO_COMFORT_XL"
+  - "SAFEGO_BLACK"
+  - "SAFEGO_BLACK_SUV"
+  - "SAFEGO_EATS"
+  - "SAFEGO_PET"
+  - "SAFEGO_PARCEL"
+
+Rules:
+- Keep any existing fields (e.g. allowed_services, enabled_services) unchanged for backward compatibility.
+- If such a field already exists, just extend the enum; do NOT rename.
+- When a new US driver finishes onboarding:
+  - set a safe default, e.g. all ride types ON initially:
+    allowed_ride_types_us = [
+      "SAFEGO_X",
+      "SAFEGO_COMFORT",
+      "SAFEGO_XL",
+      "SAFEGO_COMFORT_XL",
+      "SAFEGO_BLACK",
+      "SAFEGO_BLACK_SUV"
+    ]
+  - but allow the driver to change this later.
+
+Matching engine:
+- When assigning a ride, filter drivers by:
+  - driver.country_code == "US"
+  - ride.service_type is in driver.allowed_ride_types_us
+  - driver is online and available
+- Do NOT assign a SafeGo Black ride to a driver who has disabled "SAFEGO_BLACK" in preferences.
+
+2) UI – DRIVER TRIP PREFERENCE PANEL (DESKTOP + MOBILE)
+
+Location:
+- Opened from the left footer “trip selector” button on the driver map screen.
+- Works as a bottom sheet on mobile and a centered panel on desktop.
+- Title: "Trip Preferences"
+
+Cards:
+- Each ride type is represented as a compact card.
+- Use the previously defined COMPACT card spec, with these concrete properties:
+
+  - 3 cards per row on desktop.
+  - 2 cards per row on tablet.
+  - On mobile, 2 cards per row (min width ~140px).
+
+  CARD STYLE:
+  - height: 80–85px
+  - border-radius: 14px
+  - padding: 12px 10px
+  - background: rgba(255,255,255,0.06)
+  - border: 1px solid rgba(255,255,255,0.15)
+  - display: flex; flex-direction: column; align-items: center; justify-content: center;
+  - gap: 6px
+  - entire card clickable (toggle)
+
+  ICON:
+  - 22–24px
+  - generic car icon for X, Comfort, XL, Comfort XL
+  - luxury icon for Black / Black SUV
+  - color: rgba(255,255,255,0.8)
+
+  TITLE TEXT:
+  - e.g. "SafeGo X"
+  - font-size: 13.5px
+  - font-weight: 500
+  - color: #FFFFFF
+  - center aligned
+
+  SELECTED STATE:
+  - background: rgba(62,139,247,0.18)
+  - border: 2px solid #3E8BF7
+  - box-shadow: 0 0 6px rgba(62,139,247,0.55)
+  - icon color: #3E8BF7
+  - title font-weight: 600
+
+  UNSELECTED STATE:
+  - background: rgba(255,255,255,0.04)
+  - border: 1px solid rgba(255,255,255,0.18)
+  - icon color: rgba(255,255,255,0.6)
+  - title opacity: 0.85
+
+  CHECK ICON:
+  - small check at top-right of the card
+  - visible only when selected
+  - size: 14px
+  - do NOT make it the only clickable area; the whole card toggles.
+
+3) INTERACTION LOGIC
+
+- When the panel opens, load current preferences for this driver (country_code == "US") and mark the relevant cards as selected.
+- Tapping/clicking a card toggles ON/OFF:
+  - If it was OFF → add its code to allowed_ride_types_us
+  - If it was ON → remove its code from allowed_ride_types_us
+- Persist changes immediately:
+  - Call driver preferences API (PATCH /driver/preferences or existing equivalent).
+  - If API fails, revert UI state and show a small toast: "Couldn’t update preferences. Please try again."
+- Validation:
+  - At least one ride type must remain enabled.
+  - If the driver tries to deselect the last remaining ride type:
+    - show message: "You must keep at least one trip type on to receive rides."
+    - do NOT allow turning all off.
+
+4) COUNTRY BRANCHING (US vs BD)
+
+- For US drivers (country_code == "US"):
+  - Show only US ride types:
+    - SafeGo X
+    - SafeGo Comfort
+    - SafeGo XL
+    - SafeGo Comfort XL
+    - SafeGo Black
+    - SafeGo Black SUV
+    - plus any US-applicable services like SafeGo Go, SafeGo Premium, SafeGo Pet, SafeGo Eats, SafeGo Parcel.
+- For BD drivers (country_code == "BD"):
+  - Do NOT show Black, Black SUV, Comfort XL, etc. if they are not allowed there.
+  - Instead show BD-specific services (e.g. CNG, Bike, Moto, etc.) using the same card style and same toggle logic, but stored in allowed_ride_types_bd.
+
+5) SAFETY & SECURITY
+
+- This panel does not expose any customer data.
+- It only reads/modifies the current driver’s own preference fields.
+- Ensure that:
+  - A driver cannot modify another driver’s preferences.
+  - Admin can still override driver allowed ride types from the admin panel if business rules require that (without removing driver’s ability to manage within allowed range).
+
+6) BACKWARD-COMPATIBLE IMPLEMENTATION
+
+- Do NOT remove older fields like generic "service_types" if they exist.
+- If old logic used a single boolean "accept_rides", keep it working.
+- Use an adapter:
+  - When reading preferences for ride assignment, prioritize the new allowed_ride_types_us array.
+  - If empty AND old field is present, fall back to the old behavior so existing drivers aren’t broken.
+
+7) TESTING SCENARIOS
+
+Implement and verify:
+- A new US driver sees all applicable ride types ON by default and can switch some off.
+- A driver enables only "SafeGo Black" and "SafeGo Black SUV" and goes online:
+  - Matching engine only gives them Black / Black SUV trips.
+- A driver tries to disable their last remaining ride type:
+  - UI shows error and keeps it ON.
+- BD driver sees BD vehicle types only, with the same card UI and toggle behavior.
+
+=====================================================================
+End of task. Implement the above exactly, keeping all SafeGo global rules intact.
+=====================================================================

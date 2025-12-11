@@ -1,0 +1,209 @@
+You are the SafeGo Super-App Development Agent.
+
+Your task is to REBUILD the entire Signup System in ONE FULL PRODUCTION-READY PASS,
+following ALL SafeGo Master Rules and Bangladesh rules.  
+No partial work. No TODO. No breaking changes.
+
+────────────────────────────────────────────
+[1. WHAT YOU MUST NOT TOUCH OR BREAK]
+────────────────────────────────────────────
+You must NOT modify or delete:
+- User table/collection
+- Any existing role:
+  - customer
+  - driver
+  - restaurant
+  - admin
+  - shop_partner
+  - ticket_operator
+- Any partner dashboards
+- Any BD partner onboarding flows
+- Any ride/food/parcel/shop/ticket/rental status engines
+- Any admin review tools
+
+You may ONLY ADD code or FIX existing faulty routing/logic.
+
+────────────────────────────────────────────
+[2. NEW SIGNUP SYSTEM — TARGET DESIGN]
+────────────────────────────────────────────
+SafeGo Bangladesh will use a modern industry-standard flow:
+
+PUBLIC:
+  /login
+  /signup   → customer-only signup
+
+AFTER LOGIN:
+  /shop-partner/onboarding
+  /ticket-operator/onboarding
+
+All partner roles must attach to logged-in customer accounts only.
+
+────────────────────────────────────────────
+[3. IMPLEMENT NEW /LOGIN PAGE]
+────────────────────────────────────────────
+Fix and ensure:
+
+1) /login must display:
+   - email
+   - password
+   - Login button
+   - error messages (Bangla allowed)
+   - bottom text:
+       “Don’t have an account? Sign up”
+     → MUST navigate to /signup (works on mobile & desktop)
+
+2) This navigation MUST use:
+   Either:
+      <Link href="/signup">  
+   Or:
+      router.push("/signup")
+
+3) No preventDefault, no dead tap-zone, no disabled overlay.
+
+4) After successful login:
+   Redirect by role:
+   - customer → /customer/bd-home (use existing BD customer landing)
+   - shop_partner → onboarding/dashboard as existing logic dictates
+   - ticket_operator → onboarding/dashboard as existing logic dictates
+   - admin → admin dashboard
+   - driver / restaurant → existing system behavior
+
+You must NOT replace any partner logic.
+
+────────────────────────────────────────────
+[4. IMPLEMENT NEW /SIGNUP PAGE (Bangladesh Customer Only)]
+────────────────────────────────────────────
+
+This will be a fresh, minimal, modern signup page.
+
+FORM FIELDS:
+  - email
+  - password
+  - confirmPassword
+  - optional: fullName
+
+DEFAULTS (hidden):
+  - country = "BD"
+  - role = "customer" (backend-enforced, not from client)
+
+CLIENT VALIDATION:
+  - email required + valid format
+  - password length ≥ 8
+  - confirmPassword must match
+  - errors in Bangla (follow existing UI style)
+
+ON SUBMIT:
+  POST /api/auth/signup
+  Then redirect to BD customer home.
+
+────────────────────────────────────────────
+[5. BACKEND SIGNUP ENDPOINT — CUSTOMER ONLY]
+────────────────────────────────────────────
+
+You MUST CREATE or FIX:
+
+POST /api/auth/signup
+
+Backend rules:
+
+1) Input:
+   { email, password, fullName? }
+
+2) SECURITY:
+   - Ignore ANY `role` field from client.
+   - role MUST be set server-side = "customer"
+   - country MUST be "BD"
+   - Basic rate limit
+
+3) VALIDATION:
+   - email not empty
+   - valid format
+   - password ≥ 8 chars
+
+4) CHECK DUPLICATE:
+   - If email exists → 400:
+     error: EMAIL_IN_USE
+     message: “এই ইমেইল দিয়ে আগে থেকেই একাউন্ট আছে।”
+
+5) CREATE USER:
+   - role: "customer"
+   - country: "BD"
+   - trust_level: "customer_basic" (if supported)
+   - password_hash
+   - any existing default fields
+
+6) RESPONSE:
+   - JWT/session containing user_id, role, country
+   - Return user object
+
+7) AUDIT LOG:
+   - event: CUSTOMER_SIGNUP_SUCCESS
+   - includes: user_id, country="BD", timestamp
+
+────────────────────────────────────────────
+[6. DO NOT BREAK ANY EXISTING ROLES]
+────────────────────────────────────────────
+
+Ensure:
+- driver, restaurant, shop_partner, ticket_operator, admin roles remain exactly as before.
+- Their dashboards & onboarding flows keep working.
+
+NO ENUM REMOVAL.
+NO SCHEMA DELETIONS.
+NO ROLE COLLAPSE.
+
+────────────────────────────────────────────
+[7. PARTNER ONBOARDING COMPATIBILITY]
+────────────────────────────────────────────
+
+1) A BD customer logs in → sees:
+   - “Become a Shop Partner”
+   - “Become a Ticket Operator”
+
+2) Clicking these routes:
+   - /shop-partner/onboarding
+   - /ticket-operator/onboarding
+   MUST:
+     - require authentication
+     - create/load partner_profile linked to this user_id
+
+3) NEVER create a second user record for partners.
+
+4) All partner onboarding steps (KYC, shop info, routes, logo/banner) must keep working.
+
+────────────────────────────────────────────
+[8. BANGLA UX REQUIREMENTS]
+────────────────────────────────────────────
+
+- All signup error messages should use natural Bangla where BD UI uses Bangla.
+- No raw JSON or stack traces in the frontend.
+
+────────────────────────────────────────────
+[9. MANDATORY END-TO-END TESTING]
+────────────────────────────────────────────
+
+You MUST perform AND PASS all steps:
+
+1) Visit /login → Click Sign Up → MUST open /signup
+2) Create new customer with:
+   email: new user  
+   password: valid
+3) Verify DB entry:
+   role = customer
+   country = BD
+4) Login with this new account → redirect to BD customer home
+5) Start “Become a Shop Partner” → onboarding opens correctly
+6) Ensure NO other role breaks
+7) Admin login still works
+
+Fix ANY bug you encounter UNTIL all pass.
+
+────────────────────────────────────────────
+[10. FINAL OUTPUT]
+────────────────────────────────────────────
+
+When finished, return:
+- FILES updated
+- EXACT changes made (frontend + backend)
+- CONFIRMATION that all E2E tests passed
+- CONFIRMATION no roles were touched or broken

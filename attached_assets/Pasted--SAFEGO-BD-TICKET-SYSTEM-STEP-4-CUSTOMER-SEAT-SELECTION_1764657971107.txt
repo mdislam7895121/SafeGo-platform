@@ -1,0 +1,116 @@
+# SAFEGO BD TICKET SYSTEM — STEP 4: CUSTOMER SEAT SELECTION UI
+# Follow ALL SafeGo master rules. BD-only. No US impact.
+# Do NOT break any existing modules.
+
+===========================================================
+A) PURPOSE
+===========================================================
+Build the full Customer “Seat Selection” interface for the BD Ticket system.
+This must integrate with:
+- Operator-created schedules from Step 2
+- Customer search results from Step 3
+- Bus seat layout types (2x2, 2x1, Sleeper, etc.)
+- Demo mode AND real mode
+
+This page is where the customer chooses seats and proceeds to checkout.
+
+===========================================================
+B) ROUTE & FILE STRUCTURE
+===========================================================
+Page route:
+  /tickets/bd/seat-select?tripId=XYZ
+
+Files to create/update:
+- client/src/modules/tickets/bd/SeatSelect.tsx
+- client/src/components/bd-ticket/SeatMap.tsx
+- client/src/components/bd-ticket/TripSummaryCard.tsx
+
+Must stay additive and non-breaking.
+
+===========================================================
+C) HEADER SUMMARY (BANGLA)
+===========================================================
+Show a top summary card:
+
+- “যাত্রাপথ:” → <from_city> → <to_city>
+- “তারিখ:” → Bangla formatted date
+- “সময়:” → Bangla formatted time
+- Operator name + logo
+- Bus type badge (AC / Non-AC / VIP / Sleeper)
+- Thumbnail bus image (from demo dataset or real bus image)
+- Fare per seat (Bangla)
+- Available seats count
+
+Bangladeshi users rely heavily on visuals → bus image MUST appear.
+
+===========================================================
+D) SEAT MAP ENGINE
+===========================================================
+Seat layout sources:
+- taken from schedule.bus.seat_layout
+  Allowed values:
+  - "2x2"
+  - "2x1"
+  - "Sleeper_1x1"
+  - "DoubleDeck_Upper"
+  - "DoubleDeck_Lower"
+
+Render grid:
+- 2x2 → 4 seats per row, aisle in middle
+- 2x1 → 3 seats per row
+- Sleeper → individual bed boxes
+- Double deck → future-ready but show one deck for now
+
+Seat states:
+- available  (default color)
+- selected   (highlight)
+- booked     (greyed or disabled)
+
+Include a clear Bangla legend:
+- “খালি”
+- “নির্বাচিত”
+- “বুকড”
+
+Demo mode:
+- Pre-mark some seats as booked (e.g., first 4 seats) for realism.
+
+===========================================================
+E) INTERACTION LOGIC
+===========================================================
+- Clicking an available seat toggles selected state.
+- Update selected seat list instantly.
+- Update total fare:
+  total = selectedSeats.length * farePerSeat
+
+Disable checkout button if no seat selected.
+
+===========================================================
+F) CHECKOUT NAVIGATION
+===========================================================
+Button text:
+  “চেকআউটে যান”
+
+Navigate to:
+  /tickets/bd/checkout?tripId=XYZ&seats=1A,1B,...
+
+Do NOT build checkout here; only pass correct data.
+
+===========================================================
+G) SAFEGO SECURITY RULES
+===========================================================
+- Do NOT show operator documents.
+- Do NOT expose internal operator data.
+- Customer must only see:
+  route + date + time + bus type + operator name + seat info.
+
+===========================================================
+H) MUST SUPPORT DEMO MODE
+===========================================================
+If BD_TICKET_DEMO_MODE is true:
+- Use demo schedules and demo seat maps.
+- Simulate booked seats.
+- Everything else same UI + logic.
+
+===========================================================
+END OF TASK
+===========================================================

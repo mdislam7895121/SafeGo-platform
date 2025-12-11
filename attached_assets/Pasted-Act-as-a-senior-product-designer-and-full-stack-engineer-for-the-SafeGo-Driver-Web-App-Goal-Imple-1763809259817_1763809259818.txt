@@ -1,0 +1,181 @@
+Act as a senior product designer and full-stack engineer for the SafeGo Driver Web App.
+
+Goal: Implement the SafeGo Driver Public Profile page and loyalty layout, mirroring Uber’s “Profile / View public profile” experience, using our existing SafeGo Points tier system (Blue, Gold, Premium).
+
+Follow all existing SafeGo conventions and rules:
+- Four roles: customer, driver, restaurant, admin
+- Do not touch ride, food, or parcel flows
+- Do not break any existing URLs, KYC, payouts, tax, or document logic
+- Keep all security rules: drivers can see only their own sensitive data; riders see only allowed public info
+- No emojis, no playful labels in the UI text
+
+====================================================
+1) ENTRY POINT: DRIVER PROFILE HEADER
+====================================================
+
+Current: /driver/profile shows the driver avatar and full name.
+
+Update this page as follows:
+1. Under the avatar + full name row, add a secondary button:
+
+   Label: “View public profile”
+   Route: navigates to /driver/profile/public (new page described below)
+
+2. This button is visible only to the logged-in driver (not a public URL listing).
+3. Leave the existing profile header styling, spacing, and typography intact.
+
+====================================================
+2) SAFEGO DRIVER PUBLIC PROFILE PAGE
+   Route: /driver/profile/public
+====================================================
+
+Overall layout:
+- Mobile-first, single-column layout similar to Uber’s public profile
+- Dark or light theme should both work with the same structure
+- White / neutral background cards, clear typography, no extra decorations
+
+Sections (top to bottom):
+
+A) Profile Hero
+----------------
+- Title at top: “Profile”
+- Hero card with:
+  - Large circular avatar
+  - Driver full name (from existing profile)
+  - Tier badge pill below the name, centered
+
+Tier badge behavior:
+- Read the driver’s tier from the existing SafeGo Points / loyalty logic.
+  We already defined tiers:
+    - Blue: 0 – 999 points
+    - Gold: 1500 – 2499 points
+    - Premium: 2500+ points
+- Show a pill button with the label matching the tier:
+    - “Blue”
+    - “Gold”
+    - “Premium”
+- This pill should be clickable and navigate to the SafeGo Points / loyalty page
+  (existing SafeGo Points route). Use the existing route; do not create a new one.
+- The hero card must not show email, phone, NID, SSN, or any internal IDs.
+
+B) About Driver (optional but recommended)
+------------------------------------------
+Simple text block under the hero card:
+- Heading: “About”
+- Fields (read-only, all optional and only if available in the profile model):
+  - City and country (e.g., “New York, US”)
+  - Languages (e.g., “Speaks Bangla and English”)
+  - “Trips with SafeGo” summary like: “14878 trips over 4.5 years”
+- This is for display only in this phase; editing stays in Account Settings.
+
+C) Compliments Section
+------------------------
+Goal: Show rider compliments in a simple, Uber-style way.
+
+Structure:
+- Heading: “Compliments”
+- Right side text button: “View all” (for now can scroll or link to /driver/profile/compliments if we already have it; otherwise use a placeholder route with a TODO comment)
+- Below heading: a horizontal scroll row or responsive grid of compliment badges.
+
+Data model:
+- Use or create a compliment entity with:
+  - id
+  - title (string)
+  - iconKey or type (to map to an illustration)
+  - count (integer, number of times received)
+
+Seed at least these compliment types:
+- Excellent Service
+- Late Night Hero
+- Great Conversation
+- Expert Navigation
+- Neat and Tidy
+- Great Amenities
+- Above and Beyond
+
+Display rules:
+- Show up to 4 compliment badges on the main profile page.
+- Each badge shows:
+  - Illustration / icon placeholder
+  - Title
+  - Small count indicator (for example “4” above or near the badge)
+- If there are no compliments yet, show an empty state:
+  - Title: “Compliments”
+  - Body: “You have not received any compliments yet. Keep driving safely and providing great service.”
+
+D) Achievements Section
+------------------------
+Goal: Show lifetime stats and loyalty style highlights.
+
+Structure:
+- Heading: “Achievements”
+- Use simple cards similar to Uber’s “Lifetime highlights”.
+
+At minimum create:
+1) Total Trips card
+   - Title: “Total trips”
+   - Value: pull from existing trip count model
+
+2) Years with SafeGo card
+   - Title: “Journey with SafeGo”
+   - Value: derive years and months from driver account creation date, formatted like “4 yr 10 mo”
+
+3) Five-Star Trips card (if we have rating breakdown)
+   - Title: “Five-star trips”
+   - Value: number of trips with 5-star rating, or a placeholder until data exists
+
+If some data does not exist yet, keep the card but show a neutral placeholder “Coming soon” in the value.
+
+====================================================
+3) PRIVACY AND SECURITY RULES
+====================================================
+
+Enforce the following:
+1. The public profile page must never show:
+   - NID number
+   - SSN or last four digits
+   - Phone number
+   - Email address
+   - Bank or payout details
+2. It may show:
+   - First and last name
+   - Profile photo
+   - City and country
+   - Rating
+   - Trips and years with SafeGo
+   - Tier name (Blue, Gold, Premium)
+3. All driver compliments and achievements are visible only to:
+   - The driver themself inside the web app
+   - Future optional rider-facing views, but those must be added later; do not implement now.
+
+====================================================
+4) IMPLEMENTATION DETAILS
+====================================================
+
+Routing:
+- Add /driver/profile/public route, wrapped with the same driver layout and auth guard as /driver/profile.
+- Ensure “View public profile” button on /driver/profile navigates correctly to this new route.
+
+Components:
+- Create a reusable PublicProfilePage component under the existing driver pages folder.
+- Use shared UI primitives consistent with the rest of SafeGo (buttons, cards, typography).
+- Make the page responsive and tested for mobile viewport first.
+
+Data:
+- Reuse existing driver / profile API to fetch:
+  - avatar
+  - name
+  - rating
+  - trips count
+  - account creation date
+  - SafeGo Points or tier value
+- If compliments or achievements data does not exist yet, stub them with mock data in a clearly marked placeholder function, so we can later plug in the real API without changing the UI.
+
+Testing:
+- Verify that:
+  - The “View public profile” button appears under the driver avatar on /driver/profile.
+  - Clicking it opens the new /driver/profile/public page.
+  - The tier pill correctly updates when the driver’s SafeGo Points tier changes (Blue, Gold, Premium).
+  - Sensitive data is never shown on the public profile page.
+
+Please implement all of the above in one complete iteration, keep the code clean and idiomatic, and then summarize what you changed, including file names and routes.

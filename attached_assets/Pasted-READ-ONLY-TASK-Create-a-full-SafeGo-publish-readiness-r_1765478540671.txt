@@ -1,0 +1,196 @@
+READ-ONLY TASK: Create a full SafeGo publish-readiness report without modifying any code.
+
+Goal:
+Audit the entire SafeGo system (backend + admin + customer/partner apps) and produce a detailed report about what is READY, PARTIAL, or MISSING before we can safely publish the platform.
+
+Hard rules (very important):
+- This is a READ-ONLY task.
+- Do NOT modify, refactor, or delete any code, config, routes, or database schemas.
+- Do NOT change landing pages, dashboards, or business logic.
+- Only read files, environment variables, and existing database models, then write a report.
+
+Output:
+Create a new Markdown report file:
+- docs/publish_readiness_report.md
+
+In that report, check and document the following sections.
+
+1) Roles coverage (Customer, Driver, Restaurant, Admin)
+   For each role, list:
+   - Existing signup / login or onboarding flows
+   - Country-specific KYC handling (BD vs US)
+   - Dashboards / pages that exist
+   - Permissions and restrictions (what each role can see/do)
+   - Status flows they interact with
+   Mark each role as: READY, PARTIAL, or MISSING for BD and US separately.
+
+2) Services coverage (Ride, Food, Parcel) + BD shop & ticket
+   For each service:
+   - Confirm routes, controllers, and UI exist for:
+     - Customer booking / ordering
+     - Driver or courier flow (where applicable)
+     - Restaurant / merchant management (for food)
+   - Confirm that BD and US rules are respected (e.g., BD + US ride-hailing, BD-only shop/ticket).
+   Mark: READY / PARTIAL / MISSING per country (BD, US).
+
+3) Country-specific KYC rules (BD vs US)
+   Confirm in code and database models that:
+
+   Bangladesh (BD) requires:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID (number + front/back images)
+   - emergency contact details
+   - verification_status + is_verified
+
+   United States (US) requires:
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - (drivers) driver license + image + expiry
+   - (drivers) ssn_last4 (optional)
+   - verification_status + is_verified
+
+   For each role and country, state whether these fields and flows are:
+   READY / PARTIAL / MISSING.
+
+4) Admin panel capabilities
+   In the code and routes, verify Admin can:
+   - Verify customers, drivers, restaurants
+   - Approve/reject KYC with rejection_reason
+   - Update pricing, fees, commissions
+   - Block/unblock any user
+   - Manage payouts and settlements
+   - View driver negative balance
+   - View restaurant negative balance
+   For each item, mark READY / PARTIAL / MISSING and point to the relevant files/routes.
+
+5) Core collections: rides, food_orders, deliveries
+   For each collection (and any related ORM models), confirm they include:
+   - Identity fields (customer_id, driver_id, restaurant_id where relevant)
+   - Addresses + geolocation
+   - Fees + commission fields
+   - Payment details (cash vs online, gateway references, transaction IDs)
+   - Timestamps (created_at, updated_at, status history)
+   - Status flow fields
+   - Rating and feedback fields
+
+   Document the exact model names and files, and mark each collection as:
+   READY / PARTIAL / MISSING.
+
+6) Commission & payout rules
+   Verify in code that the following rules are implemented:
+
+   - If customer pays CASH (rides/parcel):
+     - Driver receives full cash
+     - SafeGo commission becomes negative balance in driver_wallet_balance
+     - Driver must settle weekly
+
+   - If food order is CASH:
+     - Restaurant gets all cash
+     - Commission becomes negative balance in restaurant_wallet
+
+   - If payment is ONLINE:
+     - SafeGo keeps commission automatically
+
+   - Admin can settle balances and mark paid.
+
+   For each service (ride/food/parcel, BD & US), describe where this logic lives and whether it is:
+   READY / PARTIAL / MISSING.
+
+7) Security & privacy rules
+   Check the codebase for enforcement that:
+   - Customers cannot view driver documents (NID, license, etc.)
+   - Drivers cannot view customer NID or other sensitive info
+   - Restaurants cannot view other restaurants’ data
+   - Only admin can change pricing, commissions, verification, and blocking
+   - Users can update only their own profile
+
+   For each rule, document:
+   - How it is enforced (middleware, policy, checks)
+   - Any gaps or TODOs
+   Mark: READY / PARTIAL / MISSING.
+
+8) Status flows
+
+   Ride statuses:
+   - requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+   Food statuses:
+   - placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+   Parcel statuses:
+   - requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+   For each flow:
+   - Confirm the statuses exist in models/enums
+   - Confirm there are API endpoints or handlers for each transition
+   - Confirm admin/customer/driver views show these states
+   Mark each flow per country as: READY / PARTIAL / MISSING.
+
+9) Onboarding flows
+   For each role (customer, driver, restaurant, admin helpers where relevant):
+   - Confirm multi-step onboarding:
+     - Basic info
+     - Address
+     - ID/KYC upload (country-specific)
+     - Emergency contact
+     - verification_status = "pending"
+   - Confirm access is blocked until approved by admin.
+   Mark per-role and per-country: READY / PARTIAL / MISSING.
+
+10) Notifications
+   Verify that the system has notification mechanisms (email, in-app, etc.) for:
+   - New ride alert for driver
+   - Order updates (food)
+   - Parcel updates
+   - Verification approval/rejection
+   - Important admin notifications
+
+   For each type, document:
+   - Implementation (which services/files)
+   - Channel (email, in-app, SMS if any)
+   - Status: READY / PARTIAL / MISSING.
+
+11) Payment gateways & environments
+   Confirm configuration for:
+
+   - Bangladesh:
+     - SSLCommerz sandbox credentials (store ID, password)
+     - Callback URLs for success/fail/cancel/IPN
+     - Feature flags:
+       - SSLcommerz sandbox vs production
+       - Feature flag enabling BD online payments
+
+   - United States:
+     - Stripe integration (sandbox/test mode)
+     - Webhook endpoints and secret keys
+     - Admin configuration pages for US online payments
+
+   For each gateway and country, mark:
+   - Sandbox READY? (yes/no)
+   - Production-ready? (yes/no, list missing items)
+
+12) Final publish-readiness summary
+   At the end of docs/publish_readiness_report.md, include a concise summary:
+
+   - For Bangladesh:
+     - Which services (ride, food, parcel, shop, ticket) are READY for a limited beta?
+     - What exact items MUST be completed before a public launch?
+   - For United States:
+     - Which parts are not yet safe to publish?
+     - Critical missing items that block launch.
+
+   Use clear categories:
+   - READY FOR BETA
+   - NEEDS WORK BEFORE BETA
+   - NOT IMPLEMENTED
+
+Important:
+- Do NOT change any code while doing this audit.
+- If you see a bug or missing feature, only document it in the report; do not “fix” it in this task.
+- When finished, tell me where the report file is and summarize the top 10 critical gaps for launch.

@@ -1,0 +1,170 @@
+You are the architect + implementer for the SafeGo customer web app.
+
+Follow ALL existing SafeGo global rules:
+- Four roles: customer, driver, restaurant, admin.
+- Customer can only see their own data; never see driver earnings or any internal admin data.
+- KYC / verification logic must stay intact (US + BD rules already in code).
+- Keep all security rules, visibilityRules.ts, ProtectedRoute, auth tokens, and Zod validation where it already exists. Do not weaken any security.
+
+SCOPE FOR THIS LOOP
+- Focus ONLY on the CUSTOMER web app (SafeGo Ride, Eats, Parcel, Profile, Wallet, Support).
+- Goal: Everything the customer can see in the UI must become fully usable (no dummy buttons, no dead links, no blank webviews).
+- Do NOT add brand-new features or flows that are not already visible in the UI. First, finish and fix what already exists.
+
+BEFORE YOU CHANGE ANYTHING
+1. Re-scan the codebase and the latest status report you generated (the big table with sections: SafeGo Ride – Customer, SafeGo Eats – Customer, SafeGo Parcel – Customer, Shared Components, Security/UX, and the PROPOSED NEXT TASKS list).
+2. List all current CUSTOMER routes and screens and keep this list in memory:
+   - /customer
+   - /customer/book or /customer/booking (whichever you actually use)
+   - /customer/profile
+   - /customer/activity
+   - /customer/wallet
+   - /customer/support
+   - Any ride-status / live-map / trip-receipt / rating / order-confirmation / food-order / parcel-request routes you find.
+3. For each route, open it in desktop preview AND mobile preview and note:
+   - Does the page load or show a blank webview?
+   - Do all main buttons, tabs, and links actually do something?
+   - Are there console errors or React warnings?
+
+Fix routing / blank page issues FIRST:
+4. Fix any 404 or blank screen issues for customer pages:
+   - If there is a mismatch like /customer/book vs /customer/booking, normalize it.
+   - Ensure the router has entries for all customer pages that the UI links to.
+   - After fixing, confirm that /customer and every customer sub-route renders a valid screen in both desktop and mobile preview with NO blank webview.
+
+LOCATION + BOOKING FLOW (RIDE)
+5. Make location detection and address inputs behave like Uber, using what you already built:
+   - Pickup: auto-fill from GPS using useCustomerLocation() with a timeout fallback.
+   - Dropoff: Google Places Autocomplete suggestions must appear as the user types, both on desktop and mobile.
+   - The “swap pickup/dropoff” button must work.
+   - Previously saved “Home / Work / Favorites” from the profile must be selectable as quick destinations.
+   - Verify this on a real device preview: when you open /customer/book, your current location should auto-fill in pickup (when browser location is allowed).
+
+6. Verify the full ride booking flow end-to-end:
+   - Enter pickup/dropoff.
+   - See route options (3 routes with distance and time).
+   - Select a route.
+   - See pricing categories and estimated fare.
+   - Confirm booking.
+   - Get driver assigned and see “Your driver is on the way” state.
+
+If any step is broken, fix it without removing existing functionality.
+
+LIVE DRIVER TRACKING + ETA (RIDE)
+7. Make live driver tracking and ETA feel realistic and consistent:
+   - Use ONE source of truth for the active polyline/route the driver follows.
+   - The driver marker must move along the route toward the customer or toward the dropoff depending on phase (toPickup vs toDropoff). It must NOT go in the opposite direction.
+   - The marker (car icon) must rotate according to the heading/bearing of the movement, not snap randomly.
+   - The pickup ETA “Pickup in X min” must be based on the route distance and realistic average traffic speed (use a reasonable formula or Mapbox/OSRM data if available, but absolutely no random numbers).
+   - The “Speed” displayed must be derived from distance over time in the simulation (and respect a safe speed range for NYC; do not hardcode unrealistic 65 mph in dense city routes).
+   - When the driver reaches pickup, the state should transition to “On trip” and the map should now track the segment from pickup to dropoff.
+   - When the trip is completed, tracking should stop, and we move to the receipt / rating flow.
+
+TRIP RECEIPT + RATING (RIDE)
+8. Keep Step 1 and Step 2 that are already approved, but test them from a real booking:
+   - After trip completion, show the detailed trip receipt page with:
+     - distance, duration, time, route,
+     - base fare, AVF fees, TLC fees, surge, promo, total.
+   - Ensure all NYC-specific fees (including Accessible Vehicle Fund) are shown in the breakdown and only applied where legally required.
+   - The 5-star rating dialog must auto-open after completion, enforce rating selection, support optional feedback text, and persist the rating correctly.
+   - From the receipt screen, the “View rating” / “Edit rating” (if allowed) must work and show the saved data.
+
+CUSTOMER ↔ SUPPORT + DRIVER CHAT
+9. Fix and complete all chat entry points but keep logic simple and safe:
+   - Entry points must work from:
+     - Active ride card (chat icon).
+     - Completed trip receipt (Need help?).
+     - Profile → Support Center → Contact Support.
+     - Any “Help” button inside Activity/History.
+   - When the user taps any of those:
+     - Open a working chat UI (not a blank webview) on /customer/support or another dedicated route.
+     - Verify account details section is pre-filled (name, masked phone, trip count) and the “Start Chat” button actually opens the chat thread.
+   - Implement a minimal, mocked backend for now:
+     - Messages are stored client-side or via a safe API you already have.
+     - Customer can send messages and see them appended in the thread.
+     - Simulated replies are clearly labeled as “SafeGo Support (demo)”.
+   - Ensure the chat works on both desktop and mobile, and no button stays dead.
+
+PROFILE / PLACES / PREFERENCES
+10. Make the Profile screen fully editable and useful:
+   - “Edit” section must let the user update:
+     - Full name,
+     - Phone,
+     - Date of Birth (with validation),
+     - possibly email (only if it doesn’t break login).
+   - “Addresses & Saved Places”:
+     - Home, Work, and Favorites must open an edit screen with Google Places autocomplete.
+     - Saving must persist and reflect back in the profile and be available as quick shortcuts in the booking screen.
+   - “KYC & Verification”:
+     - Keep the verification status as read-only (approved/pending) using the existing data.
+     - The “Manage” button can open a details view or info dialog, but MUST NOT break the current KYC logic.
+   - “Preferences”:
+     - Language change (for now, keep English (US) as the only implemented option if others are not ready, but the button must not be dead).
+     - Notifications “Manage” must open a simple page where the user can toggle email/push flags that are stored in the customer profile.
+
+11. Make Profile top cards functional:
+   - Payment: open /customer/wallet or a payment methods page.
+   - Places: scroll down / jump to “Addresses & Saved Places” or open a dedicated Places screen.
+   - Safety: open a Safety page (or modal) explaining emergency numbers, trip sharing, and basic policies. Use static, non-sensitive content.
+   - All buttons must do something meaningful and not 404.
+
+WALLET + PAYMENT
+12. On the Wallet / Payment pages:
+   - List existing payment methods (even if mocked).
+   - Allow user to add a new card in a safe way (no actual card processing; use masked storage or a demo token).
+   - Allow marking a default payment method.
+   - Ensure that when a ride is booked, the selected payment method is used for the “Paid with …” section in the receipt (even if the charge is simulated).
+
+ACTIVITY / HISTORY
+13. Make Activity/History fully usable:
+   - Show a list of past trips and orders with:
+     - date/time,
+     - origin/destination,
+     - price and status.
+   - Tapping an item should open its detailed page:
+     - For rides: trip receipt + map + rating + “Contact support about this trip”.
+     - For Eats/Parcel: existing order/parcel detail pages you already have.
+   - No empty placeholders if there is data.
+
+SAFEGO EATS – CUSTOMER (ONLY WHAT EXISTS)
+14. For SafeGo Eats, do NOT build new restaurant logic; only finish what is already visible:
+   - Ensure Restaurant browse/search, details page, menu & item selection all work end-to-end.
+   - Fix “Cart & Checkout” where it is [PARTIAL]:
+     - Items from menu must add to cart.
+     - Cart drawer / Cart page UI must show line items and subtotal.
+     - Checkout button must use the existing order-confirmation flow and show order status updates.
+   - Verify Order Status tracking works (live refresh, badges).
+
+SAFEGO PARCEL – CUSTOMER (ONLY WHAT EXISTS)
+15. For SafeGo Parcel, again only complete what is partially visible:
+   - Parcel request form must use map-based pickup/dropoff address picker (reusing Ride’s address component instead of raw lat/lng).
+   - Add sender/receiver contact fields (name, phone) if this is already in the status table as NOT STARTED/PARTIAL.
+   - Package details (weight, size, category) fields must be validated and stored.
+   - Do NOT attempt complex real-time parcel tracking yet; only fix what is obviously broken in the current UI.
+
+SHARED COMPONENTS + RELIABILITY
+16. Shared components (Header/Navigation, Map, Wallet, Profile, Activity, Payment Methods, Notifications, Support Center) are marked [DONE] in your status table. For each of them:
+   - Re-test in the running app.
+   - Fix any regressions or dead interactions, but do not redesign.
+   - Keep loading/skeleton states and toast error handling consistent.
+
+17. Security, reliability, and UX:
+   - Respect existing validation (Zod schemas) and extend them safely where needed (no silent failures).
+   - Ensure ProtectedRoute and visibility rules still work.
+   - Make sure there are no critical errors in the browser console in typical flows:
+     - Open /customer.
+     - Book a ride, track it, complete it, see receipt, rate driver, contact support.
+     - Open profile, edit details, add Home/Work, open wallet, check activity.
+   - Keep all API calls behind the existing apiRequest wrapper.
+
+WORKFLOW AND CHECKPOINTS
+18. Work in small, safe steps:
+   - After each set of related changes (e.g., routing fixes, booking flow stabilization, live tracking improvements, profile edits, support chat), restart the app, test the full user flow, and then run the architect review.
+   - Only mark a step as complete when it works BOTH on desktop and mobile preview without regressions.
+
+19. At the end, produce a short, concrete status report ONLY for the CUSTOMER web app:
+   - Which routes/pages are now fully working.
+   - Which customer-visible features are fully usable (Ride, Eats, Parcel, Profile, Wallet, Support).
+   - Any remaining limitations that are intentionally left as demo-only.
+
+Start now by fixing the routing/blank-screen problem on /customer and sub-routes, then stabilize the ride booking + live tracking + receipt + rating + support flows, and only after that, finish the remaining customer features as described above.

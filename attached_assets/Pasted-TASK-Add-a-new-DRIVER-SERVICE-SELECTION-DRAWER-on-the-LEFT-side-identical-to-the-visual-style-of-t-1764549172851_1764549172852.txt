@@ -1,0 +1,140 @@
+TASK: Add a new DRIVER SERVICE SELECTION DRAWER on the LEFT side, identical to the visual style of the reference grid (Comfort, UberX, Uber Pet style cards). Map and footer must remain unchanged.
+
+========================
+1. LEFT DRAWER ACTIVATION
+========================
+- Footer left icon opens this drawer.
+- Drawer slides from LEFT (mobile + desktop).
+- Title: “Your Active Services”.
+- Background: #000000 or dark mode container (same style as screenshot).
+
+========================
+2. GRID UI (MUST MATCH REFERENCE EXACTLY)
+========================
+Each service displayed as:
+- A large rounded-rectangle card
+- Dark background (#101010 to #181818)
+- Thin light outline when OFF
+- Bright white outline + white checkmark when ON
+- Icon (person/car/motor/pet etc.)
+- Service name under icon
+
+Layout:
+- 2 columns grid
+- Equal spacing
+- Responsive on desktop/tablet
+
+Sizes:
+- Card height: ~150px
+- Border radius: 20px
+- Border width:
+    • Selected: 2px white
+    • Unselected: 1px subtle grey (#333)
+
+Checkmark:
+- Top-right corner
+- White square outline when OFF
+- White filled box with check icon when ON
+
+========================
+3. LIST OF SAFEGO SERVICES (SAFEGO VERSION)
+========================
+RIDE TYPES (example):
+- SafeGo Go
+- SafeGo X
+- SafeGo XL (7-seater)
+- SafeGo Premium
+- SafeGo Bike
+- SafeGo CNG
+- SafeGo Moto
+- SafeGo Pet
+
+FOOD:
+- SafeGo Eats
+
+PARCEL:
+- SafeGo Parcel
+
+Admin decides which services a driver is ALLOWED to use.  
+Driver can only toggle inside allowed list.
+
+========================
+4. DRIVER PREFERENCES STORAGE
+========================
+Create new fields (ADD ONLY, do not edit or remove anything existing):
+
+driver_profile.service_preferences = {
+   ride_types: {
+       safego_go: true/false,
+       safego_x: true/false,
+       safego_xl: true/false,
+       safego_premium: true/false,
+       safego_bike: true/false,
+       safego_cng: true/false,
+       safego_moto: true/false,
+       safego_pet: true/false
+   },
+   food_enabled: true/false,
+   parcel_enabled: true/false
+}
+
+Rules:
+- If a card is tapped → toggle true/false
+- Save instantly to driver_profile
+- Show toast “Preferences updated”
+
+========================
+5. FILTERING LOGIC (MANDATORY)
+========================
+When dispatching a trip, apply:
+
+driver must have:
+- verification_status = approved  
+- driver_online_status = online  
+- AND service_preferences for that product = true  
+- AND vehicle type matches admin requirements for that product  
+
+Examples:
+- 7-seater driver wants only SafeGo XL → only XL trips allowed.
+- Bike driver turns OFF food → No food orders sent to him.
+- Driver turns OFF all ride types → receives only food/parcel.
+
+If ALL services OFF:
+- Show warning toast: “Turn on a service to receive trips.”
+
+========================
+6. BACKEND BEHAVIOR (UNCHANGED)
+========================
+Keep:
+- rides
+- food_orders
+- deliveries
+- full status flows
+- commission logic (cash vs online)
+- weekly settlements
+- geo filtering
+
+Do NOT modify existing schemas. Only add service_preferences.
+
+========================
+7. SECURITY RULES
+========================
+- Driver cannot change admin-locked permissions.
+- Customer cannot see driver service settings.
+- Restaurant cannot see driver settings.
+- Admin can override driver preferences from admin panel.
+
+========================
+8. UI POLISH (REQUIRED)
+========================
+The drawer must match the reference screenshot:
+- Dark grid
+- Icon centered
+- Service name centered
+- Clean minimal look
+- Smooth tap animation
+- No clutter
+
+========================
+NO QUESTIONS.  
+Implement the drawer exactly as described in one build.

@@ -1,0 +1,175 @@
+You are the lead engineer for the SafeGo project. Follow ALL SafeGo Master Rules strictly.
+
+==================================================
+GLOBAL SAFEGO MASTER RULES (ALWAYS APPLY)
+==================================================
+1) Core roles (must ALWAYS exist):
+   - Customer / Rider (rides, food orders, parcel senders)
+   - Driver / Courier (rides, deliveries)
+   - Restaurant / Store owner
+   - Admin (global control panel)
+
+2) Global products & services:
+   - Ride-hailing (single, shared, scheduled)
+   - Food delivery (SafeGo Eats style)
+   - Parcel / courier delivery (door-to-door)
+
+3) Data & collections (backend entities must stay consistent):
+   - rides
+   - food_orders
+   - deliveries (parcels)
+   - users, drivers, restaurants, vehicles
+   - payouts, wallets, promotions, ratings, support_tickets, audit_logs
+
+4) Money, commission & payouts:
+   - Platform commission per trip/order/delivery
+   - Driver / restaurant earnings tracked in wallets
+   - Payout methods: bank account, card payouts, mobile wallet (where available)
+   - Every money-changing action must be logged in audit_logs
+
+5) KYC & country rules (minimum):
+   - US: SSN/ITIN masked storage, driver license, vehicle docs, bank info, 2FA for payouts
+   - BD: NID/passport, mobile wallet options, basic address and phone verification
+   - Never store raw sensitive data without masking + encryption hooks
+
+6) Security phases (already in system – DO NOT BREAK):
+   - Phase 1: HTTP security headers (HSTS, CSP, CORS), rate limiting on auth & payouts
+   - Phase 2: OTP service, device/session security, tamper-proof audit logs, payout 2FA
+   - Use existing security middlewares; do NOT remove or weaken anything.
+
+7) Admin panel invariants (do NOT modify now, just respect):
+   - Admin must be able to see: rides, food_orders, deliveries, users, drivers, restaurants
+   - Admin can view but NOT silently edit audit logs
+   - Any config flags you add must be admin-controllable in future.
+
+8) Status flows (must stay compatible across apps):
+   - Rides: requested → accepted → arriving → in_progress → completed → canceled
+   - Food orders: placed → accepted → being_prepared → picked_up → delivered → canceled
+   - Parcels: created → picked_up → in_transit → delivered → canceled
+   - All new UI must only use these valid statuses.
+
+9) Onboarding & support:
+   - Each role has: profile, documents, KYC, help center & support contact
+   - Disputes & ratings should use existing rating/support models where possible.
+
+==================================================
+NEW PHASE: R – SAFEGO RIDER (CUSTOMER) WEB APP
+==================================================
+Goal for this loop: Implement **R-1 Rider Web Shell + Home Dashboard** so that the customer-facing web app is ready with a professional, Uber-level base layout and navigation, reusing as much shared styling as possible.
+
+Important constraints:
+- Keep existing backend, security middlewares, and shared components intact.
+- Reuse patterns from the Driver web app where possible (headers, layout, testid usage).
+- Do NOT break any existing driver or restaurant flows.
+
+--------------------------------------------------
+R-1 TASK: Rider layout, navigation, and home
+--------------------------------------------------
+1) Routes & base layout
+   - Add a Rider layout wrapper and core routes under the `/rider` namespace:
+     - `/rider` → redirect to `/rider/home`
+     - `/rider/home`
+     - `/rider/trips`        (past & upcoming rides)
+     - `/rider/orders`       (food delivery orders)
+     - `/rider/parcels`      (parcel deliveries)
+     - `/rider/wallet`       (rider credits, promos, payment methods overview)
+     - `/rider/support`      (help center entry)
+     - `/rider/account`      (profile & basic settings)
+     - `/rider/settings`     (preferences like language, notification, map provider)
+   - Integrate this into the main App router (e.g., `client/src/App.tsx` or current router) so `/rider/...` works next to `/driver/...` and `/restaurant/...`.
+
+2) Rider layout UX (desktop + mobile)
+   - Desktop:
+     - Top bar with:
+       - SafeGo logo / wordmark
+       - Service switcher pill or tabs (Ride | Food | Parcel)
+       - Notification bell (placeholder; we’ll wire data later)
+       - Language globe (reusing existing language system)
+       - Profile avatar with dropdown (Account, Settings, Log out)
+     - Left sidebar navigation with these items:
+       - Home
+       - Trips
+       - Food Orders
+       - Parcels
+       - Wallet
+       - Support
+       - Settings
+   - Mobile:
+     - Compact top bar with logo + bell + profile.
+     - Bottom nav (or slide-out drawer) with key actions:
+       - Home, Trips, Orders, Parcels, Wallet, More.
+
+   - Ensure the sidebar / drawer:
+     - Opens on hamburger tap
+     - Closes automatically when navigating to a new route
+     - Works consistently across `/rider/*` routes.
+
+3) Rider Home screen (Uber-level polish)
+   - Path: `/rider/home`
+   - Sections:
+     a) Service hero cards (primary CTAs)
+        - Three main cards:
+          - "Book a ride" (Ride service)
+          - "Order food" (Food delivery)
+          - "Send a parcel" (Parcel delivery)
+        - Each card shows:
+          - Short subtitle (e.g., “Door-to-door rides”, “From your favorite restaurants”, “Same-day delivery”)
+          - Primary button → navigates to appropriate flow:
+            - Ride: `/rider/trips?start=new`
+            - Food: `/rider/orders?start=new`
+            - Parcel: `/rider/parcels?start=new`
+     b) Quick access widgets:
+        - “Upcoming trip” summary (if any demo data exists)
+        - “Last order” summary with reorder button (placeholder ok)
+        - “Promotions” / “SafeGo Points” short card (read-only for now)
+     c) Map preview (using the same map system as driver):
+        - Small map tile showing current location and nearby drivers as demo markers.
+        - Read-only at this stage; no route selection yet.
+
+   - Use clear `data-testid` attributes on important elements:
+     - `rider-home-ride-card`
+     - `rider-home-food-card`
+     - `rider-home-parcel-card`
+     - `rider-home-upcoming-trip`
+     - `rider-home-map-preview`
+
+4) Data & state handling
+   - For now, it is acceptable to use:
+     - Existing APIs if any rider endpoints already exist, OR
+     - Lightweight mock/demo data hooked into React Query / SWR pattern used in the app.
+   - Keep the data-fetching pattern consistent with how Driver and Restaurant dashboards are implemented.
+   - If no rider collections exist yet, stub them in the frontend ONLY (do NOT add new DB migrations in this loop).
+
+5) Auth & role safety
+   - Ensure `/rider/*` routes are protected by the existing auth layer.
+   - If there is role information available (e.g., user type flags), structure the Rider layout so that:
+     - It checks for a “rider/customer” capability before showing sensitive wallet info.
+     - At minimum, do not break existing driver/restaurant logins.
+
+6) Visual consistency & responsiveness
+   - Match typography, spacing, and button styles already used for the Driver dashboard.
+   - Verify the layout on:
+     - Mobile width
+     - Tablet
+     - Desktop
+   - Fix any major overflow or alignment issues you see.
+
+7) Testing & verification
+   - Add or update any basic tests (if the project uses testing) to cover:
+     - Rendering of `/rider/home`
+     - Navigation between `/rider/home` and `/rider/trips` via the sidebar or hero cards.
+   - Use `data-testid` attributes to make future tests easy.
+
+--------------------------------------------------
+WHAT TO DO IN THIS LOOP
+--------------------------------------------------
+- Implement the Rider layout, routes, and Home screen as described.
+- Reuse existing design tokens and layout patterns from the Driver app.
+- Do NOT introduce breaking changes to driver or restaurant experiences.
+- When done, restart the app, verify navigation under `/rider/...`, and then:
+  - Summarize exactly what you implemented (files, components, key props)
+  - List any limitations or TODOs for future Rider work (e.g., real data endpoints, full booking flow).
+
+After implementation, report back with:
+- A short status summary for R-1 (Rider Web Shell + Home)
+- Any follow-up tasks you recommend for R-2 (for example: full ride booking flow with pickup/dropoff selection).

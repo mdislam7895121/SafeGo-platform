@@ -1,0 +1,355 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS APPLY, DO NOT SKIP)
+
+You are working on SafeGo, a global super-app.
+
+ROLES (must stay fully separated):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must have:
+- Separate signup & login
+- Country-specific KYC + verification
+- Its own dashboard and navigation
+- Its own permissions & status flows
+Never mix or leak access across roles.
+
+GLOBAL SERVICES (always enabled):
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+COUNTRIES:
+- Bangladesh (BD)
+- United States (US)
+
+COUNTRY-SPECIFIC KYC (summary)
+
+BD Customers:
+- full_name, father_name, date_of_birth
+- phone_number, email (optional)
+- present_address, permanent_address
+- NID_number + NID_front_image_url + NID_back_image_url
+- emergency_contact_name/phone/relation
+- verification_status: pending | approved | rejected
+- is_verified: boolean
+- rejection_reason (nullable)
+
+US Customers:
+- full_name, date_of_birth
+- phone_number, email
+- home_address
+- emergency_contact_name/phone/relation
+- government_id_type, government_id_last4
+- verification_status, is_verified, rejection_reason
+
+BD Drivers:
+- All BD customer fields
+- driver_license_number + front/back images
+- vehicle_type/model/color/plate_number
+- driver_wallet_balance (can be negative)
+- driver_status: offline | online | on_trip
+- is_blocked, verification_status, is_verified, rejection_reason
+
+US Drivers:
+- full_name, date_of_birth
+- phone_number, email, home_address
+- emergency_contact_*
+- government_id_type, government_id_last4
+- driver_license_number + image + expiry
+- ssn_last4 (optional)
+- driver_wallet_balance
+- driver_status
+- is_blocked, verification_status, is_verified, rejection_reason
+
+BD Restaurant Owners:
+- restaurant_owner_name, father_name, date_of_birth
+- phone_number, email
+- present_address, permanent_address
+- NID_number + front/back images
+- emergency_contact_*
+- restaurant_legal_name
+- trade_license_number (optional)
+- verification_status, is_verified, rejection_reason
+
+US Restaurant Owners:
+- restaurant_owner_name, date_of_birth
+- phone_number, email
+- home_address
+- emergency_contact_*
+- government_id_type, government_id_last4
+- restaurant_legal_name
+- EIN_last4 (optional)
+- verification_status, is_verified, rejection_reason
+
+ONBOARDING (all roles):
+- Multi-step: Basic info → Address → ID/KYC upload → Emergency contact
+- Set verification_status="pending", is_verified=false
+- Block core actions until Admin approval.
+
+CORE COLLECTIONS (never remove):
+1) rides
+2) food_orders
+3) deliveries
+
+Each must include:
+- Identity fields (customer_id, driver_id, restaurant_id…)
+- Addresses + geolocation
+- Pricing, fees, commissions
+- Payment method + payment_status
+- Timestamps for each status change
+- Status field with required flow
+- Rating and feedback fields
+
+COMMISSION & PAYOUT RULES:
+1) Ride CASH:
+   - Driver gets full cash.
+   - SafeGo commission → negative driver_wallet_balance.
+2) Food CASH:
+   - Restaurant gets full cash.
+   - SafeGo commission → negative restaurant_wallet_balance.
+3) Online payment:
+   - SafeGo keeps commission automatically.
+4) Admin can view and settle negative balances and mark as paid.
+
+ADMIN PANEL (must remain capable to):
+- View/verify customers, drivers, restaurants
+- Approve/reject KYC with rejection_reason
+- Block/unblock any user or restaurant
+- Update pricing, fees, commissions
+- View driver_wallet_balance & restaurant_wallet_balance
+- Manage payouts & settlements
+- View all rides, food_orders, deliveries
+
+SECURITY RULES:
+- Customers cannot view driver/restaurant KYC or IDs.
+- Drivers cannot view customer KYC or IDs.
+- Restaurants cannot view other restaurants’ data.
+- Users can edit only their own profile.
+- Only Admin can change verification, blocking, pricing, commissions.
+- Customer-facing APIs must NEVER expose NID_number, government_id_last4, ssn_last4, or KYC images.
+
+STATUS FLOWS (do not rename):
+Ride:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed
+  or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+  or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_driver / cancelled_by_admin
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered
+  or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+NOTIFICATIONS:
+- Ride, food, parcel status updates
+- Verification approval/rejection
+- Important admin announcements
+
+NON-BREAKING DEVELOPMENT POLICY:
+- Do NOT rename or delete any collections, fields, APIs, routes, screens.
+- Only ADD new fields/components/endpoints.
+- Must not break:
+  - Admin dashboard
+  - Driver management
+  - Customer management
+  - Restaurant management
+  - Parcel management
+  - Wallet & commission settlement
+  - KYC flows
+
+================================================================
+TASK: FULL SAFEGO EATS CUSTOMER WEB AUDIT & FIX (END-TO-END)
+================================================================
+
+Goal:
+The SafeGo Eats CUSTOMER WEB food experience must be:
+- DoorDash-style professional
+- Fully responsive and device-friendly
+- Using real demo images and content
+- 100% working end-to-end (browse → cart → checkout → order created)
+- Safe and non-breaking with all existing SafeGo modules.
+
+You MUST conduct a complete audit and fix ALL issues you find before asking for confirmation.
+
+================================================
+A) SCOPE
+================================================
+- Only affect the CUSTOMER web Eats experience:
+  - /customer/food
+  - /customer/food/:restaurant_id
+  - /customer/checkout (or equivalent)
+- Do NOT change:
+  - Ride or Parcel flows
+  - Admin, Driver, Restaurant dashboards
+  - Core backend schemas or APIs
+- Old Eats UI must remain disconnected from routing.
+
+================================================
+B) ROUTING & OLD UI REMOVAL CHECK
+================================================
+1. Verify that:
+   - /customer/food and /customer/food/:id use the NEW DoorDash-style UI only.
+   - No customer route still references the legacy Eats UI.
+2. If any route still shows the old layout, disconnect it and point it to the new UI.
+
+================================================
+C) RESTAURANT LIST, FILTERS & SEARCH CHECK
+================================================
+1. Verify the main /customer/food page:
+   - Location bar (“Deliver to”)
+   - Hero search bar
+   - Cuisine/category chips (American, Italian, Indian, Chinese, etc.)
+   - Filters: Top rated, Open now, Favorites, extra filter button
+   - Sections: “Popular Near You”, “Top Rated”, etc.
+2. Validate queries:
+   - Only restaurants with is_verified=true, verification_status="approved", is_blocked=false.
+   - country_code matches logged-in customer’s country.
+   - Mode filter (delivery/pickup) respected if implemented.
+3. Fix any bug where:
+   - Restaurants fail to load without an error.
+   - Filters or search do nothing.
+   - Empty states are not handled.
+4. Ensure restaurant cards show correct:
+   - Name, cuisine, rating, estimated time, delivery fee, badges.
+
+================================================
+D) IMAGE & ASSET BINDING CHECK (CURRENT BUG)
+================================================
+You must inspect and fix ACTUAL component files (not just data):
+
+- client/src/pages/customer/eats-restaurants*.tsx
+- client/src/pages/customer/eats-restaurant-card*.tsx
+- client/src/pages/customer/eats-restaurant-detail*.tsx
+- client/src/pages/customer/eats-menu-item-card*.tsx
+
+For each component:
+
+1) Restaurant card:
+   - src MUST use:
+        restaurant.thumbnail_image
+        || restaurant.cover_photo
+        || restaurant.banner_image
+   - Remove any hardcoded placeholder icon except as final fallback when ALL are null.
+   - Ensure object-fit: cover and correct aspect ratio.
+
+2) Restaurant detail header:
+   - Banner uses restaurant.banner_image || restaurant.cover_photo.
+   - No fork/knife placeholder if a real URL exists.
+
+3) Menu item cards:
+   - src MUST read menuItem.image_url.
+   - Remove any logic that hides or overrides real URLs.
+
+4) Confirm in the browser:
+   - /customer/food shows real images on cards.
+   - /customer/food/:id shows banner + menu photos.
+
+If images still do not display, debug network requests and console errors, and fix until they do.
+
+================================================
+E) RESTAURANT DETAIL & MENU FLOW CHECK
+================================================
+1. Open a demo restaurant page.
+2. Verify:
+   - Header info: name, rating, cuisine, address, delivery info.
+   - Categories: sidebar (desktop) / scrollable tabs (mobile).
+   - Menu items grouped by category.
+3. Fix issues like:
+   - “No menu available” when demo menu exists.
+   - Wrong or missing categories.
+   - Add-to-cart button not responding.
+
+================================================
+F) CART & CHECKOUT FLOW CHECK
+================================================
+1. From a restaurant page:
+   - Add multiple items to cart.
+   - Verify cart drawer shows:
+     - Each item, quantity +/- , item total, subtotal, delivery fee, order total.
+2. Checkout:
+   - Navigate to checkout page.
+   - Confirm address, summary, payment method.
+   - Place the order.
+3. Backend validation:
+   - Confirm a record is created in food_orders with:
+     - customer_id, restaurant_id
+     - items[]
+     - subtotal_amount, delivery_fee_amount, total_amount
+     - payment_method, payment_status
+     - status="placed"
+   - Status flow remains compatible with:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+4. Ensure commission and cash/online flags are compatible with the global rules (no breaking changes).
+
+================================================
+G) DEMO DATA QUALITY CHECK
+================================================
+1. Verify demo restaurants for BD and US:
+   - At least 2 for BD, 2 for US.
+   - Proper cuisine, images, min_order_amount, delivery_fee_base, preparation_time_min.
+2. Verify demo menus:
+   - Multiple categories and items per restaurant.
+   - is_demo=true flags present (if used).
+3. Ensure demo content looks realistic and complete for launch.
+
+================================================
+H) RESPONSIVE & DEVICE-FRIENDLY CHECK
+================================================
+1. Test on three sizes:
+   - Mobile (~375–430px width)
+   - Tablet (~768px)
+   - Desktop (>1024px)
+2. Validate:
+   - Restaurant cards per row adjust correctly.
+   - Category chips scroll nicely on mobile.
+   - No horizontal scroll for main content.
+   - Tap targets are at least ~44x44px.
+   - Text readable, no overlap or cut-offs.
+
+Fix any spacing, overflow, or layout issues.
+
+================================================
+I) SECURITY & ROLE SEPARATION CHECK
+================================================
+1. Inspect responses used by the customer Eats UI:
+   - Ensure no KYC fields, no NID_number, no government_id_last4, no KYC images.
+2. Confirm:
+   - Customer cannot see restaurant owner data, wallets, or internal config.
+   - Restaurant cannot access customer KYC/IDs through Eats UI.
+3. Maintain all admin-only capabilities in Admin panel only.
+
+================================================
+J) ERROR HANDLING & UX CHECK
+================================================
+1. Remove or avoid big yellow error banners in customer UI.
+2. Use:
+   - Skeleton loaders for loading states.
+   - Friendly empty states when no restaurants/menu are found.
+   - Small toast/snackbar for errors.
+3. Ensure no unhandled exceptions in console that impact user flow.
+
+================================================
+K) FINAL SELF-TEST SCENARIOS
+================================================
+You must run and pass these scenarios before you say you are done:
+
+1) BD demo customer:
+   - Browse Eats, open a BD demo restaurant, view menu with images.
+   - Add items, checkout with allowed payment method, place order.
+
+2) US demo customer:
+   - Browse Eats, open a US demo restaurant, view images and menu.
+   - Place at least one order successfully.
+
+3) Cross-device visual check:
+   - Capture internal preview screenshots for:
+     - /customer/food (mobile)
+     - /customer/food (desktop)
+     - /customer/food/:id (mobile)
+
+Fix ANY issue found in these tests before completing the task.
+
+Do NOT stop at “images added” or “responsive done” until everything above is verified and working.

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="safepilot-gradient-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2F80ED"/>
+      <stop offset="100%" stop-color="#56CCF2"/>
+    </linearGradient>
+    <linearGradient id="safepilot-pulse-dark" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0A0A0A" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#1A1A2E"/>
+      <stop offset="100%" stop-color="#0A0A0A" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield Shape -->
+  <path 
+    d="M24 4L6 10V22C6 33.05 13.68 43.22 24 46C34.32 43.22 42 33.05 42 22V10L24 4Z" 
+    fill="url(#safepilot-gradient-dark)"
+    stroke="url(#safepilot-gradient-dark)"
+    stroke-width="1"
+    stroke-linejoin="round"
+  />
+  
+  <!-- AI Neural Pulse Wave -->
+  <path 
+    d="M12 24H16L18 20L21 28L24 18L27 30L30 22L32 24H36" 
+    fill="none" 
+    stroke="#FFFFFF" 
+    stroke-width="2" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+  
+  <!-- Outer Glow Effect -->
+  <path 
+    d="M24 4L6 10V22C6 33.05 13.68 43.22 24 46C34.32 43.22 42 33.05 42 22V10L24 4Z" 
+    fill="none"
+    stroke="rgba(86,204,242,0.3)"
+    stroke-width="2"
+    filter="blur(2px)"
+  />
+</svg>

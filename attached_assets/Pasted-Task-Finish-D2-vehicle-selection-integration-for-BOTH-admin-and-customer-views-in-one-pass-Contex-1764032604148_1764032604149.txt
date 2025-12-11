@@ -1,0 +1,38 @@
+Task: Finish D2 vehicle selection integration for BOTH admin and customer views in one pass.
+
+Context:
+- Driver vehicle form already uses brand/model/color dropdowns and works correctly.
+- Database schema and driver vehicle APIs are already stable. DO NOT change Prisma schema or existing API contracts.
+- SafeGo rules: no breaking changes, no experimental refactors, only minimal, focused edits.
+
+Goals (complete all in this single task):
+1) Admin Driver Edit Forms
+   - Update the admin driver edit UI so admins can:
+     - View and edit vehicle brand, model, color using the SAME dropdown system as the driver form.
+     - See the current plate number (read-only or editable, keep current behavior).
+   - Make sure admin list and detail pages load all drivers with their vehicle info, without N+1 queries or missing relations.
+   - Do NOT change how KYC, payouts, or status filters work.
+
+2) Vehicle / Driver Viewer Components
+   - Ensure whatever component is used to show a driver's vehicle (for admin or customer preview) reads the new brand/model/color fields correctly.
+   - Keep backward compatibility: if some old drivers have only a combined “vehicleDisplayName”, fall back to that when brand/model is missing.
+   - No new test routes like `/test/...` are needed now. Use existing pages where customers/admins see driver info.
+
+3) Safety & Compatibility
+   - No schema migrations.
+   - No changes to ride matching, wallet, earnings, or restaurant flows.
+   - If something seems risky (e.g., requires big refactor), SKIP it and clearly document in `replit.md` what you skipped and why, instead of doing a half-implementation.
+
+Deliverables:
+- Updated admin driver edit forms with working brand/model/color dropdowns.
+- Updated vehicle/driver viewer component(s) that show the correct vehicle information.
+- Brief documentation in `replit.md` explaining:
+  - Which files you changed.
+  - How admin can now edit vehicles.
+  - How the viewer components pick display values (brand + model + color vs legacy displayName).
+- Confirm with manual tests:
+  - Admin can open a driver, see vehicle brand/model/color, edit them, and save successfully.
+  - Existing drivers without full data still load without crashing.
+  - No console errors in driver, admin, or customer views.
+
+Please apply minimal, targeted changes only and keep the rest of the app behavior exactly the same.

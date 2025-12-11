@@ -1,0 +1,198 @@
+TASK: Build the SafeGo Professional Driver Map Screen (Ride + Food + Parcel Support)
+
+GOAL:
+Create a complete Uber-grade driver home screen with a live map, driver status management, trip request notifications, and responsive layout for iOS, Android, and Desktop.
+
+=====================
+1. TOP NAVIGATION BAR
+=====================
+Include:
+- Left: Hamburger menu
+- Center: SafeGo Driver logo (SG blue)
+- Right: 
+    • Notification bell with live badge count
+    • Language globe icon
+    • Driver profile avatar (circle)
+
+Rules:
+- Icons must be perfectly aligned vertically center.
+- Desktop: keep spacing wider.
+- Mobile: keep spacing tight but readable.
+- All icons must use tap ripple effect.
+
+=====================
+2. DRIVER STATUS SECTION
+=====================
+Floating card at top of map:
+
+CARD DESIGN:
+- White rounded rectangle, soft shadow.
+- Left side: Signal-strength icon showing GPS strength.
+- Title: “You’re Online” / “You’re Offline”
+- Subtitle: “Waiting for trip requests…” or “Go online to start getting trips.”
+- Status color:
+    • Online = Green accent
+    • Offline = Gray accent
+
+Add this:
+- A professional ON/OFF toggle switch on the right side of the card.
+- When offline → hide driver from dispatch engine.
+- When online → subscribe to trip requests.
+
+=====================
+3. LIVE MAP ENGINE
+=====================
+Use OpenStreetMap + Mapbox style hybrid.
+
+Features:
+- Driver current location marker (green).
+- Pickup marker (blue) → only visible when trip assigned.
+- Dropoff marker (red) → only visible when accepted.
+- Auto zoom-to-fit when trip assigned.
+- Re-center button on right side of screen.
+- Zoom in/out buttons grouped vertically.
+
+Map Controls (Professional):
+- Large circular buttons with shadow.
+- Position: bottom-right corner above the bottom legend.
+
+=====================
+4. DRIVER ACTION FLOATING BUTTONS
+=====================
+RIGHT SIDE:
+- History button (trip history)
+- Earnings button
+- SOS button
+- Each button: 48px circular, icon inside.
+
+BOTTOM RIGHT:
+- Navigation button (arrow) → launches Google Maps / Apple Maps.
+
+Rules:
+- All FABs must cast subtle shadow.
+- All icons must be SVG with sharp edges.
+
+=====================
+5. LEGEND (BOTTOM INFORMATION BAR)
+=====================
+At the bottom above the tab bar:
+
+Items:
+- You (green dot)
+- Pickup (blue dot)
+- Dropoff (red dot)
+
+Design:
+- Rounded pill background
+- Equal spacing
+- Modern tiny-dot indicators
+
+=====================
+6. TRIP REQUEST POPUP (MANDATORY)
+=====================
+Must appear when searching_driver → accepted flow triggers.
+
+Popup must include:
+- Pickup address
+- Dropoff address
+- Distance
+- Estimated earning
+- Countdown timer (10 seconds)
+- Accept / Reject buttons
+
+Design style:
+- Uber-style bottom sheet sliding from bottom.
+
+=====================
+7. RESPONSIVE DESIGN RULES
+=====================
+MOBILE:
+- Map occupies full screen.
+- Status card floats at top.
+- FAB stack right side.
+
+DESKTOP:
+- Status card pinned top-left.
+- Map uses full width/height.
+- FAB group slightly larger.
+
+=====================
+8. SECURITY RULES
+=====================
+Mandatory:
+- Driver cannot view customer documents.
+- Do not show customer phone number until trip accepted.
+- Hide all KYC documents from UI.
+- All map data encrypted via HTTPS.
+
+=====================
+9. BACKEND INTEGRATIONS
+=====================
+
+(1) Subscription to trip request events:
+- rides
+- food_orders
+- deliveries
+
+(2) Status update endpoints:
+- driver_status = online/offline
+- driver_location push every 5 seconds
+- driver_availability_realtime
+
+(3) Commission engine:
+- Apply SafeGo driver commission rules automatically based on payment method.
+
+=====================
+10. NOTIFICATIONS ENGINE
+=====================
+Show real-time:
+- New trip request alert
+- Change in pricing (admin)
+- KYC approval/rejection
+- Weekly settlement reminders
+
+=====================
+11. USA vs BD RULES (MANDATORY)
+=====================
+
+BD DRIVER KYC:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (front/back)
+- emergency contact
+- verification_status
+
+US DRIVER KYC:
+- date_of_birth
+- home_address
+- government_id_type
+- government_id_last4
+- driver_license image + expiry
+- ssn_last4 optional
+- emergency contact
+
+Access:
+- Block driver from entering the map until verification_status = approved.
+
+=====================
+12. DEMO DATA (REQUIRED)
+=====================
+Provide sample trip:
+- pickup: 233 Canal St, NY
+- dropoff: Broadway & Fulton St
+- estimated_earning: 18.40 USD
+- distance: 2.3 miles
+
+Provide sample legend icons, sample GPS signal strength, sample status card animations.
+
+=====================
+13. CUSTOMIZATION OPTIONS
+=====================
+Config:
+- Map style (light/dark)
+- FAB icon set
+- Card opacity
+- Animation speed
+- Trip popup theme

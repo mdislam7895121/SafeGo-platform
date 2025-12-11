@@ -1,0 +1,297 @@
+SAFEGO – MOBILE ADDRESS CAPSULE & ROUTE FLOW REWRITE (A–Z IMPLEMENTATION)
+
+You are updating the SafeGo rider MOBILE experience only.
+Follow all SafeGo global rules:
+
+- Do NOT change any backend logic:
+  - No changes to pricing, commission, promos, dispatch, driver matching, or payments.
+- Do NOT change any DRIVER, RESTAURANT, or ADMIN flows.
+- Only update the mobile rider UI for:
+  1) Address capsule behavior
+  2) Map visibility and zoom
+  3) Route selection row + Request ride button
+
+Keep desktop layout exactly as it is today. All changes are mobile-only.
+
+------------------------------------------------------------
+0. UNDERSTAND CURRENT (BUGGY) MOBILE BEHAVIOR
+------------------------------------------------------------
+
+Current flow (what exists now):
+
+1) Home / “Good night, islam789” screen:
+   - User enters pickup and dropoff.
+   - Taps "See prices".
+
+2) Price screen:
+   - For ~2 seconds a big white address card with PICKUP and DROPOFF is floating over the map.
+   - After that delay, the big card disappears, ride cards appear, map shrinks, etc.
+
+3) Route screen (Choose your route):
+   - Map shows route options.
+   - Route pills exist at the bottom, but on mobile:
+     - The right-most pill is partially cut.
+     - Zoom doesn’t clearly show the rider’s current position.
+   - Request ride button is visible but the row above it is not perfectly centered.
+
+This behavior is confusing and feels laggy. We want an Uber-like flow:
+- No 2-second floating address card.
+- Always a clean, compact address capsule.
+- Map always clearly shows the route and rider location.
+- Bottom route row perfectly aligned above the Request ride button.
+
+------------------------------------------------------------
+1. CONSOLIDATE ADDRESS UI INTO A SINGLE CAPSULE
+------------------------------------------------------------
+
+Goal: There should be ONE address component on mobile – a dynamic capsule, not multiple big cards.
+
+Component name suggestion (use existing naming if present):
+- `MobileAddressCapsule` (or reuse the existing address component but refactor it).
+
+Rules for the address capsule (mobile only):
+
+1) Shape & size:
+   - Full-width, but with margin:
+     - width: ~92% of viewport
+     - horizontal margin: 4% on each side
+   - Height: comfortable pill, not too thick, not too thin:
+     - 56–64px height depending on content
+   - Border radius: 9999px (fully rounded capsule)
+   - Background: #FFFFFF
+   - Border: 1px solid #E5E7EB
+   - Shadow: 0px 4px 12px rgba(0,0,0,0.08)
+   - The capsule is pinned UNDER the "Plan your ride" header, OVER the map.
+
+2) Inside layout:
+   - Left side: pickup + dropoff dots
+     - Pickup: blue dot
+     - Dropoff: red dot
+   - Text:
+     - First line: Pickup address (single line, ellipsis at end)
+     - Second line: Dropoff address (single line, ellipsis at end)
+     - Both lines left-aligned.
+     - Font:
+       - Label text (e.g. PICKUP, DROPOFF): 11px, uppercase, #9CA3AF
+       - Address text: 14px, #111827
+   - Right side icons (inside capsule):
+     1) Up/Down chevron to expand/collapse (for future; keep behavior simple now)
+     2) Edit icon or “…” if already implemented
+
+3) States (mobile only):
+   - `editing` state:
+     - Capsule height increases, showing two separate input fields for pickup & dropoff (still inside capsule style).
+   - `collapsed` state:
+     - Capsule shows pickup & dropoff on two text rows, non-editable.
+     - Tapping anywhere on text re-enters `editing`.
+   - There must NOT be any separate giant card version that floats as a separate component after “See prices”.
+   - The same capsule is reused across:
+     - initial “See prices”
+     - price selection
+     - route selection
+
+Implementation steps:
+
+- Find all components that currently render the large “PICKUP / DROPOFF” cards on the price and route screens.
+- Replace them with a single shared `MobileAddressCapsule` component.
+- Make sure the capsule receives props:
+  - `pickupAddress`
+  - `dropoffAddress`
+  - `onEditPickup`
+  - `onEditDropoff`
+  - `mode: 'editing' | 'collapsed'`
+
+------------------------------------------------------------
+2. REMOVE THE 2-SECOND FLOATING ADDRESS CARD DELAY
+------------------------------------------------------------
+
+Bug: After tapping “See prices”, the big address card floats for ~2 seconds before collapsing.
+
+We want: zero-delay behavior.
+
+Implementation:
+
+1) Search in the mobile price/route screen code for:
+   - `setTimeout`
+   - `delay`
+   - `animationDelay`
+   - or any logic where an address card is visible for some time and then hidden.
+
+2) Remove that timed behavior completely.
+
+3) New logic when user taps “See prices” on the home screen:
+   - Immediately navigate to the price screen.
+   - On the price screen:
+     - DO NOT show the large card version.
+     - Immediately render `MobileAddressCapsule` in `collapsed` mode at the top.
+     - Immediately render ride cards under it.
+     - Map should be visible behind/around the capsule without any intermediate floating card.
+
+Sequence:
+
+- Before:
+  - SeePrices → show large card for ~2s → hide card → show ride list + map.
+
+- After:
+  - SeePrices → show collapsed address capsule + ride list + map instantly.
+  - No intermediate state, no delay.
+
+------------------------------------------------------------
+3. MAP BEHAVIOR & ZOOM (MOBILE)
+------------------------------------------------------------
+
+We want the map to always make sense to the rider.
+
+Rules:
+
+1) On price screen (choose your ride):
+   - Map shows the full route (pickup to dropoff).
+   - Map is centered so that both points are visible.
+   - Map occupies the center of the screen; ride list may overlap the lower portion as currently designed.
+
+2) On route screen (Choose your route):
+   - When user taps “Choose your route”:
+     - Hide ride cards.
+     - Expand map to fill all vertical space under the header + capsule.
+     - Center and zoom to show the whole route clearly.
+   - When user taps a specific route option:
+     - Highlight the selected route.
+     - Keep both pickup and dropoff visible on the map.
+     - Show the rider’s current location marker (if available) clearly.
+
+3) No jitter:
+   - Avoid reloading map tiles unnecessarily.
+   - Reuse the same map instance between price and route screens if possible.
+
+------------------------------------------------------------
+4. ROUTE OPTIONS ROW (BOTTOM, ABOVE REQUEST RIDE)
+------------------------------------------------------------
+
+Current problem: The right-most button (third route pill) is partially cut off on mobile.
+
+Desired behavior (mobile only):
+
+1) Layout:
+   - Container spans full width with padding:
+     - padding-left: 16px
+     - padding-right: 16px
+   - Use `display: flex; justify-content: space-between; gap: 8px;`
+   - Each pill should flex equally: `flex: 1 1 0;`
+
+2) Pill styling:
+   - Rounded pill (border-radius: 9999px)
+   - Border: 1px solid #D1D5DB
+   - Background: #FFFFFF
+   - Selected pill:
+     - Border: 2px solid #2563EB
+     - Text color: #2563EB
+   - Content:
+     - Top line: Route name (e.g. “Fastest”, “CT-15 N and CT-8 N”, “I-684 N”)
+     - Bottom line: small text with duration + distance (e.g. “103 min · 94.9 mi”)
+     - Use ellipsis if text is too long to keep inside one pill.
+
+3) Position:
+   - The route options row sits directly ABOVE the Request ride button.
+   - The Request ride button is full-width, with bottom safe-area padding.
+   - On small devices, all three pills must be fully visible on screen without horizontal scrolling.
+
+4) Text links under the pills:
+   - Under the row, keep:
+     - “Choose your favorite route on the map”
+     - “Back to ride details”
+   - Text centered, font size small, color #6B7280.
+
+5) Back navigation:
+   - Tapping “Back to ride details” restores:
+     - Ride cards list
+     - Map shrinks back to previous layout
+     - Address capsule remains visible at the top
+
+------------------------------------------------------------
+5. SCREEN-BY-SCREEN UX (MOBILE SUMMARY)
+------------------------------------------------------------
+
+Implement the following exact sequence:
+
+A) HOME / SEE PRICES
+   - User sees greeting screen (Good night, etc).
+   - Enters pickup & dropoff.
+   - Taps “See prices”.
+   - Navigate to price screen with:
+     - Map + collapsed MobileAddressCapsule + ride list.
+   - No floating large address card.
+
+B) PRICE SCREEN (CHOOSE YOUR RIDE)
+   - Top: “Plan your ride” header.
+   - Under header, on top of map: MobileAddressCapsule (collapsed).
+   - Below map: SafeGo Everyday Saver promo (if active).
+   - Below promo: ride list cards (SafeGo X, Comfort, etc) exactly as previously implemented.
+   - Bottom: “Choose your route” button (full width).
+
+C) ROUTE SCREEN (CHOOSE YOUR ROUTE)
+   - Header: “Plan your ride”.
+   - MobileAddressCapsule stays pinned at top, collapsed.
+   - Under capsule: Full-height map showing route(s).
+   - Bottom:
+     - Row with 3 route pills (Fastest, etc) – all fully visible.
+     - Under that: text links “Choose your favorite route on the map” + “Back to ride details”.
+     - Under that: full-width “Request ride” button.
+
+D) BACK TO RIDE DETAILS
+   - When user taps “Back to ride details”:
+     - Hide full-screen map mode.
+     - Restore previous layout with ride cards and the map as before.
+     - Keep address capsule unchanged.
+
+------------------------------------------------------------
+6. TECHNICAL IMPLEMENTATION GUIDELINES
+------------------------------------------------------------
+
+1) Identify mobile layout breakpoint (e.g. max-width: 768px).
+   - Apply all capsule + layout changes only under this breakpoint.
+
+2) Refactor state:
+   - Introduce explicit view states for the mobile ride request flow, e.g.:
+     - `view = 'prices' | 'routes'`
+   - On “See prices”: `view = 'prices'`
+   - On “Choose your route”: `view = 'routes'`
+   - On “Back to ride details”: `view = 'prices'`
+   - The MobileAddressCapsule is always rendered, it only switches between `editing` and `collapsed`.
+
+3) Keep all business data unchanged:
+   - Do not touch:
+     - fare summary data
+     - commission splits
+     - driver earnings
+     - promo calculations
+     - dispatch criteria
+
+4) Code hygiene:
+   - Remove any dead code related to the old big address card.
+   - Keep new code well-structured and commented:
+     - Explain why capsule is permanent and why we avoid delays.
+
+------------------------------------------------------------
+7. ACCEPTANCE CRITERIA (WHAT MUST BE TRUE WHEN YOU ARE DONE)
+------------------------------------------------------------
+
+1) After tapping “See prices”:
+   - There is NO 2-second floating address card.
+   - Only the compact MobileAddressCapsule appears at the top.
+   - Ride cards and map load instantly.
+
+2) Across all steps (prices + routes):
+   - MobileAddressCapsule is always visible under the header.
+   - It looks like a clean pill, not a giant card.
+   - Switching screens does NOT show any extra address components.
+
+3) On route screen:
+   - Map shows the full route clearly.
+   - The rider’s current location is visible when “Choose your route” is active.
+   - All three route pills are fully visible and usable.
+   - Request ride button is fully visible and aligned under the pills.
+
+4) Desktop:
+   - No changes in behavior or layout compared to the current version.
+
+Once you have implemented these changes, run the app in mobile preview (iPhone 17 Pro Max and at least one smaller device) and verify that everything meets the acceptance criteria. Then take a screenshot and confirm.

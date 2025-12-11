@@ -1,0 +1,77 @@
+Before adding any new features, I want you to fully VERIFY and STABILIZE the Restaurant Support Center after your recent cleanup of the duplicate ticket routes.
+
+STRICT RULES (do NOT break these):
+- Do NOT add any new routes, models, or database tables.
+- Do NOT change any existing API contracts used by the frontend.
+- Do NOT touch global KYC/RBAC logic, auth middleware, or SafeGuard security rules.
+- Only make minimal, safe fixes if you find a clear bug (for example: wrong status code, broken handler, missing null-check).
+- Keep this task limited to the RESTAURANT support system only.
+
+TASK GOAL:
+Make sure the Restaurant Support Center (tickets + support pages) is production-ready and stable after the route cleanup.
+
+A. ROUTE & CONTROLLER VERIFICATION
+1. Inspect `server/routes/restaurant-support*.ts` (or similar files) and confirm:
+   - There are exactly 14 active routes.
+   - There are NO duplicate routes for the same path + HTTP method.
+   - Each route has:
+     - Proper auth + KYC/RBAC middleware.
+     - Error handling (try/catch or centralized error handler).
+     - Correct HTTP methods (GET/POST/PATCH for tickets).
+2. For each critical route (create ticket, list tickets, view ticket, update ticket status), verify:
+   - Input validation is enforced.
+   - It never exposes another restaurant’s data.
+   - It never leaks internal IDs or sensitive data.
+
+B. END-TO-END FLOW CHECK (RESTAURANT USER)
+Using the existing frontend (NO new pages), test these flows for a restaurant user:
+1. Open the Restaurant Support Center from the restaurant portal.
+2. Create a new support ticket with:
+   - Subject
+   - Category
+   - Description
+   - Optional attachment (if already supported)
+3. View the ticket list and open a ticket detail.
+4. Add a reply / comment to a ticket (if supported).
+5. Change ticket status (open → in progress → resolved/closed) using the existing UI.
+6. Confirm that:
+   - All actions show correct success/failure states.
+   - Nothing returns 500 errors or blank screens.
+   - Ticket list updates correctly after an action.
+
+C. UI/UX QUALITY CHECK (RESTAURANT PAGES ONLY)
+On mobile, tablet, and desktop:
+1. Verify layout and responsiveness for:
+   - Help Center page
+   - Contact Support page
+   - System Status page
+   - Ticket list + ticket detail views (if present)
+2. Make sure:
+   - No horizontal scrolling is required.
+   - Text and buttons are readable and not overlapping.
+   - Forms are usable on small screens (inputs not cut off, labels visible).
+3. You may do SMALL, SAFE UI fixes if needed:
+   - Adjust spacing, padding, or font size.
+   - Fix obvious misalignment.
+   - But do NOT redesign whole pages and do NOT move components to new routes.
+
+D. SECURITY & LOGGING
+1. Confirm that all Restaurant Support routes:
+   - Require authenticated restaurant session.
+   - Are scoped to the current restaurant’s ID.
+   - Respect existing KYC/RBAC gating.
+2. Verify audit logging / transaction wrapping is still working as before your cleanup (do NOT rewrite it; just confirm).
+3. Ensure no support API endpoint is publicly accessible without auth.
+
+E. SHORT IMPLEMENTATION SUMMARY
+After all checks:
+1. Summarize:
+   - Which routes exist in the Restaurant Support Center (short list).
+   - Which user flows you tested (create ticket, list, update, etc.).
+   - Any bugs you found and what minimal fixes you applied.
+2. Explicitly confirm:
+   - “No new routes, models, or tables were added in this task.”
+   - “All existing API contracts remain backward compatible.”
+   - “KYC/RBAC and SafeGuard rules were preserved.”
+
+This task is ONLY for verifying and stabilizing the Restaurant Support Center after removing duplicate ticket routes. Do not start building new features (like global cross-role support, new channels, or advanced analytics) in this step.

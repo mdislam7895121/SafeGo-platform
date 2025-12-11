@@ -1,0 +1,68 @@
+SafeGo Eats – Restaurant Dashboard “Performance Overview” spacing adjustment (UI only)
+
+Goal:
+On the restaurant dashboard (`/restaurant` and `/restaurant/dashboard`), add more vertical space between:
+- The search bar, and
+- The “Performance Overview” filter tabs (Today / 7 Days / 30 Days)
+
+I want the filter tabs to sit visually lower, about 10–12px further down from the search bar, so the header area can breathe and the layout looks clean.
+
+Very important rules:
+- This is a pure UI/layout change.
+- Do NOT change any backend logic, API calls, routing, auth, or KYC gating.
+- Do NOT change any data fetching or performance calculation.
+- Do NOT modify the Online/Offline toggle behavior or design that we just finished.
+- Maintain all SafeGuard rules and accessibility.
+
+Implementation details:
+
+1. Target screens
+   - `/restaurant`
+   - `/restaurant/dashboard`
+   - Any shared component that renders the restaurant dashboard “Performance Overview” section.
+
+2. What to change
+   - Only adjust the vertical spacing between:
+     - Search bar container, and
+     - The “Performance Overview” section (the tab bar that shows “Today / 7 Days / 30 Days”).
+   - Add a clear visual gap of about 10–12px (enough so it no longer feels attached to the search bar).
+
+3. Suggested approach (Tailwind / CSS)
+   - Locate the wrapper/container for the Performance Overview tabs (the element that wraps the three buttons: Today, 7 Days, 30 Days).
+   - Add a top margin such as:
+     - `mt-3` (12px) or equivalent custom CSS (10–12px).
+   - If the tabs are part of a flex layout under the search bar, adjust only the tab-container margin/padding so the rest of the layout remains unchanged.
+
+4. Layout and responsiveness requirements
+   - The tabs must remain full-width responsive on:
+     - Mobile
+     - Tablet
+     - Desktop
+   - No overlap with the search bar.
+   - No extra empty gap above or below the Performance Overview title/cards.
+   - No new horizontal scroll should appear on any breakpoint.
+   - The cards under Performance Overview (Today’s Orders, Today’s Earnings, Active Orders, etc.) must not shift in a broken way. Just move down together with the tabs if they are grouped.
+
+5. Do NOT do:
+   - Do NOT change the typography, labels, or logic of the tabs.
+   - Do NOT move the tabs to a different row or under a different section.
+   - Do NOT add or remove any filters.
+   - Do NOT touch the Online/Offline toggle size, colors, or position in the header.
+
+6. Verification steps (you must run them):
+   - Check on mobile viewport (like the screenshot I provided) that:
+     - There is a visible 10–12px gap between search bar and the filter tabs.
+     - The word “Overview” or “Performance Overview” is not cut off or hidden under the search bar.
+   - Check on desktop that spacing is consistent and aligned with the rest of the dashboard.
+   - Confirm no extra scrolling or layout glitch has been introduced.
+
+After implementing:
+   - Take a screenshot of the updated restaurant dashboard on mobile showing:
+     - Search bar
+     - The gap
+     - “Today / 7 Days / 30 Days” tabs
+     - Top part of the cards
+   - Confirm in your summary that:
+     - Only spacing was changed.
+     - No backend or logic was modified.
+     - All SafeGuard and KYC rules remain intact.

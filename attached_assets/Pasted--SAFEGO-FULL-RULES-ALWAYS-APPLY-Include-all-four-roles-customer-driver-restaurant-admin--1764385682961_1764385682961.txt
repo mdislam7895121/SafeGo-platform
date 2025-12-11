@@ -1,0 +1,100 @@
+# SAFEGO FULL RULES (ALWAYS APPLY)
+- Include all four roles: customer, driver, restaurant, admin.
+- Use global app logic for ride/food/parcel services.
+- Apply country-specific KYC for BD & US.
+- Enforce all mandatory admin panel features.
+- Maintain core collections: rides, food_orders, deliveries.
+- Apply commission rules, payout logic, security phases.
+- Apply full status flows and onboarding rules.
+- Follow SafeGo progress tracking (serial order).
+- Task must be completed fully from start to end.
+- Never break existing code or UI.
+- For any scenario or screenshot: verify → analyze → implement.
+- For development prompts: write full SafeGo rules first, then full task-specific prompt.
+- Apply correct security phase automatically.
+
+# CURRENT STEP
+C6: Build full Promo Engine + Professional Price Card System.
+
+# OBJECTIVE
+Replace “first ride” hardcoded promo with a full global Promo Engine.
+Promo must support ALL_RIDES, FIRST_RIDE, N_RIDES, City-based, Category-based, Date-based, Surge-based campaigns.
+UI must look premium like Uber — strike-through original price, savings amount, promo badge, and 3D car image.
+
+# REQUIRED FEATURES (Build All)
+1. PROMO ENGINE (BACKEND)
+   - New collection: promotions
+   - Fields:
+     id
+     name
+     description
+     discountType: PERCENT | FLAT
+     value
+     maxDiscountAmount
+     appliesTo: ALL | CITY | CATEGORY | USER_SEGMENT
+     userRule: ALL_RIDES | FIRST_RIDE | N_RIDES
+     startAt, endAt
+     isActive
+   - Apply promo AFTER fare calculation but BEFORE driver earnings.
+   - Driver earnings never decrease because of promo (SafeGo absorbs cost).
+   - Add utility calculatePromoDiscount(): returns discount + updated total.
+
+2. EVERYDAY DEFAULT PROMO
+   - Auto-create default promo:
+     name: "SafeGo Everyday Saver"
+     description: "15% SafeGo promo applied"
+     discountType: PERCENT
+     value: 15
+     userRule: ALL_RIDES
+     isActive: true
+
+3. PRICE CARD UPGRADE (CUSTOMER UI)
+   - Show:
+     - Final price (bold, blue)
+     - Strike-through original price
+     - Green “You save $X.XX”
+     - Promo badge with description (from backend)
+     - 3D vehicle image matching category
+   - For each category: show originalPrice, promoPrice, savings.
+   - All text bold where needed.
+
+4. FARE SUMMARY UPGRADE
+   - Add line:
+     Promotion (SafeGo Everyday Saver 15%): -$X.XX
+   - Total fare matches promoPrice.
+   - Driver earnings stay same.
+   - Commission stays visible and accurate.
+
+5. ADMIN PANEL
+   - Add full promo management page:
+     - Create / edit / disable promotions
+     - Apply by city / category / date range / rider segment
+     - Force-apply promo to all rides (safe override)
+
+6. MOBILE UI POLISH (HIGH QUALITY)
+   - 3D car image centered
+   - Bold fonts for price
+   - Uber-level spacing & card style
+   - Smooth fade animation when promo applies
+   - Promo badge always green with lightning icon
+
+7. SECURITY PHASE (phase 2)
+   - Validate requests server-side
+   - Prevent invalid discount misuse
+   - Log all applied promotions
+   - Admin-only promo editing endpoint protection
+
+# DELIVERABLE
+- Full backend changes
+- Full frontend changes
+- Schema migrations
+- Updated fare calculation logic
+- Updated ride card UI
+- Updated summary UI
+- Updated admin panel
+- Tests for all promo rules
+- No regression to C1–C5 work
+- Mark step C6 as completed after finish.
+
+# START NOW
+Implement the entire Promo Engine + Professional Price Card Upgrade end-to-end.

@@ -1,0 +1,86 @@
+You are working on the SafeGo driver web app.
+
+Goal
+Make the driver app behave like Uber: when a driver logs in or opens the driver area, they land directly on the live map screen (with the “Go Online / Go Offline” button), not on the dashboard. The dashboard should still be accessible from the sidebar, but it must not be the default landing page.
+
+Current context
+- Driver map page path: /driver/map  (this is where the Go Online button and current location map are)
+- There is a driver dashboard page (current default when opening the driver app).
+- We already have authentication and driver role logic implemented.
+- We must not break customer, restaurant, or admin flows. Only update the DRIVER experience.
+
+Tasks
+
+1. Make /driver and /driver/dashboard redirect to /driver/map
+   - Find the router or navigation configuration used for the driver app. It may be:
+     - React Router (e.g., client/src/router.tsx or similar), OR
+     - Next.js pages/app router (e.g., app/driver/page.tsx, app/driver/dashboard/page.tsx, or similar).
+   - Implement a redirect so that:
+     - Visiting /driver automatically redirects to /driver/map
+     - Visiting /driver/dashboard automatically redirects to /driver/map, UNLESS the user explicitly navigates from a link that is meant to show the dashboard.
+   - If we have a driver “home” route constant (like DRIVER_HOME_ROUTE or similar), update it so the default home route for drivers is /driver/map.
+   - Make sure the redirect only happens for authenticated drivers. Do not affect customers, restaurants, or admins.
+
+   Implementation hints:
+   - For React Router:
+     - Make the “index” route for the driver layout (path="/driver") render a `<Navigate to="/driver/map" replace />`.
+     - For the dashboard route, either:
+       - remove it from the default index position, OR
+       - make its component immediately redirect with `<Navigate to="/driver/map" replace />` if opened as the root page.
+   - For Next.js “pages” router:
+     - In pages/driver/index.tsx, use `getServerSideProps` or `useEffect` + `router.replace('/driver/map')` so the driver is redirected to /driver/map.
+     - In pages/driver/dashboard.tsx, add a similar redirect if this page is used as the default landing page.
+   - For Next.js “app” router:
+     - In app/driver/page.tsx, return a redirect to "/driver/map" using `redirect('/driver/map')`.
+     - If there is an app/driver/dashboard/page.tsx that is still used, either keep it for manual navigation only or redirect it to /driver/map if it was previously the home.
+
+2. Ensure Sidebar navigation still works
+   - Keep the “Dashboard” item in the left sidebar under the driver core menu (Dashboard, Active Trip, Food Delivery, Map, Trip History, etc.).
+   - When the driver clicks “Dashboard” from the sidebar, they should go to the real dashboard page, not be redirected back to /driver/map.
+   - When the driver clicks “Map” from the sidebar, they should go to /driver/map.
+   - Confirm that there is no infinite redirect loop between Dashboard and Map:
+     - Only the root driver entry (e.g. /driver or post-login redirect) should force /driver/map.
+     - Clicking Dashboard explicitly should show the dashboard normally.
+
+3. Update post-login redirect for drivers
+   - Find where we handle login success and decide where to send the user (e.g., auth callback, handleLoginSuccess, or similar).
+   - For users with role = "driver", set the post-login redirect target to /driver/map (not /driver/dashboard).
+   - Make sure:
+     - Customers still go to their customer home (customer landing page).
+     - Restaurants still go to their restaurant dashboard.
+     - Admins still go to the admin panel.
+   - If there is a central function like `getHomeRouteForRole(role)`:
+     - Update it so that:
+       - "driver" returns "/driver/map"
+       - Other roles are unchanged.
+
+4. Keep the map experience clean when landing
+   - On /driver/map:
+     - Make sure the map renders immediately, shows the current location marker, and the floating buttons we already designed:
+       - Left: Trip selector / vehicle type selector button
+       - Center: Go Online / Go Offline pill button
+       - Right: Trip info menu button
+     - Ensure there is no extra loading overlay or full-screen black refresh layer when the page first loads, except a subtle spinner if absolutely necessary.
+   - Do NOT reintroduce the old “You / Pickup / Dropoff” cards or the big offline status bar at the top of the map.
+
+5. Basic QA checks
+   - Scenario 1: New login as a driver
+     - Log out.
+     - Log in as a driver.
+     - Confirm the app sends you directly to /driver/map with the Go Online button and current location marker.
+   - Scenario 2: Existing driver session
+     - With an existing logged-in driver, open the driver area root URL (/driver).
+     - Confirm that you land on /driver/map.
+   - Scenario 3: Navigation
+     - From the sidebar, click “Dashboard” → dashboard page should open and show stats, earnings, bonus zones, etc.
+     - From the sidebar, click “Map” → return to /driver/map.
+   - Scenario 4: Other roles
+     - Confirm that customer, restaurant, and admin roles still land on their own dashboards and are not redirected to /driver/map.
+
+6. Code quality and safety
+   - Do not remove any existing security or role checks.
+   - Keep all redirects type-safe and consistent with the existing router pattern.
+   - Add short comments explaining that the driver home route is now the map page:
+     - Example: `// Drivers land on the live map screen by default (Uber-style experience).`
+
+After finishing, summarize exactly what you changed (files and key logic) so that the human can understand how the new default driver flow works.

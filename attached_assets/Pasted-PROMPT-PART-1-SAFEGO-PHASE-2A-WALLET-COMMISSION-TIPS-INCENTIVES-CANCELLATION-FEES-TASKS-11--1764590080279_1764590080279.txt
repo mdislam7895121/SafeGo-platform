@@ -1,0 +1,573 @@
+PROMPT PART 1 — SAFEGO PHASE 2A: WALLET, COMMISSION, TIPS, INCENTIVES & CANCELLATION FEES (TASKS 11–15)
+
+You are an expert backend architect working on the global super-app “SafeGo”.
+
+Your mission in THIS prompt is to implement **Phase 2A** of the SafeGo roadmap, strictly in a non-breaking way:
+
+   11. Implement Wallet Auto-Credit After Trip  
+   12. Implement Commission Deduction Logic  
+   13. Implement Tip Addition Logic  
+   14. Add Incentive/Bonus Engine  
+   15. Build Cancellation Fee + No-Show Fee Logic  
+
+You MUST fully support **all three services**:
+
+   - Rides  → `rides` collection
+   - Food delivery → `food_orders` collection
+   - Parcel delivery → `deliveries` collection
+
+The implementation must be ADDITIVE only: do not rename or remove any route, field, or collection.
+
+==================================================
+A. GLOBAL SAFEGO MASTER RULES (MUST FOLLOW)
+==================================================
+
+1) ROLES (strict separation)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+Each role has:
+   - its own signup + KYC requirements,
+   - its own dashboard,
+   - its own permissions.
+
+No role can access another role’s restricted data.
+
+2) SERVICES (must all be supported)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+All wallet and commission logic must be designed so it works for **all three** services using shared abstractions.
+
+3) COUNTRY-SPECIFIC KYC & VERIFICATION
+SafeGo currently supports at least:
+
+   a) Bangladesh ("BD")
+      - Required for customers + drivers:
+        father_name, date_of_birth, present_address, permanent_address,
+        NID (number + front/back images), emergency contact,
+        verification_status, is_verified.
+   b) United States ("US")
+      - Required for customers:
+        date_of_birth, home_address, emergency contact,
+        government_id_type, government_id_last4,
+        verification_status, is_verified.
+      - Required for drivers:
+        date_of_birth, home_address, emergency contact,
+        government_id_type, government_id_last4,
+        driver_license_number, driver_license_image,
+        driver_license_expiry, optional ssn_last4,
+        verification_status, is_verified.
+
+Business rules for THIS prompt:
+   - Wallet, commission, tips, incentives, cancellation fees apply **only** if:
+       - customer.is_verified = true AND verification_status = "approved".
+       - driver.is_verified = true AND verification_status = "approved".
+       - restaurant.is_verified = true AND verification_status = "approved".
+   - Block any financial processing for blocked or unverified entities.
+
+4) ADMIN PANEL (must stay authoritative)
+Admin must retain and/or gain the ability to:
+   - Verify customers, drivers, restaurants.
+   - Approve/reject KYC with `rejection_reason`.
+   - Block/unblock any user (customer, driver, restaurant).
+   - Update service pricing, fees, commissions (per country + per service).
+   - Manage payouts and settlements.
+   - View driver negative balances.
+   - View restaurant negative balances.
+
+In this Phase 2A, you MUST:
+   - Add admin UI/API for:
+       - configuring commission rates,
+       - configuring incentives/bonuses,
+       - configuring cancellation/no-show fees,
+       - viewing wallet balances and transaction history.
+   - But you MUST NOT remove or rename any existing admin modules / routes.
+
+5) CORE COLLECTIONS (must NOT be renamed or removed)
+   - `rides`
+   - `food_orders`
+   - `deliveries`
+
+Each must retain:
+   - identity fields (customer_id, driver_id, restaurant_id…),
+   - addresses + geolocation,
+   - fees + commission-related fields,
+   - payment details,
+   - timestamps,
+   - full status flow,
+   - rating & feedback.
+
+You may **only** ADD new fields, indexes, or reference IDs related to wallets, commission, tips, and incentives.
+
+6) COMMISSION & PAYOUT RULES (NOW IMPLEMENT THEM)
+These global rules are mandatory and must be implemented precisely:
+
+   1. If customer pays CASH for a ride:
+        - Driver receives the full trip cash from the customer.
+        - SafeGo commission becomes a negative balance in `driver_wallet_balance`.
+        - Driver must settle weekly.
+
+   2. If food order is CASH:
+        - Restaurant receives all cash from the customer.
+        - SafeGo commission becomes a negative balance in `restaurant_wallet_balance`.
+
+   3. If payment is ONLINE (ride/food/parcel):
+        - SafeGo keeps commission automatically out of the online payment.
+        - Driver/restaurant receives only their net share (via wallet, to be paid out later).
+
+   4. Admin can settle balances and mark them as paid, reducing negative balances accordingly.
+
+Your implementation MUST:
+   - Respect these rules across `rides`, `food_orders`, and `deliveries`.
+   - Use ADDITIVE fields and tables to track all movements.
+
+7) SECURITY RULES (ESPECIALLY IMPORTANT FOR MONEY)
+   - Customers cannot view driver documents (NID, license, SSN, etc.).
+   - Drivers cannot view customer NID or sensitive ID data.
+   - Restaurants cannot view other restaurants’ data.
+   - Only admins can:
+       - change pricing and commissions,
+       - override balances,
+       - change verification and block status.
+   - Users may update only their own profile and cannot tamper with wallet balances directly.
+
+In all wallet/transaction APIs:
+   - Never accept raw `balance` from the client.
+   - Only accept high-level commands (e.g., “complete ride”, “add tip”) and compute finance server-side.
+
+8) STATUS FLOWS (must align with financial events)
+Rides:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcels:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+Core financial events:
+   - Fare posting and commission are triggered at **completed**.
+   - Cancellation/no-show fees are triggered at specific cancellation states, based on configuration.
+
+9) ONBOARDING
+   - All financial features must honor:
+       - verification_status,
+       - is_verified,
+       - is_blocked.
+   - No unverified or blocked user may receive payouts or be charged online.
+
+10) NOTIFICATIONS
+   - This prompt prepares financial event types but does NOT implement FCM; that is in Phase 2B.
+   - However, you must design structured “notification events” (internal) so FCM can subscribe later.
+
+11) NO LEGAL CASE/COMPLAINT FEATURES
+   - Do NOT implement any “case”, “complaint”, or “legal claim” features in this prompt, especially for US users.
+   - This prompt is strictly about financial flows.
+
+==================================================
+B. SCOPE OF PHASE 2A
+==================================================
+
+Implement:
+
+   - Shared Wallet & Ledger system for drivers, restaurants, and (optionally) customers.
+   - Auto-credit/debit logic on ride/food/parcel completion.
+   - Commission calculation and negative balance enforcement per rules.
+   - Tip handling for cash + online.
+   - Incentive/bonus accrual engine (no fancy UI required, but fully functional backend).
+   - Cancellation / no-show fees, consistent with service status flows.
+
+Do NOT implement:
+   - Payment gateway integration (Phase 2B).
+   - FCM push notifications (Phase 2B).
+   - Any UI beyond minimal, additive components needed to view wallet and transactions.
+
+==================================================
+C. DATA MODEL: WALLETS & LEDGER (NON-BREAKING)
+==================================================
+
+1) Extend driver and restaurant models (ADD ONLY)
+   - `drivers` table/model:
+       - Add/confirm fields:
+           - driver_wallet_balance (numeric, can be negative)
+           - driver_wallet_currency (e.g., "BDT", "USD")
+   - `restaurants` table/model:
+       - restaurant_wallet_balance (numeric, can be negative)
+       - restaurant_wallet_currency
+
+DO NOT rename or remove existing fields; if they already exist, just start using them consistently.
+
+2) New collection: `wallet_transactions`
+Create a single generic table:
+
+   wallet_transactions:
+       - id
+       - owner_type: "driver" | "restaurant" | "customer" | "platform"
+       - owner_id
+       - service_type: "ride" | "food" | "parcel"
+       - entity_id: ride_id OR food_order_id OR delivery_id
+       - transaction_type:
+           "fare_gross",          // informational only, not always needed
+           "commission_debit",
+           "driver_net_credit",
+           "restaurant_net_credit",
+           "tip_cash_record",
+           "tip_online_credit",
+           "incentive_bonus",
+           "cancellation_fee_debit",
+           "no_show_fee_debit",
+           "settlement_payment",
+           "manual_adjustment"
+       - direction: "credit" | "debit"
+       - amount
+       - currency
+       - balance_after (snapshot of owner’s wallet after the transaction)
+       - country_code
+       - created_at
+       - created_by: "system" | "admin" | "script"
+       - meta (JSON, e.g. {reason, config_version, cancellation_reason,...})
+
+Rules:
+   - Every change to driver_wallet_balance / restaurant_wallet_balance MUST be mirrored by a `wallet_transactions` row.
+   - Never adjust balances without a matching ledger entry.
+
+3) Optional new collection: `platform_revenue_ledger`
+   - Track SafeGo’s platform share:
+       - id
+       - service_type
+       - entity_id
+       - amount
+       - currency
+       - revenue_type: "commission", "cancellation_fee", "no_show_fee" etc.
+       - country_code
+       - created_at
+       - meta JSON
+   - This is for admin analytics and revenue dashboards (to be used later).
+
+==================================================
+D. CONFIGURABLE COMMISSION & FARE CONTEXT
+==================================================
+
+1) Commission configuration
+Add or extend an existing config source (e.g., `pricing_configs`):
+
+   pricing_configs:
+       - id
+       - country_code ("BD", "US", etc.)
+       - service_type ("ride", "food", "parcel")
+       - commission_type: "percentage" | "flat" | "mixed"
+       - commission_value_percent   // e.g. 20
+       - commission_value_flat      // e.g. 30 BDT
+       - driver_minimum_payout (optional)
+       - restaurant_minimum_payout (optional)
+       - cancellation_fee_rules_id (FK)
+       - incentive_rules_id (FK)
+       - active_from, active_to (for versioning)
+
+Admin Panel enhancements (non-breaking):
+   - Add admin screens/APIs to:
+       - create/edit commission profiles per country/service.
+       - view which profile is currently active.
+
+2) Fare inputs
+Assume Phase 1B already computes:
+   - `final_fare_amount`
+   - `fare_breakdown`
+   - `currency`
+
+If not present, ADD (non-breaking) fields in `rides`, `food_orders`, `deliveries`:
+   - total_fare_amount
+   - currency
+   - fare_breakdown (JSON)
+   - payment_method: "cash" | "online"
+   - payment_status: "pending" | "paid" | "failed" | "refunded" (online only, to be used by Phase 2B)
+
+==================================================
+E. WALLET SERVICE & COMMISSION LOGIC (TASKS 11–12)
+==================================================
+
+Implement a centralized service:
+
+   WalletService.settleCompletedRide(ride_id)
+   WalletService.settleCompletedFoodOrder(food_order_id)
+   WalletService.settleCompletedDelivery(delivery_id)
+
+Each function:
+
+1) Load:
+   - the entity (ride/food_order/delivery) with:
+       - customer_id
+       - driver_id
+       - restaurant_id (for food)
+       - country_code
+       - service_type
+       - final/total_fare_amount
+       - payment_method
+   - relevant pricing_config for (country_code, service_type).
+
+2) Compute commission
+   - commission = PricingService.calculateCommission({
+         fare_amount,
+         commission_config
+     })
+   - net_for_partner = fare_amount - commission
+
+3) Apply rules by payment_method:
+
+A) If payment_method = "cash":
+
+   For rides:
+     - Assume driver already physically holds the full `fare_amount`.
+     - DO NOT credit driver wallet with fare_amount.
+     - Instead:
+         - driver_wallet_balance = driver_wallet_balance - commission
+         - Insert wallet_transactions:
+             - owner_type = "driver"
+             - transaction_type = "commission_debit"
+             - direction = "debit"
+             - amount = commission
+         - Insert platform_revenue_ledger row with +commission.
+
+   For food_orders:
+     - Restaurant holds all cash.
+     - restaurant_wallet_balance = restaurant_wallet_balance - commission
+     - Insert corresponding wallet_transactions & platform_revenue_ledger.
+
+   For deliveries:
+     - Apply the same pattern as rides (driver holds cash; commission becomes their negative balance).
+
+B) If payment_method = "online":
+
+   - Customer is charged by the payment gateway (Phase 2B will handle actual charge).
+   - Platform receives the full `fare_amount`.
+   - You must:
+       - Credit partner net share:
+           - For rides (driver):
+               - driver_wallet_balance += net_for_partner
+               - wallet_transactions row:
+                   owner_type = "driver"
+                   transaction_type = "driver_net_credit"
+                   direction = "credit"
+           - For food_orders (restaurant):
+               - restaurant_wallet_balance += net_for_partner
+               - wallet_transactions row with `restaurant_net_credit`.
+           - For parcel deliveries:
+               - driver_wallet_balance += net_for_partner (similar to rides).
+       - Record platform commission:
+           - Insert platform_revenue_ledger with `commission` amount.
+   - Do NOT double-count: do not adjust driver/restaurant with the gross fare; only net_for_partner.
+
+4) Mark entity as settled
+   - Add non-breaking fields:
+       - settlement_status: "pending" | "settled"
+       - settlement_at (timestamp)
+       - settlement_version (config reference)
+   - Set to "settled" once wallet + revenue entries are written.
+
+5) Idempotency
+   - Ensure each ride/food_order/delivery is settled only once.
+   - Use a unique constraint or idempotency check on service_type + entity_id in wallet_transactions or a separate `settlements` table.
+
+==================================================
+F. TIP ADDITION LOGIC (TASK 13)
+==================================================
+
+1) Data model
+Extend entities:
+
+   rides:
+       - tip_amount (numeric)
+       - tip_currency
+       - tip_payment_method: "cash" | "online" | null
+
+Same for `food_orders` and `deliveries` if you support tips there (make it configurable per service).
+
+2) Business rules:
+   - For **online tips**:
+       - 100% of the tip goes to the driver/restaurant (no commission) unless a config explicitly says otherwise.
+       - When an online tip is confirmed (Phase 2B will charge the card):
+           - driver_wallet_balance += tip_amount
+           - wallet_transactions:
+               - owner_type = "driver"
+               - transaction_type = "tip_online_credit"
+               - direction = "credit"
+               - amount = tip_amount
+   - For **cash tips**:
+       - Driver receives cash directly.
+       - Do NOT adjust wallet balance.
+       - Do create an informational `wallet_transactions` row with:
+           - transaction_type = "tip_cash_record"
+           - direction = "credit"
+           - amount = tip_amount
+           - balance_after = unchanged
+       - No platform commission on cash tips.
+
+3) Admin visibility
+   - Admin UI should show tip amounts per ride/order and aggregated by driver/restaurant.
+   - All tip rules must be country-agnostic but stored with `country_code` for analytics.
+
+==================================================
+G. INCENTIVE / BONUS ENGINE (TASK 14)
+==================================================
+
+Implement a generic incentive framework; do not hardcode any one campaign.  
+
+1) New tables:
+   - incentive_rules:
+       - id
+       - name
+       - description
+       - owner_type: "driver" | "restaurant"
+       - country_code
+       - service_type ("ride" | "food" | "parcel" | "any")
+       - rule_type:
+           "per_trip_bonus",      // bonus per completed trip/order
+           "streak_bonus",        // X trips in timeframe
+           "target_bonus"         // hit N trips/earnings
+       - parameters (JSON):
+           e.g. { "amount": 100, "currency": "BDT", "min_trips": 10, "window_hours": 24 }
+       - active_from, active_to
+       - is_active
+
+   - incentive_awards:
+       - id
+       - rule_id (FK)
+       - owner_type
+       - owner_id
+       - service_type
+       - entity_id (ride/order/delivery)
+       - amount
+       - currency
+       - created_at
+       - status: "pending" | "granted" | "cancelled"
+       - wallet_transaction_id (nullable)
+
+2) Execution
+   - On completion of any ride/food_order/delivery:
+       - Evaluate active incentive_rules for that owner (driver or restaurant).
+       - If conditions are met:
+           - Insert incentive_awards row.
+           - Credit the owner’s wallet:
+               - wallet_transactions entry with transaction_type = "incentive_bonus".
+               - Increase driver_wallet_balance or restaurant_wallet_balance.
+           - Link incentive_awards.wallet_transaction_id to the transaction.
+
+3) Admin control
+   - Admin panel must be able to:
+       - Create/edit incentive_rules.
+       - Enable/disable rules.
+       - View incentive_awards and their impact per driver/restaurant.
+
+==================================================
+H. CANCELLATION & NO-SHOW FEES (TASK 15)
+==================================================
+
+1) Configuration
+Add a `cancellation_fee_rules` table:
+
+   cancellation_fee_rules:
+       - id
+       - country_code
+       - service_type ("ride" | "food" | "parcel")
+       - applies_when:
+           - "cancelled_by_customer_after_accept",
+           - "cancelled_by_customer_after_arrival",
+           - "no_show_customer",
+           - etc. (enumerated)
+       - fee_type: "flat" | "percentage"
+       - fee_value
+       - max_fee (optional)
+       - charged_party: "customer"
+       - payout_party: "driver" | "restaurant" | "platform"
+       - currency
+       - is_active
+       - active_from, active_to
+
+Link each pricing_config or service to an active cancellation_fee_rules_id where relevant.
+
+2) Trigger points
+   - When a ride/food_order/delivery transitions to a cancel status:
+       - Example ride statuses:
+           - "cancelled_by_customer"
+           - "cancelled_by_driver"
+           - "cancelled_by_admin"
+           - "no_show_customer"
+   - For each relevant transition:
+       - Check cancellation_fee_rules for (country_code, service_type, status reason).
+       - If applicable, compute fee_amount.
+
+3) Financial logic
+   - If payment_method = "cash":
+       - SafeGo expects the fee to be collected physically or not collected (depending on UX).
+       - For simplicity and correctness:
+           - DO NOT change customer wallet in this phase.
+           - Instead:
+               - If payout_party = "driver" and fee is considered owed to driver:
+                   - driver_wallet_balance += fee_amount (if we assume platform owes driver) OR
+                   - nothing (if we assume driver collects cash).
+               - For platform-wide approach:
+                   - Treat cancellation_fee as platform revenue but **do not** attempt to simulate cash collection now.
+       - Keep this minimal; main robust implementation will be for online payments.
+
+   - If payment_method = "online":
+       - Phase 2B will collect the fee via gateway.
+       - In this phase, define the internal settlement model:
+           - wallet_transactions:
+               - If payout_party = "driver":
+                   - owner_type = "driver"
+                   - transaction_type = "cancellation_fee_debit" or credit depending on design.
+                   - Typically: credit driver with part/all of fee while platform keeps rest.
+               - If payout_party = "platform":
+                   - record in platform_revenue_ledger.
+
+4) Status consistency
+   - Ensure cancellations and fees never run twice for the same entity:
+       - Use a `cancellation_fee_applied` flag on each ride/order/delivery.
+
+==================================================
+I. ADMIN & SECURITY (FINANCIAL SECURITY PHASE)
+==================================================
+
+This Phase 2A is part of SafeGo’s **Financial Integrity & Audit Logging** security phase:
+
+   - Every financial change must have:
+       - A ledger record (`wallet_transactions` or `platform_revenue_ledger`).
+       - A clear, traceable source (ride/order/delivery id).
+       - A timestamp and country_code.
+   - Admin can:
+       - View all wallet balances and transactions.
+       - Perform manual `settlement_payment` or `manual_adjustment` operations, which:
+           - always create wallet_transactions entries,
+           - are audit-logged with admin user id.
+
+NO ONE EXCEPT ADMIN/SYSTEM:
+   - can adjust balances.
+   - can create manual adjustments.
+
+==================================================
+J. NON-BREAKING GUARANTEES & IMPLEMENTATION NOTES
+==================================================
+
+When implementing this prompt:
+
+   - Only ADD:
+       - new tables: wallet_transactions, platform_revenue_ledger, incentive_rules, incentive_awards, cancellation_fee_rules.
+       - new fields on existing models (e.g., settlement_status, tip_* fields).
+       - new services: WalletService, IncentiveService, CancellationFeeService.
+       - new admin views/APIs that are additive.
+   - Do NOT:
+       - rename or delete existing tables/fields.
+       - change any existing route signatures.
+       - alter previously implemented dispatch or status logic beyond adding settlement hooks at completion/cancellation.
+
+Implement production-quality code with:
+   - Clear separation between:
+       - PricingService (fare & commission),
+       - WalletService (balance changes & ledger),
+       - IncentiveService,
+       - CancellationFeeService.
+   - Strong server-side checks so the client cannot forge wallet balances or bypass settlement.

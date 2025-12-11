@@ -1,0 +1,68 @@
+The customer app at /customer is now rendering a completely blank white screen after the last changes. There is no 404 page and no visible error banner – just an empty page. Your ONLY goal now is to restore the SafeGo customer UI so that it loads again without breaking any existing flows. Do not add any new features until the blank screen is fixed.
+
+Follow these instructions exactly:
+
+1) Diagnose the blank screen
+- Start the application and open the /customer route in Preview.
+- Check:
+  - Browser console for runtime errors (React, TypeScript, undefined variable, hook errors, etc.).
+  - Dev tools network tab for failing requests that might crash the UI.
+  - Server logs in the Replit console.
+- Identify the exact file, function, or component that is throwing the error. Very likely this is in the new traffic ETA provider / hook or live tracking changes you just added.
+
+2) Restore a safe rendering path
+- IMPORTANT: The app must render even if traffic ETA or any external API fails.
+- For any new function or hook you added (for example: traffic-aware ETA provider or new live tracking helpers):
+  - Wrap dangerous logic with try/catch.
+  - If something fails (missing env key, bad response, undefined coordinates, etc.), return a safe fallback:
+    - For ETA: reuse the previous simulated/demo ETA logic.
+    - For optional fields: return null or a default value instead of throwing.
+- If a hook is being called in a way that violates React rules (inside a conditional, loop, etc.), refactor it so that:
+  - All hooks are called unconditionally at the top level of the component.
+- If you introduced a new context/provider that is not properly wrapped around the app, either:
+  - Fix the provider wiring, or
+  - Temporarily disable its usage and fall back to the previous implementation.
+- Do NOT change the route structure (/customer, /customer/book, etc.). Keep the same pages as before.
+
+3) If necessary, revert only the broken parts
+- Use the last working checkpoint as a reference:
+  - The last known good state was when /customer showed the booking UI and live tracking correctly (before the latest traffic ETA changes).
+- If you cannot easily patch the new traffic ETA logic without errors:
+  - Revert the new ETA/traffic-specific code to the last working version.
+  - Leave behind a TODO comment indicating where traffic-aware ETA should be reintroduced later, but make sure all references compile and run now.
+- Do NOT roll back unrelated features like:
+  - Trip receipt page
+  - Rating dialog
+  - Support chat entry points
+  - Live driver tracking that was already working
+
+4) Error boundaries and UX
+- If a global ErrorBoundary exists, make sure:
+  - It does NOT swallow errors silently with a blank screen.
+  - At minimum, it should render a basic fallback UI instead of a blank page.
+- However, the primary goal is to eliminate the error so that the normal UI renders; do not spend time building a fancy error screen.
+
+5) Verification checklist (must all pass before you stop)
+- /customer loads with:
+  - Book a ride card (pickup/dropoff inputs).
+  - Route selection, vehicle selection, and booking confirmation flow.
+- A test ride can be booked in demo mode:
+  - Driver card appears.
+  - Live map renders with driver and customer markers.
+- No uncaught errors appear in the browser console during:
+  - Initial load of /customer
+  - Booking a ride
+  - Viewing live tracking
+- Even if the traffic API or ETA provider fails, the app still works using simulated/demo ETA.
+
+6) Scope control
+- Do NOT implement new traffic-aware logic in this loop.
+- Do NOT modify Eats or Parcel, restaurant, or parcel features.
+- Focus only on:
+  - Fixing the blank screen on /customer
+  - Ensuring existing SafeGo Ride customer flow is fully usable again.
+
+When finished:
+- Summarize exactly what caused the blank screen (file + line or function).
+- Explain what fallback or revert you implemented.
+- Confirm that /customer works end-to-end again in demo mode.

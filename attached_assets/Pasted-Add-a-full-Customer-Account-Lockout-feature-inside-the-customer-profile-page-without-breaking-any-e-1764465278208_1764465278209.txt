@@ -1,0 +1,58 @@
+Add a full Customer Account Lockout feature inside the customer profile page, without breaking any existing flows.
+
+Requirements:
+
+1) Profile UI changes
+• On /customer/profile add a new section called “Security & Account Lock”.
+• In that section add:
+  – A status line: “Account status: Active / Locked”.
+  – A primary button: “Lock my account”.
+  – If the account is already locked, the primary button text becomes “Unlock my account”.
+
+2) Lock account flow
+• When the user taps “Lock my account”, open a confirmation dialog:
+  – Title: “Lock your SafeGo account?”
+  – Message explaining that they won’t be able to book rides, food orders or parcels until they unlock.
+  – Require the user to type “LOCK” to confirm.
+• On confirm:
+  – Call a backend endpoint to set isAccountLocked = true for the current user.
+  – Store a local flag in auth/session state so the UI updates immediately.
+  – Show a success toast: “Your account is locked. You can unlock it from your profile at any time.”
+
+3) Unlock account flow
+• When the account is locked, the profile section must show:
+  – “Account status: Locked”.
+  – A warning description about limited access.
+  – Primary button: “Unlock my account”.
+• Tapping the button opens an unlock dialog that:
+  – Asks for the user’s password (or PIN) and sends a one-time verification code (OTP) to email or phone (reuse existing verification utilities).
+  – Only on successful password + OTP verification call backend to set isAccountLocked = false.
+  – Update client auth/session state and show toast: “Your account is active again.”
+
+4) Backend & security rules
+• Extend the User model with a boolean field isAccountLocked (default false).
+• Update all booking and payment related endpoints (ride, food, parcel) to enforce:
+  – If isAccountLocked is true, return an HTTP 423 (Locked) or 403 with a clear error code like ACCOUNT_LOCKED.
+• On the frontend, globally handle ACCOUNT_LOCKED errors:
+  – Show a toast: “Your account is locked. Go to Profile → Security & Account Lock to unlock.”
+  – Redirect the user to /customer/profile when appropriate.
+• Do NOT block access to:
+  – Login / logout.
+  – Support Center pages so the user can still contact support.
+  – KYC and basic profile viewing.
+
+5) Login attempt protection (basic lockout)
+• Add a simple login protection rule:
+  – After 5 failed login attempts within 15 minutes for the same account, temporarily lock the account for 15 minutes (store a separate temporary lock timestamp).
+  – Show a message: “Too many failed attempts. Please try again in 15 minutes or lock your account from profile and contact support if this wasn’t you.”
+• Make sure this rate-limiting uses server-side counters and cannot be bypassed from the client.
+
+6) UX & non-breaking changes
+• Keep styling consistent with the existing profile cards (same typography, spacing, light/dark mode).
+• Do not remove or change any existing profile features (Payment, Places, KYC, Support Center, etc.).
+• Add data-test-ids for the lock/unlock buttons and dialogs so we can test this later.
+
+Please implement this feature end-to-end (frontend + backend), run the architect review, and then tell me how to test:
+• How to lock the account from profile.
+• How the app behaves when locked while trying to book.
+• How to unlock and restore full access.

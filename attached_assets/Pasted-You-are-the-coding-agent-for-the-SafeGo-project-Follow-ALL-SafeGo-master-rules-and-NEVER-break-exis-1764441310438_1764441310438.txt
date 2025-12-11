@@ -1,0 +1,176 @@
+You are the coding agent for the SafeGo project. Follow ALL SafeGo master rules and NEVER break existing working flows.
+
+====================================================
+1. GLOBAL SAFEGO RULES (ALWAYS RESPECT)
+====================================================
+1. Roles:
+   - Customer (web + future mobile app)
+   - Driver
+   - Restaurant (for Eats)
+   - Admin (backoffice)
+   All features must keep these four roles consistent.
+
+2. Product scope:
+   - Unified platform with Ride, Eats, and Parcel in one SafeGo account.
+   - Current task is ONLY about Ride post-booking experience for the CUSTOMER web app, but you must not break Eats or Parcel views.
+
+3. Security & data rules:
+   - Never expose internal IDs, secrets, tokens, or implementation details in UI.
+   - Use only already-available APIs / endpoints; do NOT hardcode keys or secrets.
+   - Validate all inputs, avoid trusting client data for pricing or commission.
+   - Do NOT change pricing, commission, or payout logic in this task – UI only.
+
+4. UX principles:
+   - Same layout must adapt cleanly to desktop AND mobile (device-friendly, responsive).
+   - Do not remove existing, working functionality without replacing it with an equivalent or better UX.
+   - Avoid breaking JSX / TypeScript – no unclosed tags, no invalid JSX fragments.
+   - Follow the current SafeGo visual language (buttons, pills, cards, typography) that you already implemented on the unified booking page.
+
+5. Non-breaking requirement:
+   - Keep the existing unified header (SafeGo logo + Ride / Eats / Parcel switcher + profile menu) exactly as is.
+   - Keep existing booking, route selection, and fare calculation logic exactly as is.
+   - If you touch an existing file, leave the logic clearer and safer than before.
+
+====================================================
+2. TASK SUMMARY
+====================================================
+Implement a complete, Uber-style **post-booking ride tracking experience** for the CUSTOMER, both on desktop and on mobile, with **proper live map, rotating driver icon, and clear status panels.** Make sure everything works end-to-end with the current unified booking flow.
+
+The user flow must be:
+
+1. Customer selects route + car and confirms ride.
+2. Screen changes to “Your driver is on the way” with:
+   - Driver card
+   - ETA to pickup
+   - Distance to pickup
+   - Live map entry point (“View live map”)
+3. When customer taps “View live map”, they see a FULL live tracking map where:
+   - Car icon moves smoothly along the route.
+   - Car icon rotates according to heading, always pointing in movement direction.
+   - Pickup phase vs on-trip phase are clearly visible.
+4. Status continuously updates until trip ends or customer cancels.
+
+====================================================
+3. FILES & ARCHITECTURE YOU MUST WORK WITH
+====================================================
+1. Frontend:
+   - React + TypeScript app (Vite).
+   - Current ride booking screen is implemented in:
+     - `client/src/pages/customer/unified-booking.tsx` (main unified booking page)
+     - plus any existing ride tracking components you already created.
+   - Map is implemented via the existing mapping setup (do NOT replace the mapping library, reuse what’s already in the project).
+
+2. Backend:
+   - There is already some driver location / route logic used for estimates and for the temporary live map you built.
+   - Reuse existing endpoints or mock data generators for driver tracking; do not change pricing or ETA business logic.
+
+If you need new components, place them under:
+   - `client/src/components/ride/` (create this folder if it doesn’t exist) with clear file names like:
+     - `RideStatusPanel.tsx`
+     - `LiveMapView.tsx`
+     - `DriverTrackingHook.ts`
+
+====================================================
+4. DESIRED UX – AFTER RIDE CONFIRM
+====================================================
+
+4.1 Status panel on unified booking screen
+------------------------------------------
+After the customer confirms a ride from the unified booking page:
+
+1. Keep the **“Choose your route”** section at the top as it is now (with three route chips: Fastest / other routes). Do NOT break their layout. They must be fully visible on mobile and desktop.
+
+2. Under this, show a **status card** with the following states:
+
+   (A) DRIVER_ON_THE_WAY (before pickup)
+   -------------------------------------
+   Card content must show:
+   - Title: `Your driver is on the way`
+   - Driver avatar circle with initials (e.g. "JD")
+   - Driver name (e.g. John D.)
+   - Rating (e.g. ★ 4.9)
+   - Car model + color (e.g. Toyota Camry · Gray)
+   - Plate number (e.g. ABC-1234)
+   - Pickup ETA: `Pickup in ~4 min`
+   - Distance to pickup: `Distance: 2.3 mi`
+   - A primary action row with:
+     - `View live map` (button with map icon)
+     - `Cancel ride` (secondary text button below)
+
+   (B) DRIVER_ARRIVED
+   ------------------
+   - Title: `Your driver has arrived`
+   - Same driver card
+   - Text: `Please meet your driver at the pickup location.`
+   - ETA can be replaced with: `Pickup: Arrived`
+   - “View live map” still available.
+
+   (C) ON_TRIP
+   -----------
+   - Title: `On your way to destination`
+   - Shows:
+     - ETA to dropoff (e.g. `~1 h 43 min`)
+     - Distance remaining (e.g. `Distance: 94.9 mi`)
+   - Still shows driver info.
+   - “View live map” is available and tracks route from current car location to dropoff.
+
+   (D) TRIP_COMPLETED
+   ------------------
+   - Title: `Trip completed`
+   - Simple summary:
+     - Final price
+     - Distance + duration
+   - Placeholder for future rating UI (just show “Rating coming soon” text for now).
+
+4.2 “View live map” behavior
+----------------------------
+- **Desktop:** clicking `View live map` should keep the current page route (`/customer/unified-booking`), but:
+  - Scroll the layout so that the right-hand map is clearly visible, AND
+  - Expand the map area into a **“tracking mode”**: center on driver, show route polyline, animate car.
+  - Highlight the active status panel on the left.
+
+- **Mobile:** clicking `View live map` should:
+  - Navigate to a **dedicated live tracking screen**, e.g. route `/customer/trip/live/:tripId` or a full-screen overlay.
+  - Use a top bar:
+    - Back arrow
+    - Trip status text (e.g. `On the way · 4 min`)
+  - Bottom sheet:
+    - Driver card
+    - ETA + distance
+    - “Cancel ride” button
+
+====================================================
+5. LIVE TRACKING & MAP BEHAVIOR
+====================================================
+
+5.1 Data model
+--------------
+You must define a small, typed interface for driver tracking:
+
+```ts
+type DriverTrackingStatus = 'DRIVER_ON_THE_WAY' | 'DRIVER_ARRIVED' | 'ON_TRIP' | 'TRIP_COMPLETED';
+
+interface DriverTrackingUpdate {
+  tripId: string;
+  status: DriverTrackingStatus;
+  driver: {
+    id: string;
+    name: string;
+    initials: string;
+    rating: number;
+    vehicleModel: string;
+    vehicleColor: string;
+    plate: string;
+  };
+  pickupEtaMinutes?: number;
+  dropoffEtaMinutes?: number;
+  distanceMiles?: number;
+  currentPosition: {
+    lat: number;
+    lng: number;
+    heading?: number; // degrees 0–360, 0 = north
+  };
+  pickupLocation: { lat: number; lng: number };
+  dropoffLocation: { lat: number; lng: number };
+  routePolyline: [number, number][]; // list of [lat, lng]
+}

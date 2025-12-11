@@ -1,0 +1,153 @@
+Step 40 – Unified Payout / Payment Section Layout (Drivers, Customers, Restaurants)
+
+Goal
+Align the “Payout / Payment Information” section across all profiles and move it to the correct position in the admin detail pages, without changing any existing payout logic or wallet/settlement behavior.
+
+Key rules
+- No database schema changes.
+- No changes to payout processing, wallet balances, or commission calculations.
+- Only layout / copy / section ordering updates on the admin UI.
+- Reuse existing payout account endpoints and models.
+- No emojis in any new labels or descriptions.
+
+1. Driver Profile – Layout Update
+
+Pages:
+- Admin driver detail page: `/admin/drivers/:id`
+
+Current:
+- Identity / KYC blocks (Bangladesh / USA)
+- Earnings summary cards:
+  - Rides: Trips, Earnings, Commission
+  - Food Orders: Orders, Earnings, Commission
+  - Parcel Deliveries: Deliveries, Earnings, Commission
+- Vehicle Information
+- Payout Information (currently at the very bottom, under the earnings cards and sometimes under vehicle info)
+
+Required layout order (top → bottom):
+1) Identity / KYC section (unchanged)
+2) Earnings Summary
+   - Rides card
+   - Food Orders card
+   - Parcel Deliveries card
+3) **Payout Information**
+   - This entire card must appear **immediately after** the Earnings Summary section and **before** Vehicle Information.
+   - Card title: “Payout Information”
+   - Existing content:
+     - Empty state text: “No payout accounts configured. Click ‘Add Payout Account’ to add one.”
+     - Button: “Add Payout Account”
+   - Keep all existing behavior for adding/removing payout accounts.
+4) Vehicle Information
+   - Vehicle details
+   - Registration and insurance status/warnings
+   - DMV/TLC inspection status (no changes here)
+
+Design requirements:
+- Use same card width and padding as other sections.
+- Add a horizontal divider between “Payout Information” and “Vehicle Information” to visually separate payout vs vehicle blocks.
+- If no vehicle exists, the “Payout Information” card still appears in the same position.
+
+2. Restaurant Profile – Layout Update
+
+Page:
+- Admin restaurant detail page: `/admin/restaurants/:id` (or existing equivalent)
+
+Target layout (top → bottom):
+1) Basic Restaurant Info
+   - Name, email, phone, address
+2) Earnings / Commission Overview
+   - Summary of total orders, earnings, and commission (existing metrics – do not change logic)
+3) **Restaurant Payout Information**
+   - New/renamed section for restaurants matching the driver payout layout:
+     - Title: “Payout Information”
+     - Same component pattern as driver payouts (list of payout accounts, empty state, “Add Payout Account” button).
+   - Reuse the same backing data model and API used by drivers (linking by restaurant id instead of driver id as appropriate).
+4) Restaurant Operations / Menu / Other existing sections
+   - Keep everything else in the same order after payout info.
+
+Notes:
+- Do not add any new payout logic; only connect to existing payout account endpoints.
+- If restaurant payout accounts are not yet wired in the backend, reuse the same create/list/update/delete endpoints as drivers, with entity type/foreign key adjusted according to existing conventions (no breaking changes).
+
+3. Customer Profile – Payment Methods Section
+
+Page:
+- Admin customer detail page: `/admin/customers/:id`
+
+Concept:
+- Customers do not receive payouts; they make payments.
+- For customers, the section should be labeled as “Payment Methods” instead of “Payout Information”.
+
+Layout (top → bottom):
+1) Basic Customer Info
+   - Name, email, phone
+2) Ride/Food/Parcel Usage Summary (if present – do not change logic)
+3) **Payment Methods**
+   - Card title: “Payment Methods”
+   - Content:
+     - List of attached payment methods (e.g., masked card, wallet, other providers) if such data is already available.
+     - If there is no data source yet, show an empty state only:
+       - Text: “No payment methods on file.”
+     - No new payment processing logic is required in this step.
+   - Follow same card layout style as Payout Information but with different text.
+4) Any existing security or account status sections
+
+Important:
+- Do not display payout accounts on the customer profile.
+- Do not expose full card numbers or sensitive payment data; use existing masking helpers.
+
+4. Payout / Payment Component Consistency
+
+Component behavior:
+- Create a shared UI pattern for:
+  - Driver Payout Information
+  - Restaurant Payout Information
+  - Customer Payment Methods (read-only for now)
+- The shared component should:
+  - Accept props like: `entityType` ("driver" | "restaurant" | "customer") and `entityId`.
+  - For drivers/restaurants, show payout accounts with the existing add/edit/remove functionality.
+  - For customers, show only a read-only list (or empty state) based on existing payment method data source; no “Add Payout Account” button for customers in this step.
+
+Copy rules:
+- Driver / Restaurant: Use “Payout Information” and “Add Payout Account”.
+- Customer: Use “Payment Methods” and “No payment methods on file.” (no add button).
+
+5. Wallet / Settlement Integration
+
+- Do not change the Wallet Settlement System implementation.
+- Do not change any commission calculations or wallet balance logic.
+- Payout cards remain purely configuration views for payout destinations; the actual settlement process continues to use the existing wallet and settlement flows.
+- Ensure that moving the cards does not break any links from the Wallet Settlement Dashboard to user profiles.
+
+6. Testing Checklist
+
+Driver profile:
+- Open `/admin/drivers/:id` for a driver with:
+  - No payout accounts
+  - At least one payout account
+- Verify:
+  - Identity → Earnings → Payout Information → Vehicle Information order.
+  - “Add Payout Account” opens existing flow.
+  - Wallet settlement still reads the correct payout account (no regression).
+
+Restaurant profile:
+- Open `/admin/restaurants/:id`:
+  - Confirm Earnings/Commission overview appears first.
+  - Confirm “Payout Information” card appears directly under the overview and works the same as drivers.
+  - Confirm wallet/settlement still functions correctly.
+
+Customer profile:
+- Open `/admin/customers/:id`:
+  - Confirm “Payment Methods” section appears under basic info and any usage summary.
+  - Confirm no “Payout Information” card exists for customers.
+  - Confirm no sensitive payment data is shown unmasked.
+
+General:
+- No new API errors in browser console.
+- No layout breakage on mobile/tablet widths.
+- No emojis introduced.
+
+Finally, summarize in the task output:
+- What layout changes were made for each role (driver, restaurant, customer).
+- Confirmation that no payout, wallet, or commission logic was modified.
+- Confirmation that all pages are mobile-responsive and consistent with existing admin design.

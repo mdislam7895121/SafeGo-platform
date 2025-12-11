@@ -1,0 +1,372 @@
+[TASK 2 – ADMIN FINANCE DASHBOARD (REVENUE + BALANCES + SETTLEMENTS)]
+
+You are now implementing a professional Admin Finance Dashboard for SafeGo.
+
+Goals:
+- Admin can see company revenue (online payments) per country and per service.
+- Admin can see driver negative balances and restaurant negative balances.
+- Admin can record settlements and mark commissions as paid.
+- Admin can filter by BD vs US, payment method, etc.
+- All changes must be additive and respect existing Admin role and permissions.
+
+====================================================
+1) HIGH-LEVEL STRUCTURE
+====================================================
+Add a new main section in the Admin panel:
+
+- Navigation:
+  - “Finance”
+    - Overview
+    - Gateway Reports
+    - Driver Balances
+    - Restaurant Balances
+    - Settlements History
+
+Only Admin users (with proper role/permission) can access these pages.
+
+====================================================
+2) BACKEND – FINANCE STATISTICS SERVICE
+====================================================
+Create a dedicated backend service/class, e.g.:
+
+- `FinanceStatsService`
+
+Responsibilities:
+- Aggregate revenue by country, service, payment_method, and time.
+- Aggregate driver and restaurant wallet balances (especially negative).
+- Provide paginated lists for Admin tables.
+
+2.1 Key functions (pseudocode):
+
+- getOverviewStats(params: { fromDate?, toDate? })
+  → returns:
+    - totalOnlineRevenueByCountry: [{ country_code, currency, total_amount }]
+    - totalCashCommissionByCountry: [{ country_code, currency, total_commission_estimated }]
+    - totalDriverNegativeBalanceByCountry: [...]
+    - totalRestaurantNegativeBalanceByCountry: [...]
+    - topCountriesByRevenue
+
+- getGatewayReport(params: { country_code?, provider?, payment_method?, fromDate?, toDate?, orderType?, page, pageSize })
+  → returns list of payment records joined from rides/food_orders/deliveries:
+    - order_type (ride/food/delivery)
+    - order_id
+    - customer_id
+    - driver_id
+    - restaurant_id
+    - country_code
+    - payment_provider
+    - payment_method
+    - payment_status
+    - currency
+    - amount (total fare or order total)
+    - safe_go_commission_amount
+    - created_at
+
+- getDriverBalances(params: { country_code?, minNegative?, page, pageSize })
+  → returns:
+    - driver_id
+    - driver_name
+    - country_code
+    - driver_wallet_balance
+    - driver_wallet_negative_balance
+    - total_unsettled_orders_count
+
+- getRestaurantBalances(params: { country_code?, minNegative?, page, pageSize })
+  → similar to above for restaurants.
+
+- getSettlementsHistory(params: { user_type?, user_id?, country_code?, fromDate?, toDate?, page, pageSize })
+  → returns settlements records.
+
+====================================================
+3) DATA MODEL – SETTLEMENTS TABLE
+====================================================
+Create a new table/collection:
+
+- Name suggestion: `settlements`
+
+Fields:
+- id
+- user_type              ("driver" | "restaurant")
+- user_id
+- country_code
+- total_amount           (numeric)
+- currency               (e.g. "USD", "BDT")
+- method                 (e.g. "bank_transfer", "cash_deposit", "bkash", "nagad", "stripe_payout_adjust")
+- reference              (string; optional, e.g. bank ref, transaction id)
+- notes                  (string; optional, admin free-text)
+- created_by_admin_id
+- created_at
+- applied_to_order_ids   (Array of order ids, or separate join table `settlement_orders`)
+
+You may also add a mapping table:
+
+- `settlement_orders`:
+  - id
+  - settlement_id
+  - order_type ("ride" | "food" | "delivery")
+  - order_id
+  - commission_amount_applied (numeric)
+
+Behavior:
+- When a settlement is recorded:
+  - Update driver_wallet_balance or restaurant_wallet_balance accordingly.
+  - Mark related orders’ is_commission_settled = true.
+
+====================================================
+4) DRIVER & RESTAURANT BALANCE LOGIC
+====================================================
+Assume:
+- driver_wallet_balance can be positive or negative.
+- driver_wallet_negative_balance reflects negative portion or is computed.
+
+Define a clear rule (but preserve existing logic):
+
+- For readability:
+  - If driver_wallet_balance < 0:
+    - driver_wallet_negative_balance = absolute value of driver_wallet_balance
+  - Else:
+    - driver_wallet_negative_balance = 0
+
+Same idea for restaurants.
+
+Do NOT break existing places that already compute or store these values. If needed, compute negative balances on the fly in FinanceStatsService, without changing core models.
+
+====================================================
+5) ADMIN FINANCE UI – OVERVIEW PAGE
+====================================================
+Route example: `/admin/finance/overview`
+
+Content:
+
+5.1 Filters:
+- Date range picker (default: last 7 days)
+- Country selector (All / BD / US)
+- Service type selector (All / ride / food / delivery)
+
+5.2 Top-level cards:
+- “Total Online Revenue”
+  - Sum of all online captured payments (Stripe + SSLCOMMERZ) for filter.
+  - Shown per country (or global if no filter).
+- “Total Driver Negative Balances”
+- “Total Restaurant Negative Balances”
+- “Total Estimated Cash Commissions”
+  - Approximated using cash orders’ commission amounts where not settled.
+
+5.3 Charts (optional but recommended):
+- Bar chart: Online revenue by country (BD vs US) over time.
+- Bar chart: Online revenue by service type (ride/food/delivery).
+- Table of “Top 10 drivers by negative balance” (link to balances page).
+- Table of “Top 10 restaurants by negative balance”.
+
+====================================================
+6) ADMIN FINANCE UI – GATEWAY REPORTS
+====================================================
+Route: `/admin/finance/gateway-reports`
+
+6.1 Filters:
+- Country: All / BD / US
+- Provider: All / stripe / sslcommerz / cash
+- Payment method: (e.g. stripe_card, apple_pay, google_pay, sslcommerz_online, cash)
+- Payment status: (pending, captured, failed, refunded)
+- Service type: (ride, food, delivery)
+- Date range
+
+6.2 Table columns:
+- Date (created_at)
+- Country
+- Service type
+- Order ID (clickable → opens order details page)
+- Customer (id/name)
+- Driver / Restaurant (if applicable)
+- Payment provider
+- Payment method
+- Amount (with currency)
+- Commission amount (safe_go_commission_amount)
+- Payment status
+- Reference id (shortened, with tooltip for full)
+
+6.3 Summary bar:
+- Total transactions count
+- Total captured amount
+- Total failed amount
+- Total commission from online payments
+
+Use pagination and sorting.
+
+====================================================
+7) ADMIN FINANCE UI – DRIVER BALANCES
+====================================================
+Route: `/admin/finance/driver-balances`
+
+7.1 Filters:
+- Country: All / BD / US
+- Min negative balance: (e.g. > 0, > 100, > 1000)
+- City/region (optional, if known)
+- Search by driver name/id
+
+7.2 Table columns:
+- Driver name
+- Driver id
+- Country
+- Total wallet balance
+- Negative balance (highlight in red)
+- Count of unsettled orders (rides/food/deliveries)
+- Last ride date
+- Action: “View details” / “Create settlement”
+
+7.3 Driver details drawer/page:
+When clicking “View details”:
+
+- Show:
+  - Driver profile summary.
+  - List of unsettled orders with:
+    - order_type, order_id
+    - service type
+    - date
+    - commission_amount
+  - Total negative balance calculated from these orders.
+
+7.4 Settlement action:
+From this detail view:
+
+- Button: “Record settlement”
+- Opens a form:
+  - Amount (default = total_negative_balance but editable)
+  - Currency (pre-filled from country)
+  - Method (dropdown: bank_transfer, cash_deposit, bkash, nagad, stripe_payout_adjust, other)
+  - Reference (text)
+  - Notes (text)
+
+On submit:
+- Create `settlements` record.
+- Adjust driver_wallet_balance accordingly.
+- Mark selected orders as is_commission_settled = true (either all or specific subset).
+- Recompute negative balance.
+- Log action by admin id.
+
+====================================================
+8) ADMIN FINANCE UI – RESTAURANT BALANCES
+====================================================
+Route: `/admin/finance/restaurant-balances`
+
+Mirror structure of driver balances, but for restaurants:
+
+8.1 Filters:
+- Country
+- Min negative balance
+- Restaurant name/id search
+
+8.2 Table columns:
+- Restaurant name
+- Restaurant id
+- Country
+- Total wallet balance
+- Negative balance
+- Unsettled food_orders count
+- Last order date
+- Action: “View details” / “Create settlement”
+
+8.3 Details + settlement:
+Exactly same settlement logic as drivers, but with user_type="restaurant".
+
+====================================================
+9) ADMIN FINANCE UI – SETTLEMENTS HISTORY
+====================================================
+Route: `/admin/finance/settlements-history`
+
+9.1 Filters:
+- Date range
+- Country
+- User type: driver / restaurant
+- User id
+- Admin who created it
+- Method
+
+9.2 Table columns:
+- Date
+- User type & user name/id
+- Country
+- Amount & currency
+- Method
+- Reference
+- Created by admin
+- Notes
+- View applied orders (button)
+
+9.3 Settlement detail:
+When clicking on a settlement:
+
+- Show:
+  - All basic fields.
+  - List of associated orders (from `settlement_orders`):
+    - order_type
+    - order_id
+    - commission_amount_applied
+    - link to order details.
+
+====================================================
+10) SECURITY & PERMISSIONS
+====================================================
+- Only Admin with “finance” permission can access Finance section.
+- Finance pages are read-only for most admins, except:
+  - Only specific roles (e.g. "super_admin" or "finance_admin") can:
+    - create settlements
+    - adjust balances via settlements
+    - toggle payment methods active/inactive per country.
+
+- Log all settlement actions:
+  - admin_id
+  - timestamp
+  - payload snapshot (excluding sensitive details)
+  - IP (if available)
+
+Do NOT allow direct arbitrary edits to driver_wallet_balance or restaurant_wallet_balance—only through settlement flows.
+
+====================================================
+11) INTEGRATION WITH BD & US PAYMENT LOGIC
+====================================================
+- Gateway Reports:
+  - Show US Stripe transactions.
+  - Show BD SSLCOMMERZ online transactions.
+  - Show cash entries where relevant (mainly as commission estimation, not gateway).
+
+- Driver/Restaurant Balances:
+  - Include:
+    - BD cash commissions (negative balances).
+    - US cash commissions.
+    - Any unpaid adjustments from online payouts (if that ever happens).
+
+- Settlements:
+  - For BD:
+    - Likely methods: bank_transfer, bkash, nagad, cash_deposit.
+  - For US:
+    - Likely methods: bank_transfer, stripe_payout_adjust, etc.
+
+====================================================
+12) TESTING & NON-BREAKING GUARANTEE
+====================================================
+- All new features must:
+  - Use new endpoints under `/admin/finance/*`.
+  - Never change existing admin routes’ behavior.
+  - Use new tables/collections (`settlements`, `settlement_orders`) without touching existing data.
+
+Testing checklist:
+
+- Existing admin modules (users, KYC, pricing, etc.) unaffected.
+- Finance dashboard reads from existing orders without changing them.
+- Creating a settlement only changes:
+  - `settlements` / `settlement_orders` table.
+  - driver_wallet_balance / restaurant_wallet_balance.
+  - orders’ is_commission_settled flag.
+- No changes to US Stripe integration except being visible in reports.
+
+Document in:
+- `docs/admin_finance_dashboard_overview.md`
+  - pages
+  - filters
+  - actions
+  - security model
+  - examples of BD vs US views.
+
+End of TASK 2.
+Implement the Admin Finance Dashboard (Overview, Gateway Reports, Driver Balances, Restaurant Balances, Settlements History) as described, in a non-breaking, production-ready, and demo-ready way.

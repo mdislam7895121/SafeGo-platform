@@ -1,0 +1,250 @@
+You are updating the SafeGo backend and admin dashboard.
+
+Goal: Implement a full Automatic Email Notification System for ALL partner onboarding workflows, without breaking any existing logic. This must work for Bangladesh partners now, but be easy to extend for United States / Global later.
+
+Context (do NOT change these):
+- There is a shared SafeGo backend already handling:
+  - Partner onboarding forms for Drivers, Restaurants, Shops, and Tickets.
+  - Landing page and /partner route for prospective partners to apply.
+  - Admin onboarding management pages at:
+    - /admin/onboarding-center
+    - Plus the four separate admin onboarding pages/sections for:
+      - Drivers
+      - Restaurants
+      - Shops
+      - Tickets
+- Admin can already see partner applications and change their status manually in the onboarding pages.
+- Customer landing page, contact center, and admin dashboards are already wired to the same backend. Do NOT duplicate any backend or create a separate “email microservice”. Reuse the existing backend and configuration.
+
+Your task: 
+Create a production-grade, secure, and auditable Email Notification System that automatically sends emails to partners whenever their onboarding status changes, and logs everything for admins.
+
+High-level rules:
+1) Do NOT break any existing pages, routes, or status flows.
+2) Keep this as a generic, extensible notification layer that works first for Bangladesh partners, but can support US/Global in the future.
+3) Treat this as a security-sensitive feature: no secrets in code, no unvalidated HTML, no mass-mail bugs.
+4) All work must be end-to-end: database, backend logic, templates, admin visibility, and basic error handling.
+
+====================================
+A. Analyze current onboarding structure
+====================================
+1. Inspect the relevant models/entities in the database/ORM (likely Prisma) for:
+   - Driver onboarding applications
+   - Restaurant onboarding applications
+   - Shop onboarding applications
+   - Ticket/Travel onboarding applications
+   (These may be separate tables or a shared table — detect the real structure.)
+
+2. Confirm what fields exist:
+   - Email / contact fields per application
+   - Current status field (e.g., PENDING, APPROVED, REJECTED, NEED_MORE_INFO, etc.)
+   - Region or country field (e.g., Bangladesh vs United States)
+   - CreatedAt, updatedAt, etc.
+
+3. Inspect the existing admin onboarding routes:
+   - /admin/onboarding-center
+   - Any sub-routes for Drivers, Restaurants, Shops, Tickets
+   See how status is updated today:
+   - Which backend endpoints handle “Approve”, “Reject”, “Need More Info”, etc.
+   - Which functions / controllers are called.
+   You MUST integrate with these instead of creating parallel flows.
+
+Document your findings in comments in the relevant backend file (short summary).
+
+====================================
+B. Design status + notification model
+====================================
+4. Define the canonical set of onboarding statuses (even if they already exist):
+   - PENDING (default)
+   - APPROVED
+   - REJECTED
+   - NEED_MORE_INFO
+   - ON_HOLD (optional, for future use)
+   - AUTO_CLOSED (optional, for future use)
+   If the project already uses its own enum, extend that canonically instead of duplicating.
+
+5. For each partner type (Driver, Restaurant, Shop, Ticket), map which statuses should trigger an email:
+   - PENDING → NO email (only initial “application received” if desired)
+   - APPLICATION_RECEIVED (if you want a separate initial email) → send email
+   - APPROVED → send “approved” email
+   - REJECTED → send “rejected” email (with generic reason if available)
+   - NEED_MORE_INFO → send email listing what is missing
+   - ON_HOLD / AUTO_CLOSED → optional, but design templates so they can be added later.
+
+6. Create a small, shared notification mapping in code, something like:
+   - notificationConfig[partnerType][status] = { templateId / builderFunction, enabled: boolean }
+
+====================================
+C. Implement Email Service (secure)
+====================================
+7. Before writing new code, search the repo for any existing email utility or mailer:
+   - If there is an existing email service, REUSE it and extend it.
+   - If there is no email service, create a new one in a single, central place, e.g.:
+     - server/services/emailService.ts (or similar path that matches the existing structure)
+
+8. The email service must:
+   - Use environment variables for all secrets:
+     - SMTP host, port, username, password OR transactional service API key (e.g. SendGrid/Mailgun)
+     - From address, e.g. no-reply@safego.com
+   - Never hard-code credentials or secrets in the repo.
+   - Provide a minimal, typed interface, e.g.:
+     - sendPartnerEmail({ to, subject, htmlBody, textBody, partnerType, country, templateName, metadata })
+   - Implement basic error handling:
+     - Log failures with enough metadata for debugging, but no sensitive secrets.
+     - Optionally use a queue / retry mechanism if the project already has one; if not, just handle errors gracefully for now.
+
+9. Make sure email sending is non-blocking for the user:
+   - The admin action (e.g. clicking APPROVE) should not be blocked for too long by slow email.
+   - If async/await is used, handle errors but do not crash the request handler.
+   - If the app uses a background job mechanism, use it; otherwise, keep it simple but safe.
+
+====================================
+D. Email templates (Bangladesh-first, region-aware)
+====================================
+10. Implement structured email templates for each partner type and status. 
+   - Put them in a dedicated folder, e.g.:
+     - server/emailTemplates/onboarding/
+   - Either implement as functions or small template files, e.g.:
+     - buildDriverApprovedEmail({ name, region, applicationId, dashboardUrl })
+     - buildRestaurantNeedMoreInfoEmail({ missingFields, supportEmail, region })
+   - Include both:
+     - textBody (plain text)
+     - htmlBody (basic, responsive HTML, but no external scripts or mixed content)
+
+11. Bangladesh-first content:
+   - For now, write English templates tailored for Bangladesh operations, e.g.:
+     - Subject: “Your SafeGo Bangladesh driver application has been approved”
+     - Message body: clearly explain:
+       - Status (approved/rejected/need more info)
+       - Next steps (e.g., “Login to your SafeGo dashboard to complete KYC”, etc.)
+   - Include a generic footer:
+       “This message was sent by SafeGo Global. If you did not apply, please contact support at support@safego.com.”
+
+12. Make the template builder functions accept a “region/country” parameter so later we can:
+   - Change wording for United States / Global partners
+   - Change links (e.g., /us/ vs /bd/ dashboards)
+   But for now, implement Bangladesh as the primary region with sensible defaults.
+
+====================================
+E. Hook into admin actions (status changes)
+====================================
+13. Locate the backend handlers used by admin onboarding pages to:
+   - Approve a partner
+   - Reject a partner
+   - Mark as Need More Info
+   - Any other relevant status transitions
+
+14. For EACH of the four partner categories (Driver, Restaurant, Shop, Ticket):
+   - After a successful status update in the database, call the email service with the correct template.
+   - Make sure:
+     - Status change is persisted BEFORE the email is sent.
+     - If email sending fails, the status change still remains in the DB, but the error is logged.
+   - Use the unified notificationConfig mapping. 
+     - Example: if notificationConfig["DRIVER"]["APPROVED"].enabled, then send email using the correct template.
+
+15. Ensure idempotency and double-click protection:
+   - If an admin spams “Approve” multiple times, do not send duplicate emails.
+   - You can handle this by:
+     - Only triggering emails when status actually changes (previousStatus !== newStatus).
+     - Optionally logging lastNotificationStatus in the DB.
+
+====================================
+F. Logging, audit, and admin visibility
+====================================
+16. Add an EmailLog (or NotificationLog) model/table if one does not exist, with fields like:
+   - id
+   - partnerType (DRIVER / RESTAURANT / SHOP / TICKET)
+   - partnerApplicationId
+   - statusTrigger (APPROVED, REJECTED, NEED_MORE_INFO, etc.)
+   - toEmail
+   - subject
+   - templateName
+   - sentAt
+   - success (boolean)
+   - errorMessage (nullable)
+
+17. In the admin dashboard, add a simple view under a logical place, for example:
+   - /admin/onboarding-center/notifications 
+   OR an “Email Activity” tab/section within the onboarding center.
+   This view should:
+   - Show a paginated list of email notifications
+   - Allow basic filters:
+     - Partner type
+     - Status / template
+     - Date range (if easy)
+   - Display only high-level info (subject, status, time, success/failure) without exposing sensitive content.
+
+18. For each partner application detail page (Driver/Restaurant/Shop/Ticket):
+   - Add a small sub-section or tab: “Notification history”
+   - Show all emails sent for that application (subject, time, status).
+   - This helps admins debug onboarding issues and confirm that communication was sent.
+
+====================================
+G. Security and privacy requirements
+====================================
+19. DO NOT:
+   - Expose raw SMTP credentials in logs.
+   - Render unescaped user input directly into HTML emails without sanitizing.
+   - Allow arbitrary “to” addresses from client input. Use only the email saved/stored for that application in the backend.
+
+20. DO:
+   - Use environment variables for all sensitive config.
+   - Validate email addresses server-side.
+   - Ensure CSP, security headers, and existing rate limiting remain unchanged for the landing page.
+   - Consider adding a simple per-IP rate limit for onboarding actions if it doesn’t exist, but only if it is safe and not breaking.
+
+====================================
+H. Testing plan (you must execute these tests)
+====================================
+21. Implement and run the following tests (manual + automated where appropriate):
+
+Manual flows:
+- Create a test Driver application (Bangladesh) via the public partner form.
+  - Go to the appropriate admin onboarding page.
+  - Change status from PENDING → APPROVED:
+    - Confirm: status changes in DB.
+    - Confirm: email log entry created correctly.
+    - Confirm: email is either delivered (if email provider is configured) OR logged safely in dev/testing.
+  - Change status PENDING → NEED_MORE_INFO:
+    - Confirm: template for “need more info” is used.
+  - Change status PENDING → REJECTED:
+    - Confirm: template for “rejected” is used.
+
+- Repeat the above for:
+  - Restaurant onboarding
+  - Shop onboarding
+  - Ticket onboarding
+
+Edge cases:
+- Approve the same application twice:
+  - Confirm no duplicate email is sent (or at least logged as prevented).
+- Status change with invalid email:
+  - Confirm the system logs a failure but does not crash the request.
+
+Automated:
+- If the project uses automated tests (e.g., Jest), add unit/integration tests for:
+  - Template builders
+  - Notification dispatch logic (status change → send email)
+  - NotificationConfig mapping
+
+====================================
+I. Final review and docs
+====================================
+22. Add a short internal documentation section (Markdown file in the repo, e.g. docs/onboarding-email-notifications.md) explaining:
+   - How the email system works
+   - Which statuses trigger emails for each partner type
+   - How to configure SMTP / API keys via environment variables
+   - How admins can see notification logs in the dashboard
+   - How to extend templates for US / Global later
+
+23. Verify everything once more in the Browser:
+   - Landing page still works for all regions (Bangladesh/United States/Global).
+   - Partner onboarding forms work as before.
+   - Admin onboarding center works as before.
+   - All new UI pieces (notification history, logs) are styled consistently with the existing design.
+
+When you are done, summarize:
+- Which files were added/modified
+- What email provider / mechanism is used
+- How to configure it in .env
+- How an admin can test the end-to-end flow for each partner type.

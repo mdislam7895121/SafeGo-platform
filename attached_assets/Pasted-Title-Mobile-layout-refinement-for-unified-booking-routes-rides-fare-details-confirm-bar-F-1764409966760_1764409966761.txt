@@ -1,0 +1,159 @@
+Title: Mobile layout refinement for unified booking (routes + rides + fare details + confirm bar)
+
+Follow all existing SafeGo rules. Do NOT change any backend logic, pricing, routing, commission, promos, or API calls. Only adjust layout/styling/responsiveness for the unified booking experience so that it looks professional on small mobile screens, similar to Uber.
+
+Context:
+- Desktop layout of /customer (ride booking) is OK now.
+- Mobile layout still looks cramped:
+  - Route selection buttons: the right-most option is half-hidden and the 3 cards look misaligned.
+  - Ride list and Fare details share the same scroll, so users cannot comfortably see rides + fare breakdown.
+  - Confirm button sometimes feels detached or not prominent.
+- We want a clear, device-friendly design: same information and logic, but optimized layout for narrow screens.
+
+Your tasks:
+
+1) Create a dedicated mobile layout breakpoint
+   - In the unified booking React/TSX files (e.g. `client/src/pages/customer/unified-booking.tsx` or related components), add a responsive breakpoint for small screens:
+     - Treat viewports `<= 768px` width as “mobile”.
+   - For mobile:
+     - Use a single-column content layout.
+     - Keep the existing desktop layout unchanged for widths above 768px.
+
+2) Mobile layout structure (top-to-bottom order)
+   On mobile, the content should appear in this order:
+
+   1. SafeGo header bar (logo + Ride/Eats/Parcel switcher) – unchanged.
+   2. Address capsule:
+        - Combined pickup and dropoff card exactly as now (same capsule card, same edit icon).
+        - Keep distance/time and “3 routes” row just under the capsule.
+   3. Promo banner (if active):
+        - SafeGo Everyday Saver green pill banner exactly as implemented.
+   4. “Choose your route” section:
+        - A title: “Choose your route”.
+        - Under it: the 3 route options as compact pills (see next step).
+   5. “Choose a ride” section:
+        - A title: “Choose a ride”.
+        - Under it: vertically scrolling list of ride cards (one per row).
+   6. Fare details section:
+        - Collapsible card: header row “Fare details” with caret icon.
+        - Body shows existing fare breakdown (base fare, time, distance, booking fee, taxes, promo, total).
+        - On mobile this card should expand/collapse smoothly.
+   7. Confirm bar:
+        - Sticky bar at the bottom with the selected ride name and price:
+          - Text: `Confirm SafeGo X · $234.68` (for example).
+          - Full-width primary button.
+
+3) Route selection buttons – show 3 clean pills
+   - For the “Choose your route” area on mobile:
+
+     Layout:
+     - Use a horizontal flex container with equal-width route pills.
+     - Example styles (you can adapt to the existing design system):
+
+       - Container:
+         - `display: flex;`
+         - `gap: 8px;`
+         - `padding: 0 16px 8px 16px;`
+         - `overflow-x: auto;` but try to fit all three within the screen when possible.
+
+       - Each route pill:
+         - `flex: 1 1 0;` so that 3 pills share the width equally.
+         - Min width around `110–120px` so text fits.
+         - Height ~ `56px`.
+         - Rounded corners: `9999px` (pill).
+         - Border for normal state: `1px solid #E5E7EB`.
+         - Background: white for normal, SafeGo blue outline + subtle blue background for selected.
+         - Inside layout: route name (e.g. Fastest) bold on top, duration and distance below in smaller gray text.
+         - Ensure all three options (Fastest, CT-15 N and CT-8 N, I-684 N …) are **fully visible**, not clipped.
+
+   - For desktop:
+     - Keep the existing larger route cards as they are now.
+     - The new pill styling should only apply under the mobile breakpoint.
+
+4) Ride list – single column, scrollable area
+   - On mobile, “Choose a ride” should be a **single column list**:
+
+     - Container:
+       - Place it in its own scrollable area between the route selector and the Fare details section.
+       - Example:
+         - `max-height: calc(100vh - headerHeight - addressHeight - promoHeight - routeHeight - confirmBarHeight - 32px);`
+         - `overflow-y: auto;`
+       - The goal: user can scroll through all car options without losing the header, route pills, and confirm bar.
+
+     - Ride card styles:
+       - One card per row (full width with side margins, e.g. 12–16px).
+       - Keep the existing 3D car image, title (SafeGo X, SafeGo Comfort, etc.), time-away, passenger icons, and price.
+       - Keep the “Popular”, “Limited”, “Saver” badges exactly as now.
+       - Selected card gets a clear blue border.
+
+5) Fare details – expandable on mobile
+   - Under the ride list, keep the existing “Fare details” component but adapt for mobile:
+
+     - Default state: collapsed, only header row visible.
+     - Header:
+       - Left: icon + “Fare details” text.
+       - Right: chevron icon that rotates when expanded.
+     - When expanded:
+       - Show the full breakdown as you already implemented (Base fare, Time, Distance, Booking fee, Taxes & surcharges, Promo, Total after discount, plus “You save $X.XX” line).
+     - Ensure this card is not cut off by the bottom sticky confirm bar.
+
+6) Sticky confirm bar for mobile
+   - For mobile view, the confirm button should be always visible at the bottom:
+
+     - Use a container like `.confirm-bar`:
+       - `position: sticky;`
+       - `bottom: 0;`
+       - `left: 0;`
+       - `width: 100%;`
+       - Background: white with top shadow (e.g. `0 -2px 8px rgba(0,0,0,0.06)`).
+       - Padding: `12px 16px`.
+
+     - Inside the bar:
+       - Full-width primary button.
+       - Text pattern: `Confirm <Selected Ride Name> · $<FinalPrice>`.
+         - Example: `Confirm SafeGo X · $234.68`.
+       - Pull the selected ride name and final price from the same state used in the summary and fare details, so all numbers stay in sync.
+
+   - On desktop:
+     - Leave confirm design as already implemented (no sticky bar changes unless you can safely reuse the same component with desktop-specific styling).
+
+7) Promo and traffic logic – keep as is, just fit layout
+   - Do not change any promo or pricing logic.
+   - Keep:
+     - Top green promo banner (“SafeGo Everyday Saver – 15% off your ride”) where it is.
+     - “You save $X.XX” text and the strikethrough original price on the selected ride.
+     - “Heavy traffic” / “Light traffic on this route” badges and their colors.
+   - Just make sure these fit nicely within the mobile ride summary card and are not clipped.
+
+8) Preserve consistency between desktop and mobile
+   - Display the **same information** on both desktop and mobile:
+     - Same routes, same times, same prices, same promo and savings text, same traffic indicators.
+   - Only the layout changes:
+     - Desktop: the current 3-column layout with map on the right stays as-is.
+     - Mobile: stacked sections, single-column cards, sticky confirm bar.
+
+9) Testing checklist
+   - After implementing, run through these scenarios in the preview:
+     1. Mobile viewport (e.g. iPhone 14/15 simulation, Pixel 7 etc.):
+        - Enter pickup and dropoff.
+        - See:
+          - Address capsule at the top.
+          - Promo banner (when active).
+          - 3 route pills fully visible.
+          - Single-column ride list scrollable.
+          - Fare details expandable.
+          - Sticky confirm bar always visible with correct ride name and price.
+     2. Switch between routes:
+        - Selected route pill updates.
+        - Times and distances in the summary and fare details change accordingly.
+     3. Switch between car categories:
+        - Selected ride highlight moves.
+        - Confirm bar text updates to the correct ride name and updated price.
+        - “You save $X.XX” and promo details stay consistent.
+
+   - Confirm that:
+     - No desktop layout is broken.
+     - No backend / routing / pricing logic is modified.
+     - Only CSS/layout and minimal JSX structure are changed for responsiveness.
+
+Please implement these mobile layout changes now, keeping the desktop version exactly as it is, and then show me screenshots (or describe) both desktop and a simulated mobile view for the unified booking page (/customer or /customer/unified-booking).

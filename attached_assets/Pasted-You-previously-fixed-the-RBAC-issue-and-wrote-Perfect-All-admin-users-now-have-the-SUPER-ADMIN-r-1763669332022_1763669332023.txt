@@ -1,0 +1,46 @@
+You previously fixed the RBAC issue and wrote:
+
+“Perfect! All admin users now have the SUPER_ADMIN role with VIEW_SUPPORT_CONVERSATIONS permission… You should now see the Support Chat card on the admin dashboard.”
+
+But in the current UI at /admin there is still NO “Support Chat” card visible anywhere under the Management section (only Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings).
+
+I need you to systematically debug and FIX this until the Support Chat card actually appears on the admin dashboard.
+
+Do ALL of the following steps:
+
+1. Verify current admin capabilities
+   - Call the backend endpoint that returns the current admin user (for example /api/auth/me or the existing auth/me endpoint you added earlier).
+   - Confirm that the logged-in admin user (admin@demo.com or admin@test.com) has:
+     - role: SUPER_ADMIN
+     - capabilities / permissions including VIEW_SUPPORT_CONVERSATIONS.
+   - If the permission key name changed anywhere (for example VIEW_SUPPORT_CHAT vs VIEW_SUPPORT_CONVERSATIONS), normalize it so the same string is used in:
+     - RBAC config,
+     - capabilities object,
+     - frontend permission guard.
+
+2. Check the admin dashboard config (adminSections)
+   - Open the React/Next file that defines the admin dashboard cards (the “Management” section).
+   - Confirm that there is a Support Chat card object in the adminSections (or equivalent) array with:
+     - title/label: “Support Chat” (or similar),
+     - a route like /admin/support,
+     - the correct permission requirement: VIEW_SUPPORT_CONVERSATIONS.
+   - If the card exists but has a different permission key, or is filtered by a condition that fails, fix it so SUPER_ADMIN always sees the Support Chat card.
+   - If the card is missing, ADD it back into the Management section with the correct route and permission guard.
+
+3. Check the frontend permission guard logic
+   - Find the helper/hook that hides cards based on permissions (for example useHasPermission/useCan or similar).
+   - Make sure it is reading the capabilities object correctly (from the login/auth response) and that it recognizes VIEW_SUPPORT_CONVERSATIONS for SUPER_ADMIN.
+   - Add a temporary console.log in the admin dashboard render to print the current user role and capabilities, and the decision for the Support Chat card. Use this to confirm why it was being hidden.
+   - Remove or clean up debug logs after verifying.
+
+4. Confirm routing and UI integration
+   - Ensure that clicking the Support Chat card navigates to /admin/support (or the configured support chat route) and that the page loads without errors.
+   - Do NOT move other cards or change the layout design. Only ensure the Support Chat card is correctly displayed in the Management section.
+
+5. Update documentation
+   - Update replit.md describing the final behavior: which role/permission is required to see the Support Chat card, and where it appears on the admin dashboard.
+
+Important:
+- Do NOT ask me questions or for confirmation. Treat this as a bug and fully fix it.
+- Run the app, log in as the admin user, and ONLY stop after you visually confirm the Support Chat card is visible on /admin.
+- Then summarize exactly what was wrong and what you changed in the code.

@@ -1,0 +1,101 @@
+C7 — SafeGo Ride Card Full Redesign (Branding + Image System + UI Polish)
+
+Follow all SafeGo rules strictly. Do NOT break any backend logic, dispatch, pricing,
+commission, promo, or ride request flows.
+
+Your tasks:
+
+1. Apply SafeGo Branding to All Categories
+   Change all visible category labels across the rider UI to:
+
+      • SafeGo X
+      • SafeGo Comfort
+      • SafeGo Comfort XL
+      • SafeGo XL
+      • SafeGo Black
+      • SafeGo Black SUV
+      • SafeGo WAV
+
+   Rules:
+   • Use bold title text.
+   • Title centered above price.
+   • Title must NOT wrap to two lines.
+
+2. Professional Price Presentation (Uber Style)
+   Update the price section:
+
+   • Current price: bold, large, dark (#000000)
+   • Original price (if promo active): small, gray, with strikethrough
+   • Savings: “You save $X.XX” in SafeGo green (#16A34A), small but readable
+   • Keep spacing tight and balanced
+   • Commission logic and pricing logic must remain unchanged
+
+3. Vehicle Image Redesign (Uber Quality)
+   Redesign image container for all cards:
+
+   • Image width: ~92% of card width
+   • Height trimmed by ~10% for clean ratio
+   • Full center alignment (horizontal + vertical)
+   • Add Uber-style soft shadow:
+        shadow: 0px 4px 14px rgba(0,0,0,0.15)
+   • Add subtle white gradient behind the car:
+        background: linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)
+   • Maintain consistent padding around the car
+   • No stretching or distortion
+
+4. Image Angle Consistency
+   All images must follow the same visual standard:
+
+   • Side view or ¾ angle (Uber uses this)
+   • Slight elevated angle so roof/top is visible
+   • White/light background only
+   • Same crop ratio for every category
+   • Cars must appear identical in scale across all cards
+
+   If existing images differ:
+      • Re-crop them
+      • Normalize aspect ratio
+      • Align bottom wheels horizontally
+
+5. Card Layout Polish (Uber-Grade UI)
+   Improve spacing + typography:
+
+   • Card padding: 16px
+   • Rounded corners: 14px
+   • Border: 1px solid #E5E7EB
+   • Shadow: subtle hover shadow on mobile
+   • Title font: 600 weight
+   • Price font: 700 weight, large
+   • Subtext font: 400, small, neutral gray (#6B7280)
+
+6. Badge System Improvements
+   Add clean badges:
+
+   • LIMITED (for low availability) → yellow badge
+   • Popular (SafeGo X default) → subtle blue badge
+   • Promo / Savings → green lightning badge
+
+7. Keep Existing Logic Untouched
+   Do NOT modify:
+
+   • fare calculation  
+   • promo engine  
+   • commission deduction  
+   • driver eligibility logic  
+   • dispatch matching  
+   • route selection  
+
+Only update the UI layer.
+
+8. Mobile + Desktop Consistency
+   • Mobile uses horizontal scroll carousel
+   • Desktop uses multi-column grid
+   • Both must show identical visual design
+   • Ensure category selection updates fare summary instantly
+
+Deliverables:
+   • Fully redesigned ride cards matching Uber quality
+   • Uniform car images
+   • SafeGo-branded category names
+   • Professional price section with savings
+   • Pixel-perfect alignment of all elements

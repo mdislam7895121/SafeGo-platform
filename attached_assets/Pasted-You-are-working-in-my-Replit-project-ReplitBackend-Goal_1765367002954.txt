@@ -1,0 +1,235 @@
+You are working in my Replit project **ReplitBackend**.
+
+Goal: 
+Take the existing SafeGo public landing page (the marketing site that shows the Bangladesh / United States / Global tabs and the SafeGo services card) and polish it to an Uber-level, professional, security-aware design. This is a **front-end UX polish only** task. Do not change backend APIs or the /ride app logic. The landing page must stay marketing-only and call the existing app routes via links (/ride, /drive, /business, /food, /parcel, /shops, /tickets, /driver/signup, /restaurant/signup, etc).
+
+Very important architectural rules:
+1. There is **one shared SafeGo backend** (pricing, GPS, ride status, country rules). The landing page is just a client.  
+2. You **must not** create any new pricing/status engine, fake estimators, or background logic inside the landing page.  
+3. The existing **region-aware config objects** on the landing page (HERO_CONFIG, REGION_SERVICES, PARTNER_CONFIG, etc.) are now correct. You must **keep this logic exactly** and only improve layout, styling, typography, and copy where requested.  
+4. Region rules to preserve:
+   - Bangladesh:
+     - Hero text is Bangladesh-focused.
+     - Services: Rides, Food Delivery, Parcel Delivery, Local Shops, Tickets & Travel.
+     - Partner section right card: “For Restaurants & Shops”.
+   - United States:
+     - Hero text is USA-focused (compliance & driver protection tone).
+     - Services: Rides, Food Delivery, Parcel Delivery. **No Shops, no Tickets** for now.
+     - Partner section right card title: just “For Restaurants”.
+   - Global:
+     - Hero text is global platform focused.
+     - Services: Rides, Food Delivery, Parcel Delivery only.
+     - Partner section right card: “For Restaurants & Shops”.
+5. Do not remove or break existing navigation links or the connection from the marketing page to internal app routes.  
+6. Do not add any new user-data forms here (no email capture, no phone inputs). All CTAs should navigate to the existing app routes only.
+
+Files and structure:
+- Locate the landing page implementation (currently used for the safeGoGlobal.com marketing homepage) – it should be under something like:
+  - `client/src/pages/landing/LandingPage.tsx` (or similar)
+  - plus any subcomponents under `client/src/components/landing/` or equivalent.
+- Work inside these React components only. Keep the project’s existing component structure; just improve it if needed (e.g., splitting into clean components).
+
+Your tasks are in 8 sections. Please go through them carefully and implement everything in one coherent pass.
+
+-------------------------------------------------------------------------------
+1) HERO SECTION – UBER-LEVEL LAYOUT & TYPOGRAPHY
+-------------------------------------------------------------------------------
+The current hero already switches text and services based on Bangladesh / United States / Global. I want you to make it look and feel like a polished Uber-class hero while preserving that logic.
+
+Requirements:
+- Keep the left side: region toggle (Bangladesh / United States / Global), main heading, subheading, primary and secondary CTAs.
+- Keep the right side: “SafeGo Services” card with the list of services for the selected region.
+
+Make these visual upgrades:
+1. Layout:
+   - Constrain hero content to a max width (e.g. 1200–1280px) and center it with generous side padding.
+   - Use a responsive **two-column** layout:
+     - Left: text and buttons (roughly 55–60% width).
+     - Right: services card (roughly 40–45% width).
+   - Ensure that on tablet/mobile, the services card stacks under the text with good spacing and padding.
+
+2. Region toggle:
+   - Keep the three tabs (Bangladesh, United States, Global).
+   - Style them as a pill segmented control:
+     - Light background pill with rounded full corners.
+     - Selected tab with strong SafeGo blue background and white text.
+     - Smooth hover and active states for all tabs.
+   - Add a short, subtle transition when switching regions (e.g. fade/slide of the description text and services card) without heavy animations.
+
+3. Heading and copy:
+   - Keep the base heading structure (“Move, eat, and deliver with SafeGo”) but adjust:
+     - Font sizes and line heights for desktop / tablet / mobile so it reads clean and modern.
+     - Tighten the line length (don’t stretch across the full screen).
+   - Update the **subheading text** using the existing HERO_CONFIG per region, but:
+     - Ensure text is clean, short, and readable (two lines max on desktop, three lines max on small screens).
+     - Maintain the different tone per region (Bangladesh launch-first, US compliance/security, Global secure mobility platform).
+
+4. CTAs:
+   - Primary button: “Explore services”.
+   - Secondary text link or ghost button: “Become a partner”.
+   - Use consistent SafeGo blue for primary, with hover state (slightly darker blue and subtle shadow).
+   - Make sure these CTAs link to the existing routes (no new URLs).
+
+5. Right-side “SafeGo Services” card:
+   - Keep using REGION_SERVICES so that the items change per region.
+   - Redesign visually:
+     - Rounded card with subtle inner gradient or light surface.
+     - Soft colored border or glow (not too strong).
+     - Each service row: icon + title + one short subtitle line.
+     - Equal spacing and alignment for all items.
+   - Remove any hardcoded BD/US/global conditions here – rely on the existing config object and just style around it.
+
+-------------------------------------------------------------------------------
+2) SERVICES GRID (“Our Services” SECTION)
+-------------------------------------------------------------------------------
+Below the hero, there is a section listing the services as cards.
+
+Requirements:
+1. Preserve the current logic that shows Bangladesh-specific services vs US/global services, but:
+   - Use a grid (2x3 on desktop, 2x2 or 1xN on smaller screens).
+   - All cards same height, with:
+     - Icon at the top.
+     - Title.
+     - Short subtitle (one or two lines).
+   - Add a subtle hover effect: small elevation shadow + slight scale (e.g. transform: scale(1.02)).
+
+2. Make sure:
+   - Bangladesh: shows all 5 services including Local Shops and Tickets & Travel.
+   - United States: only Rides, Food Delivery, Parcel Delivery (no Shops, no Tickets).
+   - Global: Rides, Food Delivery, Parcel Delivery.
+
+3. Ensure this section uses the same REGION_SERVICES config (or a similar derived mapping) so the logic stays in one place.
+
+-------------------------------------------------------------------------------
+3) PARTNER SECTION – REGION-AWARE COPY + POLISHED DESIGN
+-------------------------------------------------------------------------------
+The “Become a Partner” section currently has two cards: left for drivers/couriers, right for restaurants/shops.
+
+Requirements:
+1. Keep the region-aware text logic from PARTNER_CONFIG; do not change the conditions, only refine copy and layout slightly if needed.
+2. Layout:
+   - Two cards side by side on desktop, stacked on mobile.
+   - Each card:
+     - Icon or subtle illustration at the top.
+     - Title (“For Drivers & Couriers”, “For Restaurants & Shops”, or “For Restaurants” in US).
+     - “What you get” bullet list.
+     - “Basic requirements” bullet list.
+     - Primary CTA button (“Start driving” / “Register your business”).
+
+3. Visual polish:
+   - Make both cards the same height with consistent padding.
+   - Use checkmark bullets for benefits and simple dot bullets for requirements.
+   - Hover state: slight elevation and border accent.
+
+4. Region-specific rule to keep:
+   - Bangladesh + Global: right card title includes “& Shops”.
+   - United States: right card title is “For Restaurants” only.
+
+-------------------------------------------------------------------------------
+4) “HOW SAFEGO WORKS” SECTION – CLEAN STEP FLOWS
+-------------------------------------------------------------------------------
+This section explains the flows for Rides, Food Delivery, Parcel Delivery (and possibly others).
+
+Requirements:
+1. Reorganize content into clear columns per service (Rides, Food Delivery, Parcel Delivery) with numbered steps.
+2. Styling:
+   - Highlight step numbers in rounded circles.
+   - Use a simple vertical list of 4–5 steps per service.
+   - Consistent typography for each step (short sentence, not long paragraphs).
+3. Region logic:
+   - If any service is not available in the selected region (e.g. Tickets), do not show its flow.
+   - Keep the data in a config object (similar to REGION_SERVICES) instead of hardcoding conditionals all over the JSX.
+
+-------------------------------------------------------------------------------
+5) SAFETY & SECURITY SECTION – STRONG CYBERSECURITY MESSAGING
+-------------------------------------------------------------------------------
+This section is critical for SafeGo’s security image.
+
+Requirements:
+1. Keep it as three main cards (for Customers, Drivers & Couriers, Cybersecurity/Data), but:
+   - Clean up the copy so it is concise and professional.
+   - Emphasize:
+     - Verified drivers and identity checks.
+     - Trip GPS tracking.
+     - End-to-end encryption for all communications.
+     - No storage of sensitive payment data on devices.
+     - Regular security audits and monitoring.
+2. Visual:
+   - Use icons that clearly represent safety, identity protection, and data security.
+   - Make sure all three cards share the same layout and height.
+   - Subtle background gradient behind the entire section to make it stand out.
+
+3. Security hygiene from front-end perspective:
+   - Do not introduce any dynamic HTML rendering from untrusted sources (`dangerouslySetInnerHTML`, etc.).
+   - Avoid inline JavaScript in HTML attributes; keep event handlers inside React components.
+   - Ensure all external links (if any) use `rel="noopener noreferrer"` when `target="_blank"`.
+
+-------------------------------------------------------------------------------
+6) FAQ SECTION – CLEAN ACCORDION
+-------------------------------------------------------------------------------
+Requirements:
+1. Keep existing questions & answers but:
+   - Implement a smooth accordion component if not already present.
+   - Only one open at a time on mobile; multiple open allowed on desktop is fine.
+   - Keyboard accessible:
+     - Each question is a button element with proper ARIA attributes.
+     - Enter/Space toggles the panel.
+
+2. Typography:
+   - Questions: slightly larger and bold.
+   - Answers: smaller, with enough line height for readability.
+
+-------------------------------------------------------------------------------
+7) FOOTER – PROFESSIONAL & CONSISTENT
+-------------------------------------------------------------------------------
+Requirements:
+1. Footer layout:
+   - Company column (About, Careers, Press, Blog).
+   - Services column (Ride, Food, Parcel, Shops).
+   - Partners column (Drive with us, Deliver with us, Restaurant partners, Shop partners).
+   - Support column (FAQ, Safety, Contact, Help Center).
+2. Keep the existing SafeGo logo and “© 2025 SafeGo Global. All rights reserved.” line.
+3. Make sure:
+   - Links that are not yet implemented can be placeholder `#` or existing routes, but do not invent new backend features.
+4. Add a very subtle top border and balanced padding so it looks like a proper site footer.
+
+-------------------------------------------------------------------------------
+8) RESPONSIVENESS, ACCESSIBILITY, AND CODE QUALITY
+-------------------------------------------------------------------------------
+After visual changes, you must:
+1. Ensure full responsiveness:
+   - Desktop (large screens): everything laid out in multi-column grids.
+   - Tablet: columns reduce or stack gracefully.
+   - Mobile: single-column layout, no horizontal scrolling, buttons full-width where appropriate.
+
+2. Accessibility:
+   - Hero region tabs must be keyboard-navigable and have an accessible label (e.g. aria-label describing that they switch country/region).
+   - Buttons must use semantic `<button>` or `<a>` with clear text.
+   - Color contrast must be sufficient (do not use very light grays on white for text).
+
+3. Code quality:
+   - Keep components small and readable.
+   - Use existing design tokens / theme variables if the project has them (colors, spacing, typography).
+   - Do not introduce any new external UI libraries.
+
+-------------------------------------------------------------------------------
+Verification steps (you must perform and describe briefly in your final message):
+-------------------------------------------------------------------------------
+1. Open the landing page in preview and:
+   - Switch between Bangladesh, United States, Global:
+     - Confirm hero text and services list change correctly.
+     - Confirm partner section right-card title matches the rules above.
+   - Scroll through the entire page on desktop and verify layout.
+2. Use devtools responsive mode to test:
+   - Mobile width (around 375–414px).
+   - Tablet width (around 768–834px).
+3. Confirm:
+   - All CTAs still navigate to the same existing app routes.
+   - No console errors or React warnings are introduced.
+
+Finally, summarize for me:
+- Which files you edited.
+- What major visual and structural changes you made in each section (Hero, Services, Partner, How it Works, Safety, FAQ, Footer).
+- Any security or accessibility improvements you added.
+
+Now implement all of this in one pass and then run through the verification steps before responding.

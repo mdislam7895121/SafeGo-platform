@@ -1,0 +1,57 @@
+Please redesign the SafeGo Eats restaurant Online/Offline toggle button using the full design specification below. 
+Do not change any backend logic, routing, API behavior, or KYC gating. 
+This is a pure UI enhancement only. Maintain full SafeGuard rules.
+
+FULL REDESIGN SPECIFICATION:
+
+1. OVERALL SIZE & SHAPE
+   - Height: 46px
+   - Border-radius: 9999px (pill/capsule shape)
+   - Horizontal padding: 20px left & right
+   - Minimum tap size: 44px (mobile accessibility standard)
+
+2. ICON & LABEL
+   - Icon size: 22px
+   - Space between icon and label: 12px
+   - Label font size: 15–16px (medium / semibold)
+   - Use high-contrast colors for accessibility.
+
+3. COLOR STATES
+   - ONLINE:
+       Background: #0CCE6B (SafeGo Green)
+       Text Color: White
+       Icon: White with subtle glow
+       Border: None
+   - OFFLINE:
+       Background: #E5E7EB (Neutral gray)
+       Text Color: #374151 (Dark gray)
+       Icon: #374151
+       Border: 1px solid #D1D5DB
+
+4. INTERACTION & ACCESSIBILITY
+   - Use role="switch"
+   - aria-checked must update dynamically
+   - Must be fully keyboard accessible (Enter, Space)
+   - Focus ring: 2px outline, color #4B9EFF
+   - Smooth transition (150–200ms) on color & scale
+
+5. RESPONSIVE BEHAVIOR
+   - Button must scale correctly on mobile, tablet, desktop
+   - Text should wrap never; always stay inline
+   - Keep alignment centered in all breakpoints
+   - Must not shift surrounding layout
+
+6. DO NOT DO:
+   - Do NOT change any logic for online/offline state.
+   - Do NOT modify API or backend.
+   - Do NOT rename component files.
+   - Do NOT break existing restaurant dashboard layout.
+
+7. AFTER IMPLEMENTATION:
+   - Run responsive check on all breakpoints.
+   - Confirm tap and keyboard interaction works.
+   - Provide a screenshot of the updated toggle button.
+   - Confirm no layout regressions occurred anywhere.
+   - Confirm backward compatibility with all pages.
+
+This is a visual enhancement only. Please apply the redesign while keeping all underlying functionality unchanged.

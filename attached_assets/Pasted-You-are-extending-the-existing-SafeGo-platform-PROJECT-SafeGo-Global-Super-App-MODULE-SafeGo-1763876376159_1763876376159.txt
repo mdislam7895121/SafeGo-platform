@@ -1,0 +1,505 @@
+You are extending the existing SafeGo platform.
+
+PROJECT: SafeGo – Global Super App  
+MODULE: SafeGo Eats – Restaurant Dashboard  
+PHASE: 3 – Restaurant Menu & Catalog Management System  
+SCOPE: Non-breaking extension of existing Restaurant navigation + Orders (Phase 1 + Phase 2)
+
+Absolute constraints:
+- DO NOT remove or rename any existing fields, APIs, routes, or components.
+- DO NOT break existing features for rides, food_orders, deliveries, wallets, KYC, or admin.
+- Phase 1 navigation and Phase 2 Orders Management must continue to work exactly as before.
+- Only ADD new components, routes, backend handlers, and schema fields (additive changes only).
+- All changes must be fully backward-compatible.
+
+====================================================
+1. ROLES – SCOPE AND ACCESS
+====================================================
+
+SafeGo has 4 roles. Enforce strict separation:
+
+1. Customer
+   - Can browse restaurant menus, see item details, options, and prices.
+   - Can place food_orders based on menu items.
+   - Cannot edit menus, categories, or restaurant settings.
+
+2. Driver
+   - Has no access to restaurant menu management.
+   - When viewing a delivery task, may see a compact, read-only summary of items (e.g., “3 items – Burger, Fries, Coke”) for handling orders, but not internal prices, cost breakdown, or configuration UI.
+
+3. Restaurant (Merchant)
+   - Two sub-roles:
+     - OWNER:
+       - Full access to menu management (categories, items, options, availability, branches).
+     - STAFF:
+       - Limited access:
+         - Can view menus and item availability.
+         - May mark items or categories as temporarily unavailable / sold out (if allowed by OWNER settings).
+         - Cannot change base pricing or add/remove items unless OWNER explicitly grants permission (a flag).
+   - Restaurant can only manage its own menus (scoped by restaurant_id).
+
+4. Admin
+   - Global oversight:
+     - View any restaurant’s menu.
+     - Flag items (e.g., policy violations).
+     - Temporarily hide items or categories platform-wide.
+     - Cannot change a restaurant’s prices arbitrarily; they can only enforce policy, category mapping, or compliance flags.
+   - Controls global tax rules, platform-wide category taxonomy, and commission configuration (separate panel).
+
+====================================================
+2. GLOBAL APP LOGIC – THREE SERVICES (REFERENCE)
+====================================================
+
+SafeGo services (must remain fully functional):
+
+1. Ride-hailing
+   - Collection: `rides`.
+   - Status flow:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+   - Phase 3 must not touch ride logic.
+
+2. Food delivery (SafeGo Eats)
+   - Collection: `food_orders`.
+   - Status flow:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+   - Phase 3 focuses on the **menu/catalog side** that feeds items into `food_orders`.
+
+3. Parcel delivery
+   - Collection: `deliveries`.
+   - Status flow:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+   - Must be left untouched.
+
+Collections to keep intact:
+- `rides`, `food_orders`, `deliveries`  
+You may only ADD fields or related menu collections.
+
+====================================================
+3. KYC & ONBOARDING – GATING MENU ACCESS
+====================================================
+
+The same BD vs US KYC rules apply. Use existing RestaurantProfile:
+
+Bangladesh (BD) Restaurant Owner:
+- father_name, date_of_birth, present_address, permanent_address  
+- NID_number + front/back image URLs  
+- emergency_contact fields  
+- verification_status, is_verified
+
+United States (US) Restaurant Owner:
+- date_of_birth, home_address  
+- government_id_type, government_id_last4  
+- emergency_contact fields  
+- verification_status, is_verified
+
+Menu UI gating:
+- If restaurant is not verified (`is_verified = false` or `verification_status != "approved"`):
+  - Block write access to all menu management routes.
+  - Show “Verification pending” or “Account rejected” messages with `rejection_reason` (if any).
+- Read-only:
+  - If already-live restaurant later becomes blocked by Admin, menu management routes show “Account blocked by Admin” and prevent changes.
+
+Do NOT rebuild onboarding; just respect existing flags.
+
+====================================================
+4. COMMISSION & PRICING RELATIONSHIP
+====================================================
+
+Do not change core commission logic. Instead, connect menu prices to existing logic:
+
+1. Menu prices:
+   - Each menu item defines `base_price`, `tax_included` flag, and optional `option_group` price modifiers.
+   - During order creation, final `total_amount`, `subtotal`, `tax`, `delivery_fee`, and `commission_amount` are computed based on these prices.
+
+2. Commission rules (from global SafeGo rules):
+   - CASH food order:
+     - Customer pays full amount to restaurant.
+     - SafeGo commission becomes negative balance in `restaurant_wallet_balance`.
+   - ONLINE food order:
+     - SafeGo keeps commission automatically; restaurant sees net_amount.
+   - Admin can manage commission configuration and settle balances.
+
+Important:  
+- Menu module must NOT attempt to override commission, only provide accurate item prices and tags that feed into order totals.
+
+====================================================
+5. SECURITY & PRIVACY – MENU MODULE
+====================================================
+
+Apply SafeGo Security Roadmap principles (RBAC + audit):
+
+1. RBAC:
+   - All menu APIs must check:
+     - Authenticated user.
+     - role in {OWNER, STAFF, ADMIN} for menu writes.
+     - restaurant_id matches the restaurant being edited (unless Admin).
+   - Customers & drivers have NO write access to menu endpoints.
+
+2. Isolation:
+   - Restaurants cannot see or modify other restaurants’ menus.
+   - Admin-only actions (policy flags, forced hide) cannot be performed by restaurants.
+
+3. Audit logging:
+   - For any menu mutation (create/update/delete category/item/options), log into `security_audit_log`:
+     - actor_id, actor_role, restaurant_id
+     - entity_type: "menu_category" | "menu_item" | "menu_option"
+     - entity_id
+     - action_type: "create" | "update" | "delete"
+     - timestamp
+   - This is additive; do not break existing audit schema.
+
+====================================================
+6. RESTAURANT DASHBOARD – MENU UI MODULES
+====================================================
+
+Under existing restaurant navigation, add a new main section: “Menu”.
+
+Routes (example paths):
+
+1. `/restaurant/menu`
+   - Redirects to `/restaurant/menu/items`.
+
+2. `/restaurant/menu/categories`
+   - Category management page.
+
+3. `/restaurant/menu/items`
+   - Main menu items manager (list + filters).
+
+4. `/restaurant/menu/items/new`
+   - Create new item flow.
+
+5. `/restaurant/menu/items/:item_id`
+   - Detailed edit page for a single item.
+
+6. `/restaurant/menu/bulk`
+   - Bulk actions: import/export, mass enable/disable, price updates.
+
+7. `/restaurant/menu/availability`
+   - Item and category availability / scheduling (optional, can be a tab on items page).
+
+Make sure all pages reuse the existing layout (top nav, sidebar, responsive drawer).
+
+----------------------------------------------------
+6.1 Categories Page – `/restaurant/menu/categories`
+----------------------------------------------------
+
+Features:
+- List all categories for this restaurant:
+  - name, description, display_order, status (active/hidden), item_count.
+- Actions:
+  - Create new category.
+  - Edit name, description, display_order.
+  - Toggle visibility (e.g., hide from customers).
+- OWNER:
+  - Full CRUD on categories.
+- STAFF:
+  - Read-only by default; may have a flag `staff_can_edit_categories` (controlled by OWNER) to allow edits.
+- Admin view:
+  - Read-only view of restaurant categories from Admin panel (separate route, see Admin section).
+
+Data model (new additive collection `menu_categories` or embedded pattern):
+- id
+- restaurant_id
+- name
+- description
+- display_order
+- is_active
+- created_at, updated_at
+
+----------------------------------------------------
+6.2 Items Page – `/restaurant/menu/items`
+----------------------------------------------------
+
+Features:
+- Paginated table or card grid of menu items:
+  - thumbnail_image
+  - item_name
+  - category_name
+  - base_price
+  - availability_status (available / sold_out / hidden)
+  - is_featured
+  - preparation_time (minutes)
+- Filters:
+  - category
+  - availability
+  - price range
+  - search by name or internal code (SKU).
+- Quick actions:
+  - Toggle available/sold_out.
+  - Toggle visible/hidden.
+  - Pin/unpin as “featured”.
+
+Permissions:
+- OWNER:
+  - Full control.
+- STAFF:
+  - Can toggle availability (sold_out/available) and maybe visibility (if allowed by OWNER flag).
+
+----------------------------------------------------
+6.3 New Item Flow – `/restaurant/menu/items/new`
+----------------------------------------------------
+
+Multi-step creation form:
+
+Step 1 – Basic info
+- item_name (required)
+- short_description
+- long_description
+- category_id (dropdown of this restaurant’s categories)
+- base_price (numeric)
+- currency (use existing platform setting)
+- preparation_time (minutes)
+- is_vegetarian, is_vegan, is_halal, is_spicy (boolean flags)
+- dietary_tags[] (array of string tags, e.g., “gluten_free”, “nut_free”)
+
+Step 2 – Options & Add-ons
+- Option groups (example structure):
+  - name (e.g., “Size”)
+  - type: "single_select" | "multi_select"
+  - is_required (boolean)
+  - min_select, max_select
+  - options[]:
+    - label
+    - price_delta (can be positive or zero)
+    - is_default
+- Examples:
+  - Size: Small, Medium, Large.
+  - Add-ons: Extra cheese, Extra meat, Sauce.
+
+Step 3 – Availability & Visibility
+- availability_status:
+  - "available" | "sold_out" | "hidden"
+- service_hours override (optional):
+  - item-specific time window (e.g., breakfast-only)
+- branch availability (if multi-branch support exists):
+  - which branch/locations carry this item.
+
+Step 4 – Media & Presentation
+- item_image (upload URL field)
+- display_order within category
+- is_featured (boolean)
+- calorie information (optional; numeric).
+
+Step 5 – Review & Save
+- Summary of all entered data.
+- Confirm create.
+
+----------------------------------------------------
+6.4 Item Details/Edit – `/restaurant/menu/items/:item_id`
+----------------------------------------------------
+
+Show all fields from creation flow plus:
+
+- Metrics (read-only):
+  - total_orders_for_item
+  - total_revenue_for_item
+  - average_rating_for_item
+  - last_order_date
+
+- History tab:
+  - Price changes (old_price, new_price, changed_at, changed_by).
+  - Availability changes.
+
+OWNER can:
+- Edit any field.
+- Archive/delete item (soft delete; do not remove data from existing food_orders).
+
+STAFF can:
+- Toggle availability.
+- Edit only fields allowed by OWNER (e.g., per-item `staff_editable` flag).
+
+====================================================
+7. BULK ACTIONS – `/restaurant/menu/bulk`
+====================================================
+
+Bulk tools for OWNER:
+
+1. Bulk enable/disable:
+   - Select multiple items → mark as available/sold_out/hidden.
+
+2. Bulk price update:
+   - Increase or decrease prices by percentage or fixed amount:
+     - Example: “+10% on all Drinks category items”.
+   - Every bulk operation should generate audit logs per item (but can be batched internally).
+
+3. Import/Export:
+   - Export menu as CSV or JSON template (schema-safe).
+   - Import:
+     - Validate data.
+     - Only create/update items for that restaurant_id.
+     - Skip or mark invalid rows.
+
+STAFF:
+- No access to bulk tools unless OWNER explicitly enables `staff_can_use_bulk_tools`.
+
+====================================================
+8. BACKEND – NEW ENDPOINTS (ADD-ONLY)
+====================================================
+
+All endpoints must enforce RBAC and restaurant_id scoping.
+
+Examples:
+
+- `GET /api/restaurant/menu/categories`
+- `POST /api/restaurant/menu/categories`
+- `PATCH /api/restaurant/menu/categories/:id`
+- `DELETE /api/restaurant/menu/categories/:id` (soft delete)
+
+- `GET /api/restaurant/menu/items`
+- `POST /api/restaurant/menu/items`
+- `GET /api/restaurant/menu/items/:id`
+- `PATCH /api/restaurant/menu/items/:id`
+- `POST /api/restaurant/menu/items/:id/availability`
+- `POST /api/restaurant/menu/bulk/actions`
+
+For Admin:
+- `GET /api/admin/restaurants/:restaurant_id/menu`
+  - Read-only view of categories and items.
+- `POST /api/admin/menu/items/:id/flag`
+  - Fields: `policy_status` ("ok" | "flagged" | "blocked"), `policy_note`.
+
+All endpoints must:
+- Avoid returning any personal KYC fields.
+- Only return necessary menu fields to callers.
+
+====================================================
+9. DATA MODEL EXTENSIONS (ADD FIELDS / COLLECTIONS ONLY)
+====================================================
+
+New collections (or equivalent models):
+
+1. `menu_categories`
+   - id
+   - restaurant_id
+   - name
+   - description
+   - display_order
+   - is_active
+   - created_at, updated_at
+
+2. `menu_items`
+   - id
+   - restaurant_id
+   - category_id
+   - name
+   - short_description
+   - long_description
+   - base_price
+   - currency
+   - preparation_time_minutes
+   - availability_status ("available" | "sold_out" | "hidden")
+   - is_featured
+   - dietary_flags (vegetarian, vegan, halal, spicy)
+   - dietary_tags[]
+   - item_image_url
+   - service_hours (optional structure)
+   - stats: total_orders, total_revenue, average_rating (derived or cached)
+   - is_archived
+   - created_at, updated_at
+
+3. `menu_option_groups`
+   - id
+   - restaurant_id
+   - item_id
+   - name
+   - type ("single_select" | "multi_select")
+   - is_required
+   - min_select, max_select
+
+4. `menu_options`
+   - id
+   - option_group_id
+   - label
+   - price_delta
+   - is_default
+   - is_active
+
+Modification to existing `food_orders` (add fields only if not present):
+- items[] structure must reference:
+  - menu_item_id
+  - menu_option_ids[]
+  - captured_snapshot_of_name_and_price (so historical orders don’t break when menu changes).
+
+All schema changes must be additive.
+
+====================================================
+10. NOTIFICATIONS
+====================================================
+
+Menu-related notifications (add to existing system):
+
+1. Restaurant OWNER:
+   - When Admin flags or blocks a menu item/category for policy compliance.
+   - When bulk import has errors (summary notification with link to details).
+
+2. STAFF:
+   - Optional: notification when OWNER applies major menu changes (like price updates or new category).
+
+3. Admin:
+   - Optional: alert when a restaurant frequently toggles items sold_out (for monitoring potential issues).
+
+Customer and driver notifications remain primarily order-based; menu changes do not directly notify them.
+
+====================================================
+11. ADMIN PANEL EXTENSIONS
+====================================================
+
+Extend Admin panel with a read-only Menu view and policy tooling:
+
+1. `AdminRestaurantMenuView`
+   - Access from restaurant details page.
+   - Shows:
+     - All categories.
+     - Items in each category.
+     - Basic prices and flags (featured, availability, dietary tags).
+
+2. Policy enforcement:
+   - Admin can:
+     - Set `policy_status` and `policy_note` for suspicious items.
+     - Force-hide an item or category from the customer app.
+   - Any admin hide/flag must not alter priced orders already placed.
+
+====================================================
+12. STATUS FLOWS – NO CHANGE
+====================================================
+
+Confirm that Phase 3 does NOT alter:
+
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- Food Orders: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- Parcel Deliveries: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+Menu module only affects what can be ordered, not how orders progress.
+
+====================================================
+13. UX & RESPONSIVENESS
+====================================================
+
+- Desktop:
+  - Use existing sidebar + topbar.
+  - Category and item tables should be responsive and support sorting and filtering.
+
+- Mobile:
+  - Use existing drawer navigation.
+  - Item creation/edit forms must be usable on small screens:
+    - vertical layout
+    - collapsible sections per step.
+
+====================================================
+14. IMPLEMENTATION CHECKLIST
+====================================================
+
+1. Add “Menu” section to restaurant navigation (desktop + mobile) using existing patterns.
+2. Implement:
+   - Categories page
+   - Items list, create, edit pages
+   - Bulk actions page
+   - Availability management
+3. Wire up backend endpoints with full RBAC and restaurant_id scoping.
+4. Implement audit logs for menu changes.
+5. Enforce KYC gating and Admin block status.
+6. Extend Admin panel with read-only restaurant menu view and policy flags.
+7. Ensure no breaking changes to:
+   - rides, food_orders, deliveries
+   - existing restaurant dashboard pages
+   - commission and wallet logic.

@@ -1,0 +1,120 @@
+You are the lead backend + security engineer for the SafeGo platform. Follow ALL existing SafeGo master rules and security roadmap phases. Do NOT break or change any previously working features. You are now working on:
+
+Step 49 – Admin Analytics Data Engine & RBAC Validation Fix
+
+Context and current behavior:
+- App: SafeGo (multi-country ride + food + parcel platform) with four core roles: customer, driver, restaurant, admin.
+- We already have a working admin dashboard with 15 management cards, payouts, wallets, and earnings analytics security (RBAC) wired.
+- Admin security phases 42–48 and the Admin Financial Suite (Step 46–47) are complete and production-grade.
+- We are now seeing errors on the Admin Analytics Dashboard at route: /admin/analytics
+
+Observed bug on /admin/analytics:
+- URL: /admin/analytics
+- Logged in as: admin@demo.com / demo123 (SUPER_ADMIN, full capabilities)
+- Screen shows:
+  - “Failed to load overview data. The string did not match the expected pattern.”
+  - “Failed to load driver analytics.”
+- Tabs on this page: Drivers, Customers, Restaurants, Revenue, Risk
+- Filters:
+  - Date range: “Last 7 Days” (and other ranges like 30 days, etc.)
+  - Country filter: “All Countries”
+
+Your mission in this step:
+Fix the Admin Analytics Dashboard data-loading errors and finalize the backend analytics data engine with strict RBAC and validation, WITHOUT breaking any existing features or security phases.
+
+High-level requirements:
+1. Investigate analytics data flow
+   - Locate all backend endpoints used by /admin/analytics (overview, drivers, customers, restaurants, revenue, risk).
+   - Identify where the “string did not match the expected pattern” error originates (likely date parsing or filter parameter validation).
+   - Confirm how the frontend constructs the analytics API requests (URL, query params, body, headers, and capabilities).
+
+2. Fix data format and validation issues
+   - Ensure that date filters (e.g., “Last 7 Days”, “Last 30 Days”, custom ranges) are converted into a consistent, backend-safe format (ISO 8601 strings or validated numeric ranges).
+   - If the backend expects a specific date pattern, normalize all incoming dates to that pattern before querying.
+   - Validate all request parameters (date ranges, country, pagination, segment/tab type) using a robust validation layer (e.g., zod or schema-based validation) so invalid inputs are rejected with a clean 400 error.
+   - Ensure numeric values (counts, totals, revenue, risk scores) are handled as numbers in the database layer and converted to the correct types for the frontend (no invalid string/number mixing that would trigger pattern errors).
+   - Implement safe defaults: if a filter is missing, use a safe default (e.g., last 7 days, all countries) instead of throwing.
+
+3. Implement / verify analytics endpoints
+   - Make sure each analytics tab has a clear, documented backend endpoint:
+     - Overview analytics
+     - Driver analytics
+     - Customer analytics
+     - Restaurant analytics
+     - Revenue analytics
+     - Risk / fraud analytics (if implemented)
+   - Each endpoint must:
+     - Be idempotent and read-only.
+     - Use parameterized queries or Prisma query builders (NO raw SQL string concatenation).
+     - Handle empty datasets gracefully (return zero/empty arrays instead of throwing).
+     - Be performant for typical admin usage (no N+1 query patterns on large datasets).
+
+4. RBAC and capability enforcement
+   - Ensure analytics endpoints are gated behind the correct admin capabilities:
+     - Analytics / earnings dashboards MUST NOT be accessible to non-admin roles.
+     - Only admins with the designated capability (e.g., VIEW_EARNINGS_DASHBOARD or VIEW_ANALYTICS_DASHBOARD) may access the analytics endpoints.
+   - Use the existing RBAC system and middleware (do NOT invent a new pattern).
+   - Confirm that the /api/admin/capabilities endpoint includes the correct capability flags used by the analytics frontend.
+   - If capabilities fail to load due to a non-authentication error, the frontend may show a warning banner but must still render safely (no crashes).
+
+5. Preserve all existing SafeGo rules and financial logic
+   - Do NOT modify or regress:
+     - Wallets, payouts, and payout scheduling endpoints (Steps 46–47).
+     - Existing fraud detection, real-time monitoring, DevOps security, or automated incident response (Steps 42–45).
+     - Commission and payout logic for rides, food orders, and parcel deliveries.
+   - Analytics must be read-only summaries based on existing persisted data and must not change balances or payouts.
+
+6. Security and privacy requirements
+   - No PII leakage: analytics responses must NOT return raw personal identifiers beyond what is already allowed for admins (no passwords, tokens, secrets).
+   - Log all important analytics-access events via existing audit logging (admin, timestamp, endpoint, filters used).
+   - Ensure that all analytics endpoints are protected by the same authentication layer and JWT validation as the rest of the admin API.
+   - Do NOT touch JWT_SECRET, environment variables, or any deployment secrets.
+
+7. Frontend behavior on /admin/analytics
+   - Fix the logic so that:
+     - Overview, Drivers, Customers, Restaurants, Revenue, and Risk tabs all load successfully when data is available.
+     - When there is no data for a segment, show a clean “No analytics data for this period” state instead of a red error.
+     - When the backend rejects invalid filters (400), show a clear, friendly error explaining the filter issue, but keep the page usable.
+   - Ensure that the red error banners for “Failed to load overview data” and “Failed to load driver analytics” no longer appear under normal, valid conditions for a SUPER_ADMIN.
+
+8. Safe, incremental changes only
+   - Do NOT introduce breaking schema migrations. If a migration is absolutely necessary, only add non-destructive fields, and document them clearly.
+   - Do NOT rename or remove existing models, enums, or tables.
+   - Keep changes localized to the analytics-related backend handlers, shared validation utilities, and the /admin/analytics frontend page as needed.
+   - Preserve all security phases (Phase 1–4) exactly as they are; this step extends analytics, it does not alter the global security posture.
+
+9. Documentation
+   - Update replit.md with:
+     - A short “Step 49 – Admin Analytics Data Engine & RBAC Validation Fix” section.
+     - The list of analytics endpoints, their parameters, and which roles/capabilities can use them.
+     - Data validation rules (date formats, country codes, segments).
+     - Any limitations or important notes (e.g., how “Last 7 Days” is calculated).
+   - Keep documentation style consistent with existing sections for previous steps.
+
+10. Verification checklist
+   - Start the application and log in as admin@demo.com / demo123.
+   - Navigate to /admin/analytics and test:
+     - Last 7 Days + All Countries on each tab.
+     - At least one alternative date range.
+     - (If available) at least one specific country filter.
+   - Confirm:
+     - No red error banners about “string did not match the expected pattern”.
+     - All analytics sections load without crashing.
+     - Browser console logs show capabilities loaded and analytics requests succeeding (HTTP 200).
+   - Ensure:
+     - No TypeScript compilation errors.
+     - No runtime errors or unhandled promise rejections in server logs.
+     - Security phases 42–48 remain unchanged and functional.
+
+What to show me when you are done:
+- A concise summary of:
+  - Root cause of the analytics error.
+  - Exactly what you changed (files and key functions).
+  - How the new analytics validation and RBAC enforcement work.
+- A bullet list of all files modified.
+- Confirmation that:
+  - /admin/analytics loads successfully for admin@demo.com / demo123 with all tabs.
+  - No security regressions occurred.
+  - replit.md has been updated with the Step 49 analytics documentation.
+
+Remember: follow SafeGo global rules (4 roles, ride/food/parcel flows, KYC/AML, RBAC, payouts, security phases) and keep all changes incremental, secure, and production-ready.

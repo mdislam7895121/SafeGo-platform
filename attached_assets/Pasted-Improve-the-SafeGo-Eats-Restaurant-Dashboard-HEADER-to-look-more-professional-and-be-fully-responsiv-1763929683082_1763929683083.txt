@@ -1,0 +1,93 @@
+Improve the SafeGo Eats Restaurant Dashboard HEADER to look more professional and be fully responsive (mobile, tablet, laptop, desktop), without breaking any existing functionality or routes.
+
+GOAL:
+Create a clean, modern, Uber Eats–style restaurant header that:
+- Clearly shows restaurant identity and verification
+- Groups controls logically on the right
+- Works well on mobile, tablet, and desktop
+- Remains fully compatible with all current SafeGo rules (RBAC, KYC, 3 services, admin panel, etc.)
+
+DESIGN REQUIREMENTS:
+
+1) Layout Structure (Desktop / Large Screens)
+- Use a 3-part layout:
+  LEFT:
+    • SafeGo Eats logo/brand
+    • Restaurant name (e.g., "mohammad")
+    • Verification badge ("Verified & Active")
+    • Subtext: location status (e.g., "Location pending") in muted text
+  CENTER:
+    • Global search bar (search orders, menu items, customers, etc.)
+  RIGHT:
+    • Restaurant status pill: "Open" / "Closed" (colored pill, e.g., green for Open, red for Closed)
+    • "You're receiving orders" toggle (clearly labeled)
+    • Notifications icon with badge
+    • (Optional) Help icon
+    • Profile avatar / initials dropdown (MO) with logout
+
+- Ensure proper spacing and alignment using flexbox/grid.
+- Use consistent typography and sizes with the rest of the app.
+- Add data-testid attributes for all important header elements.
+
+2) Layout Structure (Mobile and Tablet)
+
+Mobile (small screens):
+- Row 1:
+    • Left: SafeGo Eats logo + short restaurant name
+    • Right: notifications icon + profile avatar
+- Row 2:
+    • Full-width search bar
+- Row 3:
+    • Status pill ("Open"/"Closed") + "Receiving orders" toggle
+- Below:
+    • Small text for "Verified & Active" badge and "Location pending" or location info.
+
+Tablet (medium screens):
+- Combine into a compact 2-row header:
+    • Top: logo + restaurant name + verification on the left, controls (status pill, toggle, notifications, profile) on the right.
+    • Bottom: full-width search bar.
+
+- Use Tailwind/utility classes with responsive breakpoints (sm, md, lg) to switch between layouts.
+- Make sure the header height is not too tall on mobile; keep it compact.
+
+3) Behaviour and UX
+- Status pill:
+    • Clearly shows "Open" vs "Closed"
+    • Colors must be accessible (AA contrast)
+- "You're receiving orders" toggle:
+    • Add tooltip: e.g., "Pause receiving new orders" when hovering or long-pressing
+- Notifications:
+    • Badge shows unread count
+- Profile avatar:
+    • Opens existing profile/account menu (do not change routes or behaviour)
+
+4) Implementation Constraints
+- Do NOT change any backend logic, routes, APIs, or database schemas.
+- Do NOT alter RBAC or KYC checks.
+- All changes must be additive and non-breaking.
+- Keep existing status flows for orders, rides, and deliveries unchanged.
+- Ensure the new header works across:
+    • Restaurant Dashboard
+    • Orders pages (Live Orders, Order History, etc.)
+    • Menu Management, Promotions, Payouts & Finance, and all other restaurant routes.
+
+5) Testing
+- Verify header layout on:
+    • Mobile viewport
+    • Tablet viewport
+    • Laptop / desktop viewport
+- Add or update data-testid attributes for:
+    • header container
+    • restaurant name
+    • verification badge
+    • status pill
+    • receiving-orders toggle
+    • notifications icon
+    • profile avatar
+    • search bar
+- Ensure there are no layout regressions on existing restaurant pages.
+
+After implementing, give me a short summary of:
+- Which components/files were changed
+- How the header behaves in mobile, tablet, and desktop
+- Confirmation that there are no breaking changes to any restaurant, customer, driver, admin, rides, food_orders, or deliveries flows.

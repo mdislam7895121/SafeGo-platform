@@ -1,0 +1,57 @@
+PHASE 3 – SafeGo Eats Menu Management (500+ Items Ready)
+
+GOAL:
+Upgrade the Restaurant Menu page so a restaurant can manage large menus (minimum 500 items) efficiently.
+
+SCOPE:
+- Restaurant Menu route/page only.
+- No DB schema changes.
+- Must remain fast with 500+ items.
+
+REQUIREMENTS:
+
+1) CATEGORY SYSTEM (FRONTEND)
+- Display menu grouped by categories:
+  - Example categories: Burgers, Biryani, Pizza, Drinks, Desserts, Veg, Non-Veg, Combos, Sides, etc.
+- Category list on the left (or top on mobile).
+- Clicking a category scrolls or filters to that group.
+
+2) MENU ITEM CARD FIELDS
+Each item must support (using existing fields where possible):
+- Name
+- Photo/thumbnail
+- Price
+- Short description
+- Tags (spicy, vegan, halal, etc.) if supported
+- Availability toggle (in stock / unavailable)
+- Optional:
+  - Variants (Small/Medium/Large) using existing variant model if present
+  - Add-ons (sauces, drinks, extras) if already modeled
+
+3) BULK OPERATIONS (FRONTEND ONLY)
+- Bulk select items to:
+  - Toggle availability ON/OFF
+  - Adjust price by fixed +amount or percentage (if safe)
+- Implement bulk changes on frontend and send batched API calls using existing update endpoints.
+
+4) PERFORMANCE REQUIREMENTS
+- Use virtualization/infinite scroll/pagination so UI remains smooth with 500+ items.
+- Lazy-load images (don’t load 500 photos at once).
+- Debounce search/filter input.
+
+5) SEARCH & FILTERS
+- Search bar: filter by item name.
+- Filters:
+  - Category
+  - Availability (Available / Unavailable)
+- Restore previous state when user comes back from another page during same session if possible.
+
+6) EMPTY STATES & SAFETY
+- If restaurant has no menu items, show an onboarding card:
+  - “You don’t have any menu items yet. Start by adding your first item.”
+- Do NOT remove or break existing API calls.
+- Keep all validation and error handling consistent with the rest of SafeGo.
+
+DELIVERABLE:
+- Fully functional Menu Management UI able to handle 500+ items.
+- Short explanation of how you handled performance (virtualization/pagination/etc.).

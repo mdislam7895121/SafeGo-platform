@@ -1,0 +1,65 @@
+Fix ride booking flow: keep selected pickup and destination when going to the price/plan page
+
+Context:
+- This is the SafeGo customer web app.
+- On the main customer home page, Google Places Autocomplete is now working.
+- When the user types "188 Sutter Ave" or "170-21 Jamaica Ave", the suggestions appear and can be selected.
+- After both pickup and destination are selected, the user taps the "See prices" button.
+- BUG: On the next screen (the ride planning / map screen), the app often asks again for the address in the "Where to?" field. The previously selected destination is lost, and in some cases the pickup field is also missing or mismatched.
+- Goal: The ride planner page must reuse exactly the same pickup and destination that were selected on the home screen, including address text and coordinates, so that the user does NOT have to re-enter the address.
+
+Your tasks:
+1. Audit the whole ride booking flow:
+   - Find the customer home page component with the two location inputs and the "See prices" button (likely under client/src/pages/customer and the GooglePlacesInput / LocationSearchInput components).
+   - Find the ride planning / map page that opens after "See prices" (for example a route like /customer/ride, /customer/plan or similar).
+   - Trace how pickup and destination data are passed between these pages (props, URL params, query string, context, or a shared store).
+
+2. Fix the Google Places selection handling:
+   - Ensure that when the user taps a suggestion from the Google Places Autocomplete dropdown, the FULL place information is saved in state:
+     - formatted address text (for display),
+     - place_id,
+     - latitude and longitude.
+   - Make sure the input field value is updated to the formatted address, not just the raw text the user typed.
+   - Only mark a location as "valid" after a real suggestion has been selected, not just when the user types.
+
+3. Persist pickup and destination into the ride planner page:
+   - When the user taps "See prices", check that both pickup and destination have valid place objects (with place_id and coordinates).
+   - Pass these values to the next page using the existing architecture (for example:
+     - a shared store or context, or
+     - URL query parameters, or
+     - a navigation state object).
+   - On the ride planner / map page, read these values and:
+     - Pre-fill the "Current location / pickup" field with the pickup address.
+     - Pre-fill the "Where to?" field with the destination address.
+     - Use the lat/lng to draw the route and calculate distance and ETA.
+   - Do NOT clear these fields when navigating to the map page.
+
+4. Validation and UX:
+   - Disable or show an error on the "See prices" button if both pickup and destination are not valid Google Places selections.
+   - If the user deletes or edits a location on the map page, update the state consistently so that the app does not get stuck asking for addresses again.
+
+5. Technical checks:
+   - Verify that the Google Maps JavaScript SDK and Places API key are taken from the GOOGLE_MAPS_API_KEY secret and still work with the current domain restrictions (https://*.replit.app/*, https://*.replit.dev/*, http://localhost).
+   - Check browser console logs and server logs for any errors related to:
+     - missing place_id,
+     - undefined coordinates,
+     - navigation / routing errors.
+   - Fix any bugs found in these logs that would cause the destination to be lost when opening the map page.
+
+6. Safety and non-regression:
+   - Do not break any existing SafeGo customer flows:
+     - ride request creation,
+     - price estimation,
+     - saving recent locations or favorite places.
+   - Keep all existing security and privacy middleware (CSP headers, API key usage, etc.) intact.
+
+7. Final confirmation:
+   - After implementing the fixes, restart the app and manually test this scenario:
+     - On the customer home screen, choose pickup = "182 Sutter Ave, Brooklyn" and destination = "170-21 Jamaica Ave".
+     - Tap "See prices".
+     - Confirm that on the ride planning / map page:
+       - Pickup shows "182 Sutter Ave" (current location),
+       - Destination shows "170-21 Jamaica Ave",
+       - The map centers on the correct area and a route is drawn,
+       - The app no longer asks again for the address.
+   - Provide a short summary of what you changed (files and key functions) and confirm that the bug is fixed.

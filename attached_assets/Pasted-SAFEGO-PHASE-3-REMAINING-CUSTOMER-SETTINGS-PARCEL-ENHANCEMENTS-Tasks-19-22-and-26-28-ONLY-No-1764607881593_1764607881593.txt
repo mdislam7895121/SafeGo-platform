@@ -1,0 +1,616 @@
+SAFEGO PHASE 3 (REMAINING) – CUSTOMER SETTINGS & PARCEL ENHANCEMENTS
+(Tasks 19–22 and 26–28 ONLY, Non-Breaking)
+
+You are an expert full-stack engineer working on the global super-app “SafeGo”.
+
+In this prompt, you must FINISH the remaining Phase 3 work:
+
+Customer side:
+19. Finish Customer Profile Pages
+20. Add/verify Payment Method CRUD for Customers
+21. Add Saved Places System
+22. Add Ride Preferences for Customers
+
+Parcel side:
+26. Add Parcel Size/Weight Pricing
+27. Add Proof-of-Delivery Photo Capture
+28. Add Scheduled Pickup for Parcel
+
+IMPORTANT: Phase 3 restaurant features (Tasks 23–25: kitchen tickets, real-time restaurant status, restaurant→driver dispatch) are ALREADY IMPLEMENTED.  
+In this prompt you must NOT re-implement or break them. You may only call or extend them if needed.
+
+All changes must be ADDITIVE and must preserve every existing SafeGo feature, especially the already-completed Phase 1 (dispatch), Phase 2 (wallet + payments + notifications), and Phase 3 restaurant components.
+
+==================================================
+A. GLOBAL SAFEGO MASTER RULES (MUST BE RESPECTED)
+==================================================
+
+1) Roles (4 separate roles, no mixing)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+Each role has:
+   - its own signup/onboarding,
+   - its own KYC/verification rules,
+   - its own dashboard,
+   - its own permissions.
+
+Do NOT let a role access another role’s restricted data.
+
+2) Services (3 major services, all must remain supported)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+Any new logic must not break or hard-limit any of these services.  
+Customer features mainly target rides, but must co-exist with food and parcel. Parcel features obviously target deliveries.
+
+3) Country-specific KYC rules (BD vs US)
+
+SafeGo currently supports at least:
+   - Bangladesh ("BD")
+   - United States ("US")
+
+Bangladesh – required for customers/drivers:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID number + front/back images
+   - emergency contact details
+   - verification_status
+   - is_verified
+
+United States – customers:
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - verification_status
+   - is_verified
+
+United States – drivers:
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - driver_license_number
+   - driver_license_image
+   - driver_license_expiry
+   - optional ssn_last4
+   - verification_status
+   - is_verified
+
+Phase 3 features MUST:
+   - Only show non-sensitive fields on customer UI.
+   - Never expose raw NID numbers, SSN, or ID images via APIs or frontends to non-admin users.
+   - Respect `verification_status` and `is_verified` checks when enabling scheduling, payment methods, or parcels.
+
+4) Admin panel (must stay authoritative)
+
+Admin must be able to:
+   - verify customers, drivers, restaurants (approve/reject KYC with rejection_reason),
+   - block/unblock users,
+   - configure pricing, fees, and commissions per country/service,
+   - manage payouts and settlements,
+   - view driver negative balances,
+   - view restaurant negative balances.
+
+For this prompt:
+   - Add read-only tools for:
+       - viewing individual customers’ saved places and ride preferences,
+       - viewing parcel pricing configs,
+       - viewing scheduled parcel pickups and proof-of-delivery photos.
+   - Admin is READ-ONLY for user settings (profile/saved places/preferences/payment methods) unless an explicit “admin override” route already exists.
+
+5) Core collections – must NOT be renamed or removed
+   - `rides`
+   - `food_orders`
+   - `deliveries`
+
+Each must continue to have:
+   - identity references (customer_id, driver_id, restaurant_id…),
+   - pickup/dropoff addresses + coordinates,
+   - fare + fee details,
+   - commission/settlement fields,
+   - payment method & status,
+   - timestamps,
+   - full status flow,
+   - rating + feedback.
+
+This prompt may only ADD new fields to these collections (e.g. parcel size/weight, scheduled_pickup_at, tip fields already exist, etc.).
+
+6) Commission & payout rules – DO NOT CHANGE
+
+Already implemented in Phase 2. You must NOT change their semantics:
+
+   - Cash ride: driver keeps full cash; SafeGo commission = negative driver_wallet_balance (weekly settlement).
+   - Cash food: restaurant keeps full cash; commission = negative restaurant_wallet_balance.
+   - Cash parcel: driver keeps full cash; commission recorded as negative in driver wallet.
+   - Online payments: SafeGo receives full amount via gateway; platform keeps commission, partners get net via wallets.
+   - Admin can settle and mark paid.
+
+Customer and parcel features here should only USE these results (e.g., show totals, enable parcel scheduling) without touching the logic.
+
+7) Security rules
+
+   - Customers cannot view driver KYC documents (NID, license, SSN, etc.).
+   - Drivers cannot view customer NID or sensitive government ID details.
+   - Restaurants cannot see other restaurants’ records.
+   - Only admin can:
+       - change pricing/commission,
+       - change verification/block status,
+       - manually adjust wallets/settlements.
+   - Every user can modify only THEIR OWN settings: profile, payment methods, saved places, ride preferences.
+   - Proof-of-delivery photos must:
+       - be scoped to one delivery,
+       - be visible only to that delivery’s customer, its assigned driver, and admins.
+
+8) Status flows (must remain intact)
+
+Rides:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcels:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+Parcel scheduling & POD must attach cleanly to this parcel flow:
+   - scheduled pickups eventually create a normal `requested` dispatch at the scheduled time.
+   - proof-of-delivery is created when status transitions to delivered.
+
+9) Onboarding
+
+For every role:
+   - multi-step onboarding: basic info, address, country-specific ID/KYC upload, emergency contact.
+   - verification_status starts as "pending".
+   - Access to ride ordering, food ordering, parcel sending, and payment methods is blocked until verification = approved.
+
+Phase 3 features must check for verification for:
+   - using saved payment methods,
+   - using scheduled parcel pickups.
+
+10) Notifications
+
+WebSocket + FCM are already implemented.  
+In this prompt you must:
+
+   - Emit internal events for:
+       - customer profile updated,
+       - payment method added/removed,
+       - saved place added/removed,
+       - ride preferences updated,
+       - parcel scheduled,
+       - parcel scheduled reminder,
+       - parcel delivered with proof photo uploaded.
+   - Use existing NotificationService to push user-facing messages where appropriate, without breaking earlier event types.
+
+11) No legal case / complaint module
+
+Do NOT implement any “case”, “ticket”, “lawsuit”, or “complaint filing” features for any country.  
+This prompt is strictly about UX (customer settings) and parcel enhancements.
+
+==================================================
+B. SCOPE & CONSTRAINTS FOR THIS PROMPT
+==================================================
+
+You must:
+
+   - COMPLETE customer features: profile page, payment method CRUD, saved places, ride preferences.
+   - COMPLETE parcel features: size/weight-based pricing, proof-of-delivery photo capture, scheduled pickup logic.
+
+You must NOT:
+
+   - Re-implement or change the restaurant kitchen system or Phase 3 Tasks 23–25.
+   - Change wallet/commission/payment logic (only consume them).
+   - Rename or remove any existing database columns, models, or routes.
+   - Break existing ride/food/parcel flows.
+
+==================================================
+C. CUSTOMER PROFILE PAGES (TASK 19)
+==================================================
+
+1) Data model (ensure/extend, ADD-ONLY):
+
+`customers` table/model MUST expose at least:
+
+   - id
+   - first_name, last_name
+   - email, phone
+   - country_code
+   - date_of_birth
+   - home_address (US) or present_address/permanent_address (BD)
+   - emergency_contact_name, emergency_contact_phone
+   - avatar_url (nullable)
+   - language_preference (e.g. "en", "bn")
+   - notification_preferences JSON:
+       - ride_updates (boolean)
+       - food_updates (boolean)
+       - parcel_updates (boolean)
+       - marketing (boolean)
+   - verification_status (read-only on UI)
+   - is_verified (read-only on UI)
+
+KYC document numbers/images (NID, SSN, license images) MUST NOT be included in the customer profile responses.
+
+2) APIs (customer scope)
+
+   - GET  /api/customer/profile
+   - PUT  /api/customer/profile
+
+Rules:
+
+   - Authenticate with existing auth stack.
+   - Always derive customer_id from the authenticated session; do NOT accept it from client.
+   - Validate country-specific fields:
+       - BD: present_address & permanent_address required; show them appropriately.
+       - US: home_address required; present/permanent may be hidden or mirrored.
+
+3) UI
+
+Customer “Account/Profile” screen must include:
+
+   - Basic info: name, avatar, phone, email (email/phone may be locked depending on existing flows).
+   - Addresses:
+       - For US: Home address editing.
+       - For BD: Present and permanent addresses.
+   - Emergency contact section.
+   - Language preferences.
+   - Notification preferences toggles (ride/food/parcel/marketing).
+   - Read-only verification badge/label (pending/approved/rejected).
+
+Ensure mobile + desktop layout are responsive and do not break existing navigation.
+
+==================================================
+D. PAYMENT METHOD CRUD (TASK 20 – COMPLETE)
+==================================================
+
+Assume `payment_methods` and `PaymentService` already exist from Phase 2B. You must:
+
+1) Validate and finish backend APIs (customer scope):
+
+   - POST   /api/customer/payment-methods
+       - Creates a payment method via PaymentService (tokenization).
+   - GET    /api/customer/payment-methods
+       - Lists active payment methods for this customer only.
+   - PATCH  /api/customer/payment-methods/:id
+       - Allows setting `is_default` true/false; toggle only for this customer.
+   - DELETE /api/customer/payment-methods/:id
+       - Soft-delete: set is_active=false; must only apply to customer’s own methods.
+
+Security:
+
+   - All operations must be authorized against the logged-in customer_id.
+   - Never accept someone else’s customer_id in payload/params.
+
+2) UI integration
+
+In Customer Account → “Payment Methods”:
+
+   - Show each active method with:
+       - brand,
+       - masked card (e.g., **** **** **** 4242),
+       - expiry,
+       - default indicator.
+   - Allow:
+       - “Add new card” (or payment method) → uses provider’s client SDK or PaymentService tokens.
+       - “Set as default”.
+       - “Remove”.
+
+Online payment availability is country-specific; hide or label appropriately for unsupported countries.
+
+3) Notifications & logs
+
+   - Log audit events for add/remove/default changes.
+   - Optionally notify user by email/FCM for “new payment method added” for security.
+
+==================================================
+E. SAVED PLACES SYSTEM (TASK 21)
+==================================================
+
+1) Data model
+
+Create `customer_saved_places` table (ADD-ONLY):
+
+   - id
+   - customer_id
+   - label: string ("Home", "Work", "Gym", etc.)
+   - icon_type: string ("home" | "work" | "star" | "pin" etc.)
+   - address_text
+   - latitude
+   - longitude
+   - is_default_pickup (boolean)
+   - is_default_dropoff (boolean)
+   - created_at
+   - updated_at
+
+Constraints:
+
+   - At most one “Home” and one “Work” per customer (checked by label or icon_type).
+   - A global max number of entries per customer (e.g. 10) – configurable.
+
+2) APIs (customer scope)
+
+   - GET    /api/customer/saved-places
+   - POST   /api/customer/saved-places
+   - PATCH  /api/customer/saved-places/:id
+   - DELETE /api/customer/saved-places/:id
+
+Rules:
+
+   - All operations must be scoped to the authenticated customer.
+   - When setting is_default_pickup or is_default_dropoff = true, clear that flag from other places for this customer.
+
+3) Ride booking integration
+
+   - On the “Book a ride” screen:
+       - Show quick chips/buttons for:
+           - Home, Work, other saved places.
+       - Selecting one should:
+           - fill pickup or dropoff field with the place’s address_text,
+           - set coordinates accordingly.
+
+   - Ensure no breaking changes for existing address search/autocomplete; saved places must be additive.
+
+==================================================
+F. RIDE PREFERENCES (TASK 22)
+==================================================
+
+1) Data model
+
+Create `customer_ride_preferences` table (ADD-ONLY):
+
+   - id
+   - customer_id
+   - preferred_vehicle_types: array/string list (e.g. ["car", "bike", "cng", "premium"])
+   - music_preference: "no_preference" | "quiet" | "loud_ok"
+   - air_conditioning: "no_preference" | "ac_on" | "ac_off"
+   - communication_preference: "no_preference" | "minimal_talk" | "friendly"
+   - accessibility_options JSON (e.g., {wheelchair_support: true})
+   - safety_preferences JSON (e.g., {auto_share_trip_with_contacts: true})
+   - created_at
+   - updated_at
+
+2) APIs
+
+   - GET /api/customer/ride-preferences
+   - PUT /api/customer/ride-preferences
+
+A customer has at most one preferences record; you may upsert.
+
+3) Dispatch integration (soft influence only)
+
+   - When searching for drivers for rides:
+       - If preferred_vehicle_types exists:
+           - Filter or boost drivers whose vehicle_type matches.
+       - For accessibility options:
+           - Try to match drivers who can support them (based on existing driver metadata).
+   - IMPORTANT:
+       - Preferences are “best effort” only.
+       - If no matching driver exists, system must still dispatch the nearest suitable driver – do NOT fail the ride.
+
+   - Do NOT send full preference details to drivers; at most send the subset that affects them (e.g., “accessibility requested”).
+
+==================================================
+G. PARCEL SIZE/WEIGHT PRICING (TASK 26)
+==================================================
+
+1) Data model
+
+Create `parcel_pricing_configs` (if not already present):
+
+   - id
+   - country_code
+   - region_code or city (nullable)
+   - size_category: "small" | "medium" | "large" | "oversized"
+   - max_weight_kg
+   - base_fare
+   - per_km_rate
+   - per_kg_surcharge (nullable)
+   - currency
+   - active_from
+   - active_to
+   - is_active
+
+Extend `deliveries` table (ADD-ONLY):
+
+   - parcel_size_category
+   - parcel_weight_kg
+   - parcel_pricing_config_id (FK to parcel_pricing_configs)
+   - parcel_pricing_breakdown JSON (similar to rides fare_breakdown)
+
+2) Pricing logic
+
+Extend PricingService:
+
+   PricingService.calculateParcelFare({
+       country_code,
+       city/region,
+       distance_km,
+       parcel_size_category,
+       parcel_weight_kg
+   }) → {
+       estimated_fare_amount,
+       currency,
+       breakdown
+   }
+
+Selection rules:
+
+   - Select the active parcel_pricing_config matching:
+       - country_code
+       - region (if configured)
+       - size_category such that weight <= max_weight_kg
+   - Compute:
+       - fare = base_fare + per_km_rate * distance_km + per_kg_surcharge * max(0, weight_kg - base_threshold) (if configured)
+
+Store this estimate on delivery creation and use it as base for final fare/settlement at completion.
+
+3) Admin panel
+
+   - Add admin UI for:
+       - viewing and editing parcel_pricing_configs per country/region.
+       - showing preview calculations.
+
+==================================================
+H. PROOF-OF-DELIVERY PHOTO CAPTURE (TASK 27)
+==================================================
+
+1) Data model
+
+Create `delivery_proof_photos` table:
+
+   - id
+   - delivery_id
+   - driver_id
+   - photo_url
+   - captured_at
+   - meta JSON (e.g., {gps_lat, gps_lng, device, app_version})
+
+2) APIs
+
+Driver-side:
+
+   - POST /api/driver/deliveries/:id/proof-photos
+       - multipart upload or pre-signed URL flow.
+       - Only the assigned driver can upload POD photos for that delivery.
+   - GET  /api/driver/deliveries/:id/proof-photos
+       - list thumbnails (for driver’s own deliveries only).
+
+Customer-side:
+
+   - GET  /api/customer/deliveries/:id/proof-photos
+       - Only that delivery’s customer can view.
+
+Admin-side:
+
+   - GET  /api/admin/deliveries/:id/proof-photos
+       - full access for audit.
+
+3) Delivery completion rules
+
+   - Country-configurable flag:
+       - `require_pod_photo_for_parcels` per country/region.
+   - If required:
+       - `driver:end_delivery` / “complete delivery” API MUST check that at least one proof photo exists.
+       - If not, reject completion with a clear error.
+   - If not required:
+       - POD is optional but supported.
+
+4) Storage & security
+
+   - Store images in secure object storage (e.g., S3-like bucket) with:
+       - private ACL,
+       - short-lived signed URLs for access.
+   - Never expose raw bucket paths/names to clients.
+   - Delete access when deliveries/photos are deleted per retention policy (configurable).
+
+==================================================
+I. SCHEDULED PICKUP FOR PARCEL (TASK 28)
+==================================================
+
+1) Data model
+
+Extend `deliveries` table (ADD-ONLY):
+
+   - pickup_type: "immediate" | "scheduled"
+   - scheduled_pickup_at (timestamp, nullable)
+   - scheduled_window_minutes (integer, default e.g. 30)
+   - scheduled_status: "pending" | "dispatched" | "cancelled" (track scheduling lifecycle)
+
+2) Booking flow
+
+   Customer can choose:
+
+   - Immediate:
+       - pickup_type = "immediate"
+       - behaviour remains identical to existing flow: create delivery, immediately create dispatch_sessions and start driver search.
+
+   - Scheduled:
+       - pickup_type = "scheduled"
+       - scheduled_pickup_at set by customer (with validation).
+       - scheduled_window_minutes from config (per country/region).
+
+Validation:
+
+   - scheduled_pickup_at must be at least X minutes in the future (configurable, e.g., 30 minutes).
+   - Must fall within service hours for that region (config table; e.g., 8:00–22:00).
+
+3) Dispatch integration
+
+   - For pickup_type="scheduled":
+       - On creation, do NOT dispatch immediately.
+       - Implement a scheduler/cron job that runs periodically (e.g. every 5 minutes) and:
+           - finds deliveries where:
+               - pickup_type = "scheduled"
+               - scheduled_status = "pending"
+               - scheduled_pickup_at - lead_time <= now < scheduled_pickup_at + small_buffer
+           - for each, create a dispatch_sessions row (service_type="parcel") and start driver search with existing engine.
+           - mark scheduled_status = "dispatched" once search begins.
+
+   - lead_time (e.g., 20 minutes before scheduled time) is config-driven.
+
+4) Notifications
+
+Use NotificationService + WebSockets:
+
+   - On successful scheduling:
+       - Customer gets confirmation: PARCEL_SCHEDULED_CONFIRMATION.
+   - lead_time minutes before:
+       - Customer and nearest drivers assigned/targeted get PARCEL_PICKUP_REMINDER.
+   - If no driver found:
+       - Customer gets “no driver found” message with instructions to reschedule/cancel.
+
+Admin view:
+
+   - List upcoming scheduled deliveries with status, region, and assigned drivers (if any).
+
+==================================================
+J. SECURITY PHASE – “USER SETTINGS & EVIDENCE PROTECTION”
+==================================================
+
+This prompt belongs to SafeGo’s security roadmap phase focusing on:
+
+   - protecting user settings (profile, payments, preferences, saved places) from unauthorized access,
+   - protecting parcel proof-of-delivery evidence from being accessed or tampered with.
+
+Key enforcement:
+
+   - All settings APIs must validate authenticated user_id and disallow cross-user access.
+   - POD photo access must always check role + ownership (customer, assigned driver, or admin).
+   - Admin overrides are always logged with actor_id, role, and IP.
+
+==================================================
+K. NON-BREAKING GUARANTEES & MODULE LIST
+==================================================
+
+When applying this prompt:
+
+   - ONLY ADD:
+       - tables: customer_saved_places, customer_ride_preferences, parcel_pricing_configs, delivery_proof_photos (if not existing),
+       - new columns on customers, deliveries, etc. (all nullable with safe defaults),
+       - new APIs and front-end screens/components for customer account and parcel scheduling,
+       - new scheduler/cron jobs for scheduled deliveries.
+   - DO NOT:
+       - rename or remove any existing field/table/route,
+       - change wallet/commission/payment semantics,
+       - touch the already-implemented kitchen/restaurant dispatch logic except for read-only usage.
+
+Ensure:
+
+   - Existing rides/food_orders/deliveries created before these changes still load and behave correctly.
+   - If scheduled pickups are disabled in config, system behaves exactly like before (immediate only).
+   - If POD requirement is disabled, no delivery flow is blocked.
+
+Implement production-quality code with:
+   - clear separation of modules:
+       - CustomerSettingsModule (profile, payments, saved places, preferences),
+       - ParcelEnhancementsModule (pricing, POD, scheduling),
+   - strong validation and logging,
+   - comments so future prompts can extend fraud detection and revenue analytics on top of these features without refactoring.

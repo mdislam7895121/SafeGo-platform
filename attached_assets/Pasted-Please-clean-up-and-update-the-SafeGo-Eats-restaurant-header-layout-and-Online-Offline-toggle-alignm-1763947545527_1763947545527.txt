@@ -1,0 +1,114 @@
+Please clean up and update the SafeGo Eats restaurant header layout and Online/Offline toggle alignment exactly as follows. Do NOT change any backend logic, routing, API behavior, or KYC gating. This is a pure UI/layout update under full SafeGuard rules.
+
+A. Remove duplicate header
+1. Currently the restaurant identity block appears twice:
+   - Once inside the main app header/top region
+   - Once again as a big title inside the page content (e.g., "mohammad  Verified" with another Online button)
+2. Keep ONLY the primary header identity at the top.
+3. Remove the secondary “content-level” header that repeats:
+   - Restaurant name
+   - Verified badge
+   - Online/Offline toggle
+4. After removal, the page should have:
+   - Top header row with restaurant identity + toggle
+   - Below that, the main sections (Performance Overview, cards, etc.) without any extra big name heading.
+
+B. Exact header layout structure (desktop & tablet)
+Implement this layout for `/restaurant` and all restaurant portal pages:
+
+1. Header container
+   - Width: full width of content area
+   - Max-width follows existing layout container
+   - Padding: 16px top, 16px bottom
+   - Layout: `display: flex; align-items: center; justify-content: space-between; gap: 16px;`
+   - No extra vertical margin that pushes content down too much
+
+2. Left block: Restaurant identity
+   - A vertical stack:
+     - Line 1: Restaurant name (e.g., "mohammad") in h1/h2 style
+     - On the same line: Verified badge + ID / location, as you have now
+   - Name font: same as current primary title
+   - Keep the ID and location styling unchanged
+
+3. Right block: Online/Offline toggle
+   - Use the new redesigned pill toggle (already implemented)
+   - Place this block on the RIGHT of the header flex row, but LEFT-aligned inside its own block so it visually lines up with the identity area.
+   - IMPORTANT: There should be only ONE toggle in the entire header for each page.
+
+C. Mobile layout behavior (narrow screens)
+On small screens (like the screenshots from iPhone):
+
+1. Header container
+   - `flex-direction: column;`
+   - `align-items: flex-start;`
+   - `gap: 8–12px;`
+2. Order of elements:
+   - First: Restaurant identity (name, verified, location, etc.)
+   - Second: Online/Offline pill toggle
+3. Toggle alignment:
+   - Left-aligned under the restaurant name (not centered)
+   - No extra duplicate name, no extra header block below
+
+D. Online/Offline toggle design (keep current redesign, only adjust placement)
+Keep all of the following rules already implemented:
+1. Size & shape:
+   - Height ~46px
+   - Pill radius: 9999px
+   - Horizontal padding: 20px left/right
+   - Min tap target: 44px
+2. Icon and label:
+   - Icon: 22px
+   - Space between icon and text: 12px
+   - Font size: 15–16px, medium/semi-bold
+3. Colors:
+   - ONLINE:
+     - Background: #0CCE6B
+     - Text: #FFFFFF
+     - Icon: #FFFFFF with subtle glow
+   - OFFLINE:
+     - Background: #E5E7EB
+     - Text: #374151
+     - Icon: #374151
+     - Border: 1px solid #D1D5DB
+4. Interaction & accessibility:
+   - role="switch"
+   - aria-checked reflects state
+   - Fully keyboard accessible (Enter + Space)
+   - Focus ring: 2px outline, #4B9EFF
+   - Smooth 150–200ms transition
+
+E. Spacing after header
+1. After the header block, add:
+   - Margin-bottom: 16–24px before “Performance Overview” or the first content section.
+2. Do NOT re-introduce any second-level “mohammad + Verified + Online” header there.
+
+F. Regression & responsive checks
+1. Apply the same header + toggle placement pattern to:
+   - /restaurant
+   - /restaurant/dashboard
+   - /restaurant/orders
+   - /restaurant/menu/*
+   - /restaurant/staff/*
+   - Any other restaurant top-level page that shows the identity block.
+2. Confirm:
+   - There is only ONE Online/Offline toggle per page.
+   - Toggle is:
+     - in the header
+     - left-aligned with the identity block on mobile
+     - aligned in the header row on desktop
+   - No layout shift or overlapping elements.
+   - No horizontal scroll on any breakpoint.
+
+G. Final confirmation
+After implementing:
+1. Run through mobile, tablet, and desktop breakpoints.
+2. Take a screenshot of:
+   - `/restaurant/dashboard` on mobile
+   - `/restaurant/dashboard` on desktop
+3. Confirm:
+   - No duplicate headers
+   - Header looks clean and professional
+   - Toggle placement matches the specification above
+   - All SafeGuard and KYC gating remain untouched (UI only change).
+
+This task is strictly a visual and layout refinement for the restaurant header and Online/Offline toggle alignment. Do not modify any backend logic or state management.

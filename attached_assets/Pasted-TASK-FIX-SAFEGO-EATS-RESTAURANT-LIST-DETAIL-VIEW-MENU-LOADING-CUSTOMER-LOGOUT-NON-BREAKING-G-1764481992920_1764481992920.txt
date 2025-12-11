@@ -1,0 +1,153 @@
+TASK: FIX SAFEGO EATS RESTAURANT LIST, DETAIL VIEW, MENU LOADING & CUSTOMER LOGOUT (NON-BREAKING)
+
+GOAL:
+- Fix “Failed to load restaurants” on Customer → Eats
+- Fix Restaurant Detail screen
+- Fix restaurant status, pricing, address blocks
+- Load menu categories + menu items correctly
+- Add proper logout button for customer role
+- Must follow all SafeGo Master Rules
+- Must not break existing modules
+
+===========================================================
+A. RESTAURANT LIST FIX (CUSTOMER → EATS HOME)
+===========================================================
+
+Create or update the query getEatsRestaurants with:
+
+Filters:
+- is_verified = true
+- verification_status = "approved"
+- is_blocked = false
+- is_open = true
+- country_code = authenticated_customer.country_code
+- (Optional) city_name = authenticated_customer.city_name
+
+Return ONLY safe fields:
+- restaurant_id
+- restaurant_name
+- cuisine_type
+- avg_rating
+- rating_count
+- min_order_amount
+- delivery_fee_base
+- preparation_time_min
+- city_name
+- images (logo/cover)
+
+UI:
+- Loading: skeleton cards
+- Success + restaurants: show cards
+- Success + zero restaurants: show empty state (no errors)
+- Real query error: small toast only (no yellow error box)
+
+===========================================================
+B. RESTAURANT DETAIL FIX (/customer/food/:restaurant_id)
+===========================================================
+
+Create getRestaurantDetails:
+
+Filters:
+- restaurant_id = param.restaurant_id
+- is_verified = true
+- is_blocked = false
+
+Bind properly:
+- Title → restaurant_name
+- Subtitle → cuisine_type or city_name
+- Rating → avg_rating + rating_count
+- Address → address_line_1 + city_name
+- Status:
+  - is_open=true → “Open now”
+  - is_open=false → “Closed”
+- Pricing:
+  - Show min_order_amount + delivery_fee_base
+  - If missing → hide component (no “unavailable” errors)
+
+If restaurant not found:
+- Show fallback message + back button
+
+===========================================================
+C. MENU FIX (menu_categories + menu_items)
+===========================================================
+
+Queries:
+
+1) getMenuCategories
+   - restaurant_id = param.restaurant_id
+   - is_active = true
+
+2) getMenuItems
+   - restaurant_id = param.restaurant_id
+   - is_available = true
+   - Include: item_id, name, description, image_url, base_price, currency_code, category_id
+
+UI:
+- If items exist → group by category
+- If items empty → friendly empty state (“No menu yet”)
+- If query fails → toast (“Unable to load menu”), do NOT break whole page
+
+SECURITY:
+- Do not return any owner KYC or sensitive fields.
+
+===========================================================
+D. RESTAURANT OWNER FLOW (NON-BREAKING)
+===========================================================
+
+Restaurant role may:
+- Manage ONLY its own menu categories + menu items
+- Toggle item availability
+- Edit item price, description, image
+
+Restaurant role cannot:
+- Access other restaurants
+- Access customer KYC or IDs
+
+Admin may view any menu non-destructively.
+
+===========================================================
+E. CUSTOMER LOGOUT BUTTON (MANDATORY)
+===========================================================
+
+Add logout to customer UI:
+
+Location:
+- Customer profile icon menu (top-right)
+OR
+- Customer side drawer
+
+Action:
+- auth.logout()
+- Clear token + customer_id
+- Navigate to login/landing
+
+Constraints:
+- Do NOT change driver/restaurant/admin logout flows
+- Do NOT rename routes
+- Do NOT break existing screens
+
+===========================================================
+F. SECURITY PHASES APPLIED
+===========================================================
+
+Phase 1 — Field-level minimization:
+- No KYC fields returned in customer food APIs.
+
+Phase 2 — Role-based access:
+- Customer: read-only
+- Restaurant: can edit own menu only
+- Admin: full access
+
+Phase 3 — Audit logs:
+- Log admin actions for approvals/rejections
+- Log menu create/update/delete
+- Log customer logins/logout
+
+===========================================================
+G. NON-BREAKING GUARANTEE
+===========================================================
+
+- No field/database rename.
+- No route rename.
+- Only additive improvements.
+- Fully compatible with all existing SafeGo modules.

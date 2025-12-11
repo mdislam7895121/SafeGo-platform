@@ -1,0 +1,263 @@
+Step 34 — USA Driver Identity & License Documents (DMV + NY TLC)
+
+Context
+- Platform: SafeGo (ride / food / parcel).
+- Driver KYC is already country-specific:
+  - Bangladesh: NID + address + vehicle docs, etc.
+  - USA: basic identity is present, but license documents are still incomplete.
+- Goal: Complete and harden USA driver identity + license document handling:
+  - DMV license documents required for ALL USA drivers.
+  - Extra TLC license documents required for New York drivers.
+  - SSN stored as info only (no document).
+  - Residential address as plain fields (no docs).
+  - Keep everything non-breaking and fully secure.
+
+Security phase for this step
+- Data classification: PII (SSN, license images).
+- Access control: strict RBAC for admin; drivers only see their own data.
+- Storage safety: no logging of raw document data or SSN, no public URLs.
+
+IMPORTANT:
+- This step must NOT break:
+  - Step 26 (Parcel).
+  - Step 27 (BD + USA identity core fields).
+  - Step 28 (document uploads infra).
+  - Step 29 (driver country filters).
+  - Step 31 (wallet/commission).
+  - Step 32–33 (admin document review & BD postal code).
+- Only additive / validation changes allowed.
+
+-------------------------------------------------
+1. Backend data model — USA driver identity & documents
+-------------------------------------------------
+
+Please extend the existing USA driver identity + document model (Prisma or equivalent) in a **non-breaking** way.
+
+1.1. Core USA driver identity (no change, just ensure fields exist)
+- For USA drivers, we expect at least:
+  - profilePhotoUrl (optional but recommended)
+  - firstName
+  - middleName (optional)
+  - lastName
+  - phoneNumber
+  - dateOfBirth
+  - ssn (stored securely, masked in UI)
+  - residentialAddress:
+    - street
+    - city
+    - state
+    - zip
+  - emergencyContact:
+    - name
+    - relationship
+    - phone
+  - backgroundCheckStatus (e.g. pending / passed / failed, etc.)
+
+If some of these are not yet present, add them in a backwards-compatible way (nullable columns, no destructive migration).
+
+1.2. DMV License block (USA, all states)
+
+Create or confirm a dedicated DMV license structure attached to the driver, for example:
+
+- dmvLicenseFrontUrl (string, nullable initially)
+- dmvLicenseBackUrl (string, nullable initially)
+- dmvLicenseExpiry (Date, nullable initially)
+- dmvLicenseNumber (string, optional)
+
+Rules:
+- DMV license *number* is optional.
+- DMV license *documents* and *expiry* will be REQUIRED at the validation layer for USA drivers (see sections 2–3), but the DB columns should be nullable to protect existing rows.
+
+1.3. TLC License block (USA, New York only)
+
+For USA drivers whose state == "NY", we need a TLC license document block:
+
+- tlcLicenseFrontUrl (string, nullable initially)
+- tlcLicenseBackUrl (string, nullable initially)
+- tlcLicenseExpiry (Date, nullable initially)
+- tlcLicenseNumber (string, optional)
+
+Rules:
+- TLC license *number* is optional.
+- TLC license *documents* and *expiry* will be REQUIRED when:
+  - country == "US" AND state == "NY".
+
+Do NOT enforce this at the DB schema level; enforce it in validation/business logic.
+
+-------------------------------------------------
+2. File upload endpoints (DMV/TLC/profile)
+-------------------------------------------------
+
+Reuse the existing file upload/document upload infra from Step 28.
+
+2.1. Endpoints
+
+Ensure there are secure endpoints (or extend existing ones) for:
+
+- Uploading driver profile photo.
+- Uploading DMV license front image.
+- Uploading DMV license back image.
+- Uploading TLC license front image (only for NY).
+- Uploading TLC license back image (only for NY).
+
+Requirements:
+- Only the authenticated driver can upload their own documents.
+- Admins must NOT be able to impersonate uploads as other drivers via public endpoints.
+- Store only URLs/keys in DB; actual binary objects go to storage (S3 or equivalent).
+- Do not log raw file contents or SSNs.
+
+2.2. Validation
+
+- Accept only image types (e.g. jpeg/png/webp) and reasonable max size.
+- Reject unsupported mime types or oversize files with a clear error.
+
+-------------------------------------------------
+3. Driver-facing KYC forms (USA)
+-------------------------------------------------
+
+Update the USA driver KYC flows to match the business rules:
+
+3.1. Profile & identity
+
+For country == "US":
+
+- Required:
+  - First name, last name.
+  - Phone number.
+  - Date of birth.
+  - Residential address: street, city, state, zip.
+  - Emergency contact (name + phone at minimum).
+- Optional:
+  - Middle name.
+
+3.2. SSN (info only)
+
+- SSN is an input field (no document upload).
+- On submit:
+  - Validate format (simple US-style: `^\d{3}-\d{2}-\d{4}$` or 9 digits, configurable).
+  - Store SSN securely.
+- UI rules:
+  - In driver & admin views, show masked: e.g. `***-**-1234`.
+  - Provide a "Show SSN" button only on admin view:
+    - Protected behind admin RBAC.
+    - When clicked, reveal the full SSN only for the current session/view.
+    - Never log the revealed SSN in console or network logs.
+
+3.3. DMV License (required for ALL USA drivers)
+
+For every USA driver (country == "US"):
+
+- DMV License block must include:
+  - DMV License Front image (required).
+  - DMV License Back image (required).
+  - DMV License Expiry date (required).
+  - DMV License Number (optional text field; may be empty).
+
+Validation:
+- If country == "US":
+  - front/back images and expiry date must be present before KYC can be set to Verified.
+- Do NOT block existing unverified drivers; they can be forced to complete missing fields on their next KYC update.
+
+3.4. TLC License (only for New York)
+
+When:
+- country == "US"
+- AND state == "NY"
+
+Then add a TLC License block:
+
+- TLC License Front image (required for NY).
+- TLC License Back image (required for NY).
+- TLC License Expiry date (required for NY).
+- TLC License Number (optional text field).
+
+Validation:
+- For NY drivers, TLC front/back + expiry are required before KYC verification.
+- For non-NY USA drivers, TLC fields are not required and may be hidden in UI.
+
+3.5. Profile photo
+
+- For all USA drivers, profile photo should be strongly encouraged, and can be made required at KYC completion time (OK if you enforce: "Verified" status requires profile photo).
+- Use the same upload infra; store URL only.
+
+-------------------------------------------------
+4. Admin KYC review UI — USA drivers
+-------------------------------------------------
+
+Update the admin driver detail / document review screens so that for country == "US" the following are clearly visible:
+
+- Basic info:
+  - Email, country (USA), state, city.
+  - KYC status.
+  - Background check status.
+
+- Identity section:
+  - First / Middle / Last name.
+  - Phone, DOB.
+  - SSN (masked by default, with "Show SSN" button for admins).
+
+- Residential address:
+  - Street
+  - City
+  - State
+  - ZIP
+
+- Emergency contact:
+  - Name
+  - Relationship (if available)
+  - Phone
+
+- DMV License:
+  - Expiry date.
+  - License number (if provided).
+  - Thumbnails/links for:
+    - DMV License Front image.
+    - DMV License Back image.
+  - Visual indicator if any required image is missing.
+
+- TLC License (only if state == "NY"):
+  - Expiry date.
+  - TLC number (if provided).
+  - Thumbnails/links for:
+    - TLC License Front image.
+    - TLC License Back image.
+  - Visual indicator if any required TLC doc is missing.
+
+Admin actions:
+- Approve / Reject KYC based on full set of docs.
+- On Reject, admin can specify a message (e.g. "Missing DMV front image", "TLC expired", etc.) that is sent back to driver.
+
+-------------------------------------------------
+5. Conditional logic JSON (for internal clarity)
+-------------------------------------------------
+
+You may create or update a configuration object (e.g. `driverKycConfig`) to drive conditional rendering and validation. For example (pseudo-JSON):
+
+```ts
+const driverKycConfig = {
+  US: {
+    required: {
+      identity: ["firstName", "lastName", "phoneNumber", "dateOfBirth"],
+      address: ["street", "city", "state", "zip"],
+      emergencyContact: ["name", "phone"],
+      dmvLicense: ["frontImageUrl", "backImageUrl", "expiryDate"],
+      profilePhoto: ["profilePhotoUrl"], // for Verified state
+    },
+    optional: {
+      identity: ["middleName"],
+      dmvLicense: ["licenseNumber"],
+      ssn: ["value"], // stored, masked in UI
+    },
+    states: {
+      NY: {
+        required: {
+          tlcLicense: ["frontImageUrl", "backImageUrl", "expiryDate"],
+        },
+        optional: {
+          tlcLicense: ["licenseNumber"],
+        },
+      },
+    },
+  },
+  // BD config remains as in earlier steps, do NOT modify here.
+};

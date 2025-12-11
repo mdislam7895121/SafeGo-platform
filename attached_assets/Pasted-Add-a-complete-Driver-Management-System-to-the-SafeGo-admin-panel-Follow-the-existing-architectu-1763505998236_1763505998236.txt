@@ -1,0 +1,34 @@
+Add a complete Driver Management System to the SafeGo admin panel.
+
+Follow the existing architecture, roles, permissions, and country-based rules.
+
+The admin must be able to:
+
+1. View all drivers with search, pagination, and filters (country, verification status, online/offline, rating).
+2. See a separate “Pending Drivers” list (drivers who registered but are not fully verified yet).
+3. Open any driver profile: personal info, vehicle info, current status, rating, total trips, total earned, total owed, and last active timestamp.
+4. See real-time driver online/offline status using the existing isOnline logic.
+5. Temporarily suspend a driver (cannot receive new ride requests but existing history is kept).
+6. Block/unblock a driver (hard block, cannot log in, consistent with current blocked user logic).
+7. Permanently delete a driver (only allowed if no critical unresolved trips or wallet issues).
+8. View driver trip history connected to the existing trip model (with basic filters: date range, status).
+9. View and manage driver complaints:
+   - Show a complaints list with auto-refresh (polling or subscription) so new complaints appear without manual reload.
+   - Each complaint should include: driver, customer, trip, short reason, status (open/resolved).
+   - From the complaint details page, the admin can suspend or block the driver directly.
+10. Ensure that only verified and not-suspended, not-blocked drivers are considered in the ride matching system.
+11. Update the admin dashboard stats to show:
+    - Total Drivers
+    - Active (online) Drivers
+    - Pending Drivers
+    - Suspended Drivers
+    - Blocked Drivers
+12. Use the existing Prisma schema, Next.js routing, middleware, and API structure. If you extend the Prisma schema (for complaints or driver moderation state), keep it consistent with the current style and relations.
+13. Write all necessary backend and frontend code:
+    - New admin routes: /admin/drivers, /admin/drivers/[id], /admin/complaints, /admin/complaints/[id]
+    - New API endpoints for driver listing, details, suspend, block, unblock, delete, and complaints handling
+    - UI pages and components in the admin panel
+    - Validation, error handling, loading states, and auto-refresh logic
+    - Documentation updates in replit.md describing the new driver management and complaints features
+
+Maintain full compatibility with all existing SafeGo features (auth, KYC, ride matching, wallets). Do not break or change any currently working feature.

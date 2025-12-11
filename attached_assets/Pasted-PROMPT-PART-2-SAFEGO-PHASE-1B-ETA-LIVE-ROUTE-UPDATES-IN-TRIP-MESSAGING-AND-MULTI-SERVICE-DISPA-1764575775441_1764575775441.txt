@@ -1,0 +1,375 @@
+PROMPT PART 2 — SAFEGO PHASE 1B: ETA, LIVE ROUTE UPDATES, IN-TRIP MESSAGING, AND MULTI-SERVICE DISPATCH (TASK 4–10)
+
+You are continuing the same SafeGo project from Phase 1A.  
+Assume everything from PART 1 is fully implemented and working (WebSocket, driver presence, proximity selection, assignment engine).
+
+Your job in THIS prompt is to implement **Phase 1B**:
+
+   4. Implement full Real-Time Customer–Driver Connection (beyond “accepted”)  
+   5. Add Driver ETA Broadcast to Customers  
+   6. Add Live Route Updates During Trip  
+   7. Implement Fare Recalculation for Route Changes  
+   8. Add In-Trip Messaging System (text only)  
+   9. Build Real-Time Food Delivery Dispatch Flow  
+   10. Build Real-Time Parcel Delivery Dispatch Flow  
+
+You must still respect ALL SafeGo Master Rules exactly as in Part 1, including:
+   - Four roles (Customer, Driver, Restaurant, Admin) with strict separation.
+   - Three services (ride, food, parcel).
+   - Country-specific KYC checks (BD vs US) for both customers and drivers.
+   - Admin-only control over verification, blocking, and pricing.
+   - Non-breaking changes to core collections (rides, food_orders, deliveries).
+   - Security restrictions around personal/KYC data.
+   - Status flows for rides, food, parcels.
+   - No new “case-taking” or legal complaint features for US or any country before Prompt 50.
+
+==================================================
+A. EXTEND STATUS FLOWS WITH REAL-TIME HOOKS
+==================================================
+
+1) Rides status flow (with real-time events)
+Ensure WS events and DB updates for:
+
+   - "requested"        → already handled in Part 1
+   - "searching_driver" → already handled
+   - "accepted"         → driver_accepted (assignment established)
+   - "driver_arriving"  → driver en route to pickup
+   - "in_progress"      → trip started (after pickup)
+   - "completed"        → trip ended
+   - cancel states: "cancelled_by_customer", "cancelled_by_driver", "cancelled_by_admin", "no_driver_found"
+
+For each transition:
+   - Update rides.status and rides.dispatch_status as appropriate.
+   - Append to rides.status_history (if not present, ADD NON-BREAKING status_history array).
+   - Emit WebSocket events to:
+       - customer:{customer_id}
+       - driver:{driver_id}
+       - ride:{ride_id}
+   - Always sync with dispatch_sessions.status when applicable.
+
+2) Food orders & parcel status placeholders
+In this Phase 1B, you must:
+   - Implement minimal status transitions and WS events for:
+       - food_orders: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+       - deliveries: requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+   - These will reuse the same dispatch_sessions and WebSocket infrastructure as rides, but with service_type = "food"/"parcel".
+
+==================================================
+B. DRIVER ETA BROADCAST TO CUSTOMERS (TASK 5)
+==================================================
+
+1) Routing & ETA calculation abstraction
+Implement a service:
+
+   RoutingService
+       - getRouteAndEta({
+           origin_lat, origin_lng,
+           dest_lat, dest_lng,
+           country_code,
+           service_type // "ride", "food", "parcel"
+         }) → {
+           distance_meters,
+           duration_seconds,
+           polyline_or_route_points
+         }
+
+This service should:
+   - Use a pluggable provider (e.g. Google Maps, Mapbox, OpenStreetMap-based) defined via configuration.
+   - Provide a fallback approximate ETA using straight-line distance and average speed if the provider is unavailable.
+   - Store provider API keys/config in environment or secure config, not hard-coded.
+
+2) When to compute ETA
+   - Immediately after driver accepts a ride:
+       - Compute ETA from driver location → pickup.
+       - Emit WS event:
+           event: "ride:eta_update"
+           payload: {
+               ride_id,
+               dispatch_session_id,
+               phase: "to_pickup",
+               eta_seconds,
+               distance_meters
+           }
+       - Update rides.eta_to_pickup_seconds, rides.eta_last_updated_at.
+
+   - Optionally, recompute ETA:
+       - On each driver location update while in "driver_arriving".
+       - Throttle recomputation (e.g. every 15–30 seconds, or only when position changed > X meters) to save API cost.
+
+3) Customer UI behavior
+Customer app must:
+   - Listen for "ride:eta_update" WS events.
+   - Update the visible ETA & driver approaching indicator on the map screen.
+   - Not flicker: implement smoothing (e.g. only update display if change > 10–15 seconds).
+
+==================================================
+C. LIVE ROUTE UPDATES DURING TRIP (TASK 6)
+==================================================
+
+1) Trip start and end events
+Define driver actions:
+   - "driver:mark_arrived_at_pickup" → changes ride.status to "driver_arriving".
+   - "driver:start_trip"             → changes ride.status to "in_progress".
+   - "driver:end_trip"               → changes ride.status to "completed".
+
+Each action:
+   - Uses REST or WS messages, but must apply consistent core logic.
+   - Validates that the driver is the assigned_driver_id.
+   - Emits WS events:
+       - "ride:driver_arrived"
+       - "ride:trip_started"
+       - "ride:trip_completed"
+
+2) Live route sharing
+While ride.status = "in_progress":
+   - On driver:location_update:
+       - Persist periodic location samples for the ride (e.g. ride_locations table) in a rate-limited manner.
+       - Emit WS event "ride:route_update" to:
+           - customer:{customer_id}
+           - ride:{ride_id}
+       - Payload:
+           {
+             ride_id,
+             driver_lat,
+             driver_lng,
+             heading (optional),
+             speed_mps (optional)
+           }
+
+Customer app:
+   - Updates the driver marker on the map.
+   - Shows approximate remaining ETA using RoutingService (throttled).
+
+==================================================
+D. FARE RECALCULATION FOR ROUTE CHANGES (TASK 7)
+==================================================
+
+1) Track actual traveled distance/time
+During in_progress:
+   - Keep aggregating:
+       - total_distance_meters
+       - total_duration_seconds
+   - Using either:
+       - route provider’s polyline, or
+       - incremental Haversine distance between location updates (with noise filtering).
+
+2) Recalculation logic (DO NOT break existing pricing)
+Assume there is an existing pricing engine with base fare, per-km, per-minute, surge, etc.
+
+You must:
+   - Add a NON-BREAKING function:
+
+       PricingService.recalculateFareForCompletedRide({
+           ride_id,
+           country_code,
+           city,
+           service_type: "ride",
+           base_pricing_profile_id, // if exists
+           total_distance_meters,
+           total_duration_seconds
+       }) → {
+           new_fare_amount,
+           breakdown
+       }
+
+   - Do NOT alter existing pricing calculations for already-completed rides.
+   - For new rides handled by this dispatch system:
+       - Use recalculateFareForCompletedRide at the moment of completion.
+       - Store:
+           - rides.final_fare_amount
+           - rides.fare_breakdown (JSON)
+           - rides.fare_recalculated = true
+
+3) Fare update notifications
+   - After recalculation, emit WS event to customer:
+       - "ride:fare_finalized" with final amount + breakdown (high-level).
+   - Emit WS event to driver:
+       - "ride:fare_finalized_driver" with driver-side payout-related amount (but do NOT modify any commission/wallet yet – only show).
+
+==================================================
+E. IN-TRIP MESSAGING SYSTEM (TASK 8)
+==================================================
+
+Implement a simple, secure text-only chat for:
+   - Customer ↔ Driver (for rides, food, and parcel).
+
+1) New collection: conversations & messages (ADD ONLY)
+   - conversations:
+       - id
+       - service_type ("ride" | "food" | "parcel")
+       - entity_id (ride_id, food_order_id, delivery_id)
+       - customer_id
+       - driver_id
+       - restaurant_id (nullable, for food context)
+       - created_at, updated_at
+   - messages:
+       - id
+       - conversation_id
+       - sender_role: "customer" | "driver" | "restaurant" | "admin"
+       - sender_id
+       - text (string)
+       - created_at
+       - is_read (boolean)
+       - read_at (nullable)
+
+2) WebSocket events for chat
+   - "chat:message_send" (client → server)
+       payload: { conversation_id, text }
+   - "chat:message_new" (server → client)
+       payload: {
+           conversation_id,
+           message_id,
+           sender_role,
+           text,
+           created_at
+       }
+
+Rules:
+   - Only participants of the conversation may send/receive messages.
+   - Do NOT allow sending any KYC documents or exposing personal ID numbers in system-generated text.
+   - No file uploads/media in this phase – purely text.
+
+3) Conversation lifecycle
+   - When a dispatch_session is created and a driver is assigned:
+       - Create or reuse a conversation record for that ride/food order/delivery.
+   - Conversations stay accessible for a limited time after completion (configurable).
+
+==================================================
+F. REAL-TIME FOOD DELIVERY DISPATCH (TASK 9)
+==================================================
+
+You must reuse the same dispatch infrastructure from Part 1A and adapt it for food_orders.
+
+1) Data expectations (non-breaking)
+Ensure food_orders has (or ADD if missing):
+   - customer_id
+   - restaurant_id
+   - driver_id (nullable until assigned)
+   - status (as per flow)
+   - pickup_location (restaurant)
+   - dropoff_location (customer)
+   - dispatch_session_id (new FK to dispatch_sessions)
+
+2) Dispatch flow for food_orders
+   - When a restaurant accepts an order (status: "accepted"):
+       - Create dispatch_sessions entry:
+           - service_type = "food"
+           - entity_id = food_orders.id
+           - customer_id, restaurant_id
+           - pickup_lat/lng = restaurant location
+           - dropoff_lat/lng = customer address
+           - status = "requested"
+       - Call findNearestDriversForDispatch with service_type = "food".
+       - Offer to food-eligible drivers (e.g., by the same proximity algorithm).
+       - Reuse same driver assignment engine:
+           - On accept → set dispatch_sessions.assigned_driver_id
+           - Update food_orders.driver_id
+           - Update food_orders.status appropriately (e.g., "driver_assigned").
+
+3) Status + WS events
+   - Tie into food status flow:
+       placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+   - Driver actions:
+       - "driver:arrive_at_restaurant"   → update status "ready_for_pickup" or pickup-in-progress.
+       - "driver:pick_up_order"          → food_orders.status = "picked_up".
+       - "driver:complete_delivery"      → "delivered".
+   - Emit analogous WS events:
+       - "food:driver_assigned"
+       - "food:eta_update"
+       - "food:route_update"
+       - "food:status_update"
+   - Use RoutingService & ETA logic just like rides.
+
+==================================================
+G. REAL-TIME PARCEL DELIVERY DISPATCH (TASK 10)
+==================================================
+
+Similarly, adapt dispatch to deliveries.
+
+1) Data expectations (non-breaking)
+Ensure deliveries has (or ADD if missing):
+   - customer_id (sender)
+   - receiver_contact (basic non-sensitive fields)
+   - driver_id
+   - pickup_location
+   - dropoff_location
+   - parcel_size, parcel_weight (for later pricing)
+   - status (as per flow)
+   - dispatch_session_id
+
+2) Dispatch flow
+   - When a parcel is created and confirmed by the customer:
+       - Create dispatch_sessions with:
+           - service_type = "parcel"
+           - entity_id = deliveries.id
+           - pickup_lat/lng, dropoff_lat/lng
+           - status = "requested"
+       - Call findNearestDriversForDispatch with service_type = "parcel".
+       - Reuse assignment engine as-is.
+   - Driver actions:
+       - "driver:arrive_for_pickup"  → deliveries.status = "accepted" or "picked_up" depending on design.
+       - "driver:pick_up_parcel"     → "picked_up".
+       - "driver:complete_delivery"  → "delivered".
+
+3) Status + WS events
+   - Emit:
+       - "parcel:driver_assigned"
+       - "parcel:eta_update"
+       - "parcel:route_update"
+       - "parcel:status_update"
+   - Customer app sees parcel tracking map similar to ride tracking.
+
+==================================================
+H. SECURITY, PRIVACY & COUNTRY RULES (REINFORCED)
+==================================================
+
+For all three services (ride, food, parcel):
+
+   - Do NOT expose:
+       - NID numbers
+       - SSN
+       - Government ID images
+       - Driver license numbers
+   - Only expose the minimum necessary:
+       - Driver name
+       - Vehicle info
+       - Restaurant name + address
+       - Masked phone numbers if required (or click-to-call handled server-side).
+   - Always ensure:
+       - Only verified users participate in dispatch.
+       - Blocked users (customer, driver, restaurant) are excluded from any dispatch and WS activity.
+
+==================================================
+I. CONFIGURATION & DEMO READINESS
+==================================================
+
+You must:
+   - Provide config flags to:
+       - Enable/disable ETA calculation per environment.
+       - Enable/disable live route updates per environment.
+       - Enable/disable in-trip chat per role and per service (ride/food/parcel).
+   - Ensure there is a “demo mode” where:
+       - You can simulate driver movement (e.g., mock location updates) for showing live tracking.
+       - You can override routing with dummy ETA for offline environments.
+
+==================================================
+J. NON-BREAKING GUARANTEES & EXTENSIBILITY
+==================================================
+
+When applying this Part 2 prompt:
+
+   - Only ADD:
+       - New fields to rides, food_orders, deliveries (status_history, eta fields, final_fare, etc.).
+       - New collections: conversations, messages, ride_locations (if needed).
+       - New services: RoutingService, extended PricingService methods.
+       - New WS events & handlers.
+   - Do NOT:
+       - Rename or remove any existing model, API, route, or field.
+       - Change existing pricing or commission semantics.
+   - Confirm that:
+       - Rides/food_orders/deliveries created before this feature still load and display correctly.
+       - If NO WS connection exists, core HTTP flows still work (graceful degradation).
+
+Implement all of the above in complete, production-quality code with:
+   - Clear separation of concerns (dispatch vs routing vs pricing vs chat).
+   - Enough comments and type definitions so future phases (wallet, commission, fraud detection, admin dashboards) can extend this behavior without refactoring core logic.

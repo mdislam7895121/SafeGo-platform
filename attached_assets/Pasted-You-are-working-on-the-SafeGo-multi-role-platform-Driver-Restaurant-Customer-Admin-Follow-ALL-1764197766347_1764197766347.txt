@@ -1,0 +1,101 @@
+You are working on the SafeGo multi-role platform (Driver, Restaurant, Customer, Admin). 
+Follow ALL existing SafeGo master rules, security roadmap phases, KYC rules for BD/US, 
+and the unified payout system architecture that is already implemented. 
+Do NOT break any existing functionality. Only extend and refine.
+
+TASK: Enhance the “Add Payout Method” flow so drivers and restaurant owners can choose 
+their preferred payout option from a proper dropdown, and add a clear “Account Type” 
+selection for bank payouts.
+
+Scope and constraints:
+1) Do NOT change any core payout business rules:
+   - Unified /api/payout/* backend already exists and is production-ready for individual payouts.
+   - Keep existing models (Payout, PayoutAccount, PayoutBatch) and KYC / RBAC checks as they are.
+   - Keep minimum payout amounts, country-specific rules, and encryption exactly as implemented.
+
+2) Payout Type dropdown requirements:
+   - In the Add Payout Method UI for DRIVER and RESTAURANT roles, update the “Payout Type” 
+     select so it supports all configured payout methods in the unified system:
+       • Bank Account
+       • Mobile Wallet (for Bangladesh: bKash, Nagad, Rocket, others if already defined)
+       • Stripe / External Provider (for USA or global, only if already present in the codebase)
+   - Use a clean, user-friendly label set, for example:
+       - "Bank Account"
+       - "Mobile Wallet"
+       - "Stripe Connect" (or existing label already used in the app)
+   - Respect country restrictions:
+       - Bangladesh: Bank Account + Mobile Wallet are allowed.
+       - USA: Bank Account + Stripe (or equivalent) are allowed.
+       - If any payout type is not allowed for the user’s country, hide or disable it in the dropdown.
+   - Ensure the dropdown is driven from a shared type/enum (e.g. PayoutMethodType) so 
+     both frontend and backend use the same values.
+
+3) Account Type dropdown for bank payouts:
+   - For Bank Account payout type ONLY, show an “Account Type” dropdown with options such as:
+       • Checking
+       • Savings
+       • Business Checking
+       • Business Savings
+       • Other
+   - Persist the accountType field in the correct model that stores payout account details.
+     Re-use any existing field if already present; otherwise, extend the model carefully.
+   - Add proper validation:
+       - accountType is REQUIRED when payoutType === "bank".
+       - accountType must be one of the allowed enum values.
+   - If payoutType is NOT "bank" (Mobile Wallet / Stripe), hide or disable the Account Type 
+     control and do not require it in validation.
+
+4) Mobile Wallet and other payout fields:
+   - When payoutType === "Mobile Wallet":
+       - Show the correct wallet provider selection (e.g., bKash, Nagad, Rocket, etc.)
+       - Show a mobile wallet number field instead of bank routing/account fields if that 
+         pattern already exists in the project.
+   - When payoutType === "Stripe" (or other external provider):
+       - Follow the existing integration pattern (e.g., token, external ID), do not invent 
+         new flows.
+   - Make sure the form only shows the fields relevant to the currently selected payout type.
+
+5) UI/UX requirements:
+   - Apply these changes to:
+       - Driver: /driver/account/payout-methods Add Payout Method modal/page
+       - Restaurant: /restaurant/account/payout-methods Add Payout Method modal/page
+   - Keep styling, spacing, and button layout consistent with the rest of the SafeGo UI.
+   - Add short helper text under the Account Type dropdown, e.g. 
+     “Select the type of bank account (checking, savings, or business).”
+   - Handle validation errors with clear messages (no raw JSON errors).
+
+6) Backend & API alignment:
+   - Ensure the payload sent from the frontend matches the backend expectations for each payout type:
+       - Bank: accountHolderName, accountNumber, routingNumber, bankName, accountType, country.
+       - Mobile Wallet: provider, walletNumber, country.
+       - Stripe/Other: use the existing fields already defined in the unified payout system.
+   - Update TypeScript interfaces (frontend and backend) so they stay in sync.
+   - Preserve AES-256-GCM encryption and any other security constraints for sensitive fields.
+   - Do NOT touch batch payout logic or admin-only routes.
+
+7) Security and KYC:
+   - Keep all existing KYC gating:
+       - Only verified and approved users can add/activate payout methods.
+       - Respect the existing “pending verification” states for payout accounts if present.
+   - Ensure rate limiting and audit logging stay intact for payout-related endpoints.
+
+8) Testing and verification:
+   - Manually verify in the browser:
+       - Driver > Account > Payout Methods > Add Method:
+           * Selecting Bank Account shows Account Type dropdown and bank fields.
+           * Selecting Mobile Wallet shows wallet provider + wallet number, hides Account Type.
+           * Selecting Stripe/other shows the correct fields and hides Account Type.
+       - Restaurant > Account > Payout Methods > Add Method behaves the same.
+   - Confirm that:
+       - New methods save successfully for each payout type.
+       - Data is correctly persisted and reloaded in the payout methods list.
+       - No TypeScript errors or runtime errors are introduced.
+
+9) Documentation:
+   - Update replit.md or the relevant project documentation section to briefly describe:
+       - The supported payout types per country.
+       - The meaning and allowed values of accountType.
+       - Any differences between Driver and Restaurant payout options.
+
+When you are done, summarize exactly what was changed (files, components, models), 
+and confirm that the existing unified payout system remains stable and production-ready.

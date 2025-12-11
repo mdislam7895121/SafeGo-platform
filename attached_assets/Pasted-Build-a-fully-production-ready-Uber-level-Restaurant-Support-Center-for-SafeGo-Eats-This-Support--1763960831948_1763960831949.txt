@@ -1,0 +1,105 @@
+Build a fully production-ready, Uber-level Restaurant Support Center for SafeGo Eats. 
+This Support Center must be professional, modern, responsive, and ready for immediate use by restaurants.
+
+SCOPE:
+Apply ALL support features consistently across:
+- /restaurant
+- /restaurant/dashboard
+- /restaurant/orders/*
+- /restaurant/menu/*
+- /restaurant/staff/*
+- /restaurant/support/*
+
+CORE FEATURES REQUIRED (Uber Eats Standard):
+
+1. HELP CENTER (Knowledge Base)
+   - Structured categories:
+       • Orders and Deliveries
+       • Payments & Payouts
+       • Account & Verification
+       • Menu & Store Management
+       • Device & Technical Issues
+   - Rich-text article support
+   - Smart search with ranking
+   - Article view page with related articles
+
+2. CONTACT SUPPORT CENTER
+   Must include all three channels:
+   - Live Chat (real-time messaging UI)
+   - Phone Call (display support number + call button)
+   - Email Support (form + attachments)
+   - Callback request option
+
+3. ISSUE REPORTING SYSTEM
+   - Create ticket
+   - Select issue category & subcategory
+   - Attach images/files
+   - Automatic routing to correct backend queue
+   - Auto-acknowledgment message
+   - Ticket tracking page (status: Open, In Progress, Resolved)
+   - Event timeline inside ticket
+
+4. SYSTEM STATUS PAGE
+   - Real-time service health indicators:
+       • Orders API
+       • Payments/Payouts
+       • Menu service
+       • Staff management
+       • Authentication service
+   - Past incident history
+   - Uptime visualization
+
+5. UI/UX REQUIREMENTS
+   - Clean, modern design matching Uber Eats support center UI
+   - 100% mobile, tablet, and desktop responsive
+   - Zero overlap with existing layout
+   - Consistent top header from restaurant dashboard
+   - Sidebar entry: "Support Center"
+   - No layout shift across screens
+
+6. SECURITY REQUIREMENTS
+   - Full KYC + RBAC gating
+   - Permission checks for all support features
+   - Audit logging for all actions (ticket creation, chat messages, attachments)
+   - Prevent unauthorized access
+   - Protect all uploaded files
+
+7. INTEGRATION REQUIREMENTS
+   - Connect support center with admin panel support backend
+   - Admin receives tickets, chat messages, and calls
+   - Real-time updates using existing notification system
+   - Maintain all existing backend logic
+   - Do NOT remove any previous support/admin features
+
+8. LIVE CHAT SPECIFICATIONS
+   - Real-time messaging UI
+   - Typing indicator
+   - Support agent presence indicator
+   - Send images/files
+   - Auto-scroll behavior
+   - Message timestamps
+
+9. RESPONSIVE TESTING
+   - Mobile 375px
+   - Tablet 768px
+   - Laptop 1366px
+   - Desktop 1920px
+   Confirm:
+   - No clipping
+   - No overflow
+   - Buttons tap size > 44px
+
+10. FINAL CHECK
+   - Add Support Center link to restaurant sidebar
+   - Add “Support” button in restaurant profile dropdown
+   - Ensure all pages pass accessibility checks (ARIA labels, keyboard navigation)
+   - Take screenshots of:
+       • Help Center
+       • Contact Support
+       • Ticket List
+       • Ticket Details
+       • System Status page
+   - Confirm everything is visually stable and production-ready.
+
+This task is NOT exploratory. Build the full support center end-to-end exactly as defined. 
+No placeholder pages. No partial UI. Everything must be functional and connected.

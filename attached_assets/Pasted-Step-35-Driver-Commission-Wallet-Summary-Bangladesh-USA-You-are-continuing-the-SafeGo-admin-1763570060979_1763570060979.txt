@@ -1,0 +1,214 @@
+Step 35 – Driver Commission & Wallet Summary (Bangladesh + USA)
+
+You are continuing the SafeGo admin panel work. Previous steps have implemented:
+- Driver identity & KYC for Bangladesh + USA (including NY TLC, DMV, inspection).
+- Driver wallet and settlement base system.
+- Global document expiry warnings.
+- Driver management list with filters (country, state, status, verification).
+
+Now we need a **read-only, analytics-style commission & wallet summary per driver**, with correct separation for Bangladesh and USA, without breaking any existing logic.
+
+GOAL
+Add a “Commission & Wallet Summary” block to the Admin Driver Details page that shows, for each driver:
+- Total earnings (lifetime)
+- Total commission paid to SafeGo (lifetime)
+- Current wallet / balance (including negative commission balance)
+- Breakdown by country / service type (ride / food / parcel)
+- A small transaction history list (most recent items)
+
+This step MUST NOT change the commission math or payout rules, only reporting/visualization.
+
+---------------------------
+1) Understand existing data
+---------------------------
+
+Inspect current database models related to:
+- rides
+- food_orders
+- deliveries
+- driver_wallet or equivalent (wallet transactions, settlements)
+- commission rules / fees tables
+
+Important existing rules (MUST RESPECT):
+
+1. If customer pays CASH (rides):
+   - Driver receives full cash
+   - SafeGo commission becomes negative balance in driver_wallet_balance
+   - Driver must settle weekly
+
+2. If food order is CASH:
+   - Restaurant gets all cash
+   - Commission becomes negative balance in restaurant_wallet
+
+3. If payment is online:
+   - SafeGo keeps commission automatically
+
+4. Admin can settle balances and mark paid.
+
+Do NOT modify these rules in this step.
+
+----------------------------------
+2) Commission & Wallet Summary Model
+----------------------------------
+
+We need purely computed summaries FROM existing records.
+
+For each driver, compute:
+
+- totalTrips: total number of rides+deliveries+completed food orders
+- totalEarnings: sum of driver-side earnings across all services
+- totalCommission: sum of commission fees attributed to this driver (what SafeGo has earned from them)
+- currentBalance:
+  - Positive → SafeGo owes this driver
+  - Negative → driver owes SafeGo (unsettled commission)
+- breakdownByCountry:
+  - BD:
+    - tripsCountBD
+    - earningsBD
+    - commissionBD
+  - US:
+    - tripsCountUS
+    - earningsUS
+    - commissionUS
+- breakdownByService:
+  - rides: { count, earnings, commission }
+  - food_orders: { count, earnings, commission }
+  - deliveries: { count, earnings, commission }
+
+Implementation notes:
+- Try to compute these via SQL/ORM aggregation queries (GROUP BY driverId, service, country), or via a dedicated service method.
+- DO NOT introduce new tables if not necessary; use existing transaction / wallet / trip records.
+- If a driver has no wallet record yet, treat currentBalance = 0.
+
+----------------------------------
+3) Admin Driver Details – new "Commission & Wallet" block
+----------------------------------
+
+On `/admin/drivers/[id]` (Admin Driver Details page):
+
+Add a new card/section titled:
+
+“Commission & Wallet Summary”
+
+Place it **below** the identity / documents blocks and **above** any low-priority debug sections. It should NOT break the existing layout for:
+- Identity
+- Vehicle information
+- Inspection
+- Emergency contact
+
+Inside this new block, show:
+
+1) At-a-glance stats:
+   - Total Trips: X
+   - Total Earnings: $X (or local currency for BD)
+   - Total Commission Paid to SafeGo: $Y
+   - Current Balance: 
+     - Green if driver is owed money (positive)
+     - Red if driver owes SafeGo (negative)
+
+2) Country breakdown (BD vs US):
+   - Bangladesh:
+     - Trips: N
+     - Earnings: ৳X (use BDT symbol or label)
+     - Commission: ৳Y
+   - USA:
+     - Trips: N
+     - Earnings: $X
+     - Commission: $Y
+
+3) Service breakdown:
+   - Rides: trips, earnings, commission
+   - Food Orders: orders, earnings, commission
+   - Parcel Deliveries: deliveries, earnings, commission
+
+4) Recent transactions:
+   - A small table (last 10 wallet-related entries), with:
+     - Date/Time
+     - Type (trip earning, commission charge, settlement, adjustment)
+     - Service (ride/food/parcel)
+     - Amount (positive/negative)
+     - Balance after transaction (if available)
+
+Make sure:
+
+- Currency formatting corresponds to driver’s main country:
+  - BD → BDT (৳ or “BDT X”)
+  - US → USD ($X)
+- For drivers who have activity in both countries, show both sections.
+
+----------------------------------
+4) Filters & driver list integration (light-weight)
+----------------------------------
+
+On the Driver Management list page (`/admin/drivers`):
+
+- Add 2 new columns (if space allows):
+  - Total Commission
+  - Current Balance
+
+If that’s too much for small screens, at least add:
+- A hover tooltip or expanded row display that shows:
+  - Total Commission
+  - Current Balance
+
+Also add optional filters:
+- “Balance Status”:
+  - All
+  - Positive balance
+  - Negative balance (driver owes SafeGo)
+  - Zero
+- “High Commission Drivers” (e.g. top earners by commission)
+
+These filters should be purely additive; do not break existing filters (country, state, status, verification).
+
+----------------------------------
+5) Security & Privacy
+----------------------------------
+
+- Only admins with finance/operations role should be able to view full financial details.
+  - If there is an RBAC system, wrap the Commission & Wallet block behind an appropriate permission, e.g. `admin:finance:view`.
+- Avoid exposing raw internal IDs in the UI.
+- Do NOT log computed balances or commission in debug logs unnecessarily, especially not per-transaction details.
+- This step is READ-ONLY from the admin UI:
+  - No new payout, settlement, or adjustment actions must be added here.
+  - All existing settlement flows remain unchanged.
+
+----------------------------------
+6) Non-breaking requirement
+----------------------------------
+
+- No changes to commission calculation or wallet mutation logic.
+- No changes to payout/settlement flows.
+- All new code must be defensive:
+  - If some data is missing (e.g. historical records without country codes), show partial data without crashing.
+  - Show "N/A" or "0" for missing pieces instead of errors.
+
+Specific checks:
+
+- Bangladesh-only drivers still load normally and show BD summaries only.
+- USA-only drivers still load normally and show US summaries only.
+- Drivers without any trips:
+  - Show 0 trips, 0 earnings, 0 commission, 0 balance.
+- Previous steps (KYC, documents, inspection, filters, wallet) continue to work as before.
+
+----------------------------------
+7) Testing checklist
+----------------------------------
+
+1) BD driver with multiple cash trips:
+   - Earnings > 0, Commission > 0, Balance likely negative (driver owes SafeGo).
+2) US driver paid online:
+   - Commission is already collected by SafeGo; balance may be zero or positive depending on payouts.
+3) Driver active in both BD & US:
+   - Country breakdown shows both currencies.
+4) Driver list:
+   - New columns render correctly.
+   - Balance filters work without breaking pagination or other filters.
+5) Security:
+   - Non-admin users cannot access commission details.
+   - Admin with finance role can see everything.
+
+At the end, please list:
+- Which backend services/queries you modified or added.
+- Which frontend components show the new Commission & Wallet block.
+- Confirmation that no commission or payout logic was changed—only reporting/visualization.

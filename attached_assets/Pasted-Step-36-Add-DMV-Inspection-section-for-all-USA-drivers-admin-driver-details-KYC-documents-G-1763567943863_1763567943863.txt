@@ -1,0 +1,127 @@
+Step 36 – Add DMV Inspection section for all USA drivers (admin driver details + KYC + documents)
+
+Goal:
+Extend the USA driver vehicle information with a dedicated "DMV Inspection" section that is shown for all USA drivers. This must not break any existing Bangladesh or USA functionality, and must reuse existing secure file upload and access-control patterns.
+
+Scope:
+1) Data model (non-breaking, optional fields)
+2) KYC form updates for USA drivers
+3) Admin Driver Details page layout (new DMV Inspection block)
+4) Admin Document Review integration
+5) Security & backward compatibility checks
+
+1. Data Model – DMV Inspection (USA only)
+Use the existing USA vehicle/driver entities and add new optional fields (NO breaking schema changes):
+
+- For the USA vehicle entity (e.g. VehicleUS or equivalent), add nullable fields:
+  - dmvInspectionType: string | null       // e.g. "Safety", "Emissions", "Safety + Emissions"
+  - dmvInspectionDate: Date | null
+  - dmvInspectionExpiry: Date | null
+  - dmvInspectionImageUrl: string | null   // stored path of the uploaded inspection document
+  - dmvInspectionStatus: enum | string | null
+    - Allowed values: "valid", "expired", "missing"
+    - Default: "missing" when no inspection data is available
+
+These fields must be:
+- Optional (nullable) so legacy USA drivers continue to work
+- Scoped only to USA vehicles; NO impact on Bangladesh identity/vehicle data
+
+2. KYC Forms – USA Drivers
+Update the USA driver KYC / vehicle section so that DMV Inspection data can be captured:
+
+- In the USA driver KYC form (driver app or web KYC), add a new DMV Inspection block:
+  - DMV Inspection Type: dropdown (Safety, Emissions, Safety + Emissions, Other)
+  - Inspection Date: date picker
+  - Inspection Expiry Date: date picker
+  - Upload Inspection Document: file upload (image or PDF) – REQUIRED for USA drivers
+- Validation rules:
+  - For any USA driver, DMV Inspection document upload is required before KYC can be marked as fully Verified.
+  - If inspection expiry date is in the past, mark status as "expired".
+  - If inspection document is missing, mark status as "missing".
+  - If inspection document exists and expiry is in the future, mark status as "valid".
+
+Note:
+- Do NOT change any Bangladesh KYC forms.
+- Reuse existing secure file upload endpoints and storage configuration that are already used for license images / documents.
+
+3. Admin Driver Details Page – New DMV Inspection Section
+On the Admin Driver Details page for USA drivers:
+
+- Under the existing "Vehicle Information" block (after the Insurance Document section), add a visual divider and then a new block:
+
+  Title: "DMV Inspection"
+
+  Fields to display:
+  - Inspection Type
+  - Inspection Date
+  - Inspection Expiry
+  - Status (Valid / Expired / Missing)
+  - Inspection Document: show either:
+    - a small thumbnail with "View Document" link
+    - or the text "Missing" in red if no document is available
+
+- Status & warnings:
+  - If Status = "missing":
+      Show a red warning banner:
+      "DMV inspection document is missing. Please request the driver to upload a valid inspection document."
+  - If Status = "expired":
+      Show a red warning banner:
+      "DMV inspection has expired. Please verify and request updated inspection documents."
+  - If Status = "valid":
+      No warning; show normal status.
+
+- Layout rules:
+  - Emergency Contact section should remain above Vehicle Information (as already planned).
+  - The DMV Inspection block must appear as part of the Vehicle Information area, below registration and insurance information.
+  - For non-USA or Bangladesh-only drivers, hide the DMV Inspection block entirely.
+
+4. Admin Document Review – DMV Inspection
+Update the Admin Document Review page so DMV Inspection appears along with other documents for USA drivers:
+
+- In the USA driver document review modal:
+  - Add a "DMV Inspection" subsection under vehicle-related documents.
+  - Show:
+    - Inspection Document thumbnail / link
+    - Inspection Date
+    - Inspection Expiry
+    - Current Status (valid / expired / missing)
+  - Admin actions:
+    - Approve / Reject DMV Inspection as part of the overall document approval.
+    - If rejected, show a short note to the driver (reuse the existing rejection reason mechanism).
+
+- For Bangladesh drivers, do NOT show any DMV Inspection section.
+
+5. Security & Privacy
+- Reuse the existing secure file upload mechanism used for license documents:
+  - Authenticated upload only
+  - Files must not be publicly accessible without proper authorization
+- Access control:
+  - Only admins can view DMV Inspection documents in the admin panel.
+  - Drivers can only see their own inspection status/docs on their own profile (if that UI exists).
+- No sensitive PII beyond what is already allowed for documents; DMV Inspection image is treated as a standard legal document.
+- Ensure no inspection data or URLs are leaked to unauthorized users (respect existing RBAC).
+
+6. Backward Compatibility & Tests
+- All new fields must be optional so that:
+  - Existing USA drivers without DMV Inspection data still load without crashing.
+  - Bangladesh drivers are not affected.
+- Testing checklist:
+  - USA driver with complete DMV Inspection:
+    - Driver details page shows DMV Inspection block with "valid" status.
+    - Document Review shows the inspection document correctly.
+  - USA driver without DMV Inspection:
+    - Status "missing" with red warning banner.
+    - No runtime errors.
+  - USA driver with past expiry date:
+    - Status "expired" and warning banner shown.
+  - Bangladesh driver:
+    - No DMV Inspection block visible anywhere.
+  - No regressions in:
+    - Driver list
+    - Country / state filters (including New York state filter)
+    - Existing license + TLC document uploads
+    - Wallet / settlement flows
+
+Important:
+- Do NOT modify or remove any existing Bangladesh/USA identity fields, DMV license fields, TLC license fields, or vehicle registration/insurance behavior from previous steps.
+- The change must be strictly additive and non-breaking.

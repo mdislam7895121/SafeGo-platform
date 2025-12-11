@@ -1,0 +1,127 @@
+Proceed with Phase 10.
+
+PHASE 10 – Restaurant Operational Settings System (SafeGo Eats)
+
+Requirements:
+- Fully additive; do NOT modify or break existing flows (menu, orders, payouts, analytics, reviews, media, promotions).
+- Maintain strict RBAC, BD/US KYC gating, and restaurant_id scoping.
+- OWNER controls operational settings; STAFF permissions depend on Phase 6 flags.
+- Admin must have read-only visibility + override tools.
+- All settings must influence customer ordering flow in real time.
+
+----------------------------------------------------
+1. Restaurant Hours Settings (/restaurant/settings/hours)
+----------------------------------------------------
+Features:
+- Weekly schedule: open_time, close_time per day
+- Toggle: closed_all_day
+- Support split shifts (e.g., 11am–3pm + 5pm–10pm)
+- Holiday closures (specific dates)
+- Temporary “Closed for Today” button
+
+Backend:
+- GET /api/restaurant/settings/hours
+- PATCH /api/restaurant/settings/hours
+
+Customer Impact:
+- Disable ordering outside business hours
+- Message: “Restaurant is closed right now.”
+
+----------------------------------------------------
+2. Delivery & Pickup Settings (/restaurant/settings/delivery)
+----------------------------------------------------
+Fields:
+- delivery_enabled (boolean)
+- pickup_enabled (boolean)
+- preparation_time_minutes (default 15–45)
+- auto_accept_orders (boolean)
+- max_concurrent_orders (for throttling)
+- min_order_amount
+- free_delivery_threshold
+
+Customer Impact:
+- Auto-accept if enabled
+- Throttling disables ordering: “Restaurant is currently managing high order volume.”
+
+----------------------------------------------------
+3. Delivery Zones & Fees (/restaurant/settings/zones)
+----------------------------------------------------
+Features:
+- Draw polygon zones (desktop)
+- Select radius zones (mobile)
+- Multiple zones allowed
+- Zone-based delivery fees:
+  - base_fee
+  - per_km_fee
+  - minimum_fee
+- ETA adjustments per zone
+
+Backend:
+- GET /api/restaurant/settings/zones
+- POST /api/restaurant/settings/zones
+- DELETE /api/restaurant/settings/zones/:id
+
+Customer Impact:
+- Show correct delivery fee + ETA
+- Block orders outside service area
+
+----------------------------------------------------
+4. Order Surge & Peak Hour Settings
+----------------------------------------------------
+Fields:
+- surge_enabled
+- surge_multiplier (1.1–2.0)
+- peak_hours: list of time ranges
+- weekend_multiplier
+
+Customer Impact:
+- Adjust delivery fee dynamically
+- Display surge notice to customer
+
+----------------------------------------------------
+5. Admin Oversight Panel (/admin/restaurants/:id/settings)
+----------------------------------------------------
+Admin can:
+- View all operational settings (read-only)
+- Override temporary closures
+- Flag abnormal settings (audit logged)
+- Suggest recommended settings
+
+Backend Endpoints:
+- GET /api/admin/restaurants/:id/settings
+- POST /api/admin/restaurants/:id/settings/override
+
+----------------------------------------------------
+6. Security
+----------------------------------------------------
+- OWNER has full control
+- STAFF limited by permissions:
+  - can_edit_items ≠ can_edit_operational_settings
+  - Optional flag: can_manage_operations
+- All changes logged in security_audit_log
+- No cross-restaurant access allowed
+
+----------------------------------------------------
+7. Frontend UI
+----------------------------------------------------
+Restaurant:
+- Hours editor (weekly grid + split shifts)
+- Delivery settings form
+- Pickup settings form
+- Zone editor (map + list)
+- Surge settings
+- Validation for time conflicts
+
+Customer:
+- Live closed/open logic
+- Delivery fee calculator
+- ETA adjusted by preparation time + zone
+
+Admin:
+- Read-only settings view
+- Override buttons (temporary close/open)
+- Audit history viewer
+
+----------------------------------------------------
+Finish Phase 10 fully before moving to Phase 11.
+----------------------------------------------------

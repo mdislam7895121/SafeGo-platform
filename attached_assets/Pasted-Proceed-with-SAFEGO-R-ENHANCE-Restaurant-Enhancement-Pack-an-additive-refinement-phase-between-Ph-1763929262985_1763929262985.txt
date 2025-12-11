@@ -1,0 +1,98 @@
+Proceed with SAFEGO R-ENHANCE (Restaurant Enhancement Pack), an additive refinement phase between Phase 12 and Phase 13. Do not modify or break any existing functionality from Phases 1–12. All enhancements must follow SafeGo Master Rules: 4 roles, BD/US KYC, RBAC isolation, rides/food/parcel untouched, admin verification, wallet/commission rules, status flows, notifications, audit logging, and additive-only backend.
+
+Implement the following enhancements:
+
+====================================================
+1. Restaurant Dashboard Polishing
+====================================================
+• Improve KPI cards (today / week / month filters)
+• Add revenue trend bars
+• Add “Recent Orders + Alerts” unified panel
+• Ensure data-testid for UI testing
+
+====================================================
+2. Menu Management Improvements
+====================================================
+• Add drag-and-drop category reorder
+• Add quick bulk show/hide/archive tool
+• Add live menu preview on the right sidebar
+• Speed up item edit drawer load time
+• Add item gallery mini-preview list
+
+====================================================
+3. Branding Screen Upgrades
+====================================================
+• Transparent background checkerboard for logo
+• Auto image compression + size warning
+• Auto brightness normalization for cover photo
+• Theme color contrast validation (WCAG AA)
+• Signed URL enforcement (security rule)
+
+====================================================
+4. Media Gallery Enhancements
+====================================================
+• Multi-select + bulk delete
+• Auto-tagging categories: food, ambience, kitchen, logo
+• Admin-flagged images auto-blur for customers
+• Drag reorder improvements
+• Faster gallery loading
+
+====================================================
+5. Staff Permissions & Role Templates
+====================================================
+• Add pre-built roles:
+  – Manager
+  – Cashier
+  – Editor
+• Allow OWNER to create custom roles
+• Add “CAN_HANDLE_SUPPORT” to Staff permissions
+• Add staff activity timeline UI improvements
+
+====================================================
+6. Promotions & Coupon System Enhancements
+====================================================
+• Real-time coupon validation preview
+• Expiring-soon highlighting
+• Auto-detect promotion conflicts
+• Abuse detection: repeated use across accounts
+• Admin moderation panel visual polish
+
+====================================================
+7. Payout & Finance UI Upgrades
+====================================================
+• Add payout eligibility progress meter
+• Add recent adjustments timeline
+• Add weekly settlement calendar view
+• Add payout threshold indicator
+• Improve wallet balance visualization
+
+====================================================
+8. Support System Enhancements (Restaurant View)
+====================================================
+• Quick reply templates (common phrases)
+• Better identity masking for customers
+• Priority markers for escalated tickets
+• Internal note background coloring
+• Resolution quality scoring widget
+
+====================================================
+9. Operational Settings Enhancements
+====================================================
+• Auto-suggest business hours based on order patterns
+• Surge pricing preview graph
+• Delivery zone map smoothing + snapping
+• Prep-time estimator based on load + order volume
+• Better split-shift UI
+
+====================================================
+GENERAL RULES
+====================================================
+• All changes must be additive-only.
+• No schema breaking.
+• No API renaming or removal.
+• All RBAC and KYC rules remain enforced.
+• All modifications must follow existing SafeGo design patterns.
+• All enhanced components must include data-testid attributes.
+• After completion, run full regression checks for Phases 1–12.
+
+After completing SAFEGO R-ENHANCE, confirm readiness for Phase 13 (Mobile App Architecture).

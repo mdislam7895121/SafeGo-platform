@@ -1,0 +1,363 @@
+Phase 3 – Intelligent Security & Fraud Detection for SafeGo
+
+You are working on the SafeGo platform (global ride/food/parcel app) that already has:
+
+- Strong KYC flows (BD + USA), DMV/TLC, restaurant verification
+- Wallet + commission + payout logic
+- Admin RBAC, audit logs, activity log, document expiry alerts
+- Phase 1 + Phase 2 security hardening (2FA infra, encryption, secure document URLs, rate limiting infra, Security Center foundation, etc.)
+
+Your task in Phase 3 is to add an INTELLIGENT fraud and security layer on top of the existing system, **without breaking any existing flows**.
+
+IMPORTANT GLOBAL CONSTRAINTS
+
+1) Do NOT break or modify:
+   - Core ride / food / parcel ordering flows
+   - Wallet balances and commission calculations
+   - Existing KYC schemas for driver, customer, restaurant
+   - Existing RBAC and audit logging behavior
+
+2) Database rules:
+   - Follow existing ORM/migration patterns (Prisma style).
+   - New tables/fields must be backward compatible and nullable by default.
+   - No destructive migrations on existing tables.
+
+3) Security rules:
+   - Never store full SSN, NID, card numbers, or secrets in any new logs or tables.
+   - Only store masked or derived values when absolutely needed.
+   - Reuse existing masking helpers where possible.
+   - All new APIs must be protected with existing admin auth + RBAC.
+
+4) Performance rules:
+   - Fraud detection should be implemented as lightweight, async-friendly services.
+   - No heavy blocking computation in request handlers.
+   - Paginate all list/analytics endpoints.
+
+5) UX rules:
+   - No emojis anywhere in the new UI.
+   - Follow existing admin and app design patterns (typography, spacing, button styles).
+   - Never expose internal risk scores or ML details to normal users; only to admins.
+
+--------------------------------------------------
+HIGH-LEVEL GOALS FOR PHASE 3
+--------------------------------------------------
+
+1. Build a **Fraud Event Pipeline** that collects security-relevant events.
+2. Implement a **Risk Scoring Engine** (rule-based now, ML-ready architecture).
+3. Add **Device & Geo Risk** features (device fingerprints + high-risk zones).
+4. Create an **Admin Security Center** to review incidents and take action.
+5. Integrate with **existing audit logs, RBAC, and notifications**.
+6. Provide a clear **testing + validation checklist**.
+
+You should work in logical steps, updating code and replit.md as you go.
+
+==================================================
+STEP 1 – Fraud Event Data Model
+==================================================
+
+Create new database models/tables for fraud and risk events. Use the existing ORM style.
+
+Core model: FraudEvent
+
+Fields (adjust to existing conventions, e.g., id as UUID):
+
+- id (primary key)
+- createdAt (timestamp)
+- eventType (enum/string)
+  Examples: "LOGIN", "TRIP_CREATED", "TRIP_UPDATED", "PAYMENT_ATTEMPT", "KYC_CHANGE", "DOCUMENT_UPLOAD"
+- actorType (enum/string: "driver", "customer", "restaurant", "admin", "system")
+- actorId (string / UUID reference)
+- ipAddress (nullable, if available)
+- deviceId (nullable – from device fingerprint)
+- locationLat (nullable float)
+- locationLng (nullable float)
+- city (nullable string)
+- countryCode (nullable string)
+- riskScore (float, default 0)
+- riskLevel (enum/string: "low", "medium", "high", "critical")
+- source (string: "backend", "mobile", "admin")
+- metadata (JSON, nullable) – must NOT contain SSN/NID/card numbers
+- processed (boolean, default false) – whether evaluated by risk engine
+- incidentId (nullable) – link to FraudIncident (see below)
+
+Second model: FraudIncident
+
+- id (primary key)
+- createdAt
+- updatedAt
+- status (enum/string: "open", "under_review", "closed")
+- severity (enum/string: "low", "medium", "high", "critical")
+- category (enum/string: "account_takeover", "payment_abuse", "route_anomaly", "kyc_abuse", "device_anomaly", "other")
+- primaryActorType
+- primaryActorId
+- summary (short text)
+- details (longer text / JSON)
+- riskScore (float)
+- riskLevel (string as above)
+- assignedAdminId (nullable)
+- resolutionNote (nullable)
+
+Add indexes on:
+- FraudEvent: actorId, eventType, createdAt, riskLevel
+- FraudIncident: status, severity, createdAt
+
+Update replit.md to document these new models.
+
+==================================================
+STEP 2 – Event Collection Hooks
+==================================================
+
+Implement a reusable helper, similar to the audit logger, e.g.:
+
+- server/utils/fraudEvents.ts
+  - function logFraudEvent(input: { eventType, actorType, actorId, ipAddress?, deviceId?, location?, metadata? })
+
+This helper should:
+- Validate safe metadata (no SSN/NID/card).
+- Attach country/city if location is available.
+- Save to FraudEvent table with default riskScore = 0 and riskLevel = "low".
+- Fail gracefully: if logging fails, it must NOT break the core flow.
+
+Integrate logFraudEvent into these key flows:
+
+1) Authentication
+   - On admin and user login (success + failed).
+   - Include ipAddress and deviceId (if available in headers/session).
+   - Attach actorType ("admin" or "customer"/"driver").
+
+2) Trips (rides)
+   - When a trip is created.
+   - When the trip status jumps unusually (e.g., requested → completed very quickly).
+   - When there are many cancellations by same actor in short time.
+
+3) Food Orders and Parcels
+   - On order/parcel creation.
+   - On cancellation, especially last-minute/high-value.
+   - On repeated failures from the same account or device.
+
+4) Payments and Payouts
+   - On payment attempts (success + failure).
+   - On payout requests from drivers/restaurants.
+   - Attach transaction amount (in safe metadata, no card details).
+
+5) KYC & Documents
+   - When KYC status changes (approved/rejected).
+   - When important documents are added/updated (NID, DMV, TLC, food license).
+   - Do not log full IDs, only masked or just types/status.
+
+Document all integration points in replit.md.
+
+==================================================
+STEP 3 – Risk Scoring Engine (Rule-Based, ML-Ready)
+==================================================
+
+Implement a RiskScoringService that runs asynchronously to update FraudEvent.riskScore and riskLevel based on rules.
+
+Create a module, for example:
+- server/services/riskScoring.ts
+
+Responsibilities:
+- fetch unprocessed FraudEvent entries (processed = false)
+- evaluate a ruleset
+- update riskScore (0–100) and riskLevel ("low", "medium", "high", "critical")
+- optionally create or update a FraudIncident for high/critical events
+
+Rules (examples – implement a clear, configurable structure):
+
+1) Login-related
+   - Many failed logins from same ipAddress or deviceId within a short time.
+   - Login from a new country for an existing account.
+   - Login from city/country far from typical behavior.
+
+2) Trip/Order behavior
+   - Unusual number of cancelled trips/orders within last N hours.
+   - Very short trips with high value repeated many times.
+   - Multiple orders/parcel deliveries to the same address from different accounts.
+
+3) Payment & Payout
+   - Multiple failed payment attempts for same account/device within short time.
+   - Large payout requests that deviate from normal earning patterns.
+   - First payout from a new bank account just after large earnings.
+
+4) KYC & Documents
+   - Many KYC attempts from same device/ip with different identities.
+   - Frequent document re-uploads from same account.
+
+Implementation style:
+- Use simple, readable rule functions: each returns a score increment and reason.
+- Aggregate scores into a final riskScore.
+- Map score → riskLevel (e.g., 0–29 low, 30–59 medium, 60–79 high, 80+ critical).
+- Store a summary of triggered rules in FraudEvent.metadata (safe descriptions only).
+
+Processing mode:
+- Implement a scheduled or background-friendly endpoint / job:
+  - Example: an internal endpoint /api/internal/risk/process-batch (protected) to process N events at a time.
+  - Or reuse any existing background-job pattern already in the codebase.
+
+Make risk engine extensible, so future ML models can replace or augment rule-based scoring without breaking the interface.
+
+==================================================
+STEP 4 – Device Fingerprinting & Geo Risk
+==================================================
+
+1) Device Fingerprint
+
+Add a simple, privacy-respecting deviceId mechanism:
+
+- If the mobile/web clients already send a device identifier, reuse it.
+- If not, add logic to generate and store a pseudonymous deviceId token per client (e.g., stored in local storage/app storage).
+- Never use hardware identifiers directly; treat deviceId as an app-level token.
+
+Add a DeviceProfile model:
+
+- id
+- actorType
+- actorId
+- deviceId
+- lastSeenAt
+- firstSeenAt
+- lastIpAddress
+- countryCode
+- city
+- isTrusted (boolean, default false)
+
+Update login/session flows to:
+- Upsert DeviceProfile on successful login.
+- Optionally mark specific devices as trusted from the Security Center in the future.
+
+2) Geo Risk / High-Risk Zones
+
+Define a simple RiskZone model or configuration:
+
+- id
+- countryCode
+- city or region name
+- riskLevel (low/medium/high/critical)
+- notes
+
+Integrate with RiskScoringService:
+- If an event occurs in a high/critical risk zone, boost riskScore accordingly.
+
+==================================================
+STEP 5 – Admin Security Center Enhancements
+==================================================
+
+Build upon the existing Security Center in the admin panel.
+
+Route:
+- /admin/security-center
+
+Enhancements:
+
+1) Incidents view
+   - Table of FraudIncident items:
+     - Time
+     - Severity
+     - Category
+     - Actor (type + id/email/phone)
+     - RiskScore/RiskLevel
+     - Status
+   - Filters:
+     - Date range
+     - Severity
+     - Status
+     - Category
+     - Actor email/phone search (if joinable safely)
+
+2) Incident detail view
+   - All fields from FraudIncident
+   - Related FraudEvents list
+   - Key metadata (rules triggered, locations, devices)
+   - Controls:
+     - Change status (open/under_review/closed) – with audit log
+     - Assign to an admin
+     - Add resolution note
+     - Actions for high severity:
+       - Quick link to block/suspend account (reuse existing admin actions; do not duplicate logic)
+
+3) Event analytics
+   - Simple charts:
+     - Events per day by riskLevel
+     - Top event types by volume
+     - Top high-risk zones
+   - Reuse existing chart/analytics patterns.
+
+RBAC:
+- Only admins with appropriate permission (e.g., VIEW_SECURITY_CENTER, MANAGE_INCIDENTS) can access these pages.
+- Log all changes in the existing audit log system.
+
+==================================================
+STEP 6 – Notifications & Integration
+==================================================
+
+Add basic alerting:
+
+- For any FraudIncident with riskLevel = "critical":
+  - Create an internal notification for admins (reuse existing notification framework if present).
+  - Optionally tag it in the Activity Log as a security event.
+
+- For high-risk login or payment attempts:
+  - Consider adding a user-facing warning (e.g., "We detected unusual activity on your account.") through existing notification or inbox systems.
+  - Do not reveal internal rule details.
+
+==================================================
+STEP 7 – Testing & Validation Checklist
+==================================================
+
+Create and execute a detailed test scenario list, and document in replit.md:
+
+1) Simulated attacks:
+   - Many failed logins from same IP/device.
+   - Rapid trip creation/cancellation patterns.
+   - Multiple failed payments.
+   - High payout from a new account.
+
+2) Verify:
+   - FraudEvent entries are created correctly.
+   - Risk scores and levels are updated according to rules.
+   - FraudIncidents are created for high/critical cases.
+   - Security Center shows incidents and allows status updates.
+   - No sensitive data (SSN, NID, card details) appears in FraudEvent or FraudIncident.
+
+3) Performance:
+   - Risk processing endpoint runs within acceptable time for a batch.
+   - Analytics pages are paginated and responsive.
+
+4) Security:
+   - All new APIs are behind admin authentication + RBAC.
+   - All admin actions feed into the audit log correctly.
+   - Document URLs remain signed and secure.
+   - No new endpoints leak internal implementation details.
+
+==================================================
+FINAL DELIVERABLES
+==================================================
+
+1. New database models and migrations for:
+   - FraudEvent
+   - FraudIncident
+   - DeviceProfile
+   - RiskZone (or equivalent)
+
+2. Event logging helper and integrations in:
+   - Auth flows
+   - Trip/order/parcel flows
+   - Payment/payout flows
+   - KYC/document flows
+
+3. RiskScoringService with rule-based engine and batch processing.
+
+4. Enhanced Security Center in admin:
+   - Incident list and details
+   - Filters and basic analytics
+   - Integration with blocking/suspension tools
+
+5. Documentation updates in replit.md:
+   - Description of models, services, endpoints, UI.
+   - How to run risk processing and interpret incidents.
+   - How to extend rules or plug in ML later.
+
+6. Confirmation that:
+   - No existing SafeGo business logic is broken.
+   - No sensitive data is logged.
+   - Performance and security are acceptable for production.

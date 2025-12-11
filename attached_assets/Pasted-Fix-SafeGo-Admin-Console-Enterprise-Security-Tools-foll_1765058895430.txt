@@ -1,0 +1,108 @@
+Fix SafeGo Admin Console Enterprise Security Tools — follow ALL SafeGo global rules and make no breaking changes.
+
+TASK SCOPE:
+You must fix and redesign these three pages to match the same minimal, professional header used in revenue-analytics and payouts-reports:
+
+1) /admin/safety-center
+2) /admin/activity-log
+3) /admin/access-reviews
+
+GENERAL RULES:
+- Keep all pages responsive on desktop + mobile.
+- Use the shared PageHeader component (or create a new one if missing).
+- Back button must ALWAYS appear on the top-left, with icon + label.
+- Do NOT touch business logic, only frontend UI and missing routes/components.
+
+----------------------------------------------------------
+PAGE 1: SAFETY & RISK CENTER
+----------------------------------------------------------
+Required fixes:
+1. Add a Back button:
+   - Icon: arrow-left
+   - Label: "Back to Security"
+   - backTarget: "/admin"
+
+2. Apply the minimal header layout from revenue-analytics:
+   - Title: "Safety & Risk Center"
+   - Subtitle: "Monitor and manage platform safety incidents and risk cases"
+
+3. Ensure the page is wrapped inside AdminLayout with correct padding.
+
+4. Breadcrumb:
+   - Show: Admin > Security > Safety & Risk Center
+   - Each segment must be clickable.
+
+5. Verify Risk Cases section loads properly and filters do not break.
+
+----------------------------------------------------------
+PAGE 2: ACTIVITY LOGS (Currently blank)
+----------------------------------------------------------
+This page is not rendering any component — fix immediately.
+
+Required:
+1. Create or restore ActivityLogsPage component.
+2. Use PageHeader with:
+   - Title: "Activity Logs"
+   - Subtitle: "View admin and system activity across the platform"
+   - Back button: "Back to Security"
+
+3. Load the activity logs table or placeholder:
+   - If API integration not done, create placeholder containers:
+     - "System Events"
+     - "Admin Actions"
+     - "Login Attempts"
+   - Do not leave the page blank under any condition.
+
+4. Ensure route exists:
+   - path: "/admin/activity-log"
+   - element: <ActivityLogsPage />
+
+5. Do NOT break the logging system; only fix the UI.
+
+----------------------------------------------------------
+PAGE 3: ACCESS REVIEWS PAGE
+----------------------------------------------------------
+Current issues: header spacing, weak back button, unaligned content.
+
+Required redesign:
+1. Replace existing header with standardized PageHeader.
+2. Back button must use:
+   - Arrow-left icon
+   - Label: “Back to Security”
+   - backTarget: "/admin"
+
+3. Improve title block:
+   - Title: "Periodic Access Review"
+   - Subtitle: "Audit and certify admin role assignments"
+
+4. Ensure spacing follows SafeGo admin visual spacing (24px top, 20px below header).
+
+5. Keep all forms and components intact; do not edit business logic.
+
+----------------------------------------------------------
+GLOBAL STYLING REQUIREMENTS FOR ALL THREE PAGES
+----------------------------------------------------------
+1. Header height must match payouts-reports header height.
+2. Back button alignment must match:
+   - Vertically centered with title block
+   - Left margin consistent across all admin pages
+3. Mobile behavior:
+   - Back button collapses into single line above title on <600px width
+4. Absolutely no white blank pages allowed.
+5. Absolutely no mismatched spacing between header and content.
+
+----------------------------------------------------------
+FINAL DELIVERABLES:
+----------------------------------------------------------
+1. All three pages show:
+   - PageHeader
+   - Back button (with icon + working target)
+   - Title + subtitle (consistent styling)
+   - Functional content (no blanks)
+
+2. Activity Logs page should NEVER be blank again.
+
+3. Provide a short implementation summary at the end:
+   - Which files were edited
+   - Which routes were added or fixed
+   - Confirm no breaking change to backend or schemas

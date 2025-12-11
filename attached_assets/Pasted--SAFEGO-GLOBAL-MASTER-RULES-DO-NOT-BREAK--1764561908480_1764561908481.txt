@@ -1,0 +1,234 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK)
+====================================
+
+ROLES (4 separate roles)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role:
+- Has its own signup flow, KYC, dashboard, and permissions.
+- Must never share protected data with other roles.
+
+SERVICES (always supported)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+====================================
+KYC RULES (COUNTRY-SPECIFIC)
+====================================
+
+BANGLADESH (BD) – required fields for all BD users:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified (boolean)
+
+UNITED STATES (US) – required fields for all US users:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (for drivers)
+- driver_license_image_url
+- driver_license_expiry
+- ssn_last4 (optional, drivers)
+- verification_status
+- is_verified (boolean)
+
+====================================
+ONBOARDING (ALL ROLES)
+====================================
+- Multi-step:
+  1) Basic info
+  2) Address
+  3) ID/KYC upload (BD/US rules)
+  4) Emergency contact
+- After onboarding:
+  - verification_status = "pending"
+  - Block rides/food/parcel access until admin sets verification_status = "approved".
+
+====================================
+ADMIN PANEL (MUST KEEP)
+====================================
+Admin can:
+- Verify customers, drivers, restaurants:
+  - approve/reject KYC
+  - set verification_status
+  - set rejection_reason
+- Block/unblock any user or restaurant
+- Configure pricing, fees, commissions (by country + service)
+- Manage payouts and settlements:
+  - view driver negative balance
+  - view restaurant negative balance
+  - mark balances as paid
+
+====================================
+CORE COLLECTIONS (NO SCHEMA CHANGE)
+====================================
+
+1) rides
+   - ride_id
+   - customer_id
+   - driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng, dropoff_lat, dropoff_lng
+   - service_type
+   - fare_amount, tax_amount
+   - safego_commission_amount
+   - driver_earnings_amount
+   - payment_method (cash / online)
+   - status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     OR cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - order_id
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address (+ geo)
+   - delivery_address (+ geo)
+   - items, subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount
+   - restaurant_payout_amount
+   - payment_method
+   - status:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     OR cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+3) deliveries
+   - delivery_id
+   - customer_id, driver_id
+   - pickup_address (+ geo)
+   - dropoff_address (+ geo)
+   - package_description, package_size
+   - delivery_fee
+   - safego_commission_amount
+   - driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     OR cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+====================================
+COMMISSION & PAYOUT RULES
+====================================
+1) Ride – CASH:
+   - Driver receives full cash.
+   - SafeGo commission → negative driver_wallet_balance.
+   - Driver settles weekly; admin marks paid.
+
+2) Food – CASH:
+   - Restaurant receives full cash.
+   - Commission → negative restaurant_wallet_balance.
+
+3) ONLINE payments:
+   - SafeGo collects the full amount.
+   - SafeGo keeps safego_commission_amount automatically.
+   - Driver/restaurant receive net payout only.
+
+4) Admin can settle driver/restaurant negative balances and mark them paid.
+
+====================================
+SECURITY RULES
+====================================
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer KYC/sensitive fields.
+- Restaurants cannot view other restaurants’ data.
+- Only admin can:
+  - change pricing, commissions
+  - set verification_status
+  - block/unblock users
+- Users may only update their own profile.
+
+====================================
+STATUS FLOWS (UNCHANGED)
+====================================
+Rides:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+Food:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+
+Parcel:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+====================================
+NOTIFICATIONS
+====================================
+- New ride/order/parcel alerts
+- Status updates
+- Verification decisions
+- Payout updates
+- Admin messages
+
+====================================
+TASK: REMOVE 3 SPECIFIC RIGHT-SIDE BUTTONS FROM DRIVER MAP UI
+====================================
+
+Screen: `/driver/map`  (driver app map screen)
+
+The driver map currently shows multiple circular buttons on the right side:
+
+A) At the top-right over the map:
+   - A circular Notification bell button.
+
+B) In a vertical floating stack on the right side of the map:
+   1) Reload / Refresh button (curved arrow)
+   2) Dollar / `$` button (earnings)
+   3) Shield button (safety)
+   4) Arrow button (navigation / recenter)
+
+The user wants to REMOVE ONLY three of these buttons, and KEEP the others:
+
+MUST REMOVE:
+1) Notification bell button (the circular bell over the map on the right side)
+2) Reload / Refresh button from the right-side vertical stack
+3) Dollar / `$` earnings button from the right-side vertical stack
+
+MUST KEEP:
+- Shield safety button in the vertical stack
+- Arrow navigation / recenter button in the vertical stack
+- All footer buttons at the bottom (trip selector, Go Online, right menu)
+
+------------------------------------
+1) Remove notification bell button (map overlay)
+------------------------------------
+- Locate the component that renders the **circular notification bell** floating on top of the map (not the main top bar bell in the header, only the one directly over the map area).
+- Completely remove its JSX from the `/driver/map` UI:
+  - Do NOT just hide it with CSS (`display:none`).
+  - Do NOT render an empty placeholder.
+- The driver map should still work normally without that overlay button.
+
+------------------------------------
+2) Remove reload / refresh button from right-side stack
+------------------------------------
+- Find the vertical stack of floating action buttons on the right edge of the map.
+- Identify the **reload/refresh** button in that stack (curved arrow icon).
+- Remove only this specific button from the JSX.
+
+Example pattern (to remove):
+
+```tsx
+{/* REMOVE this */}
+<ReloadButton ... />

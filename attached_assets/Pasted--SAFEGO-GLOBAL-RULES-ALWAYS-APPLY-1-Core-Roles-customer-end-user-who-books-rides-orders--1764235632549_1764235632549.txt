@@ -1,0 +1,196 @@
+[SAFEGO GLOBAL RULES — ALWAYS APPLY]
+
+1. Core Roles
+   - customer: end-user who books rides, orders food, sends parcels.
+   - driver: transport provider who accepts rides/deliveries.
+   - restaurant: merchant that receives and fulfills food orders.
+   - admin: SafeGo operations user managing configurations, payouts, disputes, compliance.
+
+2. Global Domains (must stay compatible)
+   - Rides: on-demand and scheduled trips (customer ↔ driver).
+   - Food: restaurant menus, orders, delivery tracking (customer ↔ restaurant ↔ driver).
+   - Parcel: point-to-point delivery of small items (customer ↔ driver).
+
+3. Data & Collections (do NOT break existing ones)
+   - rides: one document per ride. Includes: customer_id, driver_id, status, pickup, dropoff, distance_miles, duration_minutes, price, payment_status, created_at, updated_at.
+   - food_orders: one document per food order. Includes: customer_id, restaurant_id, driver_id, items, subtotal, delivery_fee, taxes, tip, status, payment_status, delivery_distance_miles, delivery_duration_minutes.
+   - deliveries: one document per parcel delivery. Similar to rides (sender, recipient, distance, duration, price, proof_of_delivery).
+   - users / drivers / restaurants / payouts / transactions: must remain unchanged unless explicitly extended with additive fields.
+
+4. KYC & Compliance (must remain intact)
+   - USA:
+     - Drivers: SSN (masked), driver license, state, expiry, residential address, DOB, background_check_status, profile_picture, bank_info for payouts.
+     - Customers: email, phone verification, basic billing profile, card token only (no raw card data).
+     - Restaurants: legal entity, EIN or SSN, business address, owner verification, payout bank info.
+   - Bangladesh (BD):
+     - Drivers/Restaurants: National ID or equivalent, phone OTP, local bank/bKash details.
+   - Never store raw card numbers, CVV, or full unmasked SSN. Use tokens/last4 only.
+
+5. Admin Panel Must Always Support
+   - Configuration: pricing rules, surge rules, service areas, supported cities/states.
+   - Compliance: KYC review, background check statuses, document uploads & approvals.
+   - Finance: commissions, payouts, transaction logs, refunds, chargebacks.
+   - Operations: manual ride/order monitoring, force-cancel, driver suspension, restaurant pause.
+   - Analytics: high-level metrics (trips, GMV, cancellations, active drivers, active restaurants).
+
+6. Commission & Payout Logic (do not change, only read/use)
+   - platform_commission = base_commission + surge_component + fees.
+   - driver_earnings = fare_paid_by_customer − platform_commission − applicable_taxes/fees.
+   - restaurant_earnings = order_subtotal − platform_commission − applicable_fees.
+   - All payouts are scheduled and logged into payouts collection, referencing underlying rides/food_orders/deliveries and transactions.
+
+7. Security Rules (must always be respected)
+   - Access control:
+     - customer may only read/write their own rides, food_orders, deliveries, profile, payments.
+     - driver may only read/write their own driver profile, availability, documents, assigned rides/deliveries.
+     - restaurant may only access its own menus, orders, payouts.
+     - admin has elevated access but actions are logged with actor_id, action_type, timestamp, target_id.
+   - No sensitive data in logs: never log full addresses with PII+tokens together, no raw payment details, no full SSN, no documents.
+   - API calls to external providers (maps, payments, KYC) must use server-side keys, environment variables, and strong error handling.
+
+8. Status Flows (must stay compatible)
+   - Rides:
+     - requested → driver_searching → driver_assigned → driver_arriving → driver_arrived → trip_in_progress → completed OR cancelled_[by_customer/by_driver/by_admin/system].
+   - Food:
+     - placed → restaurant_accepted → being_prepared → ready_for_pickup → driver_assigned → on_the_way → delivered OR cancelled_*.
+   - Parcel:
+     - requested → driver_assigned → picked_up → en_route → delivered OR cancelled_*.
+   - Each transition must be atomic, validated, and audited (who changed, when, from→to).
+
+9. Onboarding Requirements (no change)
+   - Drivers: complete profile, documents, KYC, vehicle details, bank info, background check pass → then can go online.
+   - Restaurants: complete business profile, menus, pricing, tax settings, payout details → then can receive orders.
+   - Customers: verified phone/email + at least one valid payment method for card regions.
+
+10. Notifications
+   - Use the existing notification system. For any new events, emit standard payloads:
+     - push/mobile, email, or SMS as supported.
+   - New ride/location events should reuse existing topics/queues if they exist (e.g., ride_quote_created, ride_updated).
+
+11. General Implementation Rules
+   - Do not break existing flows or schemas. Only additive, backward-compatible changes.
+   - Reuse existing helper utilities, hooks, and design system components where possible.
+   - Handle all errors gracefully in UI and backend.
+   - All new fields must have clear types and safe defaults for old records.
+
+---------------------------------------------------------
+[TASK: FIX CUSTOMER LOCATION ENGINE & ROUTE METRICS — USA RIDES]
+---------------------------------------------------------
+
+Goal  
+The SafeGo Customer Web App (USA region) currently:
+- does not return full address suggestions when typing,
+- does not calculate or display distance (miles),
+- does not calculate or display ETA (minutes),
+- and does not feed those metrics into the ride price engine.
+
+You must implement a complete, production-ready Location & Route Engine for the customer ride flow, similar to Uber, without breaking any existing pieces.
+
+Scope  
+- Platform: SafeGo customer web app, path `/customer`, USA region only.
+- Domain: Rides; must be compatible with existing multi-service structure (rides / food / parcel).
+- Roles involved: customer, driver, admin (for config/monitoring only).
+
+Requirements
+
+1. Address Autocomplete (Google Places)
+   - Integrate or correctly wire Google Places Autocomplete for both:
+     - pickup field (default: current location if allowed),
+     - dropoff field.
+   - When the user types in a field:
+     - show a dropdown list of suggestions with full formatted address:
+       street number, street name, city, state, ZIP, country.
+     - on selection, resolve:
+       - place_id
+       - full formatted_address
+       - latitude, longitude
+   - Ensure debouncing, error handling, and “no results” state.
+   - Make sure API keys are not exposed in client code; use env + proxy if required.
+
+2. Current GPS Location
+   - On page load, attempt to get the user’s current location via browser geolocation.
+   - If permission granted:
+     - set this as the default pickup location,
+     - resolve it into a human-readable address (reverse geocode) and display it.
+   - If denied or failed:
+     - show a clear, non-blocking message and allow manual entry.
+   - Never log raw GPS coordinates together with sensitive identifiers in plain logs.
+
+3. Distance & ETA Calculation (Directions / Distance Matrix)
+   - After both pickup and dropoff are selected (have `lat`, `lng`):
+     - call Google Directions API or Distance Matrix API server-side.
+     - compute:
+       - distance_miles (float, with at least one decimal),
+       - duration_minutes (integer or rounded).
+   - Persist these into the ride quote / draft ride object:
+       - distance_miles
+       - duration_minutes
+       - raw_provider_distance_meters
+       - raw_provider_duration_seconds
+       - route_polyline (encoded polyline string).
+   - Handle API errors gracefully with a user-friendly message and retry option.
+
+4. UI Display (Before Booking)
+   - On the main ride screen (as in the screenshot):
+     - After origin & destination are selected, but before confirming:
+       - show distance: e.g., “3.8 miles”
+       - show ETA: e.g., “Approx. 12 min”
+   - These values must update whenever the user changes pickup or dropoff.
+   - Ensure layout remains responsive and consistent with the existing design system.
+
+5. Route Rendering
+   - Draw the route on the map component (if already present):
+       - show pickup marker, dropoff marker, and the encoded polyline for the path.
+   - Make sure re-routing is handled when user edits addresses.
+   - Use efficient re-rendering and avoid flickering.
+
+6. Price Engine Integration
+   - After a valid distance and duration are computed:
+     - trigger or update the ride price calculation using existing pricing logic.
+   - Make sure the price engine receives:
+       - distance_miles
+       - duration_minutes
+       - service_type (e.g., economy, premium, etc., as currently modeled).
+   - Price breakdown should remain compatible with commission & payout rules:
+       - do not change commission formulas,
+       - only pass accurate distance/duration inputs.
+   - Keep cash payments disabled for USA if that is the current rule; do not enable them.
+
+7. Data & Schema Constraints
+   - Do NOT remove or change existing fields in rides collection.
+   - If you need new fields, only add additive ones, with safe defaults:
+       - route_polyline (string | null)
+       - provider_route_metadata (object | null, e.g., provider = “google_maps”, request_id, mode)
+   - Ensure backward compatibility for older ride documents where these fields are missing.
+
+8. Security & Privacy
+   - No API keys or sensitive tokens directly in frontend bundle.
+   - No logging of full addresses combined with card details, SSN, or other KYC data.
+   - Geolocation errors must not expose internal stack traces to customers.
+   - All new backend endpoints must enforce authentication and role checks:
+       - only authenticated customers can request route quotes for their own rides.
+   - Rate-limit external maps API calls as necessary.
+
+9. Admin & Observability
+   - Expose minimal telemetry suitable for admin/ops:
+       - total route quote failures,
+       - average distance, average duration per city,
+       - external provider error codes (sanitized).
+   - Do not expose any PII in metrics; use city/ZIP level at most.
+
+10. Non-Regression Requirements
+   - Do not break:
+       - existing payment selection (card ending with 4242, etc.),
+       - ride category selection tabs,
+       - future “Food” and “Parcel” tabs (they may show “Soon” but must not error),
+       - booking confirmation and post-booking tracking.
+   - Existing tests must continue to pass. Add new tests around:
+       - autocomplete, distance calculations, ETA display, and price calculation inputs.
+
+Deliverables
+   - Working address autocomplete with full addresses.
+   - Working GPS current location with proper fallbacks.
+   - Working distance and ETA calculation between pickup and dropoff.
+   - Route displayed on the map with markers and polyline.
+   - Price engine correctly using distance_miles and duration_minutes.
+   - All changes are backward-compatible, secure, and limited to the USA customer ride flow.

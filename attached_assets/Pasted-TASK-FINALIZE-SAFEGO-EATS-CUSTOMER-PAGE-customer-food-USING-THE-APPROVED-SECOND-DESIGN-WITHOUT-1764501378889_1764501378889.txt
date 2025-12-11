@@ -1,0 +1,63 @@
+TASK: FINALIZE SAFEGO EATS CUSTOMER PAGE (/customer/food)
+USING THE APPROVED SECOND DESIGN — WITHOUT BREAKING DESKTOP VIEW.
+
+CRITICAL RULE:
+YOU MUST FIX ONLY MOBILE/TABLET LAYOUTS.
+YOU MUST NOT BREAK OR MODIFY THE EXISTING DESKTOP DESIGN STRUCTURE.
+DESKTOP VIEW (≥ 1024px) MUST REMAIN EXACTLY AS IT IS.
+
+APPROVED DESIGN:
+User selected the SECOND DESIGN:
+- Vertical large restaurant cards
+- Big image on left
+- Name + Rating + Open badge
+- Clean spacing, no clutter
+
+WHAT YOU MUST DO:
+1) KEEP desktop UI EXACTLY as it is. No resizing, no margin changes, no card redesign.
+2) APPLY the selected SECOND DESIGN ONLY for mobile + tablet breakpoints.
+3) FIX all broken/missing restaurant images (Bella’s, Sultan’s Biryani, etc.)
+4) ENSURE mobile scrolling works correctly (no clipping, no overlap).
+5) REMOVE legacy small-card layout from mobile. DO NOT DELETE CODE. Just disable its usage.
+
+BREAKPOINT RULES:
+- Mobile: ≤ 640px → use Second Design vertical full-width card
+- Tablet: 641–1023px → scale the second design proportionally
+- Desktop: ≥ 1024px → DO NOT TOUCH existing layout (leave as-is)
+
+MOBILE FIXES REQUIRED:
+- Proper vertical scroll
+- No cut-off cards
+- Image aspect-ratio 1.6:1 with object-fit: cover
+- Safe text wrapping + ellipsis
+- 44px tap target for heart/favorite icon
+- Clean spacing between cards (16px)
+
+IMAGE FIX RULES:
+- Read all demo restaurants
+- Repair invalid image URLs
+- Apply correct HTTPS Unsplash URLs
+- Add fallback image:
+    onError → safego_default_restaurant.png
+
+FILTER & SEARCH BEHAVIOR:
+- Cuisine filters (Chinese, Bengali, Japanese, etc.) → MUST show only mobile cards
+- Top Rated/Open/Favorites → MUST use same second-design layout
+- Search bar must remain functional across all breakpoints
+
+FILES YOU WILL WORK IN:
+- client/src/pages/customer/food/*
+- client/src/components/eats/*
+Do not modify shared components used by rides, deliveries, admin, or restaurant dashboards.
+
+NON-DESTRUCTIVE REQUIREMENT:
+- Do NOT break schema, API, or desktop UI.
+- Only override mobile/tablet CSS + layout render conditions.
+
+MANDATORY SELF-TEST BEFORE COMPLETION:
+1) Mobile view (390px) shows only second design.
+2) Tablet view (768px) shows proportional second design.
+3) Desktop view (1024px+) remains EXACTLY as before — no visual changes.
+4) All restaurant images load (or fallback).
+5) Scroll is smooth top-to-bottom.
+6) Filters update restaurant list using the second design only.

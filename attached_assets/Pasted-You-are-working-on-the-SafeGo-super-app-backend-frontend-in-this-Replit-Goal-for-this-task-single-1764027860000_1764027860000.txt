@@ -1,0 +1,112 @@
+You are working on the SafeGo super-app backend/frontend in this Replit.
+
+Goal for this task (single prompt, complete fix):
+Fix the Admin KYC Approvals flow so that clicking Approve/Reject on `/admin/kyc` works reliably without any "Cannot read properties of null (reading 'json')" errors, and the UI updates correctly.
+
+Context / Current problem:
+- On the Admin KYC Approvals page (route like `/admin/kyc` or similar), when the admin clicks **Approve**, a red toast appears:
+  - "Approval failed"
+  - "Cannot read properties of null (reading 'json')"
+- Similar issues previously happened on other pages when the fetch handler tried to call `response.json()` but the response was null, empty, or not JSON (e.g., 204 or error without JSON body).
+- The admin dashboard header shows correct totals (e.g., 135 Total Users, 49 Total Drivers, etc.), but the KYC Approvals action itself fails with this null/json error.
+
+Strict rules for this change:
+1. Do **not** make any Prisma schema or database structure changes for this task.
+2. Do **not** break any existing customer, driver, restaurant, payout, or admin flows.
+3. Keep all changes strictly limited to:
+   - The KYC approval/rejection backend endpoints, and
+   - The frontend code that calls them and handles the response (Admin KYC Approvals page).
+4. Follow the existing SafeGo coding style and any helper utilities already used for API requests, error handling, and toasts.
+5. One prompt, complete fix: don’t leave TODOs that keep the KYC Approvals half-working.
+
+What you should implement:
+
+1) Find the Admin KYC Approvals frontend:
+   - Locate the page/component for KYC approvals (something like `client/src/pages/admin/kyc.tsx` or similar).
+   - Identify the functions or React Query mutations used when the admin clicks **Approve** or **Reject**.
+
+2) Fix the backend KYC approval/rejection endpoints:
+   - Find the server routes that handle KYC approve/reject actions (for example under `server/routes/admin`, `server/routes/kyc`, or similar).
+   - Standardize their HTTP responses so that they **always** return a JSON body on success, instead of empty/null or 204 without body.
+   - Use a consistent response contract such as:
+     - On success (approve or reject):
+       - HTTP 200
+       - JSON: `{ success: true, action: 'approved' | 'rejected', kycId: '<id>', status: '<new_status>' }`
+     - On failure:
+       - Appropriate HTTP status (400/404/500)
+       - JSON: `{ success: false, message: 'Human readable error...' }`
+   - If a record is not found or cannot be updated, fail gracefully with the JSON error instead of letting the handler crash or return a non-JSON response.
+
+3) Harden the frontend KYC Approvals request handling:
+   - Update the fetch / mutation which calls the approval API so it:
+     - Wraps the fetch in try/catch.
+     - Always checks `response.ok` **before** calling `response.json()`.
+     - Handles the case where the body is empty or `response.headers.get('content-length') === '0'` by:
+       - Treating it as a generic success if `response.ok === true`, or
+       - Showing a safe error toast if not OK.
+   - Suggested safe pattern:
+
+     ```ts
+     const res = await fetch('/api/admin/kyc/approve', { ... });
+
+     if (!res.ok) {
+       let errorMessage = 'KYC approval failed';
+       try {
+         const data = await res.json();
+         if (data?.message) errorMessage = data.message;
+       } catch {
+         // ignore JSON parse errors, keep default message
+       }
+       showErrorToast(errorMessage);
+       return;
+     }
+
+     let data: any = null;
+     try {
+       // handle 204 or empty body
+       const text = await res.text();
+       data = text ? JSON.parse(text) : null;
+     } catch {
+       data = null;
+     }
+
+     // If backend sent our standard JSON, use that. Otherwise just assume success.
+     showSuccessToast('KYC successfully approved');
+     // Refresh the KYC list so the approved entry disappears or shows updated status.
+     ```
+
+   - Apply the same defensive logic for **Reject** actions.
+
+4) Update UI state and list refresh:
+   - After a successful approve/reject:
+     - Ensure the local list of KYC requests is refreshed (re-fetch query or optimistically update state) so the entry reflects the new status or disappears from “Pending” list.
+     - Use the existing toast system to show:
+       - “KYC approved successfully” or
+       - “KYC rejected successfully”
+   - Make sure there is no unhandled promise rejection or console error when clicking Approve/Reject, even if the backend returns an error.
+
+5) Testing and verification (do this before concluding):
+   - As admin, open the KYC Approvals page with at least one **Pending** KYC request.
+   - Click **Approve**:
+     - Confirm there is **no** red error toast about `Cannot read properties of null (reading 'json')`.
+     - Confirm a green/success toast appears.
+     - Confirm the list updates (pending item either disappears or status changes).
+   - Click **Reject** on another test item:
+     - Same expectations as above, with a proper reject message.
+   - Check the browser console and server logs:
+     - There must be **no** runtime errors related to JSON parsing or null responses.
+   - Confirm that:
+     - Driver onboarding, customer flows, restaurant flows, and other admin pages (driver list, restaurant list, etc.) still work exactly as before.
+
+Documentation:
+- Update `replit.md` (or the appropriate documentation file) with a short “Admin KYC Approvals Response Contract” section describing:
+  - The new API response shape for approve/reject.
+  - The defensive frontend pattern you used to avoid null/JSON errors.
+
+When you are done:
+- Mark this entire KYC Approvals fix as complete.
+- In your summary, explicitly state:
+  - Which files were changed (paths).
+  - How the JSON/null error was eliminated.
+  - That no Prisma/schema changes were made.
+  - That other flows remain unaffected.

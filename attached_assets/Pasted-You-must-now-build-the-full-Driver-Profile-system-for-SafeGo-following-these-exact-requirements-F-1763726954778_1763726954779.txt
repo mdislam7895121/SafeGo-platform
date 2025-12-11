@@ -1,0 +1,108 @@
+You must now build the full Driver Profile system for SafeGo following these exact requirements.  
+Follow all SafeGo Master Rules, all 4 user roles (Customer, Driver, Restaurant, Admin), global logic, Bangladesh + USA KYC, security rules, and do not break any existing code, routes, or components.
+
+Your task:  
+Create a complete Uber-quality Driver Profile module including:
+
+1. Driver Sidebar Navigation (same UX level as Uber)
+   • Profile Image, Name, Rating  
+   • Menu Items:
+     - Refer a Friend
+     - Opportunity / Promotions
+     - SafeGo Premium (Subscription)
+     - Wallet
+     - Account
+
+2. Refer & Earn Screen
+   • Driver referral code (auto-generated)
+   • BD currency: ৳500 per referral
+   • Copy button
+   • Share button
+
+3. SafeGo Premium Screen
+   • Subscription price: ৳499 per month  
+   • Included benefits:
+     - Priority trip requests
+     - Lower commission rates
+     - Exclusive bonus zones
+     - 24/7 premium support
+     - Advanced analytics
+   • "Subscribe Now" CTA
+
+4. Driver Account Full Menu (must match Uber-style)
+   Required menu items:
+   • Vehicles  
+   • Work Hub  
+   • Documents  
+   • Payment  
+   • Tax Info  
+   • Manage SafeGo Account  
+   • Edit Address  
+   • Privacy  
+   • Language  
+   • Notifications  
+   • Dark Mode  
+   • Map Theme  
+   • Navigation Preference  
+   • Blocked Users  
+   • App Permissions  
+   • About  
+
+5. Vehicle Management Module (Uber-level)
+   • Vehicle list card with:
+     - Car photo  
+     - Model name  
+     - License plate  
+     - Status  
+   • Vehicle details screen:
+     - Commercial Registration  
+     - Insurance  
+     - DMV inspection  
+     - TLC permit  
+   • All documents must show status:
+     - Completed
+     - Expiring soon
+     - Pending
+     - Rejected
+
+6. Full Document Center
+   • Profile Photo upload  
+   • Driver License upload  
+   • Vehicle Documents upload  
+   • Status badges  
+   • Re-upload option  
+   • Validation error messages  
+
+7. Payouts UI
+   • Wallet Summary  
+   • Available Balance  
+   • Negative Balance  
+   • Weekly earnings  
+   • "View Full Wallet & Payouts" page  
+
+8. High-quality UI styling rules:
+   • Clean, modern, Uber-style spacing  
+   • Icons for each menu item  
+   • All text aligned perfectly  
+   • Consistent component sizes  
+   • No broken components  
+   • No unused buttons  
+   • Responsive mobile-first design  
+
+9. Security Requirements:
+   • Enforce login token on all profile endpoints  
+   • Mask SSN / NID / License number  
+   • Secure file upload validation  
+   • No direct S3/URL exposure  
+   • Restrict driver-only routes  
+
+Deliverables:
+• All React/TypeScript components  
+• Routes in App.tsx  
+• API integration  
+• Validation  
+• Zustand/Context updates  
+• Reusable UI components  
+• No breaking changes to existing code  
+
+Make sure the entire module is production-grade, clean, and stable.

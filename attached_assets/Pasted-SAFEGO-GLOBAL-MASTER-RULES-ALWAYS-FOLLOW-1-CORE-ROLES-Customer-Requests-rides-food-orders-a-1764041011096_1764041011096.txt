@@ -1,0 +1,194 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS FOLLOW)
+
+1) CORE ROLES
+- Customer: Requests rides, food orders, and parcel deliveries.
+- Driver: Fulfills rides, food, and parcel tasks; needs KYC, vehicle, and payout setup.
+- Restaurant: Manages menu, orders, prep & handoff for SafeGo Eats.
+- Admin: Full platform oversight; manages KYC, payouts, fraud checks, promotions, and configuration.
+
+2) GLOBAL APP LOGIC (ALL SERVICES)
+- Three main services must always stay supported and not broken:
+  1. Rides (customer ↔ driver with pickup/dropoff, ETA, pricing, matching).
+  2. SafeGo Eats (customer ↔ restaurant ↔ driver, food ordering and delivery).
+  3. Parcels (customer ↔ driver for package pickup & dropoff).
+- Any change you make must keep all three service types functional. If you touch shared code (auth, users, KYC, wallet, payments, notifications), verify that rides, food, and parcels are not broken.
+
+3) COUNTRY / KYC RULES
+- USA:
+  - Drivers: identity docs (ID/license), SSN (masked in UI), DOB, address, vehicle details, background check status.
+  - Payouts: bank info or supported payout method; follow existing validation.
+- Bangladesh:
+  - Drivers: National ID, driving license, phone, address; keep existing fields intact.
+- Never remove existing required KYC fields; you may extend them but not break current flows.
+- KYC flows exist for customers, drivers, and restaurants; keep approval logic consistent and secure.
+
+4) ADMIN PANEL REQUIREMENTS
+- Admin must always retain:
+  - User, driver, and restaurant lists with filters and search.
+  - KYC approval queues for all roles.
+  - Wallet & payouts overview and controls.
+  - Promotions & bonuses management for drivers (and later other roles).
+  - Basic analytics / stats (do not break existing summaries).
+
+5) DATA & COLLECTIONS
+- Core models/tables must remain valid: users, driver_profiles, vehicles, restaurants, menu_items, orders/food_orders, rides, deliveries, wallet, payouts, transactions, promotions/driver_promotions.
+- Any new fields:
+  - Use backward-compatible migrations with safe defaults.
+  - Do not delete/rename critical columns without explicit migration and compatibility.
+
+6) COMMISSION & PAYOUT LOGIC
+- Existing commission and earnings math must stay intact.
+- Promotions that change earnings must:
+  - Record their impact in transactions/earnings breakdowns.
+  - Not break wallet, payouts, or driver earnings pages.
+- Keep monetary handling consistent with serializeDecimal / parsing utilities.
+
+7) SECURITY RULES
+- Enforce auth and role checks on all new/changed endpoints.
+- Validate ownership (drivers only see/edit their own data).
+- Validate IDs and inputs; reject malformed or unauthorized access.
+- Keep existing file/upload security (size, type, path) intact.
+- Never log secrets, tokens, or sensitive PII.
+
+8) STATUS & LIFE-CYCLE FLOWS
+- Keep existing status flows for rides, food orders, parcels, payouts, and promotions.
+- Promotions must support: draft / scheduled / active / paused / ended.
+- Do not break any existing life-cycle transitions.
+
+9) ONBOARDING REQUIREMENTS
+- Drivers must complete KYC, vehicle, documents, and payout info before full activation.
+- Restaurants must complete their onboarding (KYC, menu, hours).
+- Customers must keep basic profile and verified contact as defined today.
+- Do not relax these checks.
+
+10) NOTIFICATIONS
+- If new behavior should trigger notifications, reuse existing utilities.
+- Only send notifications when state really changes (no spam).
+
+11) IMPLEMENTATION RULES FOR THIS PROJECT
+- Avoid schema-breaking changes; if needed, migrate safely.
+- Preserve current coding style, folder structure, and shared hooks/components.
+- Before editing shared code, check all the places it is used (customer, driver, restaurant, admin).
+- After every change, manually verify:
+  - The feature you touched.
+  - That rides, Eats, parcel, wallet, and KYC flows still work.
+- For this task you must complete backend + frontend + basic tests in ONE pass (no partial work, no TODOs).
+
+12) OWNER EXTRA RULES
+- First, understand the existing behavior and any screenshots or scenarios; fix the real root cause.
+- Each task prompt must be implemented fully from start to finish in a single loop.
+- Do not introduce new bugs; do not leave features half-done.
+- Respect D-phase sequencing for driver features (D1–D7).
+
+================================================================
+TASK: CONNECT ADMIN DAY-BY-DAY PROMOTIONS TO DRIVER DATE STRIP (D7 – PART 2)
+================================================================
+
+Context:
+- The D7 driver “Promotions & Bonuses” page already has a horizontal date pill strip (F 21, S 22, …, 27, 28, 29, 30, etc.).
+- You already fixed the off-by-one selection bug so that tapping each pill selects the correct date.
+- Now we need to fully connect admin day-by-day promotions to this date picker:
+  - Admin can set different promotions per calendar day (e.g., 30th vs 31st).
+  - Driver should only see the promotions for the selected day.
+  - The behavior must work consistently for all services where driver promotions apply (rides, Eats, parcel).
+
+Goal:
+- Make the admin promotions configuration truly **date-aware** and ensure the driver date strip behaves as a proper day-by-day promotions browser.
+
+Detailed Requirements:
+
+1) Review existing promotions data model and admin UI
+- Locate the driver promotions models/tables, e.g. `driver_promotions` or `promotions`.
+- Inspect fields already present: title, description, service type, bonus type, amounts, status, and any date/time fields.
+- Open the admin pages (e.g., `/admin/driver-promotions`) and see:
+  - How a promotion is currently created/edited.
+  - How the schedule/date is currently defined (single date? start/end? no date?).
+- Do NOT remove or change existing fields in a breaking way.
+
+2) Add/normalize explicit date-range or single-day schedule
+- Ensure each promotion has clear schedule fields:
+  - `startDate` (DATE or TIMESTAMP without time zone, but consistent with the rest of the system).
+  - `endDate` (can be equal to `startDate` for single-day promotions).
+  - Keep or add a `status` field (draft/scheduled/active/paused/ended) if not already in place.
+- Implementation rules:
+  - If these fields already exist, reuse them and DO NOT rename them; just standardize their semantics.
+  - If you must add them:
+    - Use a safe migration.
+    - Default older promotions to a wide, safe range (e.g., now to now+X) so nothing breaks.
+- Promotions must be considered **active for a specific calendar day D** if:
+  - `status` is active (or scheduled but already started, depending on existing logic).
+  - AND `startDate <= D <= endDate` when compared in the same normalized time zone.
+
+3) Admin create/edit promotions – day-by-day UX
+- On the admin driver promotions page:
+  - Allow the admin to set:
+    - Either:
+      - “Single-day promotion”: pick a date; `startDate` and `endDate` are that same date.
+      - Or a “date range”: pick start + end date.
+  - Use the existing UI style and components (date pickers, select boxes, etc.).
+- Ensure:
+  - Validation prevents endDate < startDate.
+  - Required fields (title, type, service, payout/bonus parameters, dates) are enforced.
+  - No breaking changes to existing promotion records.
+- If admin edits an existing promotion:
+  - The currently saved dates should be pre-filled.
+  - Saving preserves the promotion and adjusts only the changed fields.
+
+4) Driver Promotions & Bonuses page – day-by-day filtering
+- In the driver Opportunity → Promotions & Bonuses page:
+  - For whatever API/hook is used to fetch promotions:
+    - Add a filter parameter based on the **selected calendar date** from the date strip (normalized to the same zone as `startDate`/`endDate`).
+    - Backend should return only promotions for which `startDate <= selectedDate <= endDate` and `status` is active (or as defined).
+- When the driver taps on a date pill:
+  - The selected date in state is updated.
+  - A new request is made (or local filtering is performed) so that:
+    - Only promotions valid for that day are shown in the Quests / Bonuses / In Progress / Done sections.
+- If there are no promotions for that date:
+  - Show a clear “No promotions available for this date” style message while keeping the rest of the layout intact.
+- Ensure the following are still consistent:
+  - Total Earned and This Month values (they may be overall, not per-day; keep existing intended behavior).
+  - Active and In Progress counters match the visible list.
+
+5) Optional visual hint: mark days that have promotions
+- If feasible without large refactors, enhance the date strip so that:
+  - Days with at least one active promotion show a subtle indicator (e.g., a small dot or bold text).
+  - Days without promotions stay plain.
+- This hint must be data-driven: based on actual promotions schedule, not hard-coded.
+- Do not degrade performance; avoid over-fetching. You can:
+  - Fetch a compact “calendar summary” for the current window of dates, or
+  - Reuse promotions data already loaded.
+
+6) Time zone and boundary handling
+- Use the same time zone convention as existing earnings/promotions logic. If the backend already normalizes to UTC or server TZ, follow that.
+- Avoid off-by-one date bugs:
+  - Convert selected date to the same format used by the API (e.g., `YYYY-MM-DD`).
+  - When comparing dates, ignore time-of-day unless necessary.
+- Manually test around midnight (local time) to make sure promotions appear on the intended day.
+
+7) Safety and regression checks
+- Verify:
+  - Admin can create two different promotions for consecutive days (e.g., 30th and 31st) and the driver sees them on the correct days when tapping the date strip.
+  - Existing promotions created before this change still behave sensibly.
+  - No changes break:
+    - Admin driver stats, wallet, and payouts.
+    - Driver earnings/payout pages.
+    - Rides, Eats, and parcel flows.
+- Fix any console or server errors you find.
+
+8) Documentation
+- Update `replit.md` (or main docs) with a short section:
+  - “D7 Admin–Driver Promotions Connection”
+  - Describe:
+    - How admin defines single-day vs multi-day promotions.
+    - How the driver date strip queries and displays day-by-day promotions.
+    - Any new endpoints/parameters.
+
+END OF TASK
+- Implement all of the above in one loop.
+- Do not leave partial work, TODOs, or commented-out dead code.
+- After finishing, summarize:
+  - Files changed.
+  - Admin → driver date-mapping logic.
+  - Exact steps for:
+    - Admin: create two different promotions on two different dates.
+    - Driver: open Promotions & Bonuses page, tap those dates, and see the correct promotions.

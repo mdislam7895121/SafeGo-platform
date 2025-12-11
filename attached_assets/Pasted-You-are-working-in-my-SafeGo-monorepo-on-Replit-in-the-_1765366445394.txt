@@ -1,0 +1,154 @@
+You are working in my SafeGo monorepo on Replit, in the project currently named “ReplitBackend”.
+
+Goal:
+Redesign and polish the SafeGo marketing landing page (the root URL, e.g. https://safegoglobal.com/) so that it:
+- Looks and feels as professional as Uber’s marketing site.
+- Stays 100% connected to the existing SafeGo backend and app routes.
+- Respects region-specific business rules for Bangladesh, United States, and Global.
+- Follows basic frontend security and privacy best practices for a public marketing page.
+
+VERY IMPORTANT ARCHITECTURE RULES (DO NOT BREAK):
+1. There is a single shared SafeGo backend (pricing, GPS, ride status, country rules).
+2. The landing page is ONLY a frontend client. It must NOT create its own pricing, routing, or status logic.
+3. All existing app routes like `/ride`, `/drive`, `/delivery`, `/food`, `/parcel`, `/shops`, `/tickets`, `/driver/signup`, `/restaurant/signup`, etc. must keep working exactly as they do now.
+4. Do NOT expose any secrets, API keys, tokens, or internal URLs in the landing page code. Use existing public routes only.
+5. Do NOT change any backend schemas, Prisma models, or APIs. This task is frontend-only.
+
+FILES / STRUCTURE:
+1. Find the main landing page implementation, currently something like:
+   - `client/src/pages/landing/LandingPage.tsx`
+   - And any related components under `client/src/components/landing/` (Hero, Services, Partner, HowItWorks, Safety, FAQ, Footer, etc.).
+2. Before making big changes, create a small comment near the top of the main landing page file explaining:
+   - Date
+   - What was changed
+   - That this is a visual/UX refactor only.
+
+DESIGN REQUIREMENTS (Uber-level professional quality):
+1. Overall layout:
+   - Keep the existing hero layout (left text, right services card) but refine spacing, typography, and alignment so it looks more premium and balanced on desktop and mobile.
+   - Ensure a consistent max-width container and vertical rhythm between sections.
+   - Use subtle background gradients, card shadows, and smooth section separation (no harsh borders or random gaps).
+   - Keep the existing font choices unless there is a simple and safe way to improve them using system fonts or what is already used by the app.
+
+2. Header / Navigation:
+   - Keep the SafeGo logo, region selector (Bangladesh / United States / Global), and main nav items (Ride, Drive, Business, About).
+   - Make the header sticky on scroll (if it is not already) so users can always access navigation.
+   - Make sure the “Log in” and “Sign up” buttons are clearly visible on desktop and still accessible via a clean menu on mobile.
+   - DO NOT change the actual links for Login/Signup – only style them.
+
+3. Region selector + services logic (must respect existing business rules):
+   - Bangladesh:
+     - Services: Rides, Food Delivery, Parcel Delivery, Local Shops, Tickets & Travel.
+     - “Become a partner” section: left card “For Drivers & Couriers”; right card “For Restaurants & Shops”.
+   - United States:
+     - Services: Rides, Food Delivery, Parcel Delivery. NO “Local Shops”.
+     - “Become a partner” section: right card title should be just “For Restaurants”.
+   - Global:
+     - Same structure as Bangladesh for now, but copy should be generic (no Bangladesh-specific text).
+   - Use a simple `REGION_CONFIG` (or improve the existing one) that already drives this behavior. Do NOT hardcode the texts three times – keep it config-driven and easy to extend.
+
+4. Hero section:
+   - Keep the main headline concept: “Move, eat, and deliver with SafeGo”.
+   - Under the title, have a short, strong, one-line description per region:
+     - Bangladesh: emphasize “first launching in Bangladesh” and all-in-one app.
+     - United States: emphasize rides + food + parcel, future expansion, and strong compliance.
+     - Global: emphasize SafeGo as a global, secure mobility and delivery platform.
+   - Primary CTA button (left): “Explore services” pointing to the app landing route for /ride or the correct entry point that already exists. DO NOT invent new URLs.
+   - Secondary CTA (text button link): “Become a partner” that scrolls to or navigates to the “Become a partner” section on the same page.
+
+5. Services section:
+   - Use clean, consistent cards for each service (Rides, Food Delivery, Parcel Delivery, Local Shops, Tickets & Travel).
+   - Each card:
+     - Has an icon, title, and 1 short line of text.
+     - On hover (desktop) add a very subtle scale/shadow effect.
+   - Cards should align in a neat responsive grid (2 columns on small screens, 4/5 on larger screens).
+   - Make sure the set of cards respects the region rules described above.
+
+6. “Become a Partner” section:
+   - Two cards side by side (on mobile stack them vertically).
+   - Left card: “For Drivers & Couriers” (always same content).
+   - Right card:
+     - Bangladesh / Global: title “For Restaurants & Shops”.
+     - United States: title “For Restaurants”.
+   - Each card has:
+     - A short description.
+     - 3–4 bullet points (compact, professional copy – no long paragraphs).
+     - A primary button:
+       - Drivers: “Start driving” → keep the current internal link to driver signup/onboarding.
+       - Restaurants/Shops: “Register your business” → keep the existing restaurant signup link.
+   - IMPORTANT: Only update the visual style and text. Do NOT change the actual signup URLs.
+
+7. “How SafeGo Works” section:
+   - Turn this into a clear, step-by-step flow grouped by service:
+     - Rides
+     - Food Delivery
+     - Parcel Delivery
+   - Use numbered steps and ensure all text is concise and easy to scan.
+   - Maintain the existing structure but refine spacing, icons, and typography to match the rest of the page.
+
+8. “Safety & Security” section (very important for cybersecurity positioning):
+   - Keep three main columns:
+     - “Your safety comes first” (for customers)
+     - “Safety while you work” (for drivers & couriers)
+     - “Protecting your data” (cybersecurity and privacy)
+   - Update the “Protecting your data” column to clearly highlight:
+     - HTTPS-only communication across all services.
+     - No sharing of personal data with third parties without consent.
+     - Regular security reviews and monitoring on the backend (described at a high level only).
+   - This is marketing copy, not technical documentation. DO NOT hardcode any internal IPs, domains, or security tool names. Keep it generic but accurate.
+
+9. FAQ / Support section:
+   - Use a simple accordion for FAQs, with clean spacing between questions.
+   - Keep questions like:
+     - How do I request a SafeGo ride?
+     - When is SafeGo launching in Bangladesh?
+     - How do I become a driver or courier?
+     - What payment methods are accepted?
+     - How is my safety ensured?
+   - Make sure the content is region-neutral where necessary (for example, you can mention “launching first in Bangladesh” only when the selected region is Bangladesh).
+
+10. Final CTA + Footer:
+   - Final CTA should have two options:
+     - “Download the app” (for future app store links – keep it as a placeholder button with no external link yet or a simple `#` anchor).
+     - “Become a partner” (scrolls to the partner section or uses existing navigation).
+   - Footer:
+     - Keep company links: About us, Careers, Press, Blog.
+     - Services links: Ride, Food, Parcel, Shops (only show Shops link if supported by the region, but you can keep the link list simple and static for now if dynamic is too complex).
+     - Partners: Drive with us, Deliver with us, Restaurant partners, Shop partners.
+     - Support: FAQ, Safety, Contact, Help Center (or similar).
+     - Show copyright as: `© 2025 SafeGo Global. All rights reserved.`
+
+FRONTEND SECURITY & PRIVACY REQUIREMENTS (for this page):
+1. No inline `<script>` tags or inline `onClick="..."` handlers in raw HTML. Use React/TypeScript event handlers only.
+2. Do not introduce any analytics SDKs, tracking scripts, or third-party embeds in this task.
+3. Do not fetch any personal data on this landing page. It is a public, unauthenticated marketing page.
+4. Ensure all external links (if any are used) open safely:
+   - Use `rel="noopener noreferrer"` when using `target="_blank"`.
+5. Do not log any sensitive info to the browser console.
+6. The landing page should remain fully functional even if JavaScript errors are thrown elsewhere in the app – keep it as simple and robust as possible.
+
+RESPONSIVE DESIGN:
+1. Test and adjust layout for:
+   - Small mobile screens
+   - Tablets
+   - Standard laptop/desktop width
+2. Make sure:
+   - Hero text does not wrap in an ugly way on mobile.
+   - Service cards stay readable (2-per-row or full-width).
+   - Partner and safety sections stack cleanly with enough spacing.
+3. Avoid horizontal scrolling at all breakpoints.
+
+AFTER IMPLEMENTATION:
+1. Run the dev server and visually check:
+   - Bangladesh region: shows 5 services (including Local Shops, Tickets & Travel) and “For Restaurants & Shops” in the partner section.
+   - United States region: shows only Rides, Food Delivery, Parcel Delivery and partner section right card as “For Restaurants”.
+   - Global region: content is generic and shows all core services.
+2. Confirm that:
+   - All CTAs (Explore services, Become a partner, Start driving, Register your business) still navigate to the correct app routes that already existed.
+   - There are no TypeScript errors or obvious console errors related to the landing page.
+3. Once everything looks correct, clean up any commented-out experimental code you might have added.
+
+Finally, summarize exactly what you changed (files touched, high-level visual improvements, and any config changes), and confirm that:
+- All region rules are respected.
+- No backend logic or routes were modified.
+- No secrets or sensitive data are exposed in the landing page.

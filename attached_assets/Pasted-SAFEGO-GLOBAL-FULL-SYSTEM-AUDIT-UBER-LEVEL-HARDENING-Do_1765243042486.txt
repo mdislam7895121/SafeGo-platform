@@ -1,0 +1,481 @@
+SAFEGO GLOBAL – FULL SYSTEM AUDIT & UBER-LEVEL HARDENING
+(Do NOT simplify. Do NOT remove any existing features.)
+
+You are the lead architect for the SafeGo global super-app.
+Your task now is to perform a **full system audit and hardening pass**
+so that SafeGo behaves at Uber-level quality, while preserving all
+existing features and routes.
+
+You must follow ALL SafeGo Master Rules below and treat them as
+non-negotiable.
+
+=====================================================
+0) CORE ROLES (MUST ALWAYS EXIST, STRICTLY SEPARATED)
+=====================================================
+SafeGo has exactly 4 primary roles. Never mix permissions.
+
+1. Customer
+2. Driver (ride + delivery)
+3. Restaurant (merchant) – SafeGo Eats
+4. Admin
+
+Each role MUST have its own:
+- signup / onboarding (multi-step)
+- KYC + verification rules
+- dashboard / home
+- permissions & allowed actions
+- status flows
+
+No role can see or edit another role’s sensitive data
+(except Admin with proper controls).
+
+=====================================================
+1) GLOBAL APP LOGIC – SERVICES
+=====================================================
+SafeGo must fully support 3 major services:
+
+1. Ride-hailing
+2. Food delivery (SafeGo Eats)
+3. Parcel delivery
+
+For each service you must ensure:
+- Proper request/assignment flows
+- Status flows (see section 7)
+- Pricing & commission logic applied correctly
+- Wallet behavior consistent
+- Notifications correctly triggered
+
+=====================================================
+2) COUNTRY-SPECIFIC ONBOARDING & KYC (BD + US)
+=====================================================
+SafeGo currently supports at least:
+- Bangladesh ("BD")
+- United States ("US")
+
+You MUST maintain and enforce country-specific KYC rules:
+
+BANGLADESH (BD) – Drivers (ride & delivery):
+- father_name (required, min length)
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image
+- nid_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- driving_license_number
+- driving_license_front_image
+- driving_license_back_image
+- vehicle_registration info
+- insurance_document (optional)
+- verification_status
+- is_verified
+
+UNITED STATES (US) – Drivers:
+- date_of_birth
+- home_address (street, city, state, ZIP)
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- government_id_front_image
+- government_id_back_image
+- driver_license_number + license_image + expiry (for car)
+- ssn_last4 (optional)
+- verification_status
+- is_verified
+
+Restaurants (BD + US):
+- business / restaurant name
+- restaurant_address + city + state/district + postal/ZIP
+- restaurant_phone
+- cuisine type
+- owner / contact name
+- government/tax id fields per country (if implemented)
+- emergency contact details
+- verification_status
+- is_verified
+
+Onboarding rules:
+- Multi-step wizard
+- After submit → verification_status = "pending_review"
+- is_verified = false
+- Partner CANNOT go online / accept rides / accept orders until approved by Admin.
+
+=====================================================
+3) ADMIN PANEL – MINIMUM CAPABILITIES
+=====================================================
+Admin panel MUST be able to:
+
+- View & manage:
+  - customers
+  - drivers (ride + delivery)
+  - restaurants
+  - any other partners (shop, etc.)
+- Approve / reject KYC for all partner types
+- See and set:
+  - verification_status (Not Verified, Pending Review, Need More Info, Rejected, Approved)
+  - is_verified
+  - rejection_reason
+- Block / unblock any user (customer, driver, restaurant)
+- Update pricing, fees, and commissions (global or per region)
+- Manage payouts:
+  - view balances
+  - mark settlements as paid
+- View **negative balances**:
+  - driver negative balance (cash trips)
+  - restaurant negative balance (cash food orders)
+
+You must NOT remove any existing admin routes.
+Only add or improve.
+
+=====================================================
+4) CORE COLLECTIONS – rides, food_orders, deliveries
+=====================================================
+SafeGo MUST maintain these three collections (DB tables/models):
+
+1. rides
+2. food_orders
+3. deliveries
+
+Each MUST include at minimum:
+
+- identity fields:
+  - customer_id
+  - driver_id (for rides / deliveries)
+  - restaurant_id (for food_orders)
+- address + geo:
+  - pickup_address + coordinates
+  - dropoff_address + coordinates
+- pricing:
+  - base_fare
+  - distance_fare or item_subtotal
+  - safeGo_commission
+  - driver_earnings / restaurant_earnings
+  - total_amount
+- payment:
+  - payment_method (cash / online)
+  - payment_status
+- status tracking (see section 7)
+- timestamps:
+  - created_at
+  - accepted_at
+  - completed_at
+  - cancelled_at (if any)
+- rating & feedback:
+  - customer_rating
+  - driver_rating (for rides / deliveries)
+  - optional comments
+
+You must NOT rename or remove existing fields. Only add if needed.
+
+=====================================================
+5) COMMISSION & WALLET / PAYOUT RULES
+=====================================================
+You MUST enforce these rules globally:
+
+1. If customer pays CASH for a RIDE:
+   - Driver receives the full cash from customer.
+   - SafeGo’s commission for that ride becomes a **negative balance**
+     in driver_wallet_balance.
+   - Driver must settle this negative balance weekly.
+   - Admin can mark settlements as paid.
+
+2. If food order is CASH:
+   - Restaurant receives all cash from customer.
+   - SafeGo’s commission becomes **negative balance** in restaurant_wallet.
+   - Admin can settle/mark paid.
+
+3. If payment is ONLINE:
+   - SafeGo keeps its commission automatically from the online amount.
+   - Driver/restaurant receive their net share (no negative balance created).
+
+4. Admin must be able to:
+   - View driver & restaurant wallets
+   - See negative balances
+   - Mark settlements completed
+   - Generate basic payout reports (even if minimal/JSON-level)
+
+Do NOT change any existing wallet schema. Only fix logic.
+
+=====================================================
+6) SECURITY & PRIVACY RULES
+=====================================================
+You MUST enforce:
+
+- Customers cannot view driver documents (NID, licenses, IDs).
+- Drivers cannot view customer NID/government ID or any sensitive KYC fields.
+- Restaurants cannot view other restaurants’ profiles, documents, or internal data.
+- Only Admin can:
+  - change pricing & commissions
+  - set verification_status / is_verified
+  - block/unblock users
+- Users can update only their own profile and own business data.
+- No sensitive data in client logs or browser console.
+- Upload endpoints must validate file types & size (profile photos, IDs, etc.).
+
+=====================================================
+7) STATUS FLOWS – MUST BE COMPLETE
+=====================================================
+For every service, you must maintain the full status flow.
+Do NOT remove any status.
+
+Ride statuses:
+  requested
+  → searching_driver
+  → accepted
+  → driver_arriving
+  → in_progress
+  → completed
+  OR cancelled_x (with a reason)
+
+Food order statuses:
+  placed
+  → accepted
+  → preparing
+  → ready_for_pickup
+  → picked_up
+  → on_the_way
+  → delivered
+  OR cancelled_x
+
+Parcel statuses:
+  requested
+  → searching_driver
+  → accepted
+  → picked_up
+  → on_the_way
+  → delivered
+  OR cancelled_x
+
+Each status change should:
+- Update DB
+- Trigger relevant notifications
+- Update dashboards (customer + driver + restaurant + admin)
+
+=====================================================
+8) ONBOARDING FLOWS (ALL PARTNERS)
+=====================================================
+For each partner type (driver, delivery driver, restaurant, shop):
+
+- Multi-step wizard:
+  1) basic info
+  2) address
+  3) KYC (country specific)
+  4) emergency contact
+  5) delivery/vehicle preferences (for drivers)
+  6) summary + consent
+  7) final review and submit
+
+Rules:
+- Before final submit → verification_status = "not_verified" or "not_submitted".
+- After submit → verification_status = "pending_review".
+- is_verified remains false until Admin approves.
+- Access to “Go Online / Accept Orders / Start Working” is blocked until approved.
+
+=====================================================
+9) NOTIFICATIONS (SYSTEM-WIDE)
+=====================================================
+You MUST ensure notifications exist for:
+
+- New ride request to drivers (nearby/available).
+- New delivery/parcel request to delivery drivers.
+- New food order to restaurant.
+- Order / ride / parcel status updates to customers.
+- Verification changes:
+  - Pending → Need More Info → Approved → Rejected.
+- Important admin messages (policy updates, settlement reminders, etc.).
+
+At minimum, there must be:
+- In-app notification / banners.
+- Email stubs/templates for verification events.
+
+=====================================================
+10) UNIFIED VERIFICATION ENGINE (ALREADY IMPLEMENTED)
+=====================================================
+You must PRESERVE the new unified verification engine for ALL partners.
+
+Canonical states:
+- Not Verified  – onboarding not started
+- Pending Review – onboarding submitted, awaiting admin
+- Need More Info – admin requested extra documents/corrections
+- Rejected – application not approved (with rejection_reason)
+- Approved – fully verified, partner can go online
+
+Rules:
+- is_verified = true ONLY when status = Approved.
+- All partner dashboards (driver, delivery driver, restaurant, shop)
+  must use this single source of truth for:
+  - badge text
+  - verification banner
+  - enabling/disabling Online / Accept Orders
+  - status controls.
+
+Do NOT introduce any new conflicting flags.
+
+=====================================================
+11) NON-BREAKING CHANGE POLICY
+=====================================================
+You MUST obey these implementation constraints:
+
+- All changes are backward-compatible.
+- Do NOT rename or delete existing:
+  - DB fields
+  - API routes
+  - URL paths
+  - core components
+- If something is wrong, **extend** or wrap it. Do not break it.
+- Prefer configuration / new helpers / new components instead of destructive changes.
+
+If in doubt, choose the additive, safe option.
+
+=====================================================
+12) FULL-SYSTEM AUDIT SCOPE
+=====================================================
+You must now perform a full audit and hardening pass across ALL modules:
+
+A) Customer side:
+   - Landing pages (ride, food, parcel)
+   - Login / signup / logout
+   - Profile & settings
+   - Book a ride flow
+   - Food ordering flow
+   - Parcel sending flow
+   - Location search / suggestions
+   - Map & trip tracking
+   - Notifications
+
+B) Driver side (ride + delivery):
+   - Onboarding wizard (BD + US)
+   - Login / logout
+   - Driver dashboards (ride and delivery)
+   - Go Online / Go Offline
+   - Incoming request list / assignment
+   - Trip cards and map tracking
+   - Wallet view (including negative balance)
+   - Status flows for rides & deliveries
+   - Verification banners
+
+C) Restaurant side (SafeGo Eats):
+   - Restaurant onboarding & KYC (BD + US logic)
+   - Restaurant dashboard:
+     - Verified badge
+     - Online / Closed / Busy mode
+     - KYC banners
+   - Menu management (if present)
+   - Order list & status changes
+   - Earnings / wallet view (including negative balance)
+
+D) Other partner types (shop/etc., if implemented):
+   - Onboarding
+   - Dashboard
+   - Verification behavior
+   - Ability to go live only when Approved
+
+E) Admin panel:
+   - User lists (customers, drivers, restaurants, partners)
+   - Detail views & KYC data
+   - Verification actions (Pending → Need More Info → Approved/Rejected)
+   - Block / unblock
+   - Commission & pricing configuration
+   - Wallet & settlement tools
+   - Status overview (rides, food_orders, deliveries)
+
+F) Back-end APIs & routes:
+   - Auth & token handling
+   - Role-based access control
+   - Data validation & error responses
+   - File upload endpoints (profile photos, IDs)
+
+=====================================================
+13) UBER-LEVEL UX & RELIABILITY CHECKLIST
+=====================================================
+For all major flows (rides, food, parcel), you must ensure:
+
+- No “dead ends” or blank screens.
+- Clear error messages, never raw stack traces.
+- Loading states & graceful fallbacks (no infinite spinners).
+- Mobile responsiveness (small screens) without breaking desktop layout.
+- Consistent terminology (Ride, Delivery, Order, Parcel).
+- Clear state in dashboards:
+  - what is happening now?
+  - what the user can do next?
+
+=====================================================
+14) EXECUTION PLAN – WHAT YOU MUST DO
+=====================================================
+
+You must perform this work in clear phases, all within this task:
+
+PHASE 1 – Map & Document
+- Scan the codebase for all modules listed above.
+- Identify:
+  - mismatches with SafeGo rules
+  - missing states
+  - broken UX
+  - security gaps
+- Create an internal checklist of issues.
+
+PHASE 2 – Fix & Harden (Non-Breaking)
+- For each problem:
+  - Fix it using additive, backward-compatible changes.
+  - Align behavior with:
+    - SafeGo rules
+    - unified verification engine
+    - commission & wallet logic
+    - status flows
+- Ensure all 3 services (ride, food, parcel) are fully functional end-to-end.
+
+PHASE 3 – Security & Privacy
+- Verify role-based access control.
+- Ensure no sensitive KYC fields leak to wrong roles.
+- Harden upload + token handling.
+- Fix any “403 invalid or expired token” flows.
+
+PHASE 4 – End-to-End QA (BD + US)
+For both BD and US:
+
+1) Ride-hailing:
+   - customer books ride
+   - driver accepts and completes
+   - wallet & commission behavior correct
+
+2) Food delivery:
+   - customer places order
+   - restaurant accepts & prepares
+   - driver picks up & delivers
+   - commission logic correct (cash vs online)
+
+3) Parcel delivery:
+   - customer requests parcel delivery
+   - driver handles complete flow
+   - correct statuses & notifications
+
+PHASE 5 – Final Report (MANDATORY)
+At the end, you must provide a short but precise report including:
+
+1) Summary of all major fixes and audits
+2) A list of modules/files you changed, grouped by area:
+   - customer app
+   - driver app
+   - restaurant app
+   - admin panel
+   - backend APIs
+   - shared utilities (e.g., verification.ts)
+3) Explanation of why all changes are **non-breaking** and preserve
+   existing APIs and schemas.
+4) Confirmation check list:
+   - All 4 roles working with correct permissions
+   - All 3 services (ride, food, parcel) working end-to-end
+   - BD + US KYC rules enforced
+   - Admin verification flows correct
+   - rides, food_orders, deliveries collections consistent
+   - commission & wallet rules enforced
+   - unified verification engine used everywhere
+   - notifications triggered for all critical actions
+
+ONLY when all of the above are satisfied, you may state that the
+system is Uber-level hardened and ready for deployment.
+
+Start the full system audit and hardening now.

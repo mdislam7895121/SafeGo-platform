@@ -1,0 +1,183 @@
+CRITICAL BUG – FIX DRIVER LICENSE INPUTS NOW (US DRIVER ONBOARDING V2)
+
+The US Driver V2 onboarding is still broken at /partner/driver/register.
+
+Problem:
+- On the "Driver License" step, the following fields DO NOT accept typing:
+  - Driver License Number
+  - License Issuing State
+  - License Expiration Date
+- This has been broken for more than a day. Preview shows the fields and error text, but when I tap and type, the value stays empty.
+
+You must treat this as a critical blocking bug.
+
+=====================================================================
+A. SafeGo master rules (do not break)
+=====================================================================
+While fixing this, you MUST respect all existing SafeGo rules:
+
+1) Roles: customer, driver, restaurant, admin
+   - Separate onboarding, KYC, dashboards, permissions, and status flows.
+   - Public signup is customer-only; driver onboarding happens after login.
+
+2) Services: rides, food delivery, parcel delivery
+   - Do not break any existing ride/food/parcel flows.
+
+3) Country-specific KYC:
+   - BD KYC: father_name, NID, etc. must remain unchanged.
+   - US KYC (drivers): date_of_birth, home_address, emergency_contact,
+     government_id_type, government_id_last4,
+     driver_license_number/state/expiry/images, optional ssn_last4,
+     plus TLC fields in NYC TLC zone.
+   - Do NOT rename/remove any KYC fields.
+
+4) Admin panel:
+   - Admin must still verify drivers/customers/restaurants, approve/reject KYC,
+     see rejection_reason, manage pricing/commission/blocking/payouts, and view
+     negative balances.
+
+5) Collections: rides, food_orders, deliveries
+   - Keep identity, geo, fees+commission, payment, timestamps, rating & feedback.
+
+6) Commission & payouts:
+   - Cash ride → driver keeps cash, commission → negative driver_wallet_balance.
+   - Cash food → restaurant keeps cash, commission → negative restaurant_wallet.
+   - Online payment → SafeGo keeps commission automatically.
+   - Admin can settle and mark paid.
+
+7) Security:
+   - Customers cannot see driver documents.
+   - Drivers cannot see customer KYC.
+   - Restaurants cannot see other restaurants.
+   - Only admin can change pricing, commission, verification, blocking.
+   - Users can edit only their own profile.
+
+8) Status flows for rides/food/parcel must remain intact.
+
+All fixes must be additive and non-breaking.
+
+=====================================================================
+B. FORCE-FIX THE DRIVER LICENSE FORM BINDINGS
+=====================================================================
+
+Now focus ONLY on the "Driver License" step component in the US Driver Onboarding V2 flow (route: /partner/driver/register).
+
+Your goal: make typing WORK in these three fields on both mobile and desktop, even if you have to simplify the implementation.
+
+1) Locate the V2 component
+   - Find the component that renders the "Driver License" step with:
+     - Driver License Number
+     - License Issuing State
+     - License Expiration Date
+     - Driver License Images
+   - This should be the V2 implementation (NOT the legacy V1).
+
+2) Simplify the three inputs to plain, working, controlled fields:
+
+   For the license number field:
+   - Use a simple controlled text input with React Hook Form (or equivalent).
+   - Pseudocode example (adapt to your tech stack):
+
+     Controller name="driver_license_number" control={control}
+       render={({ field }) => (
+         <input
+           type="text"
+           {...field}
+         />
+       )}
+
+   Requirements:
+   - No custom mask or formatter.
+   - No extra value={...} overriding `field.value`.
+   - No readOnly or disabled.
+   - No inputMode="none" or pattern that blocks all chars.
+
+   For the license issuing state:
+   - Use a basic <select> bound to the form:
+
+     Controller name="driver_license_state" control={control}
+       render={({ field }) => (
+         <select {...field}>
+           {/* list of states */}
+         </select>
+       )}
+
+   Requirements:
+   - onChange MUST call `field.onChange`.
+   - The select must not be disabled.
+   - Options must actually be present.
+
+   For the license expiration date:
+   - Use a simple date input:
+
+     Controller name="driver_license_expiry" control={control}
+       render={({ field }) => (
+         <input
+           type="date"
+           {...field}
+         />
+       )}
+
+   - Do NOT wrap this in a complex date-picker that can swallow events.
+   - Do NOT set readOnly.
+
+3) Remove anything that can freeze input:
+   - Remove temporary or leftover props:
+     - readOnly
+     - disabled
+     - value={someConstant}
+   - Remove any useEffect that constantly resets these values to empty.
+   - If there is a validation schema that runs on every keypress and rejects all input, change it so that:
+     - typing is allowed
+     - validation errors are shown on blur or on submit, not by blocking keystrokes.
+
+4) Check overlays / pointer-events:
+   - Inspect the surrounding layout:
+     - Make sure no absolutely-positioned element is placed over the input with pointer-events: auto.
+   - If an overlay is used for styling, set `pointer-events: none` on that overlay so taps go to the input.
+
+5) Ensure feature flags are not freezing the form:
+   - Confirm `driverOnboardingV2` or any gate is NOT:
+
+     - Re-mounting the component on every keystroke, or
+     - Resetting the form to default values continuously.
+
+=====================================================================
+C. TESTING REQUIREMENTS
+=====================================================================
+
+After making these changes:
+
+1) Manual tests:
+   - Desktop Chrome:
+     - Type in Driver License Number → characters must appear.
+     - Select a state from the dropdown → value must change.
+     - Pick an expiration date → value must change.
+   - Mobile (Safari or Chrome):
+     - Repeat all three actions, confirm typing works.
+
+2) Automated tests:
+   - Add/adjust unit tests for the Driver License step component:
+     - Typing into fields updates form state.
+     - Required-field validation shows messages only when empty on submit.
+
+   - Update integration/E2E tests for US Driver Onboarding V2:
+     - Full happy path where the Driver License step is filled successfully.
+
+3) Regression:
+   - BD driver onboarding must remain unchanged.
+   - Admin driver verification (NYC TLC + Standard US) must still work.
+   - Ride/food/parcel flows must still work and not be affected.
+
+=====================================================================
+D. REPORT BACK
+=====================================================================
+
+When done, summarize clearly:
+- What was the exact root cause of the non-typing bug.
+- Which components/files were changed.
+- How the final implementation of the three fields looks now (high level).
+- Confirmation that:
+  - I can type into all three fields on mobile and desktop.
+  - All tests pass.
+  - No SafeGo rule or existing feature was broken.

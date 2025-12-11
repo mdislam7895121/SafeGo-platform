@@ -1,0 +1,158 @@
+Act as a senior full-stack engineer and product designer for the SafeGo platform.
+
+Goal: Build an Admin Live Support Console so SafeGo support agents can handle escalated chats from drivers, riders, restaurants, and parcel couriers. The driver-side bot + live chat system (Option C architecture) is already production-ready. Now we must add an admin-side console that connects to the same support conversations.
+
+Follow all existing SafeGo conventions and rules:
+- Four roles: driver, rider (customer), restaurant, courier (parcel).
+- Keep all existing KYC, payouts, tax, documents, and tier logic unchanged.
+- Do not modify rider/driver/restaurant/parcel URLs or flows, only extend admin functionality.
+- Reuse the existing support conversation + messages models if they already exist. If not, add them in a backwards-compatible way.
+- Respect existing security model: only admin/support users can access /admin routes.
+- Do not break any existing APIs; only add new admin APIs where necessary.
+
+Admin Live Support requirements:
+
+1) Routes and Security
+- Add a new protected route: /admin/support
+- Only users with role "admin" or "support_agent" can access it.
+- Use existing auth/session/JWT middleware; reject non-admin users with 403.
+- Keep all current admin routes intact.
+
+2) Data Model (Prisma or current ORM)
+Ensure we have:
+- supportConversation:
+  - id
+  - userId
+  - role: "driver" | "rider" | "restaurant" | "courier"
+  - channel: "support"
+  - status: "waiting_bot" | "waiting_agent" | "active_agent" | "closed"
+  - escalationType: "manual" | "auto" | "none"
+  - lastMessageAt
+  - rating (optional)
+  - feedback (optional)
+  - createdAt, updatedAt
+- supportMessage:
+  - id
+  - conversationId
+  - senderType: "bot" | "agent" | "user"
+  - senderId (agentId or userId, nullable for bot)
+  - text
+  - metadata (JSON, for intent/topic/debug)
+  - createdAt
+
+Do NOT change driver-side schemas in a breaking way. Migrate safely if needed.
+
+3) Admin APIs
+Implement backend endpoints under /api/admin/support:
+
+- GET /api/admin/support/conversations
+  - Query params: status, role, search (email/phone/id), page, pageSize
+  - Returns a paginated list with: id, role, user display name, obscured email, status, lastMessageAt, unreadCount, escalationType
+
+- GET /api/admin/support/conversations/:id
+  - Returns:
+    - conversation meta (role, status, escalationType, createdAt, rating, feedback)
+    - user summary: basic profile, country, tier, last 5 trips summary or last payout snapshot if easily available
+    - messages[] ordered by createdAt
+
+- POST /api/admin/support/conversations/:id/assign
+  - Body: { agentId?: string } (default to current admin user if omitted)
+  - Sets "assignedAgentId" on conversation and status = "active_agent"
+
+- POST /api/admin/support/messages
+  - Body: { conversationId, text }
+  - Sender is current admin user (senderType="agent")
+  - Valid only when conversation status is "waiting_agent" or "active_agent".
+  - If status is "waiting_agent" and no assigned agent, auto-assign to current agent and move to "active_agent".
+
+- POST /api/admin/support/conversations/:id/close
+  - Marks conversation status = "closed"
+  - Sets "closedAt" if needed
+  - Triggers existing rating flow on the user side (do NOT implement new rating logic here; just call the existing hook or flag).
+
+All admin endpoints must:
+- Check that the conversation belongs to the correct SafeGo environment.
+- Reject actions on closed conversations.
+- Log errors cleanly.
+
+4) Bot → Admin escalation integration
+- When the driver/rider/restaurant/courier bot triggers escalation (manual keywords or auto-escalation after 3 failed answers), the backend must:
+  - Create or update a supportConversation with status = "waiting_agent"
+  - Save the escalationType ("manual" or "auto")
+  - Ensure the conversation appears in the /admin/support inbox list with a "New" badge.
+
+5) Admin Support UI (/admin/support)
+Build a professional 2-panel layout:
+
+A. Left panel: Conversation Inbox
+- A searchable, filterable list of conversations.
+- Each row shows:
+  - role badge: Driver / Rider / Restaurant / Parcel
+  - user name or masked email/phone
+  - last message preview
+  - status pill: "Waiting bot", "Waiting agent", "Active", "Closed"
+  - escalationType badge (Manual/Auto) for escalated tickets
+  - unread count indicator for the current admin
+
+- Filters:
+  - Tabs: "Open", "My chats", "Waiting agent", "Closed"
+  - Role filter: All, Drivers, Riders, Restaurants, Parcels
+  - Search field for email/phone/conversation ID.
+
+B. Right panel: Live Chat + User Info
+- Header:
+  - user name + role + country (e.g., "Driver – USA")
+  - status indicator: "Bot only", "Waiting agent", "Agent connected"
+  - "Take chat" / "Release chat" button for assignment
+- Message area:
+  - Chat bubbles for user, bot, and agent with clear visual differences
+  - Timestamps
+  - Small system messages for escalation events ("Auto-escalated after 3 unhelpful replies", "Agent joined", "Chat ended")
+- Input area:
+  - Text box + Send button
+  - Quick-reply buttons depending on role, for example:
+    - Driver: payouts, trip issues, documents, tax
+    - Rider: trip fare, driver didn’t arrive, cancel fee, safety
+    - Restaurant: order not received, menu update, payout
+    - Courier: pickup address, customer unavailable, damaged package
+
+C. Optional right-side user summary panel (nice to have but implement if time allows)
+- Show:
+  - Tier: Blue / Gold / Premium
+  - Recent earnings or trips
+  - Last payout date
+  - Last 5 trips or deliveries (short summary)
+
+6) Escalation and chat lifecycle
+- Bot side:
+  - Manual escalation: user types "agent", "human", "support", "not helping"
+  - Auto escalation: 3 consecutive unhelpful bot replies
+- Backend:
+  - Set conversation.status = "waiting_agent"
+- Admin:
+  - When agent clicks "Take chat", set status="active_agent" and assign agentId.
+  - When agent clicks "End chat", set status="closed" and trigger user-side rating flow.
+- Frontend must respect the single "conversationActive" flag from Option C:
+  - Do not allow sending messages from bot or agent if the conversation is closed.
+  - Show a "Chat ended" card with rating already handled on the user side.
+
+7) UX and Guardrails
+- Do not touch existing driver/support UI other than using the existing escalation and rating endpoints.
+- Keep Quick Topics and role-based intent engine logic as is.
+- Keep all URLs and route names stable; add new ones under /admin only.
+- Ensure no race conditions: always check the conversationActive/state ref before calling admin APIs.
+
+Implementation steps:
+1) Inspect current models and APIs used by the driver-side support system (Option C).
+2) Extend or reuse the models to support admin views without breaking anything.
+3) Implement the admin endpoints.
+4) Build the /admin/support UI with the 2-panel layout, inbox + chat.
+5) Wire escalation events so that escalated conversations appear for admins.
+6) Test the full flow:
+   - Driver starts chat → bot responds
+   - Driver types "agent" or triggers auto-escalation
+   - Conversation appears in /admin/support
+   - Admin takes chat, sends replies, and closes conversation
+   - Driver sees human responses and rating flow after chat end.
+
+Be explicit in your changes, show the key code snippets, and keep everything consistent with the existing SafeGo codebase.

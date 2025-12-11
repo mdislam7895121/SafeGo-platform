@@ -1,0 +1,172 @@
+Act as a senior backend architect and SafeGo Admin-Panel engineer.  
+Implement the full “Opportunity Bonus Management System” so that SafeGo admins can increase or decrease temporary ride incentives, boost zones, and promotional payout amounts during special periods, without affecting core ride, payout, or commission logic.
+
+Follow all SafeGo company rules:
+- Do NOT modify existing core collections: users, drivers, rides, food_orders, deliveries, payouts, wallets.
+- All global business configuration must be controlled only by the Admin Panel.
+- All monetary logic must be auditable and stored in the database.
+- All changes require RBAC, admin audit logs, and server-side validation.
+- No bonus or incentive amount can be hard-coded on the frontend.
+- Do not touch Online/Offline, trip-management, or earnings UI. This system affects only “Opportunity” page and bonus logic.
+
+==================================================
+1) DATA MODEL — OPPORTUNITY BONUS SETTINGS
+==================================================
+
+Create a new persistent configuration model:
+Collection/table: opportunity_settings
+
+Fields:
+- id
+- bonus_type (trip_boost, surge_boost, peak_hour_boost, per_ride_bonus)
+- country_code (US, BD)
+- currency
+- base_amount (default incentive)
+- promo_amount (temporary increased amount)
+- promo_multiplier (optional alternative to promo_amount)
+- zone_id (nullable; for zone-based boosts)
+- start_at (nullable)
+- end_at (nullable)
+- is_active (boolean)
+- created_by_admin_id
+- updated_by_admin_id
+- created_at
+- updated_at
+- notes (internal admin description)
+
+Rules:
+- Only one active setting applies per (bonus_type, country_code, zone_id).
+- If promo window is active, promo_amount or promo_multiplier overrides base_amount.
+- If promo window expired or disabled, fall back to base_amount.
+- No destructive changes to historical data.
+
+==================================================
+2) ADMIN PANEL — OPPORTUNITY MANAGEMENT UI
+==================================================
+
+Add a new section in the Admin Panel:
+Menu Label: Opportunity Bonuses
+Location: Under Promotions/Marketing group.
+
+Page 1: Opportunity Bonuses List
+Columns:
+- Bonus Type
+- Country
+- Effective Bonus
+- Base Amount
+- Promo Amount or Multiplier
+- Zone
+- Status (Active / Scheduled / Expired)
+- Start Date
+- End Date
+- Updated By
+
+Actions:
+- Create New Opportunity Rule
+- Edit Rule
+- Deactivate Rule
+
+Create Form:
+Fields:
+- Bonus Type (trip_boost / surge_boost / peak_hour_boost / per_ride_bonus)
+- Country Code
+- Currency
+- Base Amount
+- Optional Promo Amount
+- Optional Promo Multiplier (never both at once)
+- Zone (nullable)
+- Start Date/Time
+- End Date/Time
+- is_active
+- Notes
+
+Validation:
+- Base Amount >= 0
+- Promo Amount >= Base Amount
+- End Date > Start Date
+
+Deactivate:
+- Set is_active = false
+- Mark status as inactive but keep audit trail
+
+Security:
+- Only roles admin/super_admin can modify settings.
+- Every action saved to audit trail:
+  admin_id, action, old_value, new_value, timestamp, ip_address.
+
+==================================================
+3) DRIVER APP INTEGRATION — OPPORTUNITY PAGE
+==================================================
+
+In the driver web app, update the Opportunity page backend logic:
+
+- Fetch effective opportunity settings for:
+  - driver country_code
+  - bonus_type
+  - zone (if applicable)
+
+Compute effective_bonus:
+- If promo window active:
+  - If promo_amount exists → use promo_amount
+  - Else if multiplier exists → base_amount * multiplier
+- Else use base_amount.
+
+Frontend UI shows:
+- “Current Bonus: [effective_bonus][currency]”
+- If promo active:
+  - Show label: “Limited-time increased bonus until [end_date]”
+- Do not store any static amounts in UI.
+
+Do NOT modify:
+- Ride request logic
+- Commission logic
+- Payout cycle logic
+
+==================================================
+4) BONUS APPLICATION DURING RIDES
+==================================================
+
+When a bonus-triggering ride is completed:
+- Insert new record into opportunity_rewards collection/table:
+
+Fields:
+- driver_id
+- ride_id
+- country_code
+- bonus_type
+- opportunity_setting_id (snapshot)
+- reward_amount
+- currency
+- triggered_at
+- status (pending/paid)
+- paid_at (nullable)
+
+Wallet integration:
+- When reward moves to driver wallet:
+  Create wallet transaction:
+    type = OPPORTUNITY_BONUS
+    amount = reward_amount
+    metadata = { opportunity_setting_id, bonus_type }
+
+Past payouts must never change when admin edits future bonuses.
+
+==================================================
+5) BUSINESS & SAFETY RULES
+==================================================
+
+- Admin Panel is the only place to change bonus amounts.
+- No client-side overrides.
+- All bonus amounts must be stored and applied server-side.
+- If no opportunity_settings exists for a driver’s region, return bonus = 0 safely.
+- Existing ride payouts must remain untouched and correct.
+
+==================================================
+6) DELIVERABLES
+==================================================
+
+Provide:
+- Database model for opportunity_settings and opportunity_rewards.
+- Admin Panel pages for listing/creating/editing/deactivating bonuses.
+- Backend logic to compute bonus for every driver region and bonus type.
+- Driver Opportunity page integration using dynamic backend values.
+- Full security, audit logging, and compliance with SafeGo architecture.

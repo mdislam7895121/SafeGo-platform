@@ -1,0 +1,101 @@
+You are working on the SafeGo admin platform. Follow all existing SafeGo rules and do NOT break any working feature.
+
+Context:
+- Demo mode is already implemented and working.
+- Analytics dashboards and Earnings & Analytics (/admin/analytics, /admin/earnings) now load correctly with demo data and RBAC filters.
+- Wallets page (/admin/wallets) is also fixed and shows demo wallet balances for drivers and restaurants.
+- However, the Payouts Requests page is still broken.
+
+Bug description:
+- When I open:  /admin/payouts/requests
+  - I get a completely blank white screen in the admin UI.
+  - No error banner, no table, nothing is rendered.
+- The Payouts card in the admin home is:
+  - Title: “Payouts”
+  - Subtitle: “Review and approve pending payout requests”
+- Demo mode is enabled and should have payout data:
+  - Demo service creates ~32 payouts (completed + pending), all RBAC-friendly.
+  - Earnings dashboards show payouts info, so the database clearly has payout data.
+- Wallets page is working, so the payments schema and wallet balances are fine. Only the payouts requests view is broken.
+
+Goal / expected behavior:
+1. /admin/payouts/requests should:
+   - Load WITHOUT any blank white screen.
+   - Show a paginated table of payout requests (at least with demo data).
+   - Show key fields such as:
+     - Owner type (driver / restaurant)
+     - Owner name
+     - Wallet ID (or reference)
+     - Amount
+     - Status (pending, approved, rejected, failed)
+     - Requested date, processed date
+     - Country / city (for jurisdiction)
+   - Allow SUPER_ADMIN to see all payouts, and COUNTRY_ADMIN / CITY_ADMIN to see only payouts in their jurisdiction.
+   - Show a clear empty state (e.g., “No payout requests yet”) instead of a blank screen if there is truly no data.
+
+2. Security / RBAC requirements (must match the rest of SafeGo):
+   - Roles:
+     - SUPER_ADMIN: can view all payouts and approve/reject payouts globally.
+     - COUNTRY_ADMIN: only payouts for their country (US admin → NYC + SF, BD admin → Dhaka, etc.).
+     - CITY_ADMIN: only payouts for their assigned city.
+     - Drivers / Restaurants / Customers: must NOT be able to hit any admin payouts endpoints.
+   - All payouts API responses must:
+     - Use the same RBAC filter pattern as analytics and earnings.
+     - Prevent cross-jurisdiction data leakage.
+     - Only return payouts belonging to wallets in the admin’s jurisdiction.
+   - Follow the same null-safe defensive patterns as analytics:
+     - safeNumber(), safeString(), safeArray() helpers or equivalent
+     - Optional chaining with default values to avoid runtime crashes
+
+Tasks for you:
+1. Find the frontend page/component for payouts requests, likely under:
+   - client/src/pages/admin/payouts/requests.tsx
+   - or similar path
+   - If the file does not exist or is incomplete, create/fix it based on how the Wallets page is implemented.
+2. Check the browser console and server logs when loading /admin/payouts/requests:
+   - Identify any runtime TypeError / undefined property / 403 / 500 errors.
+   - Fix all such errors without breaking Wallets or Earnings.
+3. Backend API:
+   - Find the payouts-related routes, probably under:
+     - server/routes/payouts.ts
+     - server/services/earningsService.ts or payoutService.ts
+   - Ensure there is a proper endpoint for listing payout requests, e.g.:
+     - GET /api/admin/payouts/requests
+   - Make sure this endpoint:
+     - Uses the same RBAC filter utilities as analytics/earnings.
+     - Filters by jurisdiction (country / city) according to the admin role.
+     - Returns a clean JSON structure that the frontend can easily map to a table.
+     - Uses safe helpers (safeNumber, safeString, etc.) so missing fields don’t crash the UI.
+4. Frontend integration:
+   - On /admin/payouts/requests:
+     - Call the correct payouts list endpoint.
+     - Add proper loading state, error state, and empty state.
+     - Render a table of payout requests using the response.
+     - Ensure that if the endpoint returns an empty array, we see a “No payout requests” message (NOT a blank white page).
+   - Handle 403 errors gracefully:
+     - If a non-admin or wrong-role user hits the page, show an RBAC error banner instead of crashing.
+5. Demo data verification:
+   - With demo mode enabled (tsx scripts/run-demo-mode.ts enable):
+     - Confirm that the payouts requests table shows multiple demo records.
+     - Confirm that changing role (SUPER_ADMIN vs COUNTRY_ADMIN vs CITY_ADMIN) changes which payouts are visible.
+   - Confirm that clearing demo data (tsx scripts/run-demo-mode.ts clear) does NOT break production logic. In that case, the page should simply show an empty state.
+
+Quality and safety requirements:
+- Do NOT change or weaken any existing security features.
+- Reuse the existing RBAC helpers and safe* helpers that were built for analytics/earnings.
+- Keep the code consistent with the existing style of the project.
+- Avoid any breaking changes to other admin routes (analytics, earnings, wallets, KYC, etc.).
+- After changes, restart the app, reload /admin/payouts/requests, and verify:
+  - No console runtime errors.
+  - No blank screen.
+  - Payout table or clear empty-state is visible.
+
+Finally, summarize:
+- Root cause of the blank Payouts screen.
+- Files changed (with paths).
+- How RBAC and demo mode are enforced for payouts.
+- How I can manually test this in:
+  - SUPER_ADMIN
+  - COUNTRY_ADMIN (US)
+  - COUNTRY_ADMIN (BD)
+  - CITY_ADMIN

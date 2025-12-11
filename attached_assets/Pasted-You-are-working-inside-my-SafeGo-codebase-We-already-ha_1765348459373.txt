@@ -1,0 +1,111 @@
+You are working inside my SafeGo codebase. We already have a full backend and frontend audit. Some highest-priority issues are already fixed in this Replit project (token key, mock data, raw fetch, currency hardcoding, payment rules, deprecated auth_token).
+
+Now your job is to finish ALL remaining audit fixes – without changing the visual UI design and without adding new “extra” features.
+
+Follow these rules:
+
+1. DO NOT redesign UI. No layout changes, no new pages, no new buttons.
+2. DO NOT change backend contracts or database schema.
+3. Only fix the issues explicitly listed below.
+4. Always use the shared apiRequest helper from `client/src/lib/queryClient.ts` instead of raw fetch.
+5. Keep BD/US business rules exactly as in the existing code and audits.
+
+Tasks to complete now (the remaining items from the audits):
+
+B3 – Route polyline display
+- Files: 
+  - `client/src/pages/rider/trip/active.tsx`
+  - `client/src/pages/customer/bd-ride-booking.tsx`
+  - `client/src/pages/customer/food-order-tracking.tsx`
+- Make sure that, whenever the backend provides a non-empty `routePolyline`, the map renders it using the shared `decodePolyline(...)` helper and the appropriate `<Polyline>` component.
+- If `routePolyline` is null or empty, the map must still work with markers only.
+
+B4 – Empty states for “no results”
+- Files:
+  - `client/src/pages/bd/ticket-search.tsx`
+  - `client/src/pages/customer/food-restaurants.tsx`
+  - `client/src/pages/customer/eats-home.tsx`
+- Add a clean, minimal empty state message when the result lists are empty, for example:
+  - “No buses found for your search.”
+  - “No restaurants available in this area yet.”
+- Do not change layout; just show the message in the existing content area.
+
+B5 – BD-specific endpoints on shared pages
+- Files:
+  - `client/src/pages/customer/ride-request-page.tsx`
+  - `client/src/pages/customer/bd-ride-booking.tsx`
+- Make the code respect the existing country rules:
+  - For BD, continue to use the BD-specific endpoints as they are.
+  - For US (and other regions), use the generic fare and ride endpoints already defined in the backend audit (for example `/api/fares/calculate-categories` and `/api/rides`), using `countryCode` and `cityCode` from the authenticated user or the existing context.
+- DO NOT invent new endpoints. Only wire to the real ones that already exist in the backend project.
+- Keep all existing pricing logic coming from the backend – no frontend fare calculations.
+
+C1 – Duplicate decodePolyline helpers
+- Remove duplicated `decodePolyline` functions from individual pages and use a single shared helper (from `client/src/lib/locationService.ts` or the existing shared utility).
+- Make sure all map components import from the shared helper and that TypeScript types stay correct.
+
+C2 – Hardcoded default coordinates
+- Replace hardcoded map centers (e.g. `[23.8103, 90.4125]` for BD and `[40.7128, -74.006]` for US) with a smarter default:
+  - Prefer the user’s last known location if available.
+  - Otherwise, use a backend-provided or config-based default if already present in the codebase.
+- Do not add new backend endpoints; just reuse what already exists.
+
+C3 – “any” types in ride and tracking mutations
+- For ride booking and ride tracking pages, replace `any` in mutation handlers with proper TypeScript interfaces.
+- Create or reuse `RideData`, `RideStatus`, `LiveTrackingData`, and `FareEstimateResponse` types in a shared `client/src/types` directory if needed.
+- Do not change the API contracts; types must match the real backend responses from the audits.
+
+C4 – credentials: "include" without apiRequest
+- Find any remaining fetch calls that use `credentials: "include"` but do not use `apiRequest`.
+- Replace them with `apiRequest` so token refresh and error handling are consistent.
+
+D1–D5 – Missing frontend flows that backend already supports
+(Implement only the minimal UI wiring needed; no full redesign.)
+
+D1 – US-specific ride booking nuances
+- Ensure the unified ride-request page correctly handles US rules (no cash, correct currency, correct endpoints) based on `countryCode`.
+
+D2 – Driver negative balance explanation (customer side)
+- On the driver- or wallet-related screens where cash rides are shown, add a small explanatory text or tooltip that matches the backend commission logic (driver owes commission for cash rides).
+- Keep it simple and non-intrusive.
+
+D3 – KYC enforcement banner on ride booking
+- If the authenticated user is not KYC-verified (according to the backend status), show a warning banner on the ride-request page:
+  - Example: “Please complete your KYC verification to keep using SafeGo without interruption.”
+- Do not block the button unless the backend already enforces a hard block; just mirror the backend rule.
+
+D4 – Promo code validation errors
+- Make sure promo code errors from the backend are clearly shown in the booking and checkout UIs (rides, food, parcel).
+- Use existing toast / error components; no new design.
+
+D5 – Tip interface for completed rides
+- On the ride receipt / completed trip screen, add a simple tip UI that calls the existing backend tip endpoint if it already exists.
+- If the endpoint is not present, add a “Coming soon” disabled state instead of inventing new backend logic.
+
+E3 – Manual Bearer token usage without refresh
+- For any remaining code paths that manually read the token from localStorage and set the `Authorization` header themselves, refactor them to use the shared `apiRequest` or helper functions from `queryClient.ts`.
+- Ensure they no longer depend on old token key names.
+
+E4 – WebSocket using stale token
+- In `use-admin-notifications-ws.ts` and any other WebSocket client, make the token retrieval resilient:
+  - Always read the current token using the same standardized key (`safego_token` or the centralized token helper).
+  - Handle token refresh or reconnection properly when token changes.
+
+F1–F5 – UX polish items
+- F1: When route is loading, show a small “Calculating route…” or similar indicator near the map (no big redesign).
+- F2: Make sure all currency display uses the same `formatCurrency` helper and the backend-provided currency code.
+- F3: Geocoding failures should show a clear message like “Could not resolve this address. Please try a different location.”
+- F4: If ticket/restaurant search falls back from an error, never silently show mock data. Instead, show an error message plus the empty state.
+- F5: Where possible, show a simple offline error when network is unavailable (reuse existing error/alert components; no new infrastructure).
+
+When you are done:
+
+1. List every file you changed.
+2. For each file, list which audit issue(s) it fixed (e.g. “B3 + C1”).
+3. Confirm that:
+   - All token usage is standardized.
+   - No mock data remains in production paths.
+   - All payment and currency rules respect the SafeGo global rules for US and BD.
+   - No backend contract was modified.
+
+Do not say “I’ll execute.” Just perform the changes and then show the summary.

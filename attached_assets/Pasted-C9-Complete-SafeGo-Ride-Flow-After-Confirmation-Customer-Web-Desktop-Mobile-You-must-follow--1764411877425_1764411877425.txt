@@ -1,0 +1,248 @@
+C9 — Complete SafeGo Ride Flow After Confirmation (Customer Web, Desktop + Mobile)
+
+You must follow all existing SafeGo rules:
+
+- Do NOT change any backend logic:
+  - No changes to fare calculation, surcharges, promos, or commission
+  - No changes to driver earnings logic
+  - No changes to route calculation or distance/time logic
+- Only update the CUSTOMER WEB UI and the ride state flow on the new unified customer page.
+- The existing unified design at /customer is correct and must be preserved:
+  - SafeGo header with logo and Ride/Eats/Parcel switcher
+  - Address capsule with pickup/dropoff and “3 routes” text row
+  - SafeGo Everyday Saver promo banner
+  - “Choose your route” 3 cards row (Fastest, etc.)
+  - “View on map” button
+  - “Choose a ride” stacked list with SafeGo X / Comfort / Comfort XL / XL / Black / Black SUV / WAV
+  - Detailed breakdown panel with distance, time, “You save $X.XX”, promo, and “Fare details”
+  - Bottom sticky blue Confirm button with ride name and price
+
+Your job in this task:  
+Finish the ride flow AFTER the user taps the Confirm button, with a proper state machine and responsive UI, WITHOUT breaking anything that already works.
+
+----------------------------------------------------------------------
+1. Define a Clear Ride State Machine (Frontend Only)
+----------------------------------------------------------------------
+
+Create a frontend-only state machine for the customer ride flow.  
+Use a single source of truth object like `currentRide` with a status field.
+
+Suggested statuses (string union or enum):
+
+- "SELECTING"          // existing state – choosing route + ride
+- "CONFIRMING"         // brief state when the user taps Confirm
+- "SEARCHING_DRIVER"   // finding a driver
+- "DRIVER_ASSIGNED"    // driver accepted and is on the way
+- "TRIP_IN_PROGRESS"   // passenger is in the car
+- "TRIP_COMPLETED"     // trip completed, show receipt + rating
+- "TRIP_CANCELLED"     // optional: cancelled by rider
+
+Rules:
+
+- Start in "SELECTING".
+- When the bottom Confirm button is pressed:
+  - Validate that a route and ride are selected.
+  - Move to "CONFIRMING" → immediately into "SEARCHING_DRIVER".
+- In "SEARCHING_DRIVER":
+  - Use a front-end timer (e.g. setTimeout) to simulate driver assignment after a few seconds (3–5 seconds).
+  - After the timer, transition to "DRIVER_ASSIGNED".
+- For now, transition controls can be developer/debug-only buttons like:
+  - “Start trip” → moves to "TRIP_IN_PROGRESS"
+  - “Complete trip” → moves to "TRIP_COMPLETED"
+- Do NOT call any real backend dispatch or payment APIs; keep it purely UI/state-based.
+
+Store this state in a React hook (or the framework already used in this project) in the unified customer page.  
+Do NOT create a new page; keep everything under /customer.
+
+----------------------------------------------------------------------
+2. UI: What Happens Right After Confirm (SEARCHING_DRIVER)
+----------------------------------------------------------------------
+
+When the user presses the Confirm button:
+
+- Keep the header, address capsule, promo banner, and route row exactly as they are.
+- Replace ONLY the “Choose a ride” section with a new “Ride status” panel, depending on the status.
+
+For status = "SEARCHING_DRIVER":
+
+- Show a card titled: “Finding your driver…”
+- Inside that card show:
+  - Selected ride info:
+    - Vehicle image
+    - Ride name (e.g., SafeGo X)
+    - Final price (same as Confirm button)
+    - Selected route summary (e.g., Fastest · 1h 42m · 94.9 mi)
+  - A subtle animated loading indicator (e.g. 3 dots or spinner)
+  - A text line:
+    - “We are looking for the best nearby driver for you.”
+- Keep the map unchanged (desktop shows it on the right; mobile uses the existing “View on map” button).
+- Add a secondary text button: “Cancel ride (before driver is assigned)”
+  - This ONLY changes the local state back to "SELECTING" and restores the ride list UI.
+  - Do NOT alter any backend bookings.
+
+On mobile (narrow width):
+
+- The new “Finding your driver” card should appear above the bottom edge, same width as the ride list used to be.
+- The blue Confirm button is hidden while searching (there is nothing to confirm again).
+- The footer should not overlap the card.
+
+----------------------------------------------------------------------
+3. UI: Driver Assigned & On the Way (DRIVER_ASSIGNED)
+----------------------------------------------------------------------
+
+When the state moves to "DRIVER_ASSIGNED":
+
+- Keep header, address bar, promo banner, and route row exactly as they are.
+
+Replace the status card content with a new layout:
+
+Card title: “Your driver is on the way”
+
+Inside the card:
+
+1) Top section – driver and car:
+
+- Driver avatar (use initials-based circle if no real photo, e.g. “JD”)
+- Driver name placeholder (e.g., “John D.”)
+- Rating text (e.g., “4.9 ★”) – static, no backend change.
+- Car name and color (e.g., “Toyota Camry · Gray”)
+- Plate number placeholder (e.g., “ABC-1234”)
+
+2) Middle section – timing:
+
+- “Pickup in ~X min” (reuse existing pickup ETA from the selected card)
+- “Distance: 94.9 mi · ~1h 42m” (reuse from selected route)
+
+3) Actions row:
+
+- Button: “View live map”
+  - Desktop: Scroll the map into view and highlight the route.
+  - Mobile: Open the existing full-screen map view overlay you built for “Choose your route”.
+- Secondary text button: “Cancel ride”
+  - For now, purely local — move to "TRIP_CANCELLED" (simple message + “Back to home” button).
+  - Do NOT change any backend or payments.
+
+Layout rules:
+
+- Desktop: Status card stays in the same column where “Choose a ride” used to be.
+- Mobile: Status card stays above the bottom edge, scrollable with the rest.
+
+----------------------------------------------------------------------
+4. UI: Trip In Progress (TRIP_IN_PROGRESS)
+----------------------------------------------------------------------
+
+For status = "TRIP_IN_PROGRESS":
+
+- Title: “On trip to your destination”
+- Show:
+
+  - Same driver + car info as in DRIVER_ASSIGNED.
+  - A progress line:
+    - “Remaining: ~1h 35m · 90 mi”
+    - For now you can simulate this, for example by subtracting some dummy values.
+  - A single main action button:
+    - “View live map”
+  - A subtle text:
+    - “If you need help, please contact SafeGo support.”
+
+- The blue bottom button should now read:
+  - “Trip in progress” (disabled / non-clickable)
+  - Keep it visually present but not active so the user understands the ride is already running.
+
+- When the developer/debug “Complete trip” control is triggered, change state to "TRIP_COMPLETED".
+
+----------------------------------------------------------------------
+5. UI: Trip Completed (TRIP_COMPLETED) – Receipt + Rating
+----------------------------------------------------------------------
+
+For status = "TRIP_COMPLETED":
+
+Show a new “Trip completed” section instead of the status card.
+
+Layout (desktop and mobile, responsive):
+
+1) Confirmation header:
+
+- Title: “Trip completed”
+- Subtitle: e.g., “Hope you had a safe ride.”
+
+2) Trip summary card:
+
+- Pickup and dropoff addresses
+- Date and time of the trip (you can use the current browser time)
+- Route summary: “Fastest · 1h 42m · 94.9 mi”
+- Final price (same number as before)
+- Text line: “Promo SAFEGOEVER applied · You saved $10.00”
+  - Reuse the same promo data that already drives the discount.
+
+3) Fare details:
+
+- Reuse the existing Fare details breakdown UI:
+  - Base fare
+  - Time
+  - Distance
+  - Booking fee
+  - Taxes & surcharges
+  - Promo line with -$10.00
+  - Total after discount
+
+4) Rating + Tips (UI-only, no backend changes):
+
+- Section title: “Rate your driver”
+- 5-star rating component (clickable stars, local state only)
+- Under it: tip buttons row:
+  - “No tip”, “$2”, “$4”, “$6”
+- Important: Selecting a tip must NOT change the total price or any backend logic.  
+  Just visually highlight the selected tip and store it in local UI state.
+
+5) Buttons:
+
+- Primary button: “Done”
+  - Returns the screen back to the original "SELECTING" state:
+    - Same layout as a fresh /customer view, with address and routes preserved for convenience.
+- Optional secondary text link: “View full trip receipt”
+  - For now, this can simply scroll to the Fare details section.
+
+----------------------------------------------------------------------
+6. Mobile Behaviour – Keep It Clean and Scrollable
+----------------------------------------------------------------------
+
+On narrow screens (mobile view):
+
+- The layout must be fully usable with vertical scrolling.
+- Requirements:
+  - Route cards row: All 3 route options must be fully visible and tappable.  
+    Use horizontal scroll only if absolutely necessary, but keep card widths so that at least 2.2 cards are visible at once.
+  - Ride list: The user must be able to scroll the ride list and still see the sticky Confirm bar at the bottom.
+  - When the ride is confirmed and status card is shown, the card and Fare details must be reachable by scrolling; nothing should be cut off.
+  - The sticky bottom bar text updates correctly:
+    - "Confirm SafeGo X · $234.68" in SELECTING
+    - Hidden or disabled when searching / on trip
+    - “Done” or similar when the trip is completed (if you put this into the sticky bar).
+
+Do NOT introduce a separate mobile-only page. Use responsive CSS/layout only.
+
+----------------------------------------------------------------------
+7. Keep Everything Backward-Compatible
+----------------------------------------------------------------------
+
+- Do NOT delete or modify the existing unified booking route or file structure, except where necessary to add the state machine and new UI panels.
+- Do NOT break the existing:
+  - Address editing
+  - Route choosing
+  - Promo application and saver badges
+  - Fare details breakdown
+  - Map integrations you already wired up (View on map, etc.)
+
+If you need to refactor, keep changes minimal and localized, with clear component names like:
+
+- `<RideSelectionPanel />`
+- `<RideStatusPanel />`
+- `<TripSummaryPanel />`
+
+End of task. Implement this C9 ride flow update and then show me screenshots of:
+
+1) Searching for driver  
+2) Driver on the way  
+3) Trip in progress  
+4) Trip completed with rating and fare details

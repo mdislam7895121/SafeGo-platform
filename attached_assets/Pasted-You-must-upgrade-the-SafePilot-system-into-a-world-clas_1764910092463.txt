@@ -1,0 +1,180 @@
+You must upgrade the SafePilot system into a world-class business automation engine that reduces admin workload, reduces company cost, detects risks, grows the business, and supports SafeGo operations with intelligent decision-making. SafePilot must follow all SafeGo global rules, KYC laws, RBAC, safety requirements, and must not break any existing flows. Only ADD new modules. No renaming, no removal.
+
+=============================
+SAFE PILOT — CORE MISSIONS
+=============================
+
+SafePilot must act as:
+1. Business Automation Engine
+2. Growth Engine
+3. Cost Reduction Engine
+4. Fraud & Safety Shield
+5. Admin Assistant
+6. Partner Success Coach
+7. Customer Retention Brain
+8. Financial Intelligence System
+9. Compliance Guardian (BD + USA)
+
+=============================
+WHAT YOU MUST BUILD
+=============================
+
+Build the following SafePilot intelligence modules:
+
+------------------------------------
+1. Growth Engine (Demand-Supply AI)
+------------------------------------
+- Detect ride, food, parcel demand by area.
+- Detect driver, courier, restaurant shortage.
+- Recommend new partner onboarding areas.
+- Predict next 7/30 days high-demand zones.
+- Recommend surge pricing or incentive adjustments.
+
+------------------------------------
+2. Cost Reduction Engine (Expense Killer AI)
+------------------------------------
+- Detect unnecessary refunds.
+- Detect discount abuse.
+- Detect incentive overspend.
+- Detect payout leakage.
+- Predict company loss before it happens.
+- Suggest exact actions to reduce cost.
+
+------------------------------------
+3. Auto-Onboarding Engine
+------------------------------------
+- Recommend which partner categories to onboard:
+  - Ride drivers
+  - Food restaurants
+  - Parcel couriers
+  - Shop/ticket/rental partners
+- Recommend best locations, benefits, and messages.
+- Generate ready-to-use onboarding campaigns.
+
+------------------------------------
+4. Marketing AI (Zero-Budget Marketing)
+------------------------------------
+- Generate social media captions.
+- Generate SMS/WhatsApp notification templates.
+- Generate local area marketing ideas.
+- Auto-create push notification content.
+- Recommend festival/seasonal campaigns.
+
+------------------------------------
+5. Partner Success Coach AI
+------------------------------------
+- Auto-generate driver training steps.
+- Auto-generate restaurant delivery improvement plans.
+- Detect low-performing partners.
+- Suggest personalized improvement actions.
+
+------------------------------------
+6. Customer Retention AI
+------------------------------------
+- Detect unhappy customers.
+- Recommend apology messages or offers.
+- Auto-generate “win-back” strategies.
+- Identify customers likely to leave soon.
+
+------------------------------------
+7. Smart Pricing Engine
+------------------------------------
+- Recommend optimal surge areas.
+- Recommend profit-driven discount strategy.
+- Recommend restaurant commission improvements.
+- Forecast revenue impact.
+
+------------------------------------
+8. Fraud & Safety Shield
+------------------------------------
+- Detect ghost trips.
+- Detect ghost deliveries.
+- Detect fake coupons.
+- Detect driver–customer collusion.
+- Detect repeated safety incidents.
+- Detect suspicious KYC patterns.
+- Generate admin alerts with risk scores.
+
+------------------------------------
+9. Financial Intelligence Engine
+------------------------------------
+- Predict weekly/monthly earnings.
+- Detect negative balance risks.
+- Detect unpaid settlement risks.
+- Suggest payout schedule optimization.
+
+------------------------------------
+10. Legal & Compliance Guard (BD + USA)
+------------------------------------
+- Detect violations of BD NID rules.
+- Detect violations of US ID or privacy rules.
+- Suggest compliance actions.
+- Auto-generate investigation summaries.
+
+=============================
+SAFEPILOT UI REQUIREMENTS
+=============================
+
+Add:
+- Floating button on all admin pages labeled “SafePilot”.
+- Sidebar entry: “SafePilot Intelligence”.
+- Right-side drawer UI:
+  - Page-aware suggestions
+  - Insights section
+  - Quick actions
+  - Chat-like questions box
+
+SafePilot must auto-load correct suggestions based on the admin page:
+- Drivers page
+- Restaurants page
+- Rides/orders/deliveries page
+- Payout page
+- Refund page
+- Safety center
+- KYC center
+- Growth dashboard
+
+=============================
+BACKEND REQUIREMENTS
+=============================
+
+Add endpoints:
+- /api/admin/safepilot/context
+- /api/admin/safepilot/query
+- /api/admin/safepilot/suggest
+- /api/admin/safepilot/actions
+- /api/admin/safepilot/log
+
+Add tables (non-breaking):
+- SafePilotInteraction
+- SafePilotConfig
+
+Risk scoring functions must be rule-based and data-driven.
+
+=============================
+SECURITY & RBAC
+=============================
+
+Add:
+- Permission: admin.safepilot.use
+- Feature flag: safepilot_enabled
+
+SafePilot must NEVER:
+- Execute destructive actions
+- Bypass KYC
+- Bypass payouts
+- Change pricing/commission
+- Reveal hidden user data
+- Break BD/US laws
+
+=============================
+IMPLEMENTATION RULES
+=============================
+
+- Do NOT ask the user questions.
+- Follow SafeGo system architecture.
+- Maintain non-breaking changes.
+- Self-check all modules.
+- Provide end-to-end working implementation.
+
+Final result: SafePilot must let a single admin run the entire business with minimal staffing and minimal cost, providing world-class intelligence and automation for SafeGo.

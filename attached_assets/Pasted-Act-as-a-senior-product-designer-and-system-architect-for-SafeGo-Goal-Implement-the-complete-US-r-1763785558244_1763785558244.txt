@@ -1,0 +1,125 @@
+Act as a senior product designer and system architect for SafeGo.
+
+Goal:
+Implement the complete US rideshare driver tax system using the 1099 model. 
+Follow all SafeGo global conventions:
+- Four roles: customer, driver, restaurant, admin
+- Keep all existing payouts, wallet, and navigation logic
+- Do not touch ride, food, or parcel flows
+- Do not break any existing URLs
+- Tax system must only update the driver account center section
+
+====================================================
+1) W-9 TAX INFORMATION SETUP (Driver Account → Tax Info)
+====================================================
+
+Create a full W-9 equivalent form inside:
+Route: /driver/account/tax-info/update
+
+Fields to collect:
+- Full legal name
+- Street address
+- City
+- State
+- Zip code
+- SSN/ITIN (full, but store encrypted)
+- SSN masked display: show only last 4 digits (***-**-1234)
+- Certification checkbox ("I certify that the above tax information is correct.")
+
+Validation:
+- All fields required
+- SSN input masked on screen
+- Show success confirmation after submitting
+
+Security Rules:
+- Store full SSN encrypted (server-side only)
+- Show only masked SSN everywhere in the UI
+- No one except the driver can view their tax data
+- Admins cannot view full SSN; only “Verified/On File” badge
+
+UI Requirements:
+- Same design style as existing Tax Info page
+- “Update Tax Information” button must open this form
+- Use clean card layout and Uber-style spacing
+
+====================================================
+2) EARNINGS MAPPING → 1099 TAX BUCKETS
+====================================================
+
+Create backend logic that automatically divides annual earnings into two buckets:
+
+A) 1099-K Bucket (Trip Revenue)
+- all trip fares
+- surge
+- trip price-based incentives
+- cancellation fees
+
+B) 1099-NEC Bucket (Non-trip Income)
+- referral payouts
+- bonuses
+- promotions
+- guaranteed hourly earnings
+- opportunity payouts
+
+Store both totals yearly:
+- trip_revenue_total_ytd
+- non_trip_income_total_ytd
+
+====================================================
+3) YEAR-END TAX DOCUMENT GENERATION
+====================================================
+
+Driver must see these downloadable files on Tax Info page:
+
+1) 1099-K Form (if IRS threshold met: use dynamic threshold)
+2) 1099-NEC Form (if non-trip earnings ≥ $600)
+3) Annual Tax Summary (always available)
+
+Create document placeholders:
+Route: /driver/account/tax-info
+Add download buttons for:
+- “Year-to-date Tax Summary”
+- “1099-K Form”
+- “1099-NEC Form”
+
+Use SafeGo’s existing file storage system.
+
+====================================================
+4) TAX INFO PAGE FIX
+====================================================
+
+Fix the non-working “Update Tax Information” button:
+- Ensure clicking opens the new W-9 update form
+- Fix the route link, state params, and modal loading
+
+====================================================
+5) PERMISSIONS AND SECURITY RULES
+====================================================
+
+- Drivers can view, update, and edit ONLY their own tax info
+- No one can see another driver’s tax data
+- Mask all sensitive data by default
+- All actions logged for audit (SafeGo standard)
+- Do not expose full SSN or tax address to admin
+
+====================================================
+6) UI/UX REQUIREMENTS
+====================================================
+
+Match Uber's Tax Center:
+- Minimalist spacing
+- Left-aligned layout
+- White background with clean grey dividers
+- Clear headings: "Tax Documents" and "Taxpayer Information"
+- Use SafeGo iconography already in the system
+
+====================================================
+
+Implement everything above without breaking any existing driver features, payouts flow, or wallet logic.
+After completion, return a checklist confirming:
+- W-9 form created
+- SSN encryption + masking enabled
+- 1099-K / 1099-NEC buckets working
+- Year-end documents attached
+- Tax Info button fixed
+- Security rules applied

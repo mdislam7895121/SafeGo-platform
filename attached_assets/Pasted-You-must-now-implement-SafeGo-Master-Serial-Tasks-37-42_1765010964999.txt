@@ -1,0 +1,141 @@
+You must now implement SafeGo Master Serial Tasks 37–42 (Ratings & Reputation Engine) in ONE unified, non-breaking update. All SafeGo Master Rules remain fully enforced.
+
+=====================================================================
+SECTION 0 — NON-BREAKING RULES
+=====================================================================
+You must NOT modify:
+• existing fare logic  
+• commission rules  
+• fraud prevention logic (tasks 16–22)  
+• finance/settlement layer  
+• privacy & consent  
+• onboarding flows  
+• ride/food/parcel status engines  
+
+All rating systems must be additive, modular, and fully backward compatible.
+
+=====================================================================
+SECTION 1 — TASK SET (37–42)
+=====================================================================
+
+---------------------------------------------------------------------
+TASK 37 — Customer Rating Score System
+---------------------------------------------------------------------
+Create:
+• customer_rating table  
+Fields:
+- customer_id
+- average_rating
+- total_ratings
+- rating_breakdown (1–5 counts)
+
+Add endpoint:
+POST /api/rating/customer
+
+Rules:
+• Driver gives rating after completing ride/delivery
+• Score auto-updates
+• Low-rated customers affect fraud_score synergy
+
+---------------------------------------------------------------------
+TASK 38 — Driver Rating Score System
+---------------------------------------------------------------------
+Create:
+• driver_rating table  
+Fields:
+- driver_id
+- average_rating
+- total_ratings
+- breakdown (1–5 counts)
+
+Add endpoint:
+POST /api/rating/driver
+
+Rules:
+• Customers rate drivers after trips/orders
+• Low driver rating impacts:
+  - ride priority
+  - ability to receive trips
+
+---------------------------------------------------------------------
+TASK 39 — Restaurant/Partner Rating System
+---------------------------------------------------------------------
+Create:
+• partner_rating table
+
+Rules:
+• Customers rate:
+  - food quality
+  - packing quality
+  - on-time performance
+
+Drivers can also rate restaurants for:
+  - pickup delay
+  - behavior
+
+Affects search ranking and order priority.
+
+---------------------------------------------------------------------
+TASK 40 — Rating + Fraud Score Integration
+---------------------------------------------------------------------
+Combine rating & fraud modules:
+• If average rating < threshold:
+    fraud_score += penalty
+• If multiple low ratings within 24 hours:
+    trigger reputation_flag event
+
+Create reputation_logs table.
+
+---------------------------------------------------------------------
+TASK 41 — Auto-Restriction if Rating Too Low
+---------------------------------------------------------------------
+Rules:
+• Driver rating < 4.0 → Warning
+• Driver rating < 3.5 → Temporary block
+• Customer rating < 3.0 → Trip request cooldown
+• Restaurant rating < 3.0 → Reduced visibility in search
+
+Admin can override restrictions via Reputation Center.
+
+---------------------------------------------------------------------
+TASK 42 — Performance Dashboard in Admin Panel
+---------------------------------------------------------------------
+Add new Admin module:
+**Reputation & Performance Center**
+
+Tabs:
+1. Customer Ratings  
+2. Driver Ratings  
+3. Partner Ratings  
+4. Reputation Flags  
+5. Low Rating Auto-Actions  
+6. Rating Distribution Charts  
+
+Charts:
+• role-wise rating distribution  
+• daily rating trend  
+• flagged accounts list  
+
+=====================================================================
+SECTION 2 — DATABASE ADDITIONS (NON-BREAKING)
+=====================================================================
+Add tables:
+• customer_rating  
+• driver_rating  
+• partner_rating  
+• reputation_logs  
+
+=====================================================================
+SECTION 3 — ENFORCEMENT RULES
+=====================================================================
+• Rating cannot be edited once submitted  
+• Must log all rating submissions  
+• Fraud and rating systems must communicate via shared risk engine  
+• Auto-restrictions must not break payout, tax, or KYC flows
+
+=====================================================================
+SECTION 4 — COMPLETION MESSAGE
+=====================================================================
+When fully implemented, return:
+
+“Tasks 37–42 (Ratings & Reputation Engine) implemented and validated — SafeGo Master Rules compliant.”

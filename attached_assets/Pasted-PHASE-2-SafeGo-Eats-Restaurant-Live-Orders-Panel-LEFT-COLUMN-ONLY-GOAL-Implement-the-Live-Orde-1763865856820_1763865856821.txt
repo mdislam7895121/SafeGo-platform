@@ -1,0 +1,53 @@
+PHASE 2 – SafeGo Eats Restaurant Live Orders Panel (LEFT COLUMN ONLY)
+
+GOAL:
+Implement the Live Orders experience in the left column of the Restaurant Dashboard without breaking any backend contracts.
+
+SCOPE:
+- Only affects restaurant dashboard left column and any LiveOrders components.
+- Use existing order and status models from the backend.
+- No schema changes.
+
+REQUIREMENTS:
+
+1) LIVE ORDERS LIST
+- Fetch current orders for this restaurant with a non-terminal status.
+- Each order card must show:
+  - Order ID
+  - Time received (“10 min ago” style if possible)
+  - Short item summary (e.g., “3 items · 2x Burger, 1x Fries”)
+  - Order type: Delivery / Pickup
+  - Payment status (Paid / Pending)
+  - Status badge: NEW, ACCEPTED, PREPARING, READY, OUT FOR DELIVERY, COMPLETED
+
+2) STATUS TRANSITIONS (RESTAURANT SIDE)
+- For each status, allowed actions:
+  - NEW:
+    - Button: Accept
+    - Button: Reject (requires confirmation)
+  - ACCEPTED:
+    - Button: Mark as Preparing
+  - PREPARING:
+    - Button: Mark as Ready
+  - READY:
+    - Button: Mark as Out for Delivery (only for delivery orders)
+    - For pickup orders: Button: “Customer Picked Up” → Completed
+- Use existing APIs for updating order status.
+- If API errors, show toast with clear message and do NOT crash list.
+
+3) EMPTY / LOADING STATES
+- Loading: skeleton cards or simple “Loading live orders…” message.
+- Empty: “No live orders right now. New orders will appear here as customers order.”
+
+4) PERFORMANCE
+- Use polling or existing mechanisms already used elsewhere (DO NOT introduce WebSocket here if system doesn’t have it).
+- Polling interval must be reasonable (e.g., 10–15 seconds) and reuse global config if one exists.
+
+5) NON-BREAKING & SECURITY
+- Reuse existing order types/enums.
+- Do not introduce new status values.
+- Ensure restaurant cannot update orders belonging to other restaurants (respect existing RBAC/filters).
+
+DELIVERABLE:
+- Left column updated with a working Live Orders list.
+- Short summary of new components and which APIs are called.

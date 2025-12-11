@@ -1,0 +1,192 @@
+Step 35 – Implement USA Driver Vehicle Information Module (after Emergency Contact)
+
+You are working on the SafeGo admin panel. This is Step 35 in a long, ordered sequence, so you must treat it as an incremental, non-breaking update. Do NOT change or undo the behavior from previous steps (especially Steps 26–34 for driver KYC, document uploads, and filters).
+
+Business goals for Step 35
+- Add a complete USA vehicle information module for drivers.
+- This applies only to USA drivers. Bangladesh drivers must not be affected in this step.
+- On the admin driver details page:
+  - Emergency Contact must remain the last item inside the USA Identity section.
+  - Immediately after Emergency Contact, insert a visual divider.
+  - Under that divider, add a new “Vehicle Information” card.
+- No VIN field is required. The main identifier is the license plate plus registration/insurance documents.
+
+1. Review current implementation
+- Inspect the existing database and Prisma models related to:
+  - Drivers
+  - Vehicles (if a vehicle table already exists, reuse/extend it instead of creating an unrelated duplicate)
+  - USA driver identity / KYC records
+- Review the admin driver details page for USA drivers:
+  - Confirm the current order: name, phone, DOB, license, SSN, address, emergency contact, DMV/TLC docs.
+  - Note where Emergency Contact is rendered and how the layout is structured.
+- Confirm the existing file upload and storage mechanism used for:
+  - NID, profile photos, DMV/TLC license images, etc.
+  - We must reuse the same secure upload pipeline.
+
+2. Data model changes (USA vehicle only)
+Extend the appropriate model to store USA vehicle information. If there is already a `Vehicle` or similar model linked to drivers, extend it. If not, create a new vehicle model that is clearly linked to the driver via `driverId`.
+
+Required fields for USA vehicle records:
+- vehicleType (enum or string: sedan, suv, van, truck, etc.)
+- make (e.g., Toyota, Honda)
+- model (e.g., Camry, Accord)
+- year (integer or string, e.g., 2018)
+- color (string)
+- licensePlate (string, REQUIRED)
+- registrationDocumentUrl (string, REQUIRED once KYC is submitted)
+- registrationExpiry (date, REQUIRED)
+- insuranceDocumentUrl (string, REQUIRED once KYC is submitted)
+- insuranceExpiry (date, REQUIRED)
+- isPrimary (boolean, default true if only one vehicle is supported)
+
+Rules:
+- A USA driver must have at least one primary vehicle once KYC is fully completed.
+- For this step, assume one primary vehicle per driver. If multiple vehicles already exist, choose the first as primary but do not break existing data.
+- All new columns/fields must be added as nullable/optional first to preserve backward compatibility, then enforced via validation at the application level (not via hard DB constraints).
+
+3. Backend API – vehicle information
+- Add or extend API endpoints to:
+  - Fetch the USA driver’s main vehicle information along with their identity details.
+  - Update vehicle information for a USA driver (admin-side).
+  - Handle secure upload of registration and insurance documents (reuse the existing upload mechanism from the document/KYC system).
+- Validation rules:
+  - For country = "US":
+    - licensePlate is required when saving.
+    - registrationDocumentUrl and registrationExpiry are required when the admin marks KYC as approved.
+    - insuranceDocumentUrl and insuranceExpiry are also required when KYC is approved.
+  - For non-US countries, these vehicle fields must be ignored in this step.
+- Ensure:
+  - Only admins (proper RBAC role) can read/write vehicle details via the admin APIs.
+  - Drivers use only the existing KYC flows; do not expose admin-only endpoints to them.
+
+4. Admin driver details page – layout and UI
+Update the admin driver details page for USA drivers:
+
+Current structure (for US drivers):
+- USA Identity Information
+  - Profile Photo
+  - Full Legal Name
+  - Phone Number
+  - Date of Birth
+  - License State / License Number / Expiry
+  - SSN (masked + Show SSN button)
+  - Residential Address (street, city, state, ZIP)
+  - Background Check
+  - Emergency Contact (Name and Phone)
+- DMV/TLC License documents
+
+Required structure after this step:
+1) Keep the USA Identity Information section as is, but ensure:
+   - Emergency Contact is the LAST sub-section inside this identity block.
+
+2) Immediately AFTER Emergency Contact, insert a visual divider (e.g., a horizontal rule or clearly separated section spacing) to indicate a new major block.
+
+3) Below that divider, render a new card or section titled:
+   - “Vehicle Information”
+
+Inside the “Vehicle Information” card, display:
+- Vehicle Type
+- Make
+- Model
+- Year
+- Color
+- License Plate
+- Registration Document:
+  - Show status: “Uploaded” or “Missing”
+  - If uploaded, show a “View document” link/button using the existing secure pattern.
+- Registration Expiry (formatted date)
+- Insurance Document:
+  - Show status: “Uploaded” or “Missing”
+  - If uploaded, show a “View document” link/button.
+- Insurance Expiry (formatted date)
+
+If any required vehicle fields are missing for a USA driver:
+- Show a clear warning inside the Vehicle Information card, such as:
+  - “Vehicle information is incomplete. Please review registration and insurance documents.”
+- Do NOT break the page or throw unhandled errors.
+
+Do NOT add the Vehicle Information card for Bangladesh drivers in this step. BD layouts must stay exactly as they are.
+
+5. Admin editing behavior
+- Add an “Edit Vehicle” or similar button within the Vehicle Information card for admins.
+- On click, open an edit form (modal or inline section) with:
+  - vehicleType (select)
+  - make, model, year, color
+  - licensePlate (required)
+  - registrationExpiry (date)
+  - insuranceExpiry (date)
+  - file upload controls for:
+    - registrationDocument
+    - insuranceDocument
+- Reuse existing secure file upload components and patterns from previous KYC/document steps.
+- After successful save:
+  - Close the editor
+  - Refresh the vehicle section view
+  - Respect any cache invalidation rules already used (e.g., TanStack Query or similar).
+
+6. Document Review integration (admin/documents)
+- Update the central Document Review UI used by admins so that, for USA drivers:
+  - Under the driver’s identity documents, vehicle-related documents appear in a clearly labeled area, e.g.:
+    - Vehicle Documents
+      - Registration Document – Uploaded / Missing
+      - Registration Expiry
+      - Insurance Document – Uploaded / Missing
+      - Insurance Expiry
+- The goal is that an admin can review all critical USA driver documents (license, TLC if NY, registration, insurance) from one place.
+
+7. Security measures for Step 35
+Apply and confirm the following security measures explicitly for this step:
+- RBAC:
+  - Only authenticated admins with the proper role can access or modify vehicle data and document URLs.
+- Input validation:
+  - Validate all vehicle fields on the server (type checks, date formats, reasonable year ranges, non-empty licensePlate, etc.).
+- File security:
+  - Reuse the same secure upload mechanism as other sensitive documents (e.g., presigned URLs or equivalent).
+  - Do not log raw document URLs or sensitive metadata in plain logs.
+- Data privacy:
+  - Vehicle document URLs should not be exposed to non-admin users.
+  - Keep all new fields consistent with existing encryption/storage policies where applicable.
+- Non-breaking changes:
+  - All new fields must be optional at the schema level with safe defaults.
+  - The system must continue to work for existing drivers without vehicle data until they are updated.
+
+8. Testing and verification
+Implement and run tests to confirm:
+
+Backend:
+- A USA driver can have vehicle information created/updated via the admin API.
+- Validation errors occur correctly if a USA driver is approved without registration/insurance docs.
+- Bangladesh and other non-US drivers are unaffected.
+
+Admin UI:
+- For a USA driver:
+  - Emergency Contact appears at the end of the USA Identity section.
+  - A visual divider appears below Emergency Contact.
+  - The Vehicle Information card appears below the divider with correct data.
+  - Editing vehicle data works and updates the view.
+- For a BD driver:
+  - No Vehicle Information card is shown.
+  - The layout is unchanged.
+
+Document Review:
+- USA driver’s registration and insurance documents appear in the central document review interface with correct labels and “Missing” warnings when not present.
+
+Regression check:
+- Ensure Steps 26–34 remain fully functional:
+  - Parcel admin management
+  - Driver filtering by country and state (including New York)
+  - Wallet settlement
+  - Existing KYC and document flows.
+
+9. Documentation
+- Update `replit.md` (or the primary project documentation file) with:
+  - The new USA vehicle fields and their purpose.
+  - The updated layout for the USA driver details page (identity → emergency contact → divider → vehicle information).
+  - The admin workflow for reviewing and updating vehicle data.
+  - A note that BD drivers are not affected by this step.
+
+When you are done, summarize:
+- The exact schema changes made.
+- The API endpoints added/updated.
+- The UI changes for the USA driver details page.
+- The security checks verified for Step 35.

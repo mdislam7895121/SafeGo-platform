@@ -1,0 +1,98 @@
+You are continuing the SafeGo global admin project. Do NOT break any existing functionality. Keep all changes incremental and safe.
+
+Goal: Finish the Admin Customer Management features so that the global admin can see all customers, open a customer list, and view customer details, similar to the existing Driver Management section.
+
+Scope: ONLY work on customer-related admin features. Do not touch ride-matching logic, driver flows, restaurant flows, authentication, or KYC logic.
+
+Requirements:
+
+1) Backend – Admin Customer APIs
+- Review existing Prisma models: User, CustomerProfile, Ride, FoodOrder, Delivery, Complaints (or similar).
+- Confirm if admin endpoints already exist. If not, create admin-only endpoints such as:
+  - GET /api/admin/customers
+    - Returns paginated list of customers
+    - Supports filters: country, verificationStatus (pending, verified, blocked), search by email
+  - GET /api/admin/customers/:customerId
+    - Returns single customer with:
+      - Basic profile: email, country, verificationStatus, createdAt, lastLogin (if stored)
+      - Aggregated stats: totalRides, totalFoodOrders, totalDeliveries
+      - Recent 5–10 rides/orders/deliveries with status and timestamps
+      - Complaint summary if complaints model exists
+- Reuse existing block/unblock logic:
+  - If there is already an admin block/unblock endpoint for users, make sure it works for customers too.
+- Enforce security:
+  - All these endpoints must be admin-only, protected by existing auth middleware and role checks.
+  - Never return sensitive fields: passwordHash, JWT secrets, full NID/SSN, or any secret tokens.
+  - If ID documents are stored, return at most a masked version (e.g., last 4 digits).
+
+2) Frontend – Admin Navigation & Pages
+- In the Admin Dashboard UI, add customer management similar to driver management:
+  - In the “Platform Overview” or stats section, add customer-related cards:
+    - Total Customers
+    - Verified Customers
+    - Blocked Customers
+  - Make these cards clickable and navigate to the customer list page.
+
+- Management section:
+  - Add a “Customer Management” card next to Driver Management and Complaints:
+    - Title: “Customer Management”
+    - Subtitle: “View, block, and manage all customers”
+    - On click, navigate to /admin/customers
+
+- Customer list page:
+  - Use the file already created: client/src/pages/admin/customers.tsx
+  - Implement a table with:
+    - Columns: Email, Country, Verification Status, Total Rides, Total Food Orders, Total Deliveries, Created At, Actions
+    - Pagination controls (page, page size)
+    - Filters:
+      - Country dropdown (All, Bangladesh, United States, etc.)
+      - Verification status filter (All, Pending, Verified, Blocked)
+    - Search box for email
+    - “View” button in each row that opens the details page.
+  - Use TanStack Query for data fetching with:
+    - proper query keys
+    - automatic refetch when filters/search/pagination change
+    - error and loading states.
+
+- Customer details page:
+  - Use the file already created: client/src/pages/admin/customer-details.tsx
+  - Show:
+    - Basic profile info (email, country, createdAt, verificationStatus)
+    - Stats: total rides, total food orders, total deliveries
+    - Recent activity:
+      - last 5 rides
+      - last 5 food orders
+      - last 5 parcel deliveries
+    - Complaint history if available.
+  - Admin actions:
+    - Block / Unblock customer (reuse existing admin block endpoint)
+    - Optional: “Reset login access” placeholder button that just shows a toast saying “Feature coming soon” (do not implement password reset logic now).
+  - Add back navigation to go to the customer list.
+
+3) Dashboard integration & UX
+- Ensure all dashboard number cards (Total Users, Total Drivers, etc.) remain correct.
+- Add customer counts into the existing stats calculations, but keep logic simple and efficient (avoid heavy queries on every refresh).
+- All admin list and details pages (drivers, customers, complaints) must:
+  - Use consistent layout
+  - Have automatic refetch (e.g., every 10–15 seconds) to simulate live data, but keep intervals reasonable.
+
+4) Security phase for this change (SafeGo Security Roadmap – Phase 2: Admin & Data Access Hardening)
+- Confirm that:
+  - New routes are wrapped in admin-only ProtectedRoute on the frontend.
+  - Backend verifies the admin role before serving any customer data.
+  - Responses exclude sensitive fields and large payloads (use pagination and field selection).
+  - Add minimal logging for admin actions: blocking/unblocking customers.
+
+5) Testing
+- Create or use demo customers from both BD and US.
+- Approve KYC so they become “verified.”
+- Place a few demo rides/food orders/deliveries for them.
+- Verify:
+  - Dashboard shows correct total and verified customer counts.
+  - Clicking the customer cards navigates to /admin/customers.
+  - Customer list shows correct filters, search, and pagination.
+  - Customer details page loads with correct recent activity.
+  - Block/Unblock works and is reflected in both the list and details page without breaking the customer app.
+- Do NOT change any existing driver, restaurant, or wallet logic.
+
+Finally, summarize all code changes (files touched) and confirm that the Admin Customer Management system is fully working and production-ready without breaking existing features.

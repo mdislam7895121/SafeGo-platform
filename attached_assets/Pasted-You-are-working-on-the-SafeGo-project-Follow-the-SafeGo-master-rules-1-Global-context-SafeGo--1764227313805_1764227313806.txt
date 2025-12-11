@@ -1,0 +1,95 @@
+You are working on the SafeGo project. Follow the SafeGo master rules:
+
+1) Global context:
+- SafeGo is a multi-service platform: rides, food delivery, and parcel/courier.
+- There are four roles: customer (rider), driver, restaurant/merchant, and admin.
+- There are separate flows for Ride, Eats, and Courier/Parcel, but they share one account, wallet, payout, notifications, and security model.
+
+2) Compliance & KYC:
+- USA flows: require phone verification, email verification, basic KYC, and payout methods that do NOT include cash for riders. Drivers and restaurants must have bank/Stripe-style payouts with account type selection.
+- Bangladesh flows: support local payment methods and optional cash where previously defined.
+- Never silently reintroduce “cash” as a rider payment option in USA flows.
+
+3) Data & Collections:
+- Core collections/tables already exist: rides, food_orders, deliveries/parcel, payouts, wallets, incentives, trust_score, safety_incidents, audit_logs, notifications, training, etc.
+- Do not rename or remove existing fields or tables without a strong reason.
+- All changes must remain backwards compatible with existing seed/demo data.
+
+4) Admin panel:
+- Admin must be able to monitor and manage rides, drivers, riders, restaurants, payouts, disputes, and safety incidents.
+- Do not break any existing admin routes or metrics while changing customer or driver UI.
+
+5) Business rules:
+- Commission and payout logic are already implemented; do not change any pricing, commission, or payout calculations.
+- For riders in the USA there is no “cash” payment method; only card / wallet / other digital methods already defined in the schema.
+- Status flows (requested → accepted → arriving → in_progress → completed / cancelled) must remain consistent between frontend and backend.
+
+6) Security:
+- Security hardening phases 1 and 2 are already in place (security headers, rate limiting, OTP, device/session security, tamper-proof audit logs, payout 2FA).
+- Do not weaken any security checks or validation.
+- Log errors safely without exposing secrets or internal stack traces to the UI.
+- Treat this task as a UI/runtime bugfix only.
+
+7) Testing & quality:
+- All interactive elements must have stable data-testid attributes so we can test them.
+- Keep the design professional, mobile-first, and similar to Uber-level UX.
+- Do not add experimental or “fun” features in this task.
+
+--------------------------------
+TASK: FIX BROKEN R3 RIDER RIDE REQUEST PAGE
+--------------------------------
+
+Problem:
+- After your last refactor of the rider “Plan your ride / Request Ride” experience, the `/customer/ride` page is now completely blank (white screen in the browser).
+- Previously this page was working and you just refactored it to be more Uber-style (auto-detect current location, show suggestions, no manual fare field, no cash option in USA).
+
+What you must do now:
+
+1) Reproduce and inspect:
+- Open the `/customer/ride` (or equivalent rider ride request) route in the running app.
+- Confirm that the page is blank.
+- Open the browser console and Replit logs to identify any React/runtime errors, routing errors, or TypeScript errors related to this page.
+- DO NOT ignore warnings that cause the UI not to render.
+
+2) Find the root cause:
+- Inspect the rider ride request page component file (for example: `client/src/pages/rider/ride.tsx` or `client/src/pages/customer/ride.tsx` or the actual path you are using).
+- Verify that:
+  - The component has a valid default export.
+  - It returns JSX and is not accidentally returning `null` or an empty fragment.
+  - There are no hooks or context calls that throw before rendering (for example, accessing undefined router/query or map context).
+  - Layout/wrapper components used by this page are not failing and not swallowing errors.
+
+3) Fix the implementation (keep the new UX but make it work):
+- Keep the Uber-style UX we discussed:
+  - Pickup field that auto-detects current location when focused or on page load (where allowed by the browser).
+  - Dropoff input with live place suggestions (using your existing suggestion/mock system).
+  - No manual “Fare Amount” input field.
+  - No “cash” option for USA riders; only the digital payment methods already defined in the schema.
+- Ensure that:
+  - The component mounts correctly and renders visible UI.
+  - Any map or geolocation hooks gracefully handle failure (no crash if location access is denied).
+  - All async data (suggestions, fare estimate, etc.) is loaded with proper loading and error states instead of throwing.
+
+4) Do NOT:
+- Do not change driver flows (C-series), restaurant flows (D-series), or payout logic.
+- Do not add new business rules, SIEM, anomaly detection, or bug bounty logic in this task.
+- Do not touch admin panels except where strictly necessary for this page to render.
+
+5) Error handling & security:
+- Wrap the ride request component in a safe error boundary or equivalent pattern so that future errors show a friendly error state instead of a blank white page.
+- Make sure any logs or error messages shown in the UI are generic (no stack traces, no secrets).
+
+6) Verification & tests:
+- After fixing, reload `/customer/ride`:
+  - The page must render a “Plan your ride / Request Ride” style UI with pickup and dropoff fields, current-location detection, suggestion list, and a visible button to request the ride.
+  - The page must no longer be blank.
+- Add or confirm meaningful `data-testid` attributes on the main elements:
+  - pickup input
+  - dropoff input
+  - suggestion list
+  - request ride button
+- Confirm that the flow remains consistent with backend ride creation (status, payment method, and pricing logic unchanged).
+
+Finally:
+- Summarize what was broken, what you changed, and which file(s) you touched.
+- Clearly confirm that `/customer/ride` renders correctly again and that no other major routes were affected.

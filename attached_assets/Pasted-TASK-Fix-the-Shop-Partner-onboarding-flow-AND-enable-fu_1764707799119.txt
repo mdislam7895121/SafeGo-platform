@@ -1,0 +1,76 @@
+TASK: Fix the Shop Partner onboarding flow AND enable full demo access for BD customers.
+
+Follow SafeGo Master Rules.
+
+──────────────────────────
+PROBLEM SUMMARY
+──────────────────────────
+- /shop-partner/setup shows blank loading page.
+- User can become "shop_partner" without completing Step 1.
+- Step 2 submit throws validation errors because all required fields from Step 1 are missing.
+- On reload, Step 1 form data is lost.
+- Customer accounts cannot see BD demo content (tickets, rentals, shops).
+
+──────────────────────────
+REQUIRED FIXES (Implement all)
+──────────────────────────
+
+1. FRONTEND FIX — SHOP PARTNER ONBOARDING (BD)
+Implement full 3-step wizard with persistent form state:
+- Step 1: Owner & Identity info (all mandatory BD KYC fields)
+- Step 2: Delivery settings
+- Step 3: Shop details & confirmation
+
+Rules:
+- User cannot go to Step 2 unless Step 1 is fully valid.
+- User cannot submit Step 3 unless Step 1 & 2 stored in state.
+- If setup is incomplete, redirect ALWAYS to Step 1.
+- If setup is complete, redirect to shop dashboard (/shop-partner/dashboard).
+- Store wizard state in localStorage or global store so reload never loses data.
+
+2. BACKEND FIX — SHOP PARTNER VALIDATION
+Implement combined payload validation:
+{
+  shopName,
+  shopType,
+  shopAddress,
+  ownerName,
+  fatherName,
+  dateOfBirth,
+  presentAddress,
+  permanentAddress,
+  nidNumber,
+  emergencyContactName,
+  emergencyContactPhone,
+  deliveryRadius,
+  prepTime,
+  countryCode: "BD"
+}
+
+- Reject if ANY required field missing.
+- Return clean human-readable errors in Bangla.
+
+3. ROUTING FIX
+- If user is shop_partner but NOT verified:
+    always redirect to onboarding.
+- If user is verified:
+    route to dashboard.
+- Do not auto-route to Step 2 or Step 3 without Step 1 completion.
+
+4. ADMIN FIX
+- Admin should see shop_partner accounts as Pending KYC until Step 1–3 saved.
+
+5. CUSTOMER DEMO UNLOCK (BD)
+Enable full BD demo for customer role:
+- BD rentals list must show sample vehicles (car, microbus, tourist bus).
+- BD shops must show at least 6 demo shops with demo items.
+- BD tickets must show demo routes and demo buses.
+- Customer should be able to browse everything without any operator approval.
+
+6. QA TEST CASES (Agent must verify)
+- Fresh user signup as shop_partner should land on Step 1 always.
+- Reload during Step 2 keeps Step 1 data.
+- Submitting Step 2 without Step 1 should be impossible.
+- Customer login (BD) should show:
+    * Ride + Eats + Parcel + BD Rentals + BD Shops + BD Tickets
+- No blank screens anywhere.

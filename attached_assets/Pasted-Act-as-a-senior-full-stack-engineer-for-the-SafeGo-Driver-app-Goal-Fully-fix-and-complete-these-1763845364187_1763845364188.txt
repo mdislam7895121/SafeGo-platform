@@ -1,0 +1,199 @@
+Act as a senior full-stack engineer for the SafeGo Driver app.
+
+🎯 Goal
+Fully fix and complete these two features only:
+1) Driver Support Chat – “Create New Ticket”
+2) Driver Wallet – “Payout method / Add payout method”
+
+Follow all existing SafeGo conventions and rules:
+- Four roles: customer, driver, restaurant, admin (do NOT change this model)
+- Keep all existing KYC, tax, payouts, referral, opportunity, tier logic as-is
+- Do NOT touch ride, food, or parcel booking flows
+- Do NOT break any existing URLs, API routes, or database tables
+- No destructive migrations; additive + backward-compatible changes only
+- Finish these two modules completely before starting any new feature
+
+=================================================
+1) FIX SUPPORT CHAT – CREATE NEW TICKET
+=================================================
+
+Current issue:
+- On the Driver Support page, pressing **“Create New Ticket”** shows a red 500 error.
+- Error mentions `prisma.supportConversation.create(...)` with missing or invalid fields (adminUserId, userId, userType, etc.).
+- No ticket is actually created.
+
+Your tasks:
+
+1. Backend diagnosis
+   - Locate the support service used by the driver Support Chat (for example: `server/services/supportConversationService.ts` or similar).
+   - Find the function that handles **create new ticket/conversation** for drivers.
+   - Inspect the Prisma model for:
+     - `SupportConversation`
+     - `SupportMessage`
+   - Identify which fields are required (e.g., `userId`, `userType`, `adminUserId`, `status`, etc.) and which fields are currently missing or passed as `undefined`.
+
+2. Correct the conversation creation logic
+   - For a driver creating a ticket from `/driver/help`:
+     - Use the authenticated user’s id as `userId`.
+     - Set `userType = "driver"` (or the existing enum value for drivers).
+     - Set `adminUserId = null` (or an allowed default) until an admin is assigned.
+     - Initialize a sensible default `status` (e.g., `"open"`).
+   - Add proper input validation with Zod (use the same pattern as other validated endpoints).
+   - Make sure the create endpoint:
+     - Returns the new conversation id
+     - Is safe from invalid input and missing fields
+     - Only allows the logged-in user to create their own ticket
+
+3. Frontend wiring for Support Chat
+   - On the Driver **Support** page, ensure the **“Create New Ticket”** button:
+     - Calls the correct API mutation for creating a conversation
+     - Shows loading state while the request is in progress
+     - On success:
+       - Shows a success toast (same style as other success actions)
+       - Adds the new ticket to the conversations list with:
+         - Ticket id
+         - Status (Open)
+         - Created date/time
+         - Last message preview (empty or “New support ticket created”)
+   - On failure:
+     - Show a friendly error message instead of a raw 500 JSON dump
+     - Log the actual error to console/server logs for debugging, but never show internal stack traces to the driver
+
+4. Security and access control
+   - A driver must only see their own conversations.
+   - Admin endpoints for support must not be affected by this change.
+   - Do not change any role-based auth logic; just fix the driver ticket creation to conform to it.
+
+5. Testing – Support Chat
+   - As a driver:
+     - Go to `/driver/help`
+     - Press “Start Chat” or open the Support Chat page
+     - Press **“Create New Ticket”**
+     - Confirm:
+       - No 500 error
+       - A new ticket appears in the list
+       - Status is Open
+       - Timestamps look correct
+   - Refresh the page and verify the ticket still loads correctly from the database.
+
+Only proceed to the Wallet work after Support Chat ticket creation works 100% end-to-end.
+
+=================================================
+2) FIX WALLET – PAYOUT METHOD / ADD PAYOUT METHOD
+=================================================
+
+Current issue:
+- On the Driver Wallet page, the **“Payout method / Add payout method”** card is visible but:
+  - Either it does nothing when tapped, or
+  - It opens a stub page with no real API-backed functionality.
+
+Target behavior (Uber-style):
+- Driver can open a dedicated payout methods screen from Wallet
+- Driver can add at least one payout method
+- Payout methods are stored in the database and used by payouts
+- Sensitive details are masked in the UI
+
+Your tasks:
+
+1. Routing and navigation
+   - Ensure that the **“Payout method / Add payout method”** row in Wallet:
+     - Navigates to a real page like `/driver/account/payout-methods` (or the existing route used in the codebase).
+   - The page should follow current SafeGo UI (header, back button, SG logo) and show:
+
+     - List of existing payout methods (if any)
+     - A primary highlight for the default payout method
+     - A button: **“Add payout method”**
+
+2. Data model and API
+   - Reuse or extend the existing payout/bank details model instead of creating something completely new.
+   - A payout method should store at least:
+     - `id`
+     - `userId` (driver)
+     - `country` (e.g., US, BD)
+     - `type` (e.g., `bank_transfer`, `bkash`, `nagad`, etc.)
+     - `currency` (USD, BDT)
+     - `accountHolderName`
+     - `accountNumber` or `walletNumber`
+     - `routingNumber` / `bankName` where applicable
+     - `isPrimary`
+     - `createdAt`, `updatedAt`
+
+   - Create/update API endpoints with Zod validation:
+     - `GET /api/driver/payout-methods` – list current driver’s payout methods
+     - `POST /api/driver/payout-methods` – create new payout method
+     - `PATCH /api/driver/payout-methods/:id` – update or set primary
+     - `DELETE /api/driver/payout-methods/:id` – delete non-primary method
+
+   - Security rules:
+     - Scope all queries by the authenticated driver id.
+     - A driver must not read or modify any other user’s payout methods.
+     - Server should never return full raw account numbers for display.
+       - Return masked values, e.g., “•••• 1234”.
+
+3. Country-specific behavior (US + Bangladesh)
+   - For **US drivers**:
+     - Support “Bank transfer” with:
+       - Bank name
+       - Account holder name
+       - Routing number
+       - Account number (store encrypted or at least masked in responses)
+   - For **Bangladesh drivers**:
+     - Support at least:
+       - Bank transfer
+       - Mobile wallets like bKash/Nagad (if already modeled in the system)
+     - Align currency with BDT and existing payout logic.
+
+4. Frontend form behavior
+   - When driver taps **“Add payout method”**:
+     - Show a simple multi-step or single form:
+       - Method type selector (Bank / bKash / etc., depending on country)
+       - Fields appropriate to the type
+     - Client-side validation for required fields before calling the API.
+     - On success:
+       - Show success toast
+       - Return to payout methods list, showing the new method
+       - If this is the first method, mark it as primary automatically.
+
+   - From the list:
+     - Allow driver to:
+       - Set a method as primary (radio button or “Set as primary” action)
+       - Remove a non-primary method
+     - All actions must call the correct API endpoints and handle loading + error states properly.
+
+5. Integration with payouts
+   - Ensure the existing payout logic (scheduled weekly payout / cash out) uses the primary payout method.
+   - If no payout method exists:
+     - Wallet should show a clear message like “Add a payout method to receive your earnings.”
+     - The Cash Out button (if present) should be disabled or show an explanatory error.
+
+6. Testing – Wallet
+   - As a US driver:
+     - Open Wallet → tap **“Payout method / Add payout method”**
+     - Add a US bank account
+     - Confirm it appears in the list with masked details
+     - Mark it as primary and verify the state persists after refresh
+   - As a Bangladesh driver (if test user exists):
+     - Repeat with a BDT payout method (bank or mobile wallet).
+   - Verify no sensitive data is leaked in the UI or logs.
+
+=================================================
+3) FINAL CHECK + SUMMARY
+=================================================
+
+After you finish both features:
+
+1. Run the application and manually test:
+   - Support Chat → Create New Ticket (no 500, ticket created and visible)
+   - Wallet → Payout method:
+     - Open page
+     - Add method successfully
+     - See masked details
+     - Set primary
+2. Confirm there are no new TypeScript, Prisma, or runtime errors in the console/server logs.
+3. Then stop and provide a clear summary in the Agent log:
+   - Files changed (frontend + backend)
+   - New API endpoints
+   - Any schema updates
+   - How to test each feature step-by-step
+
+Do NOT start any other enhancements (FAQ content, block riders, attachments, etc.) until these two flows are 100% stable and production-ready.

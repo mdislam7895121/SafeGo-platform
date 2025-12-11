@@ -1,0 +1,154 @@
+You are working on the SafeGo global super-app admin console. 
+Follow ALL SafeGo master rules. Do NOT remove, rename, or break any existing logic.
+
+====================================================
+SAFEGO MASTER RULES (SUMMARY – DO NOT BREAK)
+====================================================
+
+ROLES (4 fixed roles)
+- Customer
+- Driver
+- Restaurant/Merchant
+- Admin
+
+Each has its own onboarding, KYC, dashboard, permissions, and status flows.
+Only Admin can access the admin console, enterprise tools, and SafePilot AI.
+
+SERVICES (must always support all 3)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+COUNTRY KYC (BD vs US)
+- BD: father_name, date_of_birth, present_address, permanent_address, NID (number + front/back images), emergency contact, verification_status, is_verified.
+- US: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, drivers: driver_license (number + image + expiry), optional ssn_last4, verification_status, is_verified.
+
+ADMIN PANEL REQUIRED
+- Verify customers, drivers, restaurants
+- Approve/reject KYC with rejection_reason
+- Edit pricing, fees, commissions
+- Block/unblock any user
+- Manage payouts, see driver/restaurant negative balances
+
+COLLECTIONS (must keep intact)
+- rides
+- food_orders
+- deliveries
+
+Each must keep identity fields, addresses + geo, fees + commission, payment details, timestamps, rating & feedback.
+
+COMMISSION & PAYOUT RULES
+- Cash ride: driver keeps cash, SafeGo commission becomes negative driver_wallet_balance, weekly settlement.
+- Cash food: restaurant keeps cash, commission becomes negative restaurant_wallet.
+- Online: SafeGo keeps commission.
+- Admin can settle and mark paid.
+
+SECURITY RULES
+- Customers cannot see driver documents.
+- Drivers cannot see customer KYC.
+- Restaurants cannot see other restaurants.
+- Only admin can change pricing, commission, verification, blocking.
+- Users edit only their own profile.
+
+STATUS FLOWS (do not rename)
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x
+- Parcels: requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+
+ONBOARDING
+- Customer: simple signup + address + emergency contact + country KYC, verification_status="pending".
+- Drivers/Restaurants: separate partner onboarding after login, multi-step with documents and payout info.
+
+NOTIFICATIONS
+- New rides, food, parcel updates, KYC decisions, admin alerts.
+
+All changes MUST be additive and non-breaking.
+
+====================================================
+CURRENT BUG – BACK BUTTON NOT WORKING
+====================================================
+
+Screen: Admin → Security → Access Reviews  
+Route: /admin/access-reviews  
+Header shows: "← Back to Security" above "Periodic Access Review".
+
+Problem:
+- The "Back to Security" control is visible but clicking it does nothing. 
+- It does not navigate to any route and behaves like plain text.
+
+Goal:
+- Make the "Back to Security" control a fully working back button using the existing router.
+- Keep the current text and icon, only fix wiring and layout if needed.
+
+====================================================
+IMPLEMENTATION INSTRUCTIONS
+====================================================
+
+1) Locate the Access Reviews page component
+   - Find the React (or framework) component used for /admin/access-reviews.
+   - Example: AccessReviewsPage, AccessReviewScreen, etc.
+
+2) Find the “Back to Security” UI element
+   - It might be:
+     - A simple <span> or <div>
+     - A button without onClick
+     - A Link with missing "to" / "href"
+   - Identify exactly where it is rendered in the header.
+
+3) Hook it up to the router
+   - Use the existing router used elsewhere in the admin console
+     (e.g., React Router `useNavigate`, `Link`, Next.js `Link`, etc.).
+   - Determine the correct target route for “Security”:
+     - If there is a dedicated Security landing page (e.g. "/admin/security"), use that.
+     - If not, use the main admin dashboard (e.g. "/admin") or the root Security section parent that already exists in the sidebar.
+   - Implement one of the patterns below (depending on the framework):
+
+   Example (React Router v6):
+   - const navigate = useNavigate();
+   - <button onClick={() => navigate("/admin/security")}>Back to Security</button>
+
+   Example (Link-based):
+   - <Link to="/admin/security" className="back-link">← Back to Security</Link>
+
+   Use the **actual existing route** in the codebase for the Security root, not a new one.
+
+4) Keep the header layout consistent
+   - Place the Back button inside the PageHeader / header container, not floating independently.
+   - Layout pattern:
+     [ ← Back to Security ] [ Title + Subtitle ] [ (optional actions) ]
+   - Do not change fonts or theme tokens; reuse existing header styles.
+
+5) Clickability and accessibility
+   - Ensure the element is a <button> or <a>/<Link> with:
+     - cursor: pointer
+     - aria-label like "Go back to Security"
+   - Make sure no overlay or container with `pointer-events: none` is covering the button area.
+   - The button must respond on first click with navigation.
+
+6) Regression checks
+   - After the fix, test navigation:
+
+     a) Open /admin/access-reviews from the sidebar.
+     b) Click “Back to Security”.
+     c) Confirm:
+        - The app navigates to the Security parent route (e.g. /admin/security or /admin).
+        - URL changes.
+        - No console errors.
+
+   - Confirm that:
+     - No other pages’ back buttons are broken.
+     - No routes, APIs, or database schemas were modified.
+
+====================================================
+DELIVERABLES
+====================================================
+
+1) A working “Back to Security” control on /admin/access-reviews that:
+   - Navigates to the correct Security parent route.
+   - Uses the existing router, not window.history hacks.
+
+2) Header layout remains consistent with other admin pages (Safety Center, Activity Logs, etc.).
+
+3) A short comment in the Access Reviews header code explaining:
+   - Which route “Back to Security” navigates to.
+   - That this is an admin-only navigation helper.

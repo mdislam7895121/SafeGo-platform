@@ -1,0 +1,67 @@
+Start the full Ticket & Rental Partner System build.
+
+Follow all SafeGo global rules:
+- 4 roles (Customer, Driver, Partner, Admin)
+- Country rules for BD & USA
+- Customer-only signup; all partners onboard after login
+- Wallet, payout, commission rules
+- Real booking lifecycle with status engine
+- Secure file upload, token auth
+- Admin oversight and approval system
+
+Your tasks:
+1. Create Ticket & Rental partner onboarding:
+   - Rental partner form (vehicle/equipment type, pricing, documents)
+   - Ticket operator form (event/travel type, seats, timing)
+   - Apply BD/USA ID rules
+   - File upload: NID/Passport/Business docs
+   - Admin approval workflow
+
+2. Build Partner Dashboard:
+   - Add/manage rental listings
+   - Add/manage ticket listings
+   - Set price, availability calendars, stock/slots
+   - Upload images/files
+   - See bookings, accept/cancel
+   - View wallet, payouts, commissions
+   - Notifications, messages
+
+3. Customer Booking Flow:
+   - Browse/search rentals & tickets
+   - Availability check
+   - Booking request
+   - Payment initiation
+   - Confirm booking
+   - Ticket PDF/QR generation
+   - Rental start/end workflow
+
+4. Admin System:
+   - View all rental/ticket partners
+   - Approve/reject partners
+   - Override bookings or slots
+   - Check documents
+   - Payment & fraud audit
+   - Booking logs, partner history
+
+5. Backend Implementation:
+   - Database tables for rental, tickets, slots, bookings, documents
+   - API routes for all partner and booking flows
+   - Wallet + commission + payout rules
+   - Notification events
+   - Role-based access control
+   - Status flow engine for bookings
+
+6. Security:
+   - Token auth everywhere
+   - Check all partner permissions
+   - Validate file uploads
+   - Prevent booking fraud or duplicate slots
+   - Log all critical events
+
+7. Testing:
+   - Build full E2E tests
+   - Ensure 100% Ticket/Rental booking flow passes
+   - Fix all issues automatically
+   - Prepare final system audit report
+
+Complete everything in one run, produce a full demo-ready Ticket & Rental Partner system.

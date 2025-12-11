@@ -1,0 +1,58 @@
+You are working inside the SafeGo monorepo on Replit, in the project that contains:
+
+- client/src/pages/customer/ride-request-page.tsx
+- client/src/pages/customer/ride-tracking-page.tsx
+- client/src/lib/queryClient.ts
+- client/src/hooks/useFareCalculation.ts
+- client/src/hooks/useLiveRideTracking.ts
+- client/src/hooks/useGoogleMaps.ts
+- client/src/contexts/AuthContext.tsx
+
+The backend is already fully implemented and integrated. You must NOT touch any backend code. You must also NOT change any core business logic or pricing logic. Only do the small, concrete frontend polish tasks described below.
+
+Treat the following “SAFEGO FRONTEND–BACKEND INTEGRATION ANALYSIS & PLAN” as already verified and correct. You should implement ONLY the “Minor Improvements Recommended” section, exactly and safely.
+
+====================================================
+CONSTRAINTS – DO NOT BREAK THESE
+====================================================
+
+1. Do NOT modify backend files.
+2. Do NOT change endpoints, URLs, or HTTP methods.
+3. Do NOT change the overall layout or visual structure of pages.
+   - You may add small text messages (like “No vehicles available”) in the existing card area.
+4. Do NOT remove or weaken any auth logic in queryClient.ts or AuthContext.
+5. Do NOT introduce any new state management library or routing library.
+6. Keep TypeScript types strict; avoid using `any` where possible.
+7. Keep all region/pricing/status logic delegated to the backend. Frontend must only format and display.
+
+====================================================
+SCOPE – WHAT YOU MUST IMPLEMENT
+====================================================
+
+You have the following high-level findings from the audit:
+
+- The API client (queryClient.ts) is already production-ready.
+- Ride booking and ride tracking already call real backend endpoints.
+- Currency formatting is mostly correct but there is one hardcoded fallback based on `isBD`.
+- Ride tracking currently uses a raw `fetch()` in one spot instead of the shared `apiRequest`.
+- Route polyline from backend exists but is not always rendered on the tracking map.
+- Empty-state UI for “no vehicles available” is missing on the booking page.
+
+Your job is to implement ONLY the small improvements below, file by file.
+
+====================================================
+TASK 1 – Fix currency fallback on ride request page
+====================================================
+
+File: client/src/pages/customer/ride-request-page.tsx
+
+Goal:
+- Currency and symbol must come from backend, not from frontend region detection.
+- Continue to use the existing `formatCurrency` helper, but feed it the correct currency code from backend.
+
+Steps:
+
+1. Locate the place where the currency is chosen using something like:
+
+   ```ts
+   const currency = isBD ? "BDT" : "USD";

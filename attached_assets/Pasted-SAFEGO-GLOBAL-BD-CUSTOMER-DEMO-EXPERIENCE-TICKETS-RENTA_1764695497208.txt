@@ -1,0 +1,143 @@
+SAFEGO GLOBAL – BD CUSTOMER DEMO EXPERIENCE (TICKETS + RENTALS + SHOPS)
+
+Always respect these SafeGo master rules. Do NOT break them.
+
+A) ROLES (no mixing access)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+BD-only business roles (already added):
+5) Shop Partner (shop_partner)
+6) Ticket & Rental Operator (ticket_operator)
+
+Each role must keep its own:
+- signup requirements
+- KYC/verification flow
+- dashboard
+- permissions
+- status flows
+
+B) GLOBAL SERVICES (must all keep working)
+1) Ride-hailing
+2) Food delivery (Eats)
+3) Parcel delivery
+
+BD Expansion services (customer-facing):
+4) Tickets (bus tickets via ticket_operator)
+5) BD Rentals (car rentals via ticket_operator)
+6) BD Shops (e-store via shop_partner)
+
+C) COUNTRY-SPECIFIC KYC (NO schema breaking)
+
+Bangladesh (BD) mandatory:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number + front/back images
+- emergency_contact (name, phone, relation)
+- verification_status
+- is_verified
+
+United States (US) mandatory:
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status
+- is_verified
+
+D) ADMIN PANEL (must remain intact)
+Admin must be able to:
+- verify customers, drivers, restaurants, shop partners, ticket operators
+- approve/reject KYC (with rejection_reason)
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view driver negative balance
+- view restaurant negative balance
+- view shop_partner and ticket_operator negative balances
+- view BD expansion statistics
+
+E) CORE COLLECTIONS (NO breaking)
+These must keep working exactly as today:
+
+1) rides
+2) food_orders
+3) deliveries
+
+Each includes:
+- identity fields (customer_id, driver_id, restaurant_id, etc.)
+- addresses + geolocation
+- fees + commission
+- payment details
+- timestamps
+- full status flow
+- rating and feedback
+
+You may ONLY extend with new fields or new collections. Never rename or remove.
+
+F) COMMISSION & PAYOUT RULES
+1) If customer pays CASH for a ride:
+   - Driver receives full cash.
+   - SafeGo commission becomes negative balance in driver_wallet_balance.
+   - Driver must settle weekly. Admin can clear the balance.
+
+2) If food order is CASH:
+   - Restaurant gets all cash.
+   - Commission becomes negative balance in restaurant_wallet.
+
+3) If BD ticket or BD rental is CASH:
+   - Ticket operator receives all cash.
+   - SafeGo commission becomes negative balance in operator_wallet_balance.
+
+4) If payment is ONLINE:
+   - SafeGo keeps its commission automatically (no negative balance).
+
+5) Admin can settle balances and mark them paid.
+
+G) SECURITY RULES
+- Customers cannot view driver, operator, or shop owner documents (NID, license).
+- Drivers cannot view customer NID or other sensitive data.
+- Restaurant cannot view other restaurants.
+- Shop partners cannot view other shops.
+- Ticket operators cannot view other ticket operators.
+- Only admin can change pricing, commissions, verification_status, blocking.
+- Users can update only their own profile.
+
+H) STATUS FLOWS (do not change)
+
+Ride:
+requested → searching_driver → accepted → driver_arriving
+→ in_progress → completed OR cancelled_x
+
+Food:
+placed → accepted → preparing → ready_for_pickup
+→ picked_up → on_the_way → delivered OR cancelled_x
+
+Parcel:
+requested → searching_driver → accepted → picked_up
+→ on_the_way → delivered OR cancelled_x
+
+I) ONBOARDING
+Each user type (customer, driver, restaurant, shop_partner, ticket_operator) has:
+- basic info step
+- address step
+- ID/KYC upload (country-specific)
+- emergency contact
+- verification_status = "pending"
+- access blocked until admin approval
+
+J) NOTIFICATIONS
+- New ride alert for driver
+- Order status updates (food, parcel, tickets, rentals)
+- Verification approval/rejection
+- Important admin notifications
+
+All changes below must be BACKWARD-COMPATIBLE and ADDITIVE.
+Do not rename or remove existing fields, enums, or routes.

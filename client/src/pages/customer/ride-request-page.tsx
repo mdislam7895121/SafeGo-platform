@@ -1,0 +1,874 @@
+/**
+ * Unified Ride Request Page
+ * 
+ * Customer-facing page for booking rides supporting both Bangladesh and US markets.
+ * SafeGo Master Rules Compliance:
+ * - BD: Both cash and online payments allowed
+ * - US: ONLY online payment (cash hidden)
+ * - KYC validation enforced per country
+ * - Role isolation enforced
+ */
+
+import { useState, useEffect, useCallback } from "react";
+import { useLocation, Link } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useKycStatus } from "@/hooks/useKycStatus";
+import { KycEnforcementBanner } from "@/components/KycEnforcementBanner";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { decodePolyline } from "@/lib/formatters";
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
+import {
+  ArrowLeft,
+  MapPin,
+  Navigation,
+  Crosshair,
+  Loader2,
+  Car,
+  Wallet,
+  CreditCard,
+  Moon,
+  Zap,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Bike,
+  Truck,
+  Crown,
+  Info,
+  BanknoteIcon,
+  Shield,
+  Users,
+} from "lucide-react";
+
+interface LocationData {
+  address: string;
+  lat: number;
+  lng: number;
+  name?: string;
+  placeId?: string;
+}
+
+interface VehicleOption {
+  vehicleType: string;
+  displayName: string;
+  description: string;
+  baseFare: number;
+  estimatedFare: number;
+  fareRange: { min: number; max: number };
+  currency: string;
+  etaMinutes: number;
+  capacity: number;
+  icon: string;
+  cashAllowed: boolean;
+  onlineAllowed: boolean;
+  isNightTime: boolean;
+  isPeakTime: boolean;
+  fareBreakdown: {
+    baseFare: number;
+    distanceFare: number;
+    timeFare: number;
+    bookingFee: number;
+    nightMultiplier: number;
+    peakMultiplier: number;
+    totalFare: number;
+    currency: string;
+  };
+}
+
+interface FareEstimateResponse {
+  success: boolean;
+  countryCode: string;
+  cityCode: string;
+  cityName: string;
+  distanceKm: number;
+  durationMin: number;
+  vehicleOptions: VehicleOption[];
+  estimateId: string;
+  expiresAt: string;
+}
+
+interface CityOption {
+  code: string;
+  name: string;
+}
+
+const pickupIcon = L.divIcon({
+  className: "custom-marker",
+  html: `<div style="
+    width: 32px; height: 32px; background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); 
+    border: 3px solid white; border-radius: 50%; 
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  ">
+    <span style="color: white; font-weight: bold; font-size: 14px;">A</span>
+  </div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+});
+
+const dropoffIcon = L.divIcon({
+  className: "custom-marker",
+  html: `<div style="
+    width: 32px; height: 32px; background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); 
+    border: 3px solid white; border-radius: 50%; 
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  ">
+    <span style="color: white; font-weight: bold; font-size: 14px;">B</span>
+  </div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+});
+
+function MapBoundsHandler({
+  pickupLocation,
+  dropoffLocation,
+}: {
+  pickupLocation: LocationData | null;
+  dropoffLocation: LocationData | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (pickupLocation && dropoffLocation) {
+      const bounds = L.latLngBounds(
+        [pickupLocation.lat, pickupLocation.lng],
+        [dropoffLocation.lat, dropoffLocation.lng]
+      );
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    } else if (pickupLocation) {
+      map.setView([pickupLocation.lat, pickupLocation.lng], 15);
+    } else if (dropoffLocation) {
+      map.setView([dropoffLocation.lat, dropoffLocation.lng], 15);
+    }
+  }, [map, pickupLocation, dropoffLocation]);
+
+  return null;
+}
+
+function getVehicleIcon(iconType: string) {
+  switch (iconType) {
+    case "bike":
+      return <Bike className="h-6 w-6" />;
+    case "truck":
+      return <Truck className="h-6 w-6" />;
+    case "car-front":
+      return <Crown className="h-6 w-6" />;
+    default:
+      return <Car className="h-6 w-6" />;
+  }
+}
+
+function getVehicleColor(vehicleType: string): string {
+  switch (vehicleType) {
+    case "bike":
+      return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
+    case "cng":
+      return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
+    case "car_economy":
+      return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
+    case "car_premium":
+      return "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400";
+    default:
+      return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+  }
+}
+
+
+function calculateDirectDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export default function RideRequestPage() {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const countryCode = user?.countryCode || "US";
+  const isUS = countryCode === "US";
+  const isBD = countryCode === "BD";
+
+  const { data: kycStatus, isLoading: kycLoading } = useKycStatus(!!user);
+
+  const [pickupLocation, setPickupLocation] = useState<LocationData | null>(null);
+  const [dropoffLocation, setDropoffLocation] = useState<LocationData | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string>(isBD ? "DHK" : "NYC");
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"cash" | "online">("online");
+  const [speedOption, setSpeedOption] = useState<"normal" | "priority">("normal");
+  const [isLocating, setIsLocating] = useState(false);
+  const [showFareBreakdown, setShowFareBreakdown] = useState(false);
+  const [estimatedDistance, setEstimatedDistance] = useState<number | null>(null);
+  const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
+  const [routePolyline, setRoutePolyline] = useState<[number, number][] | null>(null);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
+
+  const { data: cities, isLoading: citiesLoading } = useQuery<{ cities: CityOption[] }>({
+    queryKey: ["/api/rides/bd/cities", countryCode],
+    enabled: isBD,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const {
+    data: fareEstimate,
+    isLoading: fareLoading,
+    refetch: refetchFare,
+  } = useQuery<FareEstimateResponse>({
+    queryKey: [
+      "/api/rides/bd/fare-estimate",
+      countryCode,
+      selectedCity,
+      pickupLocation?.lat,
+      pickupLocation?.lng,
+      dropoffLocation?.lat,
+      dropoffLocation?.lng,
+      estimatedDistance,
+      estimatedDuration,
+      speedOption,
+    ],
+    enabled:
+      !!pickupLocation &&
+      !!dropoffLocation &&
+      !!estimatedDistance &&
+      !!estimatedDuration &&
+      estimatedDistance > 0,
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        countryCode,
+        cityCode: selectedCity,
+        pickupLat: pickupLocation!.lat.toString(),
+        pickupLng: pickupLocation!.lng.toString(),
+        dropoffLat: dropoffLocation!.lat.toString(),
+        dropoffLng: dropoffLocation!.lng.toString(),
+        estimatedDistanceKm: estimatedDistance!.toString(),
+        estimatedDurationMin: estimatedDuration!.toString(),
+        speedOption,
+      });
+      return apiRequest(`/api/rides/bd/fare-estimate?${params}`);
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const requestRideMutation = useMutation({
+    mutationFn: async (data: {
+      vehicleType: string;
+      pickupAddress: string;
+      pickupLat: number;
+      pickupLng: number;
+      pickupPlaceId?: string;
+      dropoffAddress: string;
+      dropoffLat: number;
+      dropoffLng: number;
+      dropoffPlaceId?: string;
+      estimatedDistanceKm: number;
+      estimatedDurationMin: number;
+      paymentMethod: "cash" | "online";
+      speedOption: "normal" | "priority";
+    }) => {
+      return apiRequest("/api/rides/bd/request", {
+        method: "POST",
+        body: JSON.stringify({
+          ...data,
+          countryCode,
+          cityCode: selectedCity,
+        }),
+      });
+    },
+    onSuccess: (data: { ride: { id: string } }) => {
+      toast({
+        title: "Ride Requested",
+        description: "Looking for a driver nearby...",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
+      setLocation(`/customer/ride-tracking/${data.ride.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Request Failed",
+        description: error.message || "Could not request ride. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const fetchRoute = useCallback(async () => {
+    if (!pickupLocation || !dropoffLocation) return;
+
+    setIsRouteLoading(true);
+    try {
+      const data = await apiRequest(
+        `/api/maps/directions?origin=${pickupLocation.lat},${pickupLocation.lng}&destination=${dropoffLocation.lat},${dropoffLocation.lng}`
+      );
+
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0].legs[0];
+        setEstimatedDistance(route.distance.value / 1000);
+        setEstimatedDuration(Math.ceil(route.duration.value / 60));
+
+        if (data.routes[0].overview_polyline) {
+          const decoded = decodePolyline(data.routes[0].overview_polyline.points);
+          setRoutePolyline(decoded);
+        }
+      }
+    } catch {
+      // Fallback to direct distance calculation when route API fails
+      const directDistance = calculateDirectDistance(
+        pickupLocation.lat,
+        pickupLocation.lng,
+        dropoffLocation.lat,
+        dropoffLocation.lng
+      );
+      setEstimatedDistance(directDistance);
+      setEstimatedDuration(Math.ceil((directDistance / 30) * 60));
+    } finally {
+      setIsRouteLoading(false);
+    }
+  }, [pickupLocation, dropoffLocation]);
+
+  useEffect(() => {
+    if (pickupLocation && dropoffLocation) {
+      fetchRoute();
+    }
+  }, [pickupLocation, dropoffLocation, fetchRoute]);
+
+  useEffect(() => {
+    if (isUS) {
+      setSelectedPaymentMethod("online");
+    }
+  }, [isUS]);
+
+  const handleCurrentLocation = async () => {
+    setIsLocating(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      const geocodeData = await apiRequest(`/api/maps/geocode?latlng=${latitude},${longitude}`);
+      const address =
+        geocodeData.results?.[0]?.formatted_address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+
+      setPickupLocation({
+        address,
+        lat: latitude,
+        lng: longitude,
+      });
+
+      toast({
+        title: "Location Found",
+        description: "Using your current location as pickup",
+      });
+    } catch {
+      toast({
+        title: "Location Access Denied",
+        description: "Please enable location permissions in your browser settings, or enter your pickup address manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleRequestRide = () => {
+    if (!pickupLocation || !dropoffLocation || !selectedVehicle || !estimatedDistance || !estimatedDuration) {
+      toast({
+        title: "Missing Information",
+        description: "Please select pickup, dropoff, and vehicle type",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isUS && selectedPaymentMethod === "cash") {
+      toast({
+        title: "Cash Not Available",
+        description: "Cash payment is not available in the United States. Please use online payment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedOption = fareEstimate?.vehicleOptions.find(
+      (v) => v.vehicleType === selectedVehicle
+    );
+    if (selectedOption && selectedPaymentMethod === "cash" && !selectedOption.cashAllowed) {
+      toast({
+        title: "Cash Not Available",
+        description: "This vehicle type does not accept cash payment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    requestRideMutation.mutate({
+      vehicleType: selectedVehicle,
+      pickupAddress: pickupLocation.address,
+      pickupLat: pickupLocation.lat,
+      pickupLng: pickupLocation.lng,
+      pickupPlaceId: pickupLocation.placeId,
+      dropoffAddress: dropoffLocation.address,
+      dropoffLat: dropoffLocation.lat,
+      dropoffLng: dropoffLocation.lng,
+      dropoffPlaceId: dropoffLocation.placeId,
+      estimatedDistanceKm: estimatedDistance,
+      estimatedDurationMin: estimatedDuration,
+      paymentMethod: selectedPaymentMethod,
+      speedOption,
+    });
+  };
+
+  const selectedVehicleOption = fareEstimate?.vehicleOptions.find(
+    (v) => v.vehicleType === selectedVehicle
+  );
+
+  const defaultCenter: [number, number] = isBD ? [23.8103, 90.4125] : [40.7128, -74.006];
+  const currency = fareEstimate?.vehicleOptions?.[0]?.currency || selectedVehicleOption?.currency || "USD";
+
+  return (
+    <div className="flex flex-col h-screen bg-background" data-testid="ride-request-page">
+      <header className="flex items-center gap-3 p-3 sm:p-4 border-b bg-card shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setLocation("/customer")}
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg font-semibold truncate">Book a Ride</h1>
+          <p className="text-sm text-muted-foreground">
+            {isBD ? "Bangladesh" : "United States"}
+          </p>
+        </div>
+        {isBD && cities?.cities && cities.cities.length > 0 && (
+          <select
+            value={selectedCity}
+            onChange={(e) => setSelectedCity(e.target.value)}
+            className="px-3 py-1.5 text-sm border rounded-md bg-background shrink-0"
+            data-testid="select-city"
+          >
+            {cities.cities.map((city) => (
+              <option key={city.code} value={city.code}>
+                {city.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </header>
+
+      <div className="flex-1 relative min-h-0">
+        <MapContainer
+          center={pickupLocation ? [pickupLocation.lat, pickupLocation.lng] : defaultCenter}
+          zoom={13}
+          style={{ height: "100%", width: "100%" }}
+          zoomControl={false}
+          aria-label="Ride booking map showing pickup and dropoff locations"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <MapBoundsHandler pickupLocation={pickupLocation} dropoffLocation={dropoffLocation} />
+          {pickupLocation && (
+            <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={pickupIcon} />
+          )}
+          {dropoffLocation && (
+            <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={dropoffIcon} />
+          )}
+          {routePolyline && routePolyline.length > 0 && (
+            <Polyline
+              positions={routePolyline}
+              pathOptions={{ color: "#3B82F6", weight: 4, opacity: 0.8 }}
+            />
+          )}
+        </MapContainer>
+
+        <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-[1000]">
+          <Card className="shadow-lg">
+            <CardContent className="p-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <GooglePlacesInput
+                    value={pickupLocation?.address || ""}
+                    onChange={() => {}}
+                    placeholder="Enter pickup location"
+                    variant="pickup"
+                    onLocationSelect={(loc) => {
+                      setPickupLocation({
+                        address: loc.address,
+                        lat: loc.lat,
+                        lng: loc.lng,
+                        placeId: loc.placeId,
+                      });
+                    }}
+                    onCurrentLocation={handleCurrentLocation}
+                    isLoadingCurrentLocation={isLocating}
+                    showCurrentLocation={true}
+                    className="w-full"
+                    data-testid="input-pickup"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCurrentLocation}
+                  disabled={isLocating}
+                  className="shrink-0"
+                  data-testid="button-current-location"
+                >
+                  {isLocating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Crosshair className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <GooglePlacesInput
+                    value={dropoffLocation?.address || ""}
+                    onChange={() => {}}
+                    placeholder="Enter destination"
+                    variant="dropoff"
+                    onLocationSelect={(loc) => {
+                      setDropoffLocation({
+                        address: loc.address,
+                        lat: loc.lat,
+                        lng: loc.lng,
+                        placeId: loc.placeId,
+                      });
+                    }}
+                    showCurrentLocation={false}
+                    className="w-full"
+                    data-testid="input-dropoff"
+                  />
+                </div>
+              </div>
+
+              {isRouteLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  <span>Calculating route...</span>
+                </div>
+              )}
+
+              {!isRouteLoading && estimatedDistance && estimatedDuration && (
+                <div 
+                  className="flex items-center gap-4 text-sm text-muted-foreground pt-1 flex-wrap"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center gap-1">
+                    <Navigation className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>{estimatedDistance.toFixed(1)} km</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>~{estimatedDuration} min</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="bg-card border-t max-h-[55vh] overflow-y-auto shrink-0">
+        {kycStatus?.requiresKycBeforeBooking && (
+          <div className="p-3 sm:p-4">
+            <KycEnforcementBanner kycStatus={kycStatus} />
+          </div>
+        )}
+
+        {fareLoading && (
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        )}
+
+        {!fareLoading && fareEstimate?.vehicleOptions && fareEstimate.vehicleOptions.length > 0 && (
+          <div className="p-3 sm:p-4 space-y-4">
+            {(fareEstimate.vehicleOptions[0]?.isNightTime ||
+              fareEstimate.vehicleOptions[0]?.isPeakTime) && (
+              <Alert className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+                <AlertDescription className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                  {fareEstimate.vehicleOptions[0]?.isNightTime && (
+                    <>
+                      <Moon className="h-4 w-4 shrink-0" />
+                      <span>Night rates apply (10 PM - 6 AM)</span>
+                    </>
+                  )}
+                  {fareEstimate.vehicleOptions[0]?.isPeakTime && (
+                    <>
+                      <Zap className="h-4 w-4 shrink-0" />
+                      <span>Peak hour pricing active</span>
+                    </>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Select Vehicle</h3>
+              <RadioGroup
+                value={selectedVehicle || ""}
+                onValueChange={setSelectedVehicle}
+                className="space-y-2"
+              >
+                {fareEstimate.vehicleOptions.map((option) => (
+                  <label
+                    key={option.vehicleType}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      selectedVehicle === option.vehicleType
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover-elevate"
+                    }`}
+                    data-testid={`vehicle-option-${option.vehicleType}`}
+                  >
+                    <RadioGroupItem
+                      value={option.vehicleType}
+                      id={option.vehicleType}
+                      className="sr-only"
+                    />
+                    <div className={`p-2.5 rounded-lg shrink-0 ${getVehicleColor(option.vehicleType)}`}>
+                      {getVehicleIcon(option.icon)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{option.displayName}</span>
+                        {option.capacity > 1 && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Users className="h-3 w-3 mr-1" />
+                            {option.capacity}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {option.description}
+                      </p>
+                      {isBD && (
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                          {option.cashAllowed && (
+                            <span className="flex items-center gap-1">
+                              <BanknoteIcon className="h-3 w-3" /> Cash
+                            </span>
+                          )}
+                          {option.onlineAllowed && (
+                            <span className="flex items-center gap-1">
+                              <CreditCard className="h-3 w-3" /> Online
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-semibold text-lg">
+                        {formatCurrency(option.estimatedFare, option.currency)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {option.etaMinutes} min away
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+
+            {selectedVehicleOption && (
+              <>
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Payment Method</h3>
+                  <RadioGroup
+                    value={selectedPaymentMethod}
+                    onValueChange={(v) => setSelectedPaymentMethod(v as "cash" | "online")}
+                    className="flex gap-3"
+                  >
+                    <label
+                      className={`flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                        selectedPaymentMethod === "online"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover-elevate"
+                      }`}
+                      data-testid="payment-online"
+                    >
+                      <RadioGroupItem value="online" id="online" className="sr-only" />
+                      <CreditCard className="h-5 w-5 text-primary shrink-0" />
+                      <span className="font-medium">Online</span>
+                    </label>
+                    {isBD && selectedVehicleOption.cashAllowed && (
+                      <label
+                        className={`flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                          selectedPaymentMethod === "cash"
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover-elevate"
+                        }`}
+                        data-testid="payment-cash"
+                      >
+                        <RadioGroupItem value="cash" id="cash" className="sr-only" />
+                        <Wallet className="h-5 w-5 text-green-600 shrink-0" />
+                        <span className="font-medium">Cash</span>
+                      </label>
+                    )}
+                  </RadioGroup>
+                  {isUS && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Online payment only in the United States
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowFareBreakdown(!showFareBreakdown)}
+                  className="flex items-center gap-2 text-sm text-primary hover:underline w-full justify-center py-2"
+                  data-testid="button-fare-breakdown"
+                >
+                  <Info className="h-4 w-4" />
+                  {showFareBreakdown ? "Hide" : "View"} Fare Breakdown
+                  {showFareBreakdown ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </button>
+
+                {showFareBreakdown && selectedVehicleOption.fareBreakdown && (
+                  <Card className="bg-muted/50">
+                    <CardContent className="p-3 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Base Fare</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.baseFare, currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Distance ({estimatedDistance?.toFixed(1)} km)
+                        </span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.distanceFare, currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Time ({estimatedDuration} min)
+                        </span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.timeFare, currency)}</span>
+                      </div>
+                      {selectedVehicleOption.fareBreakdown.bookingFee > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Booking Fee</span>
+                          <span>{formatCurrency(selectedVehicleOption.fareBreakdown.bookingFee, currency)}</span>
+                        </div>
+                      )}
+                      {selectedVehicleOption.fareBreakdown.nightMultiplier > 1 && (
+                        <div className="flex justify-between text-amber-600">
+                          <span className="flex items-center gap-1">
+                            <Moon className="h-3 w-3" /> Night Rate
+                          </span>
+                          <span>x{selectedVehicleOption.fareBreakdown.nightMultiplier.toFixed(1)}</span>
+                        </div>
+                      )}
+                      {selectedVehicleOption.fareBreakdown.peakMultiplier > 1 && (
+                        <div className="flex justify-between text-orange-600">
+                          <span className="flex items-center gap-1">
+                            <Zap className="h-3 w-3" /> Peak Rate
+                          </span>
+                          <span>x{selectedVehicleOption.fareBreakdown.peakMultiplier.toFixed(1)}</span>
+                        </div>
+                      )}
+                      <div className="border-t pt-2 flex justify-between font-semibold">
+                        <span>Total</span>
+                        <span>{formatCurrency(selectedVehicleOption.fareBreakdown.totalFare, currency)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+
+            <Button
+              className="w-full h-12 text-base"
+              disabled={
+                !selectedVehicle ||
+                !pickupLocation ||
+                !dropoffLocation ||
+                requestRideMutation.isPending ||
+                kycStatus?.requiresKycBeforeBooking
+              }
+              onClick={handleRequestRide}
+              data-testid="button-request-ride"
+            >
+              {requestRideMutation.isPending ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Requesting...
+                </>
+              ) : selectedVehicleOption ? (
+                <>
+                  Request {selectedVehicleOption.displayName} · {formatCurrency(selectedVehicleOption.estimatedFare, currency)}
+                </>
+              ) : (
+                "Select a Vehicle"
+              )}
+            </Button>
+          </div>
+        )}
+
+        {!fareLoading &&
+          (!fareEstimate?.vehicleOptions || fareEstimate.vehicleOptions.length === 0) &&
+          pickupLocation &&
+          dropoffLocation &&
+          estimatedDistance && (
+            <div className="p-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No vehicles available for this route. Please try a different location.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+        {(!pickupLocation || !dropoffLocation) && (
+          <div className="p-4 text-center text-muted-foreground">
+            <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>Enter pickup and destination to see available vehicles</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

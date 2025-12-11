@@ -1,0 +1,146 @@
+Implement the full SafeGo Driver Incentive Engine that includes: 
+Uber-style Quest Bonuses, Boost Zones, Weather Incentives, Airport Bonuses, and Late-Night Bonuses.
+
+========================================================
+A. QUEST BONUS SYSTEM (WEEKLY GOALS)
+========================================================
+Create a system that offers drivers bonus payouts when they complete a certain number of rides within a defined time window.
+
+Rules:
+1. Weekly cycles (Mon 00:00 – Sun 23:59)
+2. Default Quest tiers:
+   - Tier 1: 20 rides = $15 bonus
+   - Tier 2: 40 rides = $40 bonus
+   - Tier 3: 60 rides = $75 bonus
+3. Quests reset every week.
+4. Drivers can track progress in real-time.
+5. Add flags:
+   - questActive
+   - questTier
+   - ridesCompletedInCycle
+   - questBonusEarned
+
+========================================================
+B. BOOST ZONE ENGINE (TIME & LOCATION BASED INCENTIVES)
+========================================================
+Boost Zones increase driver earnings by a percentage based on demand for specific areas and times.
+
+Rules:
+1. Create a Boost Zone config using geo-polygons.
+2. Boost multipliers:
+   - Normal: +10% payout
+   - Busy: +20% payout
+   - Very Busy: +30% payout
+3. Timing windows:
+   - Weekdays: 5 PM – 7 PM
+   - Weekends: 4 PM – 11 PM
+4. Apply boost AFTER dynamic commission but BEFORE final driver payout.
+5. Add Boost flags:
+   - boostActive
+   - boostPercent
+   - boostZoneId
+
+========================================================
+C. AIRPORT PICKUP BONUSES
+========================================================
+Apply fixed bonuses for airport pickups.
+
+Airports:
+- JFK → +$4 per ride
+- LGA → +$3 per ride
+- EWR → +$3 per ride
+
+Rules:
+1. Trigger only if pickup zone matches airport zones.
+2. Add to driver payout directly (not fare).
+3. Add flag airportBonusApplied.
+
+========================================================
+D. WEATHER BONUS SYSTEM
+========================================================
+Activate incentives when weather conditions increase driver demand.
+
+Weather triggers:
+- Heavy Rain
+- Snow
+- Storm
+- Temperature < 30°F
+
+Bonus:
+- +$2 per ride during weather events
+
+Add flags:
+- weatherBonusActive
+- weatherConditionType
+
+========================================================
+E. LATE-NIGHT INCENTIVES
+========================================================
+Give extra incentives during late-night hours when driver supply is low.
+
+Time window:
+12:00 AM – 3:00 AM (every day)
+
+Bonus:
++ $3 per ride
+
+Add flags:
+- lateNightBonusApplied
+
+========================================================
+F. INTEGRATION RULES (VERY IMPORTANT)
+========================================================
+1. Incentives must NEVER break minimum driver payout rule.
+2. Incentives are added AFTER fare calculation but BEFORE final payout.
+3. Incentives NEVER reduce SafeGo’s commission or rider fare.
+4. Multiple incentives can stack:
+   - Quest Bonus (weekly)
+   - Boost Zone Bonus
+   - Airport Bonus
+   - Weather Bonus
+   - Late-Night Bonus
+5. Add final driver incentive breakdown:
+   - questBonus
+   - airportBonus
+   - weatherBonus
+   - lateNightBonus
+   - boostZoneBonus
+   - totalIncentivePayout
+
+========================================================
+G. UI + BREAKDOWN UPDATES
+========================================================
+Add a section called “Driver Bonuses” in the driver payout breakdown.
+
+Fields:
+- Incentive type
+- Bonus amount
+- Active flags
+- Weekly Quest Progress bar (0–100%)
+
+========================================================
+H. TEST CASES (MUST PASS)
+========================================================
+Create automated tests for:
+1. Quest completion tiers
+2. Multiple boost zones
+3. Airport pickup bonus stacking with boost
+4. Weather bonus + late-night bonus combined
+5. Incentives not breaking minimum payout
+6. Incentives not affecting rider fare
+7. Weekly quest reset
+8. Multi-incentive stacked payout
+9. Correct UI breakdown structure
+10. Incentive suppression if config disabled
+
+========================================================
+I. FINAL OUTPUT
+========================================================
+- Updated backend incentive engine
+- Boost zone polygon config
+- Weather detection integration
+- Driver payout module integration
+- Weekly quest logic
+- Frontend UI updates (Driver App)
+- 100% passing tests
+- No conflict with current Pricing Engine or Dynamic Commission Engine

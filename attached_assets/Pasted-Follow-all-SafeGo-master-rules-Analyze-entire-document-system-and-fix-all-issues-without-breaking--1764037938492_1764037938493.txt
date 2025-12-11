@@ -1,0 +1,37 @@
+Follow all SafeGo master rules. 
+Analyze entire document system and fix all issues without breaking any existing customer/driver/restaurant/admin flow. Complete the full Driver Document Management System (D7) in one continuous implementation.
+
+Required final output:
+
+1. DRIVER DOCUMENT CENTER
+- Implement full driver document page with checklists, statuses (pending/under_review/approved/rejected), upload and re-upload options, file validations, size/type limits, and secure token handling.
+- Required documents: profile_photo, driver_license, insurance_doc, car_registration, vehicle_inspection, tlc_license (NY only), license_plate_number only (NO license plate image), NO social_security_upload.
+- Integrate document progress into driver KYC status.
+- Fix all upload errors: “unexpected field”, “access token required”, “cannot read properties of null (reading 'json')”.
+
+2. ADMIN DOCUMENT VERIFICATION
+- Build complete admin doc verification center.
+- View documents by driver, filter by status, sort by country.
+- Add Approve/Reject with required reason for rejection.
+- Auto-update driver KYC state after admin action.
+- Trigger driver notifications after approval/rejection.
+
+3. BACKEND API STANDARDIZATION
+- Fix all document upload handlers.
+- Standardize API JSON responses with success:true/false format.
+- Secure all endpoints with proper token validation.
+- Ensure zero breakage to existing KYC, vehicle system, promotions, payouts, restaurant, or customer flows.
+
+4. UI/UX REQUIREMENTS
+- Build modern, clean document center UI.
+- Add preview modal for uploaded documents.
+- Add progress bar for uploads.
+- Ensure full mobile responsive behavior.
+
+5. SYSTEM-WIDE SAFETY CHECKS
+- Ensure no breaking schema changes unless strictly necessary.
+- Validate migration backward compatibility.
+- Test all flows: driver upload, admin verify, driver see updated status.
+
+Complete all of D7 fully in one implementation. 
+After finishing, return a summary of what was built and confirm all tests passed.

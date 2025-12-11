@@ -1,0 +1,2391 @@
+import { useState, useEffect } from "react";
+import { useLocation, Link, Redirect } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { 
+  Car, Bike, ArrowLeft, ArrowRight, CheckCircle2, 
+  Loader2, User, FileText, ShieldCheck,
+  Upload, AlertCircle, MapPin, Building2, ClipboardCheck
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { isPartnerAvailable, getPartnerConfig, type PartnerType } from "@shared/partnerAvailability";
+import { calculateAge } from "@shared/dateUtils";
+// V1 is kept in ./legacy/driver-registration-v1.tsx for backup/reference only
+// V2 is now the only version used for driver onboarding (feature flag bypass)
+
+const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' }, { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' }, { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' }, { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' }, { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' }, { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' }, { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' }, { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' }, { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' }, { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' }, { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' }, { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' }, { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' }, { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' }, { code: 'DC', name: 'District of Columbia' }
+];
+
+const EMERGENCY_RELATIONSHIPS = [
+  { value: 'spouse', label: 'Spouse' },
+  { value: 'parent', label: 'Parent' },
+  { value: 'sibling', label: 'Sibling' },
+  { value: 'child', label: 'Child' },
+  { value: 'friend', label: 'Friend' },
+  { value: 'other', label: 'Other' },
+];
+
+const personalInfoSchemaUS = z.object({
+  usaFullLegalName: z.string().min(2, "Full legal name is required"),
+  phone: z.string().min(10, "Phone number is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
+    if (!dob) return false;
+    const age = calculateAge(dob);
+    return age >= 18;
+  }, { message: "You must be at least 18 years old to register as a driver" }),
+  usaStreet: z.string().min(5, "Street address is required"),
+  usaAptUnit: z.string().optional(),
+  usaCity: z.string().min(2, "City is required"),
+  usaState: z.string().min(2, "State is required"),
+  usaZipCode: z.string().regex(/^\d{5}(-\d{4})?$/, "Valid ZIP code required (e.g., 12345 or 12345-6789)"),
+  emergencyContactName: z.string().min(2, "Emergency contact name is required"),
+  emergencyContactPhone: z.string().min(10, "Emergency contact phone is required"),
+  emergencyContactRelationship: z.string().min(1, "Relationship is required"),
+  ssnLast4: z.string().regex(/^\d{4}$/, "Must be exactly 4 digits").optional().or(z.literal("")),
+});
+
+const personalInfoSchemaBD = z.object({
+  phone: z.string().min(10, "Phone number is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
+    if (!dob) return false;
+    const age = calculateAge(dob);
+    return age >= 18;
+  }, { message: "You must be at least 18 years old to register as a driver" }),
+  emergencyContactName: z.string().min(2, "Emergency contact name is required"),
+  emergencyContactPhone: z.string().min(10, "Emergency contact phone is required"),
+  fatherName: z.string().min(2, "Father's name is required"),
+  presentAddress: z.string().min(5, "Present address is required"),
+  permanentAddress: z.string().optional(),
+});
+
+const licenseInfoSchema = z.object({
+  driverLicenseNumber: z.string().min(5, "Driver license number is required"),
+  driverLicenseState: z.string().min(2, "License issuing state is required"),
+  driverLicenseExpiry: z.string().min(1, "License expiry date is required"),
+  governmentIdType: z.string().optional(),
+  governmentIdLast4: z.string().max(4).optional(),
+});
+
+const vehicleInfoSchema = z.object({
+  vehicleType: z.string().min(1, "Vehicle type is required"),
+  vehicleMake: z.string().min(1, "Vehicle make is required"),
+  vehicleModel: z.string().min(1, "Vehicle model is required"),
+  vehicleYear: z.string().min(4, "Vehicle year is required"),
+  vehicleColor: z.string().min(1, "Vehicle color is required"),
+  vehiclePlate: z.string().min(1, "License plate is required"),
+});
+
+const nycComplianceSchema = z.object({
+  tlcLicenseNumber: z.string().optional().or(z.literal("")),
+  tlcLicenseExpiry: z.string().optional().or(z.literal("")),
+  fhvLicenseNumber: z.string().optional().or(z.literal("")),
+  dmvInspectionDate: z.string().min(1, "DMV inspection date is required"),
+  dmvInspectionExpiry: z.string().min(1, "DMV inspection expiry is required"),
+});
+
+const documentsSchema = z.object({
+  nidNumber: z.string().min(10, "NID number is required (minimum 10 digits)"),
+});
+
+type PersonalInfoUSData = z.infer<typeof personalInfoSchemaUS>;
+type PersonalInfoBDData = z.infer<typeof personalInfoSchemaBD>;
+type LicenseInfoData = z.infer<typeof licenseInfoSchema>;
+type VehicleInfoData = z.infer<typeof vehicleInfoSchema>;
+type NycComplianceData = z.infer<typeof nycComplianceSchema>;
+
+interface RegistrationData {
+  personalInfo: Partial<PersonalInfoUSData & PersonalInfoBDData>;
+  licenseInfo: Partial<LicenseInfoData>;
+  vehicleInfo: Partial<VehicleInfoData>;
+  nycCompliance: Partial<NycComplianceData>;
+  documents: { nidNumber?: string };
+  backgroundCheckConsent?: boolean;
+}
+
+function isNycBorough(city: string | undefined): boolean {
+  if (!city) return false;
+  const normalizedCity = city.trim().toLowerCase();
+  return NYC_BOROUGHS.some(borough => normalizedCity.includes(borough.toLowerCase()));
+}
+
+export default function DriverRegistration() {
+  return <DriverRegistrationV2 />;
+}
+
+function DriverRegistrationV2() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isNycDriver, setIsNycDriver] = useState(false);
+  const [formData, setFormData] = useState<RegistrationData>({
+    personalInfo: {},
+    licenseInfo: {},
+    vehicleInfo: {},
+    nycCompliance: {},
+    documents: {},
+  });
+  
+  const [licenseFrontFile, setLicenseFrontFile] = useState<File | null>(null);
+  const [licenseBackFile, setLicenseBackFile] = useState<File | null>(null);
+  const [registrationFile, setRegistrationFile] = useState<File | null>(null);
+  const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
+  const [inspectionFile, setInspectionFile] = useState<File | null>(null);
+  const [tlcFrontFile, setTlcFrontFile] = useState<File | null>(null);
+  const [tlcBackFile, setTlcBackFile] = useState<File | null>(null);
+  const [fhvFile, setFhvFile] = useState<File | null>(null);
+  const [dmvInspectionFile, setDmvInspectionFile] = useState<File | null>(null);
+  const [nidFrontFile, setNidFrontFile] = useState<File | null>(null);
+  const [nidBackFile, setNidBackFile] = useState<File | null>(null);
+  const [skipTlcDetails, setSkipTlcDetails] = useState(false);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const typeParam = urlParams.get('type');
+  const vehicleParam = urlParams.get('vehicle');
+  const driverType: 'ride' | 'delivery' = typeParam === 'delivery' ? 'delivery' : 'ride';
+  const vehicleType: 'bicycle' | 'motorbike' | 'car' | 'walking' | null = vehicleParam === 'bicycle' ? 'bicycle' : vehicleParam === 'motorbike' ? 'motorbike' : vehicleParam === 'car' ? 'car' : vehicleParam === 'walking' ? 'walking' : null;
+  const isBicycleDelivery = driverType === 'delivery' && vehicleType === 'bicycle';
+  const isWalkingDelivery = driverType === 'delivery' && vehicleType === 'walking';
+  const isCarDelivery = driverType === 'delivery' && vehicleType === 'car';
+  
+  const countryCode = user?.countryCode || "US";
+  const isBD = countryCode === "BD";
+  const isUS = countryCode === "US";
+  const partnerType: PartnerType = driverType === 'ride' ? 'driver_ride' : 'driver_delivery';
+  const config = getPartnerConfig(partnerType, countryCode);
+  const isAvailable = isPartnerAvailable(partnerType, countryCode);
+
+  const STEPS_US_BICYCLE_DELIVERY = [
+    { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
+    { id: 2, title: "Government ID", icon: FileText, desc: "ID verification (no license needed)" },
+    { id: 3, title: "Background Check", icon: ClipboardCheck, desc: "Consent & verification" },
+    { id: 4, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
+  ];
+
+  const STEPS_US_CAR_DELIVERY = [
+    { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
+    { id: 2, title: "Driver License", icon: FileText, desc: "License details & images" },
+    { id: 3, title: "Vehicle Documents", icon: Car, desc: "Registration, insurance, inspection" },
+    { id: 4, title: "Background Check", icon: ClipboardCheck, desc: "Consent & verification" },
+    { id: 5, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
+  ];
+
+  const STEPS_US = (isBicycleDelivery || isWalkingDelivery) ? STEPS_US_BICYCLE_DELIVERY : isCarDelivery ? STEPS_US_CAR_DELIVERY : isNycDriver ? [
+    { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
+    { id: 2, title: "Driver License", icon: FileText, desc: "License details & images" },
+    { id: 3, title: "Vehicle Details", icon: Car, desc: "Vehicle info & documents" },
+    { id: 4, title: "NYC Compliance", icon: Building2, desc: "TLC, FHV, DMV inspection" },
+    { id: 5, title: "Background Check", icon: ClipboardCheck, desc: "Consent & verification" },
+    { id: 6, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
+  ] : [
+    { id: 1, title: "Personal Information", icon: User, desc: "Name, contact, address" },
+    { id: 2, title: "Driver License", icon: FileText, desc: "License details & images" },
+    { id: 3, title: "Vehicle Details", icon: Car, desc: "Vehicle info & documents" },
+    { id: 4, title: "Background Check", icon: ClipboardCheck, desc: "Consent & verification" },
+    { id: 5, title: "Review & Submit", icon: ShieldCheck, desc: "Verify and submit" },
+  ];
+
+  const STEPS_BD = [
+    { id: 1, title: "Personal Information", icon: User, desc: "ব্যক্তিগত তথ্য" },
+    { id: 2, title: "Vehicle Information", icon: Car, desc: "গাড়ির তথ্য" },
+    { id: 3, title: "Documents", icon: FileText, desc: "NID ও কাগজপত্র" },
+    { id: 4, title: "Review & Submit", icon: ShieldCheck, desc: "জমা দিন" },
+  ];
+
+  const STEPS = isBD ? STEPS_BD : STEPS_US;
+
+  const { data: existingProfile, isLoading: profileLoading } = useQuery<{ profile: any } | null>({
+    queryKey: ["/api/partner-driver/registration/status", driverType],
+    enabled: !!user,
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("/api/partner-driver/registration/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/partner-driver/registration/status"] });
+      toast({
+        title: "Application Submitted",
+        description: "Your driver application has been submitted for review.",
+      });
+      setLocation("/customer");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Submission Failed",
+        description: error?.message || "Please check your information and try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const personalFormUS = useForm<PersonalInfoUSData>({
+    resolver: zodResolver(personalInfoSchemaUS),
+    mode: "onChange",
+    defaultValues: {
+      usaFullLegalName: user?.email?.split('@')[0] || "",
+      phone: "",
+      dateOfBirth: "",
+      usaStreet: "",
+      usaAptUnit: "",
+      usaCity: "",
+      usaState: "",
+      usaZipCode: "",
+      emergencyContactName: "",
+      emergencyContactPhone: "",
+      emergencyContactRelationship: "",
+      ssnLast4: "",
+    },
+  });
+
+  const personalFormBD = useForm<PersonalInfoBDData>({
+    resolver: zodResolver(personalInfoSchemaBD),
+    mode: "onChange",
+    defaultValues: {
+      phone: "",
+      dateOfBirth: "",
+      emergencyContactName: "",
+      emergencyContactPhone: "",
+      fatherName: "",
+      presentAddress: "",
+      permanentAddress: "",
+    },
+  });
+
+  const licenseForm = useForm<LicenseInfoData>({
+    resolver: zodResolver(licenseInfoSchema),
+    mode: "onChange",
+    defaultValues: {
+      driverLicenseNumber: "",
+      driverLicenseState: "",
+      driverLicenseExpiry: "",
+    },
+  });
+
+  const vehicleForm = useForm<VehicleInfoData>({
+    resolver: zodResolver(vehicleInfoSchema),
+    mode: "onChange",
+    defaultValues: {
+      vehicleType: "",
+      vehicleMake: "",
+      vehicleModel: "",
+      vehicleYear: "",
+      vehicleColor: "",
+      vehiclePlate: "",
+    },
+  });
+
+  const nycForm = useForm<NycComplianceData>({
+    resolver: zodResolver(nycComplianceSchema),
+    mode: "onChange",
+    defaultValues: {
+      tlcLicenseNumber: "",
+      tlcLicenseExpiry: "",
+      fhvLicenseNumber: "",
+      dmvInspectionDate: "",
+      dmvInspectionExpiry: "",
+    },
+  });
+
+  const [nidNumber, setNidNumber] = useState("");
+  const [backgroundCheckConsent, setBackgroundCheckConsent] = useState(false);
+
+  if (!user) {
+    return <Redirect to={`/login?returnTo=/partner/${driverType === 'ride' ? 'ride' : 'delivery'}/start`} />;
+  }
+
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader-registration" />
+      </div>
+    );
+  }
+
+  if (existingProfile?.profile?.verificationStatus === "pending") {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/30">
+            <CardContent className="p-8 text-center">
+              <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
+              <h2 className="text-xl font-bold mb-2">Application Under Review</h2>
+              <p className="text-muted-foreground mb-4">
+                Your driver application is currently being reviewed. {config?.approvalMessage}
+              </p>
+              <Button onClick={() => setLocation("/customer")} data-testid="button-back-customer">
+                Back to Home
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (existingProfile?.profile?.verificationStatus === "approved") {
+    return <Redirect to="/driver" />;
+  }
+
+  if (!isAvailable && config?.waitlistEnabled) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-2xl mx-auto">
+          <Link href="/customer">
+            <Button variant="ghost" className="mb-6" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </Link>
+          <Card>
+            <CardContent className="p-8 text-center">
+              <AlertCircle className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <h2 className="text-xl font-bold mb-2">Coming Soon to Your Area</h2>
+              <p className="text-muted-foreground mb-4">{config?.approvalMessage}</p>
+              <Button onClick={() => {
+                toast({
+                  title: "Waitlist Joined",
+                  description: "We'll notify you when driver registration opens in your area.",
+                });
+                setLocation("/customer");
+              }} data-testid="button-join-waitlist">
+                Join Waitlist
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const progressPercent = (currentStep / STEPS.length) * 100;
+
+  const handleNext = async () => {
+    let isValid = false;
+    
+    if (isUS) {
+      if (currentStep === 1) {
+        isValid = await personalFormUS.trigger();
+        if (isValid) {
+          const values = personalFormUS.getValues();
+          
+          // Additional age check for ride-hailing drivers (must be 21+)
+          if (driverType === 'ride' && values.dateOfBirth) {
+            const age = calculateAge(values.dateOfBirth);
+            if (age < 21) {
+              toast({
+                title: "Age Requirement Not Met",
+                description: "You must be at least 21 years old to register as a ride-hailing driver.",
+                variant: "destructive",
+              });
+              return;
+            }
+          }
+          
+          setFormData(prev => ({ ...prev, personalInfo: values }));
+          const needsNycCompliance = values.usaState === 'NY' && isNycBorough(values.usaCity);
+          setIsNycDriver(needsNycCompliance);
+          licenseForm.reset({
+            driverLicenseNumber: "",
+            driverLicenseState: "",
+            driverLicenseExpiry: "",
+          });
+        }
+      } else if (currentStep === 2) {
+        isValid = await licenseForm.trigger();
+        if (isValid) {
+          if (!licenseFrontFile || !licenseBackFile) {
+            toast({
+              title: "Missing Documents",
+              description: "Please upload both front and back images of your driver license.",
+              variant: "destructive",
+            });
+            return;
+          }
+          setFormData(prev => ({ ...prev, licenseInfo: licenseForm.getValues() }));
+        }
+      } else if (currentStep === 3) {
+        isValid = await vehicleForm.trigger();
+        if (isValid) {
+          if (!registrationFile || !insuranceFile) {
+            toast({
+              title: "Missing Documents",
+              description: "Please upload vehicle registration and insurance documents.",
+              variant: "destructive",
+            });
+            return;
+          }
+          setFormData(prev => ({ ...prev, vehicleInfo: vehicleForm.getValues() }));
+        }
+      } else if (currentStep === 4 && isNycDriver) {
+        isValid = await nycForm.trigger();
+        if (isValid) {
+          if (!dmvInspectionFile) {
+            toast({
+              title: "DMV Inspection Required",
+              description: "Please upload your DMV inspection document. TLC and FHV documents are optional.",
+              variant: "destructive",
+            });
+            return;
+          }
+          setFormData(prev => ({ ...prev, nycCompliance: nycForm.getValues() }));
+        }
+      } else if ((currentStep === 5 && isNycDriver) || (currentStep === 4 && !isNycDriver)) {
+        if (backgroundCheckConsent !== true) {
+          toast({
+            title: "Consent Required",
+            description: "You must consent to a background check to continue.",
+            variant: "destructive",
+          });
+          return;
+        }
+        isValid = true;
+        setFormData(prev => ({ ...prev, backgroundCheckConsent: true }));
+      }
+    } else {
+      if (currentStep === 1) {
+        isValid = await personalFormBD.trigger();
+        if (isValid) {
+          setFormData(prev => ({ ...prev, personalInfo: personalFormBD.getValues() }));
+        }
+      } else if (currentStep === 2) {
+        isValid = await vehicleForm.trigger();
+        if (isValid) {
+          setFormData(prev => ({ ...prev, vehicleInfo: vehicleForm.getValues() }));
+        }
+      } else if (currentStep === 3) {
+        if (!nidNumber || nidNumber.trim().length < 10) {
+          toast({ 
+            title: "NID Required", 
+            description: "Please enter a valid NID number (minimum 10 digits)",
+            variant: "destructive" 
+          });
+          return;
+        }
+        isValid = true;
+        setFormData(prev => ({ ...prev, documents: { nidNumber } }));
+      }
+    }
+    
+    if (isValid && currentStep < STEPS.length) {
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  const handleSubmit = () => {
+    let submitData;
+    
+    if (isUS) {
+      if (isBicycleDelivery || isWalkingDelivery) {
+        submitData = {
+          driverType,
+          countryCode,
+          vehicleType: isWalkingDelivery ? 'walking' : 'bicycle',
+          personalInfo: {
+            phone: formData.personalInfo.phone,
+            dateOfBirth: formData.personalInfo.dateOfBirth,
+            emergencyContactName: formData.personalInfo.emergencyContactName,
+            emergencyContactPhone: formData.personalInfo.emergencyContactPhone,
+            emergencyContactRelationship: formData.personalInfo.emergencyContactRelationship,
+            usaFullLegalName: formData.personalInfo.usaFullLegalName,
+            usaStreet: formData.personalInfo.usaStreet,
+            usaAptUnit: formData.personalInfo.usaAptUnit,
+            usaCity: formData.personalInfo.usaCity,
+            usaState: formData.personalInfo.usaState,
+            usaZipCode: formData.personalInfo.usaZipCode,
+            ssnLast4: formData.personalInfo.ssnLast4,
+          },
+          vehicleInfo: {
+            vehicleType: isWalkingDelivery ? 'walking' : 'bicycle',
+          },
+          documents: {
+            governmentIdType: formData.licenseInfo?.governmentIdType,
+            governmentIdLast4: formData.licenseInfo?.governmentIdLast4,
+            governmentIdFrontUrl: "pending_upload",
+            governmentIdBackUrl: "pending_upload",
+          },
+          backgroundCheckConsent: formData.backgroundCheckConsent,
+          canRide: false,
+          canFoodDelivery: true,
+          canParcelDelivery: true,
+        };
+      } else if (isCarDelivery) {
+        submitData = {
+          driverType,
+          countryCode,
+          vehicleType: 'car',
+          personalInfo: {
+            phone: formData.personalInfo.phone,
+            dateOfBirth: formData.personalInfo.dateOfBirth,
+            emergencyContactName: formData.personalInfo.emergencyContactName,
+            emergencyContactPhone: formData.personalInfo.emergencyContactPhone,
+            emergencyContactRelationship: formData.personalInfo.emergencyContactRelationship,
+            usaFullLegalName: formData.personalInfo.usaFullLegalName,
+            usaStreet: formData.personalInfo.usaStreet,
+            usaAptUnit: formData.personalInfo.usaAptUnit,
+            usaCity: formData.personalInfo.usaCity,
+            usaState: formData.personalInfo.usaState,
+            usaZipCode: formData.personalInfo.usaZipCode,
+            ssnLast4: formData.personalInfo.ssnLast4,
+          },
+          vehicleInfo: {
+            vehicleType: 'car',
+          },
+          documents: {
+            driverLicenseNumber: formData.licenseInfo?.driverLicenseNumber,
+            driverLicenseExpiry: formData.licenseInfo?.driverLicenseExpiry,
+            driverLicenseState: formData.licenseInfo?.driverLicenseState,
+            driverLicenseFrontUrl: "pending_upload",
+            driverLicenseBackUrl: "pending_upload",
+            vehicleRegistrationUrl: "pending_upload",
+            vehicleInsuranceUrl: "pending_upload",
+            vehicleInspectionUrl: "pending_upload",
+          },
+          nycCompliance: !skipTlcDetails ? {
+            tlcLicenseNumber: formData.nycCompliance?.tlcLicenseNumber,
+            tlcLicenseFrontUrl: "pending_upload",
+            tlcLicenseBackUrl: "pending_upload",
+          } : undefined,
+          backgroundCheckConsent: formData.backgroundCheckConsent,
+          canRide: false,
+          canFoodDelivery: true,
+          canParcelDelivery: true,
+        };
+      } else {
+        submitData = {
+          driverType,
+          countryCode,
+          personalInfo: {
+            phone: formData.personalInfo.phone,
+            dateOfBirth: formData.personalInfo.dateOfBirth,
+            emergencyContactName: formData.personalInfo.emergencyContactName,
+            emergencyContactPhone: formData.personalInfo.emergencyContactPhone,
+            emergencyContactRelationship: formData.personalInfo.emergencyContactRelationship,
+            usaFullLegalName: formData.personalInfo.usaFullLegalName,
+            usaStreet: formData.personalInfo.usaStreet,
+            usaAptUnit: formData.personalInfo.usaAptUnit,
+            usaCity: formData.personalInfo.usaCity,
+            usaState: formData.personalInfo.usaState,
+            usaZipCode: formData.personalInfo.usaZipCode,
+            ssnLast4: formData.personalInfo.ssnLast4,
+          },
+          vehicleInfo: {
+            vehicleType: formData.vehicleInfo.vehicleType,
+            vehicleMake: formData.vehicleInfo.vehicleMake,
+            vehicleModel: formData.vehicleInfo.vehicleModel,
+            vehicleYear: formData.vehicleInfo.vehicleYear,
+            vehicleColor: formData.vehicleInfo.vehicleColor,
+            vehiclePlate: formData.vehicleInfo.vehiclePlate,
+            registrationDocumentUrl: "pending_upload",
+            insuranceDocumentUrl: "pending_upload",
+          },
+          documents: {
+            driverLicenseNumber: formData.licenseInfo.driverLicenseNumber,
+            driverLicenseExpiry: formData.licenseInfo.driverLicenseExpiry,
+            driverLicenseState: formData.licenseInfo.driverLicenseState,
+            driverLicenseFrontUrl: "pending_upload",
+            driverLicenseBackUrl: "pending_upload",
+          },
+          nycCompliance: isNycDriver ? {
+            tlcLicenseNumber: formData.nycCompliance.tlcLicenseNumber,
+            tlcLicenseExpiry: formData.nycCompliance.tlcLicenseExpiry,
+            tlcLicenseFrontUrl: "pending_upload",
+            tlcLicenseBackUrl: "pending_upload",
+            fhvLicenseNumber: formData.nycCompliance.fhvLicenseNumber,
+            fhvDocumentUrl: "pending_upload",
+            dmvInspectionDate: formData.nycCompliance.dmvInspectionDate,
+            dmvInspectionExpiry: formData.nycCompliance.dmvInspectionExpiry,
+            dmvInspectionImageUrl: "pending_upload",
+          } : undefined,
+          backgroundCheckConsent: formData.backgroundCheckConsent,
+        };
+      }
+    } else {
+      submitData = {
+        driverType,
+        countryCode,
+        personalInfo: formData.personalInfo,
+        vehicleInfo: {
+          vehicleType: formData.vehicleInfo.vehicleType,
+          vehicleModel: formData.vehicleInfo.vehicleModel,
+          vehiclePlate: formData.vehicleInfo.vehiclePlate,
+          vehicleMake: formData.vehicleInfo.vehicleMake,
+          vehicleYear: formData.vehicleInfo.vehicleYear,
+          vehicleColor: formData.vehicleInfo.vehicleColor,
+        },
+        documents: {
+          nidNumber: formData.documents.nidNumber,
+        },
+      };
+    }
+    
+    submitMutation.mutate(submitData);
+  };
+
+  const StepIcon = STEPS[currentStep - 1].icon;
+
+  const renderUSPersonalInfo = () => (
+    <Form {...personalFormUS}>
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()} autoComplete="off">
+        <FormField
+          control={personalFormUS.control}
+          name="usaFullLegalName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel htmlFor="personal-full-legal-name">Full Legal Name *</FormLabel>
+              <FormControl>
+                <Input 
+                  id="personal-full-legal-name"
+                  placeholder="As shown on your driver license" 
+                  autoComplete="off"
+                  {...field} 
+                  data-testid="input-legal-name" 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={personalFormUS.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="personal-phone">Phone Number *</FormLabel>
+                <FormControl>
+                  <Input 
+                    id="personal-phone"
+                    placeholder="(555) 123-4567" 
+                    autoComplete="off"
+                    {...field} 
+                    data-testid="input-phone" 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={personalFormUS.control}
+            name="dateOfBirth"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="personal-date-of-birth">Date of Birth *</FormLabel>
+                <FormControl>
+                  <Input 
+                    id="personal-date-of-birth"
+                    type="date" 
+                    autoComplete="off"
+                    {...field} 
+                    data-testid="input-dob" 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="border-t pt-6">
+          <h4 className="font-semibold mb-4 flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Home Address (US Standard Format)
+          </h4>
+          
+          <FormField
+            control={personalFormUS.control}
+            name="usaStreet"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="personal-street-address">Street Address 1 *</FormLabel>
+                <FormControl>
+                  <Input id="personal-street-address" placeholder="123 Main Street" autoComplete="off" {...field} data-testid="input-street" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={personalFormUS.control}
+            name="usaAptUnit"
+            render={({ field }) => (
+              <FormItem className="mt-4">
+                <FormLabel htmlFor="personal-apt-unit">Street Address 2 (Apt/Unit/Suite)</FormLabel>
+                <FormControl>
+                  <Input id="personal-apt-unit" placeholder="Apt 4B, Suite 100, Unit 5" autoComplete="off" {...field} data-testid="input-apt" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+            <FormField
+              control={personalFormUS.control}
+              name="usaCity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="personal-city">City *</FormLabel>
+                  <FormControl>
+                    <Input id="personal-city" placeholder="City" autoComplete="off" {...field} data-testid="input-city" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={personalFormUS.control}
+              name="usaState"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="personal-state">State *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger id="personal-state" data-testid="select-state">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {US_STATES.map(state => (
+                        <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={personalFormUS.control}
+              name="usaZipCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="personal-zip">ZIP Code *</FormLabel>
+                  <FormControl>
+                    <Input id="personal-zip" placeholder="12345" maxLength={10} autoComplete="off" {...field} data-testid="input-zip" />
+                  </FormControl>
+                  <FormDescription className="text-xs">5-digit or ZIP+4</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        <div className="border-t pt-6">
+          <h4 className="font-semibold mb-4">Emergency Contact</h4>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={personalFormUS.control}
+              name="emergencyContactName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="personal-emergency-name">Contact Name *</FormLabel>
+                  <FormControl>
+                    <Input id="personal-emergency-name" placeholder="Full name" autoComplete="off" {...field} data-testid="input-emergency-name" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={personalFormUS.control}
+              name="emergencyContactPhone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="personal-emergency-phone">Contact Phone *</FormLabel>
+                  <FormControl>
+                    <Input id="personal-emergency-phone" placeholder="(555) 123-4567" autoComplete="off" {...field} data-testid="input-emergency-phone" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          
+          <FormField
+            control={personalFormUS.control}
+            name="emergencyContactRelationship"
+            render={({ field }) => (
+              <FormItem className="mt-4">
+                <FormLabel htmlFor="personal-emergency-relationship">Relationship *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger id="personal-emergency-relationship" data-testid="select-relationship">
+                      <SelectValue placeholder="Select relationship" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {EMERGENCY_RELATIONSHIPS.map(rel => (
+                      <SelectItem key={rel.value} value={rel.value}>{rel.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="border-t pt-6">
+          <FormField
+            control={personalFormUS.control}
+            name="ssnLast4"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="personal-ssn-last4">SSN Last 4 Digits (Optional)</FormLabel>
+                <FormControl>
+                  <Input 
+                    id="personal-ssn-last4"
+                    placeholder="••••" 
+                    maxLength={4} 
+                    type="password"
+                    autoComplete="off"
+                    {...field} 
+                    data-testid="input-ssn-last4" 
+                  />
+                </FormControl>
+                <FormDescription>
+                  Optional for identity verification. We never store your full SSN.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </form>
+    </Form>
+  );
+
+  const renderLicenseInfo = () => (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="license-number-field">Driver License Number *</Label>
+        <Controller
+          name="driverLicenseNumber"
+          control={licenseForm.control}
+          render={({ field }) => (
+            <input
+              type="text"
+              id="license-number-field"
+              placeholder="Enter your license number"
+              autoComplete="off"
+              data-testid="input-license-number"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              {...field}
+            />
+          )}
+        />
+        {licenseForm.formState.errors.driverLicenseNumber && (
+          <p className="text-sm text-destructive">{licenseForm.formState.errors.driverLicenseNumber.message}</p>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="license-state-field">License Issuing State *</Label>
+          <Controller
+            name="driverLicenseState"
+            control={licenseForm.control}
+            render={({ field }) => (
+              <select
+                id="license-state-field"
+                data-testid="select-license-state"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                {...field}
+              >
+                <option value="">Select state</option>
+                {US_STATES.map(state => (
+                  <option key={state.code} value={state.code}>{state.name}</option>
+                ))}
+              </select>
+            )}
+          />
+          {licenseForm.formState.errors.driverLicenseState && (
+            <p className="text-sm text-destructive">{licenseForm.formState.errors.driverLicenseState.message}</p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="license-expiry-field">License Expiration Date *</Label>
+          <Controller
+            name="driverLicenseExpiry"
+            control={licenseForm.control}
+            render={({ field }) => (
+              <input
+                type="date"
+                id="license-expiry-field"
+                autoComplete="off"
+                data-testid="input-license-expiry"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                {...field}
+              />
+            )}
+          />
+          {licenseForm.formState.errors.driverLicenseExpiry && (
+            <p className="text-sm text-destructive">{licenseForm.formState.errors.driverLicenseExpiry.message}</p>
+          )}
+        </div>
+      </div>
+
+        <div className="border-t pt-6">
+          <h4 className="font-semibold mb-4">Driver License Images *</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Front of License *</Label>
+              <label htmlFor="license-front" className="block cursor-pointer">
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors ${licenseFrontFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                  <Upload className={`h-8 w-8 mx-auto mb-2 ${licenseFrontFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <p className="text-sm text-muted-foreground">{licenseFrontFile ? 'Image selected' : 'Upload front of license'}</p>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    id="license-front"
+                    onChange={(e) => setLicenseFrontFile(e.target.files?.[0] || null)}
+                    data-testid="input-license-front"
+                  />
+                  <Button type="button" variant="outline" size="sm" className="mt-2">Choose File</Button>
+                  {licenseFrontFile && <p className="text-sm mt-2 text-green-600 font-medium">{licenseFrontFile.name}</p>}
+                </div>
+              </label>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Back of License *</Label>
+              <label htmlFor="license-back" className="block cursor-pointer">
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors ${licenseBackFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                  <Upload className={`h-8 w-8 mx-auto mb-2 ${licenseBackFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <p className="text-sm text-muted-foreground">{licenseBackFile ? 'Image selected' : 'Upload back of license'}</p>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    id="license-back"
+                    onChange={(e) => setLicenseBackFile(e.target.files?.[0] || null)}
+                    data-testid="input-license-back"
+                  />
+                  <Button type="button" variant="outline" size="sm" className="mt-2">Choose File</Button>
+                  {licenseBackFile && <p className="text-sm mt-2 text-green-600 font-medium">{licenseBackFile.name}</p>}
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+    </div>
+  );
+
+  const renderVehicleInfo = () => (
+    <Form {...vehicleForm}>
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+        <FormField
+          control={vehicleForm.control}
+          name="vehicleType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Vehicle Type *</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-vehicle-type">
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {driverType === 'ride' ? (
+                    <>
+                      <SelectItem value="sedan">Sedan</SelectItem>
+                      <SelectItem value="suv">SUV</SelectItem>
+                      <SelectItem value="minivan">Minivan</SelectItem>
+                      <SelectItem value="luxury">Luxury</SelectItem>
+                      {isBD && <SelectItem value="cng">CNG Auto</SelectItem>}
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="car">Car</SelectItem>
+                      <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                      <SelectItem value="bicycle">Bicycle</SelectItem>
+                      <SelectItem value="scooter">Scooter</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={vehicleForm.control}
+            name="vehicleMake"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Vehicle Make *</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Toyota, Honda, Ford" {...field} data-testid="input-vehicle-make" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={vehicleForm.control}
+            name="vehicleModel"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Vehicle Model *</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Camry, Civic, F-150" {...field} data-testid="input-vehicle-model" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <FormField
+            control={vehicleForm.control}
+            name="vehicleYear"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Vehicle Year *</FormLabel>
+                <FormControl>
+                  <Input placeholder="2024" maxLength={4} {...field} data-testid="input-vehicle-year" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={vehicleForm.control}
+            name="vehicleColor"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Vehicle Color *</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., White, Black, Silver" {...field} data-testid="input-vehicle-color" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={vehicleForm.control}
+            name="vehiclePlate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>License Plate *</FormLabel>
+                <FormControl>
+                  <Input placeholder="ABC-1234" {...field} data-testid="input-vehicle-plate" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {isUS && (
+          <div className="border-t pt-6">
+            <h4 className="font-semibold mb-4">Vehicle Documents *</h4>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Vehicle Registration *</Label>
+                <label htmlFor="registration-doc" className="block cursor-pointer">
+                  <div className={`border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors ${registrationFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                    <Upload className={`h-8 w-8 mx-auto mb-2 ${registrationFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                    <p className="text-sm text-muted-foreground">{registrationFile ? 'Document selected' : 'Upload registration'}</p>
+                    <input 
+                      type="file" 
+                      accept="image/*,.pdf" 
+                      className="hidden" 
+                      id="registration-doc"
+                      onChange={(e) => setRegistrationFile(e.target.files?.[0] || null)}
+                      data-testid="input-registration-doc"
+                    />
+                    <Button type="button" variant="outline" size="sm" className="mt-2">Choose File</Button>
+                    {registrationFile && <p className="text-sm mt-2 text-green-600 font-medium">{registrationFile.name}</p>}
+                  </div>
+                </label>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Vehicle Insurance *</Label>
+                <label htmlFor="insurance-doc" className="block cursor-pointer">
+                  <div className={`border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors ${insuranceFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                    <Upload className={`h-8 w-8 mx-auto mb-2 ${insuranceFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                    <p className="text-sm text-muted-foreground">{insuranceFile ? 'Document selected' : 'Upload insurance'}</p>
+                    <input 
+                      type="file" 
+                      accept="image/*,.pdf" 
+                      className="hidden" 
+                      id="insurance-doc"
+                      onChange={(e) => setInsuranceFile(e.target.files?.[0] || null)}
+                      data-testid="input-insurance-doc"
+                    />
+                    <Button type="button" variant="outline" size="sm" className="mt-2">Choose File</Button>
+                    {insuranceFile && <p className="text-sm mt-2 text-green-600 font-medium">{insuranceFile.name}</p>}
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+      </form>
+    </Form>
+  );
+
+  const renderNycCompliance = () => (
+    <Form {...nycForm}>
+      <form className="space-y-6">
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Building2 className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-semibold text-blue-800 dark:text-blue-200">NYC DMV Inspection Required</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  As a driver operating in one of New York City's five boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten Island), 
+                  you must provide DMV inspection documentation. TLC license and FHV permit are optional and can be added later.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <h4 className="font-semibold">TLC (Taxi & Limousine Commission) License <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h4>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={nycForm.control}
+              name="tlcLicenseNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>TLC License Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter TLC license number (optional)" {...field} data-testid="input-tlc-number" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={nycForm.control}
+              name="tlcLicenseExpiry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>TLC License Expiry</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} data-testid="input-tlc-expiry" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>TLC License Front <span className="text-muted-foreground">(Optional)</span></Label>
+              <label htmlFor="tlc-front" className="block cursor-pointer">
+                <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${tlcFrontFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                  <Upload className={`h-6 w-6 mx-auto mb-1 ${tlcFrontFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <p className="text-xs text-muted-foreground">{tlcFrontFile ? tlcFrontFile.name : 'Upload TLC front'}</p>
+                  <input type="file" accept="image/*" className="hidden" id="tlc-front" onChange={(e) => setTlcFrontFile(e.target.files?.[0] || null)} data-testid="input-tlc-front" />
+                </div>
+              </label>
+            </div>
+            <div className="space-y-2">
+              <Label>TLC License Back <span className="text-muted-foreground">(Optional)</span></Label>
+              <label htmlFor="tlc-back" className="block cursor-pointer">
+                <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${tlcBackFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                  <Upload className={`h-6 w-6 mx-auto mb-1 ${tlcBackFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <p className="text-xs text-muted-foreground">{tlcBackFile ? tlcBackFile.name : 'Upload TLC back'}</p>
+                  <input type="file" accept="image/*" className="hidden" id="tlc-back" onChange={(e) => setTlcBackFile(e.target.files?.[0] || null)} data-testid="input-tlc-back" />
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t pt-6 space-y-4">
+          <h4 className="font-semibold">FHV (For-Hire Vehicle) Permit <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h4>
+          
+          <div className="space-y-2">
+            <Label>FHV Document/Sticker Image <span className="text-muted-foreground">(Optional)</span></Label>
+            <label htmlFor="fhv-doc" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${fhvFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${fhvFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{fhvFile ? fhvFile.name : 'Upload FHV document or sticker'}</p>
+                <input type="file" accept="image/*" className="hidden" id="fhv-doc" onChange={(e) => setFhvFile(e.target.files?.[0] || null)} data-testid="input-fhv-doc" />
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div className="border-t pt-6 space-y-4">
+          <h4 className="font-semibold">DMV Vehicle Inspection *</h4>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={nycForm.control}
+              name="dmvInspectionDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Inspection Date *</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} data-testid="input-dmv-date" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={nycForm.control}
+              name="dmvInspectionExpiry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Inspection Expiry *</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} data-testid="input-dmv-expiry" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>DMV Inspection Document *</Label>
+            <label htmlFor="dmv-doc" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${dmvInspectionFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${dmvInspectionFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{dmvInspectionFile ? dmvInspectionFile.name : 'Upload DMV inspection sticker/paper'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="dmv-doc" onChange={(e) => setDmvInspectionFile(e.target.files?.[0] || null)} data-testid="input-dmv-doc" />
+              </div>
+            </label>
+          </div>
+        </div>
+      </form>
+    </Form>
+  );
+
+  const renderGovernmentIdOnly = () => (
+    <div className="space-y-6">
+      <Card className="border-green-200 bg-green-50 dark:bg-green-950/30">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <div>
+              <h4 className="font-medium">Simplified Verification</h4>
+              <p className="text-sm text-muted-foreground">
+                As a bicycle delivery driver, no driver's license is required. Just provide your government ID.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="govt-id-type">Government ID Type *</Label>
+            <Select 
+              value={formData.licenseInfo?.governmentIdType || ""} 
+              onValueChange={(value) => setFormData(prev => ({ 
+                ...prev, 
+                licenseInfo: { ...prev.licenseInfo, governmentIdType: value } 
+              }))}
+            >
+              <SelectTrigger id="govt-id-type" data-testid="select-govt-id-type">
+                <SelectValue placeholder="Select ID type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="drivers_license">Driver's License (Optional)</SelectItem>
+                <SelectItem value="state_id">State ID</SelectItem>
+                <SelectItem value="passport">Passport</SelectItem>
+                <SelectItem value="passport_card">Passport Card</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="govt-id-last4">Last 4 Digits of ID *</Label>
+            <Input 
+              id="govt-id-last4"
+              placeholder="XXXX" 
+              maxLength={4}
+              value={formData.licenseInfo?.governmentIdLast4 || ""}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                licenseInfo: { ...prev.licenseInfo, governmentIdLast4: e.target.value } 
+              }))}
+              data-testid="input-govt-id-last4" 
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>ID Front *</Label>
+            <label htmlFor="govt-id-front" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${licenseFrontFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${licenseFrontFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{licenseFrontFile ? licenseFrontFile.name : 'Upload front of ID'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="govt-id-front" onChange={(e) => setLicenseFrontFile(e.target.files?.[0] || null)} data-testid="input-govt-id-front" />
+              </div>
+            </label>
+          </div>
+          <div className="space-y-2">
+            <Label>ID Back *</Label>
+            <label htmlFor="govt-id-back" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${licenseBackFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${licenseBackFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{licenseBackFile ? licenseBackFile.name : 'Upload back of ID'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="govt-id-back" onChange={(e) => setLicenseBackFile(e.target.files?.[0] || null)} data-testid="input-govt-id-back" />
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderReviewUSBicycle = () => (
+    <div className="space-y-4">
+      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <Bike className="h-6 w-6 text-green-600" />
+            <div>
+              <h4 className="font-medium">Bicycle Delivery Driver Application</h4>
+              <p className="text-sm text-muted-foreground">
+                Review your information below before submitting.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Personal Information</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Name:</span>
+            <span>{formData.personalInfo.usaFullLegalName}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Phone:</span>
+            <span>{formData.personalInfo.phone}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Date of Birth:</span>
+            <span>{formData.personalInfo.dateOfBirth}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Address:</span>
+            <span>
+              {formData.personalInfo.usaStreet}
+              {formData.personalInfo.usaAptUnit && `, ${formData.personalInfo.usaAptUnit}`}, 
+              {formData.personalInfo.usaCity}, {formData.personalInfo.usaState} {formData.personalInfo.usaZipCode}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Emergency Contact</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Name:</span>
+            <span>{formData.personalInfo.emergencyContactName}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Phone:</span>
+            <span>{formData.personalInfo.emergencyContactPhone}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Relationship:</span>
+            <span>{formData.personalInfo.emergencyContactRelationship}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Government ID</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">ID Type:</span>
+            <span>{formData.licenseInfo?.governmentIdType?.replace('_', ' ') || 'Not provided'}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Last 4 Digits:</span>
+            <span className="font-mono">****{formData.licenseInfo?.governmentIdLast4 || ''}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">ID Images:</span>
+            <span className="text-green-600 flex items-center gap-1">
+              {licenseFrontFile && licenseBackFile ? (
+                <><CheckCircle2 className="h-4 w-4" /> Uploaded</>
+              ) : 'Pending'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Vehicle & Services</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Vehicle Type:</span>
+            <span className="flex items-center gap-1">
+              <Bike className="h-4 w-4 text-green-600" /> Bicycle
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Services:</span>
+            <span>Food Delivery, Parcel Delivery</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Background Check Consent</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="flex items-center gap-2">
+            {formData.backgroundCheckConsent ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span className="text-green-600">Consent provided</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <span className="text-yellow-600">Consent not provided</span>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200">
+        <CardContent className="p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            By submitting this application, you agree to SafeGo's Terms of Service and Partner Agreement.
+            Your application will be reviewed and you'll receive a decision within 24 hours.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderCarVehicleDocuments = () => (
+    <div className="space-y-6">
+      <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/30">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <Car className="h-6 w-6 text-purple-600" />
+            <div>
+              <h4 className="font-medium">Car Delivery Documents</h4>
+              <p className="text-sm text-muted-foreground">
+                Upload your vehicle registration, insurance, and inspection documents.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        <h4 className="font-semibold flex items-center gap-2">
+          <FileText className="h-4 w-4" />
+          Required Vehicle Documents
+        </h4>
+        
+        <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-2">
+            <Label>Vehicle Registration *</Label>
+            <label htmlFor="car-registration" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${registrationFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${registrationFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{registrationFile ? registrationFile.name : 'Upload vehicle registration document'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="car-registration" onChange={(e) => setRegistrationFile(e.target.files?.[0] || null)} data-testid="input-car-registration" />
+              </div>
+            </label>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Vehicle Insurance *</Label>
+            <label htmlFor="car-insurance" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${insuranceFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${insuranceFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{insuranceFile ? insuranceFile.name : 'Upload proof of insurance'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="car-insurance" onChange={(e) => setInsuranceFile(e.target.files?.[0] || null)} data-testid="input-car-insurance" />
+              </div>
+            </label>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Vehicle Inspection *</Label>
+            <label htmlFor="car-inspection" className="block cursor-pointer">
+              <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${inspectionFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                <Upload className={`h-6 w-6 mx-auto mb-1 ${inspectionFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <p className="text-xs text-muted-foreground">{inspectionFile ? inspectionFile.name : 'Upload state/DMV inspection document'}</p>
+                <input type="file" accept="image/*,.pdf" className="hidden" id="car-inspection" onChange={(e) => setInspectionFile(e.target.files?.[0] || null)} data-testid="input-car-inspection" />
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <Card className="border-blue-200">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              NYC TLC Details (Optional)
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">Optional</Badge>
+          </div>
+          <CardDescription>
+            For NYC professional drivers only. You can skip this if you don't have TLC credentials.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="skip-tlc"
+              checked={skipTlcDetails}
+              onCheckedChange={(checked) => setSkipTlcDetails(checked as boolean)}
+              data-testid="checkbox-skip-tlc"
+            />
+            <label
+              htmlFor="skip-tlc"
+              className="text-sm font-medium leading-none cursor-pointer"
+            >
+              Skip TLC details for now
+            </label>
+          </div>
+
+          {!skipTlcDetails && (
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="tlc-license-number">TLC License Number</Label>
+                <Input
+                  id="tlc-license-number"
+                  placeholder="Enter TLC license number (optional)"
+                  value={formData.nycCompliance?.tlcLicenseNumber || ""}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    nycCompliance: { ...prev.nycCompliance, tlcLicenseNumber: e.target.value }
+                  }))}
+                  data-testid="input-tlc-license-optional"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>TLC License Front</Label>
+                  <label htmlFor="tlc-front-optional" className="block cursor-pointer">
+                    <div className={`border-2 border-dashed rounded-lg p-3 text-center hover-elevate transition-colors ${tlcFrontFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                      <Upload className={`h-5 w-5 mx-auto mb-1 ${tlcFrontFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                      <p className="text-xs text-muted-foreground">{tlcFrontFile ? tlcFrontFile.name : 'Optional'}</p>
+                      <input type="file" accept="image/*,.pdf" className="hidden" id="tlc-front-optional" onChange={(e) => setTlcFrontFile(e.target.files?.[0] || null)} data-testid="input-tlc-front-optional" />
+                    </div>
+                  </label>
+                </div>
+                <div className="space-y-2">
+                  <Label>TLC License Back</Label>
+                  <label htmlFor="tlc-back-optional" className="block cursor-pointer">
+                    <div className={`border-2 border-dashed rounded-lg p-3 text-center hover-elevate transition-colors ${tlcBackFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+                      <Upload className={`h-5 w-5 mx-auto mb-1 ${tlcBackFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+                      <p className="text-xs text-muted-foreground">{tlcBackFile ? tlcBackFile.name : 'Optional'}</p>
+                      <input type="file" accept="image/*,.pdf" className="hidden" id="tlc-back-optional" onChange={(e) => setTlcBackFile(e.target.files?.[0] || null)} data-testid="input-tlc-back-optional" />
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderReviewUSCar = () => (
+    <div className="space-y-4">
+      <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/30">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <Car className="h-6 w-6 text-purple-600" />
+            <div>
+              <h4 className="font-medium">Car Delivery Driver Application</h4>
+              <p className="text-sm text-muted-foreground">
+                Review your information below before submitting.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Personal Information</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Name:</span>
+            <span>{formData.personalInfo.usaFullLegalName}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Phone:</span>
+            <span>{formData.personalInfo.phone}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Date of Birth:</span>
+            <span>{formData.personalInfo.dateOfBirth}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Address:</span>
+            <span>
+              {formData.personalInfo.usaStreet}
+              {formData.personalInfo.usaAptUnit && `, ${formData.personalInfo.usaAptUnit}`}, 
+              {formData.personalInfo.usaCity}, {formData.personalInfo.usaState} {formData.personalInfo.usaZipCode}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Driver License</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">License Number:</span>
+            <span className="font-mono">{formData.licenseInfo?.driverLicenseNumber || 'Not provided'}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Expiry Date:</span>
+            <span>{formData.licenseInfo?.driverLicenseExpiry || 'Not provided'}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">License Images:</span>
+            <span className="text-green-600 flex items-center gap-1">
+              {licenseFrontFile && licenseBackFile ? (
+                <><CheckCircle2 className="h-4 w-4" /> Uploaded</>
+              ) : 'Pending'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Vehicle Documents</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Registration:</span>
+            <span className={registrationFile ? "text-green-600 flex items-center gap-1" : "text-yellow-600"}>
+              {registrationFile ? <><CheckCircle2 className="h-4 w-4" /> Uploaded</> : 'Missing'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Insurance:</span>
+            <span className={insuranceFile ? "text-green-600 flex items-center gap-1" : "text-yellow-600"}>
+              {insuranceFile ? <><CheckCircle2 className="h-4 w-4" /> Uploaded</> : 'Missing'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Inspection:</span>
+            <span className={inspectionFile ? "text-green-600 flex items-center gap-1" : "text-yellow-600"}>
+              {inspectionFile ? <><CheckCircle2 className="h-4 w-4" /> Uploaded</> : 'Missing'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Vehicle & Services</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Vehicle Type:</span>
+            <span className="flex items-center gap-1">
+              <Car className="h-4 w-4 text-purple-600" /> Car (Delivery)
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Services:</span>
+            <span>Food Delivery, Parcel Delivery</span>
+          </div>
+          {!skipTlcDetails && formData.nycCompliance?.tlcLicenseNumber && (
+            <div className="grid grid-cols-2 gap-2">
+              <span className="text-muted-foreground">TLC License:</span>
+              <span className="font-mono">{formData.nycCompliance.tlcLicenseNumber}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Emergency Contact</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Name:</span>
+            <span>{formData.personalInfo.emergencyContactName}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Phone:</span>
+            <span>{formData.personalInfo.emergencyContactPhone}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Relationship:</span>
+            <span>{formData.personalInfo.emergencyContactRelationship}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Background Check Consent</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="flex items-center gap-2">
+            {formData.backgroundCheckConsent ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span className="text-green-600">Consent provided</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <span className="text-yellow-600">Consent not provided</span>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200">
+        <CardContent className="p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            By submitting this application, you agree to SafeGo's Terms of Service and Partner Agreement.
+            Your application will be reviewed and you'll receive a decision within 2-3 business days.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderBackgroundCheck = () => (
+    <div className="space-y-6">
+      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4">
+            <ClipboardCheck className="h-8 w-8 text-blue-600 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Background Check Required</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                To ensure the safety of our riders and community, all SafeGo drivers must undergo a background check. 
+                This includes verification of your driving record, criminal history, and identity.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <h4 className="font-semibold">What the background check includes:</h4>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+              <span>Motor Vehicle Records (MVR) - driving history, license status, violations</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+              <span>Criminal Background - federal, state, and county records</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+              <span>National Sex Offender Registry check</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+              <span>Identity Verification - SSN trace and address history</span>
+            </li>
+            {isNycDriver && (
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <span>NYC TLC license verification and compliance check</span>
+              </li>
+            )}
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="background-check-consent"
+              checked={backgroundCheckConsent}
+              onCheckedChange={(checked) => setBackgroundCheckConsent(checked as boolean)}
+              data-testid="checkbox-background-consent"
+            />
+            <div className="grid gap-1.5 leading-none">
+              <label
+                htmlFor="background-check-consent"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                I consent to a background check
+              </label>
+              <p className="text-xs text-muted-foreground">
+                By checking this box, I authorize SafeGo and its third-party partners to conduct a background check 
+                as part of my driver application. I understand that I may be disqualified based on the results.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {!backgroundCheckConsent && (
+        <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 rounded-lg">
+          <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <p className="text-sm text-yellow-700 dark:text-yellow-400">
+            You must consent to the background check to continue with your application.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderBDPersonalInfo = () => (
+    <Form {...personalFormBD}>
+      <form className="space-y-4">
+        <FormField
+          control={personalFormBD.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>ফোন নম্বর *</FormLabel>
+              <FormControl>
+                <Input placeholder="01XXXXXXXXX" {...field} data-testid="input-phone" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={personalFormBD.control}
+          name="dateOfBirth"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>জন্ম তারিখ *</FormLabel>
+              <FormControl>
+                <Input type="date" {...field} data-testid="input-dob" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={personalFormBD.control}
+          name="fatherName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>পিতার নাম *</FormLabel>
+              <FormControl>
+                <Input placeholder="পিতার সম্পূর্ণ নাম" {...field} data-testid="input-father-name" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={personalFormBD.control}
+          name="presentAddress"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>বর্তমান ঠিকানা *</FormLabel>
+              <FormControl>
+                <Input placeholder="বর্তমান ঠিকানা" {...field} data-testid="input-present-address" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={personalFormBD.control}
+          name="permanentAddress"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>স্থায়ী ঠিকানা</FormLabel>
+              <FormControl>
+                <Input placeholder="স্থায়ী ঠিকানা (ঐচ্ছিক)" {...field} data-testid="input-permanent-address" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={personalFormBD.control}
+            name="emergencyContactName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>জরুরি যোগাযোগের নাম *</FormLabel>
+                <FormControl>
+                  <Input placeholder="নাম" {...field} data-testid="input-emergency-name" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={personalFormBD.control}
+            name="emergencyContactPhone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>জরুরি যোগাযোগের ফোন *</FormLabel>
+                <FormControl>
+                  <Input placeholder="ফোন নম্বর" {...field} data-testid="input-emergency-phone" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </form>
+    </Form>
+  );
+
+  const renderBDDocuments = () => (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Label>জাতীয় পরিচয়পত্র নম্বর (NID) *</Label>
+        <Input 
+          placeholder="NID নম্বর লিখুন (ন্যূনতম ১০ সংখ্যা)" 
+          value={nidNumber}
+          onChange={(e) => setNidNumber(e.target.value)}
+          data-testid="input-nid-number" 
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>NID সামনের ছবি</Label>
+          <label htmlFor="nid-front" className="block cursor-pointer">
+            <div className={`border-2 border-dashed rounded-lg p-6 text-center hover-elevate ${nidFrontFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+              <Upload className={`h-8 w-8 mx-auto mb-2 ${nidFrontFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+              <p className="text-sm text-muted-foreground">{nidFrontFile ? nidFrontFile.name : 'NID সামনের দিক'}</p>
+              <input type="file" accept="image/*" className="hidden" id="nid-front" onChange={(e) => setNidFrontFile(e.target.files?.[0] || null)} data-testid="input-nid-front" />
+            </div>
+          </label>
+        </div>
+        <div className="space-y-2">
+          <Label>NID পেছনের ছবি</Label>
+          <label htmlFor="nid-back" className="block cursor-pointer">
+            <div className={`border-2 border-dashed rounded-lg p-6 text-center hover-elevate ${nidBackFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
+              <Upload className={`h-8 w-8 mx-auto mb-2 ${nidBackFile ? 'text-green-600' : 'text-muted-foreground'}`} />
+              <p className="text-sm text-muted-foreground">{nidBackFile ? nidBackFile.name : 'NID পেছনের দিক'}</p>
+              <input type="file" accept="image/*" className="hidden" id="nid-back" onChange={(e) => setNidBackFile(e.target.files?.[0] || null)} data-testid="input-nid-back" />
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderReviewUS = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Personal Information</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Name:</span>
+            <span>{formData.personalInfo.usaFullLegalName}</span>
+            <span className="text-muted-foreground">Phone:</span>
+            <span>{formData.personalInfo.phone}</span>
+            <span className="text-muted-foreground">Date of Birth:</span>
+            <span>{formData.personalInfo.dateOfBirth}</span>
+          </div>
+          <div className="pt-2 border-t mt-2">
+            <p className="text-muted-foreground text-xs mb-1">Address:</p>
+            <p>{formData.personalInfo.usaStreet}{formData.personalInfo.usaAptUnit ? `, ${formData.personalInfo.usaAptUnit}` : ''}</p>
+            <p>{formData.personalInfo.usaCity}, {formData.personalInfo.usaState} {formData.personalInfo.usaZipCode}</p>
+          </div>
+          <div className="pt-2 border-t">
+            <p className="text-muted-foreground text-xs mb-1">Emergency Contact:</p>
+            <p>{formData.personalInfo.emergencyContactName} ({formData.personalInfo.emergencyContactRelationship})</p>
+            <p>{formData.personalInfo.emergencyContactPhone}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Driver License</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">License #:</span>
+            <span className="font-mono">{formData.licenseInfo.driverLicenseNumber}</span>
+            <span className="text-muted-foreground">State:</span>
+            <span>{formData.licenseInfo.driverLicenseState}</span>
+            <span className="text-muted-foreground">Expires:</span>
+            <span>{formData.licenseInfo.driverLicenseExpiry}</span>
+          </div>
+          <div className="flex gap-2 mt-3">
+            {licenseFrontFile && <Badge variant="secondary" className="text-xs">Front image uploaded</Badge>}
+            {licenseBackFile && <Badge variant="secondary" className="text-xs">Back image uploaded</Badge>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Vehicle Details</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Type:</span>
+            <span className="capitalize">{formData.vehicleInfo.vehicleType}</span>
+            <span className="text-muted-foreground">Vehicle:</span>
+            <span>{formData.vehicleInfo.vehicleYear} {formData.vehicleInfo.vehicleMake} {formData.vehicleInfo.vehicleModel}</span>
+            <span className="text-muted-foreground">Color:</span>
+            <span>{formData.vehicleInfo.vehicleColor}</span>
+            <span className="text-muted-foreground">Plate:</span>
+            <span className="font-mono">{formData.vehicleInfo.vehiclePlate}</span>
+          </div>
+          <div className="flex gap-2 mt-3">
+            {registrationFile && <Badge variant="secondary" className="text-xs">Registration uploaded</Badge>}
+            {insuranceFile && <Badge variant="secondary" className="text-xs">Insurance uploaded</Badge>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {isNycDriver && formData.nycCompliance && (
+        <Card className="border-blue-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">NYC Compliance</CardTitle>
+              <Badge className="bg-blue-600 text-xs">TLC/FHV</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <span className="text-muted-foreground">TLC License #:</span>
+              <span className="font-mono">{formData.nycCompliance.tlcLicenseNumber}</span>
+              <span className="text-muted-foreground">TLC Expiry:</span>
+              <span>{formData.nycCompliance.tlcLicenseExpiry}</span>
+              {/* FHV Number hidden per NYC rule - admin will extract from uploaded document */}
+              <span className="text-muted-foreground">DMV Inspection:</span>
+              <span>{formData.nycCompliance.dmvInspectionDate} - {formData.nycCompliance.dmvInspectionExpiry}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {tlcFrontFile && <Badge variant="secondary" className="text-xs">TLC front uploaded</Badge>}
+              {tlcBackFile && <Badge variant="secondary" className="text-xs">TLC back uploaded</Badge>}
+              {fhvFile && <Badge variant="secondary" className="text-xs">FHV doc uploaded</Badge>}
+              {dmvInspectionFile && <Badge variant="secondary" className="text-xs">DMV inspection uploaded</Badge>}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200">
+        <CardContent className="p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            By submitting this application, you agree to SafeGo's Terms of Service and Partner Agreement. 
+            Your application will be reviewed within {config?.approvalMessage || '24-48 hours'}.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderReviewBD = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">ব্যক্তিগত তথ্য</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">ফোন:</span>
+            <span>{formData.personalInfo.phone}</span>
+            <span className="text-muted-foreground">জন্ম তারিখ:</span>
+            <span>{formData.personalInfo.dateOfBirth}</span>
+            <span className="text-muted-foreground">পিতার নাম:</span>
+            <span>{formData.personalInfo.fatherName}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">গাড়ির তথ্য</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">ধরন:</span>
+            <span>{formData.vehicleInfo.vehicleType}</span>
+            <span className="text-muted-foreground">মডেল:</span>
+            <span>{formData.vehicleInfo.vehicleModel}</span>
+            <span className="text-muted-foreground">প্লেট:</span>
+            <span>{formData.vehicleInfo.vehiclePlate}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">কাগজপত্র</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">NID:</span>
+            <span className="font-mono">{formData.documents.nidNumber}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200">
+        <CardContent className="p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            এই আবেদন জমা দিয়ে, আপনি SafeGo-এর সেবার শর্তাবলী এবং পার্টনার চুক্তিতে সম্মত হচ্ছেন।
+            আপনার আবেদন পর্যালোচনা করা হবে।
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderStepContent = () => {
+    if (isUS) {
+      if (isBicycleDelivery || isWalkingDelivery) {
+        if (currentStep === 1) return renderUSPersonalInfo();
+        if (currentStep === 2) return renderGovernmentIdOnly();
+        if (currentStep === 3) return renderBackgroundCheck();
+        if (currentStep === 4) return renderReviewUSBicycle();
+      } else if (isCarDelivery) {
+        if (currentStep === 1) return renderUSPersonalInfo();
+        if (currentStep === 2) return renderLicenseInfo();
+        if (currentStep === 3) return renderCarVehicleDocuments();
+        if (currentStep === 4) return renderBackgroundCheck();
+        if (currentStep === 5) return renderReviewUSCar();
+      } else if (isNycDriver) {
+        if (currentStep === 1) return renderUSPersonalInfo();
+        if (currentStep === 2) return renderLicenseInfo();
+        if (currentStep === 3) return renderVehicleInfo();
+        if (currentStep === 4) return renderNycCompliance();
+        if (currentStep === 5) return renderBackgroundCheck();
+        if (currentStep === 6) return renderReviewUS();
+      } else {
+        if (currentStep === 1) return renderUSPersonalInfo();
+        if (currentStep === 2) return renderLicenseInfo();
+        if (currentStep === 3) return renderVehicleInfo();
+        if (currentStep === 4) return renderBackgroundCheck();
+        if (currentStep === 5) return renderReviewUS();
+      }
+    } else {
+      if (currentStep === 1) return renderBDPersonalInfo();
+      if (currentStep === 2) return renderVehicleInfo();
+      if (currentStep === 3) return renderBDDocuments();
+      if (currentStep === 4) return renderReviewBD();
+    }
+    return null;
+  };
+
+  const isLastStep = currentStep === STEPS.length;
+
+  return (
+    <div className="min-h-screen bg-background p-4 sm:p-6">
+      <div className="max-w-2xl mx-auto">
+        <Link href="/customer">
+          <Button variant="ghost" className="mb-6" data-testid="button-back">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+        </Link>
+
+        <div className="text-center mb-8">
+          <div className={`h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+            isCarDelivery ? 'bg-gradient-to-br from-purple-500/20 to-blue-500/20' :
+            driverType === 'ride' ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20' :
+            'bg-gradient-to-br from-green-500/20 to-emerald-500/20'
+          }`}>
+            {driverType === 'ride' ? (
+              <Car className="h-8 w-8 text-blue-600" />
+            ) : isCarDelivery ? (
+              <Car className="h-8 w-8 text-purple-600" />
+            ) : (
+              <Bike className="h-8 w-8 text-green-600" />
+            )}
+          </div>
+          <h1 className="text-2xl font-bold">
+            {driverType === 'ride' ? 'Ride Driver' : 'Delivery Driver'} Registration
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {isCarDelivery ? 'Car delivery with full vehicle documents' : 'Complete all steps to submit your application'}
+          </p>
+          {isCarDelivery && (
+            <Badge className="mt-2 bg-purple-600">Car Delivery</Badge>
+          )}
+          {isNycDriver && !isCarDelivery && (
+            <Badge className="mt-2 bg-blue-600">NYC TLC/FHV Required</Badge>
+          )}
+        </div>
+
+        <div className="mb-8">
+          <div className="flex justify-between text-sm mb-2">
+            <span>Step {currentStep} of {STEPS.length}</span>
+            <span>{Math.round(progressPercent)}% Complete</span>
+          </div>
+          <Progress value={progressPercent} className="h-2" />
+        </div>
+
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {STEPS.map((step) => {
+            const Icon = step.icon;
+            const isCompleted = currentStep > step.id;
+            const isCurrent = currentStep === step.id;
+            return (
+              <div
+                key={step.id}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg flex-shrink-0 ${
+                  isCompleted ? 'bg-green-100 dark:bg-green-900/30' :
+                  isCurrent ? 'bg-primary/10' : 'bg-muted'
+                }`}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Icon className={`h-4 w-4 ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`} />
+                )}
+                <span className={`text-sm whitespace-nowrap ${isCurrent ? 'font-medium' : ''}`}>{step.title}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <StepIcon className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
+                <CardDescription>{STEPS[currentStep - 1].desc}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {renderStepContent()}
+
+            <div className="flex justify-between mt-6 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                disabled={currentStep === 1}
+                data-testid="button-previous"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
+              
+              {isLastStep ? (
+                <Button 
+                  onClick={handleSubmit}
+                  disabled={submitMutation.isPending}
+                  data-testid="button-submit"
+                >
+                  {submitMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Submit Application
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={handleNext} data-testid="button-next">
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

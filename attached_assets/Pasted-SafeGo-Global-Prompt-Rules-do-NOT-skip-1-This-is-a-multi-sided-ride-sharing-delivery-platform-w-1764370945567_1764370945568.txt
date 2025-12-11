@@ -1,0 +1,130 @@
+SafeGo Global Prompt Rules (do NOT skip)
+1. This is a multi-sided ride-sharing + delivery platform with 4 roles: Rider (customer), Driver, Restaurant/Merchant, and Admin.
+2. Core domains: ride-hailing, food delivery (SafeGo Eats), and parcel/courier, with a shared account system and shared payment methods.
+3. All pricing must respect existing USA/NYC TLC fare logic already implemented: base fares, surcharges, congestion, airport fees, AVF, BCF, HVRF, state surcharge, long-trip surcharge, out-of-town fees, tolls, cross-state fares, commissions, service fees, surge pricing, AI Marketplace Balancer, and TLC minimum pay enforcement. Never break or bypass this pipeline.
+4. Commission and payouts: platform commission and service fees are already implemented globally; TLC regulatory fees are pass-through and must never be included in commission. Any new feature must keep this invariant.
+5. Security & safety: 
+   - Never expose internal IDs or sensitive metadata in the UI or logs.
+   - All write APIs must be authenticated and authorization-checked for the correct role.
+   - Do not weaken existing auth middleware or validation.
+6. Status flows and transparency: riders and drivers must always see clear breakdowns (fares, fees, surcharges, discounts) with correct flags; any new UI must keep these breakdowns accurate and understandable.
+7. Backward compatibility: do NOT remove or break existing routes, components, tests, or TLC logic. Extend safely and keep existing tests passing. Add new tests for new behavior.
+8. Country mode: we are currently in USA / NYC mode. Do not add BD logic here. Respect U.S. card-only payments; cash is not available in the U.S. flow.
+9. Vehicle categories are prefixed with SAFEGO_ in the backend and must map cleanly to user-friendly labels in the UI. Do not change existing SAFEGO_ constants or pricing multipliers.
+10. Keep code clean, incremental, and well-documented. Update replit.md with every new feature: what it does, where the code lives, and how it interacts with the fare engine and dispatch system.
+
+--------------------------------------------------
+C3 – Rider Vehicle Category UI (Rider-facing car selection)
+Goal:
+Extend the rider “Plan your ride / See prices” flow so that, after entering pickup/dropoff and fetching the fare, the screen shows a horizontal list of vehicle categories with real-time prices for each category, similar to Uber. Categories must be fully wired to the existing C2 pricing logic and the multi-category dispatch system.
+
+Context:
+- Backend already supports 7 vehicle categories with SAFEGO_ prefixes and category-specific multipliers:
+  • SAFEGO_X
+  • SAFEGO_COMFORT
+  • SAFEGO_COMFORT_XL
+  • SAFEGO_XL
+  • SAFEGO_BLACK
+  • SAFEGO_BLACK_SUV
+  • SAFEGO_WAV
+- C1 and C2 are already implemented:
+  • C1: multi-category vehicle system, driver eligibility, and dispatch mapping.
+  • C2: rider vehicle category pricing logic (per-category fare calculation using multipliers), but the UI still shows only a single generic estimated fare.
+- Do NOT change any fare pipeline math or TLC regulatory fees. Use the existing pricing outputs that C2 already provides.
+
+Tasks (follow serial order):
+1. Analyze current rider flow
+   - Locate the components that render:
+     • “See prices” / “Plan your ride” screen.
+     • Estimated fare and route options.
+   - Identify where the current single “Estimated fare” value comes from (API response / pricing object).
+   - Confirm how the backend returns per-category pricing from C2 (e.g., an array or map keyed by SAFEGO_ constants). If needed, add a small, backward-compatible field to the pricing API to expose the full per-category breakdown without changing TLC math.
+
+2. Define category mapping + UI model
+   - Create a clear mapping from backend constants to UI labels, descriptions, and icons:
+     • SAFEGO_X           → label: "SafeGo X"       (standard, 1–4 riders)
+     • SAFEGO_COMFORT     → label: "SafeGo Comfort" (newer, more comfortable cars)
+     • SAFEGO_COMFORT_XL  → label: "Comfort XL"     (larger, comfortable, 5–6 riders)
+     • SAFEGO_XL          → label: "SafeGo XL"      (larger, standard, 5–6 riders)
+     • SAFEGO_BLACK       → label: "SafeGo Black"   (premium black sedans)
+     • SAFEGO_BLACK_SUV   → label: "SafeGo Black SUV" (premium SUVs)
+     • SAFEGO_WAV         → label: "SafeGo WAV"     (wheelchair accessible)
+   - Add a small, type-safe model/type in the frontend for:
+     • id (SAFEGO_ constant)
+     • public label
+     • short subtitle (e.g., “Affordable everyday rides” / “Premium comfort” / “Accessible vehicle”)
+     • icon name or component reference
+   - Make sure this mapping is used in exactly one place (single source of truth) and reused by any category UI.
+
+3. Integrate per-category pricing into the rider screen
+   - Modify the pricing API client and state management so that, when a rider taps “See prices”, the app:
+     • Fetches the full pricing breakdown including category-specific fares from C2.
+     • Stores both the “default” recommended category and the full 7-category pricing map.
+   - Update the “Plan your ride” / fare sheet so that:
+     • Above or beside the route details we still show an overall route summary (distance, time, traffic).
+     • Below that, add a **horizontal category selector** (scrollable if needed) with one card per available category.
+   - Each category card must display at minimum:
+     • UI label (e.g., “SafeGo X”).
+     • Estimated fare for that category (already including TLC fees, surcharges, etc., as computed by C2).
+     • Short subtitle, e.g., “Affordable everyday” / “More comfort” / “Premium black” / “Accessible”.
+   - The selected category must be visually highlighted.
+   - When the user taps a different category:
+     • Update the displayed fare and any summary text to match that category.
+     • Update the selected category in the booking state so the dispatch system receives the correct SAFEGO_ category.
+
+4. Respect driver eligibility and preferences (no new backend changes)
+   - Use existing data from C1 and the dispatch system that indicates which categories are actually serviceable for this trip.
+   - For categories not currently available:
+     • Show them visually dimmed or with a “Currently unavailable” subtext.
+     • Disable tapping on those cards (no category change to an unavailable type).
+   - For WAV (SAFEGO_WAV):
+     • Always keep the category visible but only enable selection when the dispatch logic says WAV is available.
+     • Do NOT allow drivers to opt out of WAV compliance rules via the rider UI.
+   - Do NOT introduce new rules that contradict dispatch; only reflect what is already computed.
+
+5. TLC & pricing safeguards
+   - Ensure that switching categories:
+     • Never removes or changes TLC regulatory fees (congestion, AVF, BCF, HVRF, tolls, etc.).
+     • Only adjusts the category multipliers and any category-level adjustments allowed by C2.
+   - The fare breakdown (when expanded) must still show:
+     • Base fare components.
+     • TLC fees as separate labeled items.
+     • Surge, cross-state fares, out-of-town fee, etc., unchanged.
+   - Keep all commission and service fee logic intact. The UI must still reflect the same totals the backend computes.
+
+6. UX details and edge cases
+   - Default selection:
+     • When the screen loads, select the recommended category (likely SAFEGO_X or the one provided by the backend).
+   - Long trips / cross-state trips:
+     • Ensure that the category list still works for cross-state and out-of-town trips, using the dedicated cross-state fare logic already implemented.
+   - Loading states & errors:
+     • Show a clear loading state while fetching per-category pricing.
+     • If pricing fails to load, show a safe fallback (e.g., single estimated fare with a clear error message) instead of a broken UI.
+   - Make sure the layout is responsive on mobile web; cards should be easily scrollable with touch.
+
+7. Implementation constraints
+   - Do NOT remove any existing components or delete existing pricing code.
+   - If you need new components (e.g., CategoryCarousel, VehicleCategoryCard), create them with clear names and keep them reusable.
+   - Make sure the “Request ride” button always uses the currently selected category id (SAFEGO_ constant) when creating the ride request.
+
+8. Tests
+   - Add frontend tests to verify:
+     • Category mapping from SAFEGO_ constants to labels and icons.
+     • Per-category pricing selection updates the displayed fare and selected category state.
+     • Unavailable categories are disabled and cannot be selected.
+     • WAV category remains visible and locked to the accessibility rules.
+   - Keep all existing tests passing, especially TLC pricing and fare breakdown tests.
+
+9. Documentation
+   - Update replit.md with:
+     • “C3 – Rider Vehicle Category UI” section.
+     • Explanation of how the rider category selector works.
+     • Where the mapping is defined.
+     • How it ties into C1 (multi-category vehicles), C2 (pricing), and the dispatch system.
+
+When you are done:
+- Confirm that:
+  • The rider “Plan your ride / See prices” screen shows all 7 categories with correct prices.
+  • Changing categories updates the fare and selection without breaking TLC logic.
+  • “Request ride” sends the correct SAFEGO_ category to the backend.
+- Then summarize the changes, files touched, and any follow-up steps you recommend.

@@ -1,0 +1,148 @@
+You must now implement SafeGo Master Serial Tasks 16–22 (Fraud Prevention Layer) in ONE unified, non-breaking update. All SafeGo Master Rules remain fully enforced.
+
+=====================================================================
+SECTION 0 — SAFEGO MASTER RULES (ENFORCED)
+=====================================================================
+You must NOT break:
+- ride/food/parcel collections,
+- commission rules,
+- BD/US KYC logic,
+- status flows,
+- privacy/consent enforcement,
+- pricing/tax logic,
+- partner onboarding system.
+
+Fraud Prevention additions must be additive, modular, and backward compatible.
+
+=====================================================================
+SECTION 1 — TASK SET (16–22)
+=====================================================================
+
+---------------------------------------------------------------------
+TASK 16 — One-Account-Per-Device Enforcement
+---------------------------------------------------------------------
+• Assign unique device_id to user devices (hashed, privacy-safe).
+• Prevent same user from logging into multiple devices simultaneously.
+• If device mismatch detected:
+    - log event → fraud_events table
+    - notify user
+• Allow Admin to whitelist multiple devices for special accounts.
+
+---------------------------------------------------------------------
+TASK 17 — Device Fingerprinting System
+---------------------------------------------------------------------
+• Create fingerprint data:
+    - device_id (hashed)
+    - OS
+    - model
+    - app_version
+• Use this for fraud detection, risk scoring, and anomaly alerts.
+• Store in device_fingerprints table.
+
+---------------------------------------------------------------------
+TASK 18 — Fake GPS Detection Layer
+---------------------------------------------------------------------
+• Detect impossible jumps:
+    - >5 km movement in <5 seconds,
+    - repeated teleport patterns,
+    - mismatch between device GPS & IP geolocation.
+• When detected:
+    - mark event in fraud_events
+    - auto-restrict ride/parcel actions until verified.
+
+---------------------------------------------------------------------
+TASK 19 — Parcel COD Fraud Protection Engine
+---------------------------------------------------------------------
+• Add COD validation rules:
+    - suspicious repeated COD cancellations,
+    - mismatched pickup/drop-off locations,
+    - high-value COD monitoring.
+• Auto-flag users with COD anomalies.
+• Store in cod_fraud_logs table.
+• Auto-restrict if threshold exceeded.
+
+---------------------------------------------------------------------
+TASK 20 — Merchant/Partner Manipulation Detection
+---------------------------------------------------------------------
+• Detect abnormal behavior:
+    - forced self-ordering,
+    - order padding,
+    - fake delivery cycles,
+    - too many acceptance → cancellation loops.
+• Create table: partner_fraud_logs.
+• Auto-restrict merchant until Admin reviews.
+
+---------------------------------------------------------------------
+TASK 21 — IP Anomaly + VPN Abuse Detection
+---------------------------------------------------------------------
+• Detect:
+    - IP changes between countries in minutes,
+    - known VPN ranges,
+    - mismatched IP vs GPS region.
+• Add table: ip_anomaly_logs.
+• If anomaly detected:
+    - require re-verification or 2FA
+    - alert Admin team
+
+---------------------------------------------------------------------
+TASK 22 — Suspicious Behavior Scoring Engine
+---------------------------------------------------------------------
+• Create fraud_score for each user (0–100 scale).
+• Inputs:
+    - device mismatch,
+    - fake GPS,
+    - IP anomaly,
+    - COD fraud,
+    - report frequency,
+    - cancellation abuse,
+    - partner manipulation logs.
+• If fraud_score > threshold:
+    - auto-restrict account (role_status = “restricted”)
+    - require manual Admin clearance.
+
+=====================================================================
+SECTION 2 — DATABASE STRUCTURES REQUIRED
+=====================================================================
+Add tables (non-breaking):
+- fraud_events
+- device_fingerprints
+- cod_fraud_logs
+- partner_fraud_logs
+- ip_anomaly_logs
+- fraud_scores
+
+Do NOT rename or remove existing schema.
+
+=====================================================================
+SECTION 3 — ADMIN PANEL UPDATES
+=====================================================================
+Add a new section: “Fraud Prevention Center”
+Admin can:
+• view fraud logs,
+• adjust thresholds (GPS threshold, risk score threshold),
+• whitelist devices,
+• lift restrictions,
+• update fraud detection rules.
+
+=====================================================================
+SECTION 4 — ENFORCEMENT (ALL ROLES)
+=====================================================================
+You must enforce:
+• If fraud_score > threshold → block business actions.
+• If fake GPS detected → block ride/parcel/delivery actions.
+• If COD fraud flagged → block COD orders.
+• If merchant manipulation detected → freeze merchant operations.
+
+=====================================================================
+SECTION 5 — NON-BREAKING VALIDATION
+=====================================================================
+Verify:
+• No KYC modifications.
+• No pricing/commission logic changes.
+• No ride/food/parcel status flow modifications.
+• No breaking of existing privacy/consent logic.
+• All fraud systems run in background without affecting normal users.
+
+Finally report:
+
+“Tasks 16–22 (SafeGo Fraud Prevention Layer) fully implemented — non-breaking and SafeGo Master Rules compliant.”

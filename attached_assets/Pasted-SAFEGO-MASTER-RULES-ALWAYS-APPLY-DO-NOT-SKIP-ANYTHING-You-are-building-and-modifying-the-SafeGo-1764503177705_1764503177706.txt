@@ -1,0 +1,255 @@
+SAFEGO MASTER RULES (ALWAYS APPLY – DO NOT SKIP ANYTHING)
+
+You are building and modifying the SafeGo global super-app.
+You MUST follow ALL of these rules strictly for EVERY task, without skipping or simplifying.
+
+A) ROLES — ALWAYS include all 4 roles (never mix permissions):
+1. Customer
+2. Driver
+3. Restaurant (Merchant)
+4. Admin
+
+Each role must have its own, clearly separated:
+- signup requirements
+- country-specific KYC/verification rules
+- dashboard UI
+- permissions & data access
+- status flows
+
+No role may access another role’s private area.
+
+B) GLOBAL APP LOGIC — CORE SERVICES (must ALWAYS be supported):
+SafeGo supports 3 major services:
+1. Ride-hailing
+2. Food delivery (SafeGo Eats)
+3. Parcel delivery
+
+All new features and changes must remain compatible with these 3 services and their data models.
+
+The app works WORLDWIDE, but must have country-specific logic at minimum for:
+- Bangladesh ("BD")
+- United States ("US")
+
+C) COUNTRY-SPECIFIC KYC (MANDATORY BRANCHING):
+
+BANGLADESH (BD) mandatory KYC fields (per user type):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status (e.g. "pending", "approved", "rejected")
+- is_verified (boolean)
+
+UNITED STATES (US) mandatory KYC fields:
+For all:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type (e.g. "SSN", "State ID", "Passport")
+- government_id_last4
+- verification_status
+- is_verified
+
+For DRIVERS in US ONLY (extra mandatory):
+- driver_license_number
+- driver_license_image
+- driver_license_expiry
+- ssn_last4 (optional field but supported)
+- driver_background_check_status (if present, only Admin can update)
+
+You must ALWAYS implement KYC flows with explicit branching for BD vs US for all 4 roles, using these fields.
+
+D) ADMIN PANEL — ALWAYS REQUIRED AND AUTHORITATIVE:
+Admin panel must always support at least:
+
+- View and verify customers (BD + US)
+- View and verify drivers (BD + US)
+- View and verify restaurants (BD + US)
+- Approve/reject KYC with:
+  - verification_status
+  - rejection_reason (required when rejecting)
+- Update pricing, global fees, and commissions for:
+  - rides
+  - food_orders (SafeGo Eats)
+  - deliveries (parcel)
+- Block/unblock any user (customer/driver/restaurant) with:
+  - blocked_reason
+  - blocked_at
+- Manage payouts and settlements:
+  - driver_wallet_balance
+  - restaurant_wallet_balance
+  - platform_revenue accounts
+- View negative balances:
+  - driver_negative_balance
+  - restaurant_negative_balance
+- Audit log for critical actions (verification, blocking, pricing change, payout).
+
+Only Admin may change:
+- pricing & commission rules
+- verification_status and is_verified
+- block/unblock state
+- settlement status of negative balances
+
+E) CORE COLLECTIONS (NEVER REMOVE; ALWAYS INCLUDE):
+
+You MUST always preserve and use these collections:
+
+1. rides
+2. food_orders
+3. deliveries
+
+Each collection must include at least:
+
+Identity fields:
+- customer_id
+- driver_id (if assigned)
+- restaurant_id (for food_orders)
+- admin_id (for manual overrides where applicable)
+
+Location fields:
+- pickup_address / dropoff_address (for rides, deliveries)
+- restaurant_address / delivery_address (for food_orders)
+- latitude / longitude (geo coordinates)
+
+Financial fields:
+- base_price
+- distance_fee (where applicable)
+- service_fee
+- platform_commission_amount
+- driver_earnings_amount (for rides/deliveries)
+- restaurant_earnings_amount (for food_orders)
+- total_amount_charged_to_customer
+- payment_method (e.g. "cash", "card", "wallet")
+- payment_status (e.g. "pending", "paid", "refunded")
+
+Timestamps:
+- created_at
+- updated_at
+- accepted_at
+- completed_at
+- cancelled_at (if applicable)
+
+Status flow (see Section H):
+- status field strictly following allowed lifecycle for its service
+
+Rating & feedback:
+- customer_rating
+- customer_feedback
+- driver_rating (for rides/deliveries)
+- restaurant_rating (for food_orders)
+- internal_tags (for quality/safety flags)
+
+Any new feature must extend these collections ADDITIVELY (no renaming or deleting existing fields).
+
+F) COMMISSION & PAYOUT RULES — ALWAYS ENFORCE:
+
+1. If customer pays CASH for a ride:
+   - Driver receives full cash from customer.
+   - SafeGo’s commission for that ride becomes a negative balance:
+     - driver_wallet_balance decreases by platform_commission_amount
+     - This is shown as driver_negative_balance.
+   - Driver must settle this negative balance weekly (or per configured schedule).
+
+2. If food order is CASH:
+   - Restaurant receives all cash from customer.
+   - SafeGo’s commission becomes negative balance in:
+     - restaurant_wallet_balance (decreasing it)
+     - This is shown as restaurant_negative_balance.
+   - Restaurant must settle this negative balance as per schedule.
+
+3. If payment is ONLINE (card/wallet):
+   - SafeGo receives the full online payment.
+   - SafeGo automatically keeps its commission.
+   - Driver/restaurant payouts are calculated net of commissions and fees.
+
+4. Admin can:
+   - mark driver_negative_balance as settled
+   - mark restaurant_negative_balance as settled
+   - trigger payouts
+   - adjust balances with proper audit logs
+
+These rules MUST be preserved in all logic and never broken.
+
+G) SECURITY & PRIVACY RULES — ALWAYS ENFORCED:
+
+- Customers cannot view driver documents (NID, license, SSN, etc).
+- Drivers cannot view customer NID or other sensitive KYC documents.
+- Restaurants cannot view other restaurants’ data, balances, menus, or KYC.
+- Only Admin can see full KYC documents for any user.
+- Only Admin can change:
+  - verification_status
+  - is_verified
+  - pricing and commissions
+  - blocking/unblocking
+- Users can update ONLY their own profile, and only allowed non-admin fields.
+- All PII and KYC images must be access-controlled and not exposed via public URLs.
+- Logging must avoid storing full sensitive numbers (only last4, masked display).
+
+H) STATUS FLOWS — MUST BE COMPLETE AND CONSISTENT:
+
+Ride statuses (rides collection):
+requested → searching_driver → accepted → driver_arriving → in_progress → completed
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+Food delivery statuses (food_orders collection):
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+Parcel statuses (deliveries collection):
+requested → searching_driver → accepted → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+You must NEVER introduce a new status that breaks these flows; you may only add compatible sub-states or metadata.
+
+I) ONBOARDING — MULTI-STEP FOR EACH ROLE (BLOCK ACCESS UNTIL VERIFIED):
+
+For Customer, Driver, Restaurant, Admin user accounts:
+
+Onboarding steps:
+1. Basic info (name, email, phone, country, role)
+2. Address information (country-aware, e.g. BD vs US fields)
+3. KYC upload (with country-specific fields from section C)
+4. Emergency contact (name + phone, stored per country rules)
+5. Set verification_status = "pending", is_verified = false
+6. Until Admin approves:
+   - Customers: limited access (e.g. can browse, but may have restrictions per business rule)
+   - Drivers: cannot accept rides/deliveries
+   - Restaurants: cannot go live or receive orders
+   - Admin: must complete internal checks
+
+J) NOTIFICATIONS — ALWAYS INCLUDE:
+
+The system must support notifications (push, in-app, or email) for:
+
+- New ride request alert for drivers
+- New food order alert for restaurants
+- Parcel pickup/delivery updates for drivers and customers
+- Order and ride status changes for customers
+- Verification approval/rejection for all roles (with rejection_reason where needed)
+- Important admin notifications (e.g. high driver_negative_balance, restaurant_negative_balance, fraud flags, etc.)
+
+K) IMPLEMENTATION & COMPATIBILITY RULES:
+
+- Do NOT break any existing SafeGo features, schemas, routes, or APIs.
+- All changes must be backward-compatible:
+  - Do not rename or remove fields, tables, collections, or API endpoints.
+  - Only ADD new fields/endpoints/components/derived views.
+- Preserve all existing routes and UI navigation.
+- When in doubt about a change that might break something, prefer an additive alternative (e.g. new view, new derived field, or new component) instead of modifying/removing.
+
+L) SECURITY ROADMAP PHASES (reference when adding security features):
+
+When implementing features, explicitly note which security aspects are being covered, such as:
+- Access control & role separation
+- Data minimization & masking (e.g. last4 only)
+- Audit logging for admin actions
+- Input validation and protection against injection / tampering
+
+You MUST always assume these master rules are active and binding on every task.
+Do not restate them in your own words, just obey them exactly.

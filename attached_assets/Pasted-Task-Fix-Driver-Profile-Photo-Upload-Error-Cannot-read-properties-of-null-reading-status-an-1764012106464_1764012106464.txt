@@ -1,0 +1,119 @@
+Task: Fix Driver Profile Photo Upload Error (“Cannot read properties of null (reading 'status')”) and harden the D1 driver image upload flow without breaking existing systems.
+
+Context:
+- I’m in Driver Phase D1.
+- Multi-vehicle schema is already implemented and pushed.
+- Driver Vehicle Registration page is working.
+- When I try to upload a driver profile photo, I see a red error toast:
+  “Upload failed – Cannot read properties of null (reading 'status')”.
+- This means the frontend is trying to read response.status (or similar) from a null/undefined object.
+- Restaurant side already has working image uploads (menu item images, review images). Keep those working.
+
+Goals:
+1. Fix the driver profile photo upload so that:
+   - Valid images upload successfully.
+   - The UI shows a success message and updated avatar.
+   - The image persists after refreshing the page.
+   - No “null status” runtime errors appear in the console.
+
+2. Make the driver image upload system production-ready at a “MVP-safe” level:
+   - Correct API route(s) for profile images.
+   - Strong validation (auth, KYC, ownership, file type/size).
+   - Safe error handling (no null responses, no unhandled exceptions).
+
+Please follow this plan:
+
+Phase D1-IMG-1: Analyze current implementation
+1. Open the driver profile/settings pages and any related components that handle profile photo upload.
+   - For example: `client/src/pages/driver/profile.tsx` or similar.
+   - Identify the exact API route and client logic used for:
+     - “Click to upload profile photo”
+     - The red error toast message.
+2. Open the backend routes and services for driver uploads:
+   - Look for something like `/api/driver/profile/photo`, `/api/driver/profile/image`, or shared upload handlers.
+   - Confirm whether a driver-specific upload endpoint actually exists, or if the frontend is calling a missing/incorrect route.
+3. Run the app, attempt a profile photo upload, and inspect:
+   - Browser console errors.
+   - Network tab (request URL, status code, response body).
+   - Server logs.
+
+Deliverables for this phase:
+- Short note in `replit.md` describing:
+  - Which endpoint the frontend calls.
+  - What the backend currently does (or is missing).
+  - Why the “Cannot read properties of null (reading 'status')” error occurs.
+
+Phase D1-IMG-2: Fix backend driver profile image upload API
+1. If a driver profile upload endpoint does NOT exist or is incomplete, add/complete it. For example (adjust naming to match existing patterns):
+
+   - `POST /api/driver/profile/photo`
+     - Auth required: driver role only.
+     - KYC check using the existing helper (for drivers) – equivalent of `getVerifiedDriverProfile()` used on the restaurant side.
+     - Ownership / identity enforcement – the upload must belong to the authenticated driver.
+     - Accept only image MIME types (e.g. jpeg, png, webp).
+     - Enforce size limit (5MB max, matching current UI text).
+     - Store images in the same or compatible storage approach used for restaurant images.
+     - Persist the file URL in the appropriate field on the driver profile model.
+
+2. Reuse existing upload infrastructure where possible:
+   - Reuse the same storage adapter and validation utilities used for restaurant menu/review images.
+   - Do NOT break restaurant uploads.
+
+3. Ensure safe transactional behaviour:
+   - If you perform both file write and DB update:
+     - On DB failure, clean up the uploaded file (no orphaned uploads).
+     - On file-storage failure, do not update the DB.
+   - You do not need to implement a full refactor of the wallet service here; just make the driver image upload internally consistent and safe.
+
+4. Return a clear JSON response, never `null`:
+   - On success: include at least `{ success: true, imageUrl: "<url>" }`.
+   - On validation/auth/KYC error: return a proper HTTP status (400/401/403) with a JSON body like `{ success: false, message: "…" }`.
+   - Avoid any path where the handler returns `null` or `undefined`.
+
+Phase D1-IMG-3: Fix frontend driver profile upload handling
+1. In the driver profile/settings page:
+   - Find the code that sends the upload request and reads the response.
+   - Replace any direct usage like `response.status` when `response` might be null/undefined.
+   - Always check:
+     - If fetch/axios call itself failed.
+     - If response parsing failed.
+     - If `success` is false in the JSON payload.
+
+2. Implement robust error handling:
+   - If the server returns an error JSON, show a friendly error toast with `message` from the server.
+   - If the server cannot be reached or throws an unexpected 500, show a generic error message, but do not crash the component.
+   - Never allow the UI to try to read `status` from a null object.
+
+3. On success:
+   - Update the displayed profile avatar to use the new `imageUrl`.
+   - Optionally store the updated driver profile in the client store/state.
+   - Show a green success toast (or reuse the existing success pattern).
+
+Phase D1-IMG-4: Security, KYC, and tests
+1. Security:
+   - Ensure only the authenticated driver can upload their own profile image.
+   - Enforce KYC / “verified driver” status if that is required before going online.
+   - Validate that the uploaded file belongs to the driver profile resolved from the auth context.
+
+2. Tests / validation:
+   - Manually test these scenarios:
+     - Valid image (<5MB, allowed type) → upload succeeds, avatar updates, no console errors.
+     - Oversized file or disallowed type → upload fails gracefully with a clear message.
+     - Driver not properly onboarded/KYC’d (simulate if possible) → endpoint returns 403 with clear JSON, UI shows a user-friendly message and does not crash.
+   - Confirm that restaurant image uploads still work after your changes.
+
+Phase D1-IMG-5: Documentation
+1. Update `replit.md` in the Driver D1 section with:
+   - Final API contract(s) for driver profile photo upload.
+   - Any new helper functions, middleware, or shared utilities introduced.
+   - Known limitations, if any (for example, if multiple profile photos are not supported).
+
+Acceptance criteria:
+- Uploading a valid profile photo for a driver no longer triggers:
+  “Upload failed – Cannot read properties of null (reading 'status')”.
+- The driver’s avatar updates immediately and persists after page refresh.
+- All errors are properly surfaced via toasts/alerts without UI crashes.
+- Restaurant-side image uploads remain fully functional.
+- D1 remains consistent with global SafeGo security conventions (auth, KYC, RBAC, audit logging where appropriate).
+
+Start with the backend/endpoint analysis and then show me a brief summary of what you changed before moving to the next D1 tasks.

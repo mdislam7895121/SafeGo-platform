@@ -1,0 +1,202 @@
+You are working on the SafeGo platform.
+
+============================
+GLOBAL SAFEGO MASTER RULES
+============================
+
+1. Core Roles
+- There are exactly four primary roles in SafeGo:
+  1) Customer (rider/eater/sender/receiver)
+  2) Driver (transport, delivery, parcel)
+  3) Restaurant / Merchant
+  4) Admin (platform operator)
+- Every feature must clearly state which roles are affected and must NOT accidentally expose one role’s data or controls to another.
+
+2. Product Scope (One Super App)
+SafeGo is one integrated platform with three core verticals:
+- Rides: on-demand/passenger trips.
+- Eats: restaurant food delivery.
+- Parcel: small package / document delivery.
+Constraints:
+- Same account can use multiple verticals.
+- Shared concepts: wallet, payouts, ratings, trust score, support, safety, notifications.
+- Do not introduce separate “apps” – everything lives in one unified web app with role-based routing.
+
+3. Country & KYC Logic
+SafeGo must support at least:
+- Bangladesh (BD)
+- United States (US)
+KYC rules (already implemented in backend – do NOT weaken them):
+- Drivers and Restaurants must pass full KYC before payouts, trust features, and support chat unlock.
+- BD: NID/Passport + business docs (for merchants) + bank/mobile wallet validation.
+- US: SSN / EIN + bank routing/account validation + license checks.
+- KYC status gates access to sensitive flows (payouts, documents, trust score, support, etc.).
+- Never bypass KYC checks just to “make something work”.
+
+4. Admin Panel Requirements (do NOT break)
+Admin has a unified console with:
+- User management (Driver, Customer, Restaurant)
+- KYC review and document approval
+- Payout management and batch tools (currently frozen for individual payouts only)
+- Disputes, support ticket, and chat monitoring
+- Fraud/anomaly flags (read-only for now)
+- Global configuration: commissions, minimum payout amounts, region-specific options
+- System logs / audit trail
+Your task must not remove or block any existing admin routes, only reuse them if needed.
+
+5. Data Model & Collections (must remain consistent)
+Core collections already exist and MUST NOT be renamed or structurally broken:
+- rides
+- food_orders
+- deliveries
+- users (with role flags)
+- driverProfiles, restaurantProfiles, customerProfiles
+- wallets, payouts, payoutAccounts, payoutBatches
+- ratings, trustScores, incentives, tripHistory
+- supportTickets, supportMessages
+- auditLogs, securityEvents
+When you add UI or logic, align with these models instead of inventing new overlapping entities.
+
+6. Commissions, Wallets, and Payouts (frozen design)
+- Commission logic is central and already implemented.
+- Wallet balances reflect NET earnings after commission.
+- Individual payouts are fully implemented and MARKED AS FROZEN: do NOT redesign or extend payout logic in this task.
+- Minimum payout amounts are country specific (e.g., BD ৳100, US $10, others $20).
+- Negative balances are supported (for clawbacks/adjustments) and must not be broken.
+
+7. Security Rules & Phases (already in place)
+Security Hardening Phase 1 (completed):
+- HTTP security headers: HSTS, CSP, CORS tuned for the app.
+- Rate limiting on sensitive routes (auth, payouts, KYC, support).
+- Strong KYC validation gates.
+
+Security Hardening Phase 2 (completed base services):
+- OTP service and 2FA for sensitive actions (payout changes, high-risk logins).
+- Device/session security, secure cookies, CSRF protections.
+- Tamper-proof audit logs for payouts, KYC, and account changes.
+
+For this task:
+- Do NOT weaken any existing security middleware.
+- Navigation/UI changes must still respect auth, role checks, and KYC gates.
+
+8. Implementation Principles
+- Keep all changes incremental and non-breaking.
+- Do not delete existing logic unless it is clearly dead/unused AND safe to remove.
+- Reuse existing components and patterns where possible for consistency.
+- Always check types (TypeScript) and backend routes alignment.
+- Preserve mobile-first responsive behaviour.
+
+======================================
+TASK: D-Last – Driver Side Menu UX Polish
+======================================
+
+Goal:
+Make the DRIVER side navigation drawer more professional, mobile-friendly, and easier for drivers to understand, without changing existing backend logic or security. This is the final polishing task for the D (Driver) section.
+
+Scope:
+- Affects only DRIVER web app navigation (the side menu opened from the driver interface).
+- Do NOT touch Admin, Restaurant, or Customer menus in this task.
+- Do NOT modify payout/commission/security core logic.
+
+Current state (from screenshots and codebase):
+- Side menu shows many items in one long list (Dashboard, Getting Started, Training Videos, Documents, Vehicle, Refer a Friend, Opportunity, SafeGo Points, Trip History, Performance, Trust Score, Incentives, Wallet, Account, Settings, Safety Center, Support, Help Center, Log Out).
+- When the driver taps a menu item (e.g., Account), sometimes the drawer stays open and requires a second tap to close.
+- Icons and labels are OK but could be more structured.
+- Drivers should be able to quickly access: dashboard, earnings/wallet, trip history, safety, support, account/profile, and settings.
+
+Requirements:
+
+1) Final Menu Structure & Grouping
+Reorganize the DRIVER side menu into clear sections, in this *exact* order:
+
+A. Core Driving
+- Dashboard
+- Trip History
+- Wallet
+- Incentives
+- Trust Score
+- Performance
+
+B. Account & Vehicle
+- Account  (driver profile, personal info, phone, DOB, etc.)
+- Documents
+- Vehicle
+
+C. Growth & Rewards
+- SafeGo Points
+- Opportunity
+- Refer a Friend
+
+D. Learn & Support
+- Getting Started
+- Training Videos
+- Safety Center
+- Support
+- Help Center
+
+E. Session
+- Log Out
+
+Details:
+- Keep existing routes the same (e.g., /driver/trips, /driver/wallet, /driver/account, /driver/documents, etc.). Only change the drawer configuration / components.
+- Use subtle section headers (e.g., “Core”, “Account”, “Rewards”, “Support”) that look clean on mobile.
+- Make sure “Account” is clearly understood as the place to edit profile, phone, DOB, address, etc.
+- Do not introduce **new** routes in this task. Only reorganize and relabel the navigation entries.
+
+2) Drawer Behaviour (Mobile-first)
+- When the driver taps any menu item that navigates to a route, the drawer must automatically close.
+- The drawer should not require a second tap to disappear.
+- Highlight the active menu item based on the current route (e.g., /driver/profile ⇒ Account is active).
+- Ensure the drawer works correctly on:
+  - small mobile widths,
+  - tablet,
+  - desktop.
+- Verify keyboard navigation and focus behaviour are sane (ESC closes drawer, tab order is logical).
+
+3) Visual & UX Polish
+- Keep icon set consistent and simple; reuse existing icon components.
+- Align labels: sentence case (e.g., “Trip History”, “SafeGo Points”, “Help Center”).
+- Keep “New” and “Pro” badges, but ensure they align to the right and don’t break layout on small screens.
+- Make sure there is enough vertical spacing so items are not cramped, but the menu still fits well on a typical phone screen with scrolling.
+
+4) Routing & Access Control
+- Ensure all menu items still respect:
+  - Authenticated driver session,
+  - KYC gates, where already applied (e.g., some pages may show “complete KYC” banners).
+- Do not add any direct links that bypass existing KYC checks or onboarding flows.
+- If a route already has special guards (e.g., trust score, incentives, safety center), keep those intact.
+
+5) Testing
+Perform these checks (and fix any issues found):
+- Open the driver app, open the side menu from multiple pages, navigate to:
+  - Dashboard
+  - Trip History
+  - Wallet
+  - Account
+  - Documents
+  - Vehicle
+  - Trust Score
+  - Safety Center
+  - Support
+  - Help Center
+  Each time, confirm:
+  - Navigation happens to the correct route.
+  - Drawer closes automatically after click/tap.
+  - Active menu item highlight updates correctly.
+- Test on small viewport widths to ensure the drawer slides in/out smoothly and doesn’t overlap core content incorrectly.
+- Check console for errors and fix any React/TypeScript warnings introduced by the changes.
+
+6) Non-Goals for this Task
+- Do NOT change notifications bell or globe (language/region) behavior in this task; those can be separate tasks.
+- Do NOT change payout workflow, security middleware, or backend models.
+- Do NOT modify Admin or Restaurant menus.
+
+Deliverables:
+- Updated driver navigation drawer component with the new grouped menu structure and improved behaviour.
+- Any necessary small CSS/layout tweaks to keep the drawer clean and professional.
+- Brief code comments or doc note describing the new menu structure and the rationale (so future work on the driver app understands the grouping).
+
+When you are done, summarize:
+- The final driver menu structure implemented.
+- Any bugs you found and fixed (especially around drawer closing and active state).
+- Any limitations or follow-up tasks you recommend (e.g., separate task later for notifications/globe behaviour).

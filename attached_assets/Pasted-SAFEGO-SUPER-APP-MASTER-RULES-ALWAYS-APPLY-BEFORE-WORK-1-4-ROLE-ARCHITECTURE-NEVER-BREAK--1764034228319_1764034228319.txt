@@ -1,0 +1,222 @@
+SAFEGO SUPER-APP MASTER RULES (ALWAYS APPLY BEFORE WORK)
+
+1) 4-ROLE ARCHITECTURE (NEVER BREAK)
+   - Customer App
+   - Driver App
+   - Restaurant/Merchant App
+   - Admin Panel
+   All four must remain isolated with their own dashboards, permissions, data access.
+
+2) GLOBAL SERVICES SUPPORTED
+   - Rides
+   - Food Delivery
+   - Parcel Delivery
+   Driver Earnings & Payout must work across all three.
+
+3) GLOBAL COLLECTIONS (DO NOT BREAK)
+   Must keep working exactly as they are:
+   - rides
+   - food_orders
+   - deliveries
+   - wallet_accounts
+   - wallet_transactions
+   - payouts
+   - driver_profiles
+   - users
+   No renaming, deleting, or restructuring. Additive changes only.
+
+4) COMMISSION RULES (MANDATORY)
+   - Cash Ride:
+       Driver keeps all cash.
+       SafeGo commission becomes negative balance on driver_wallet.
+   - Cash Food Order:
+       Restaurant keeps all cash.
+       SafeGo commission becomes negative balance on restaurant_wallet.
+   - Online Payments:
+       SafeGo auto-deducts commission → driver_wallet gets net amount.
+   - Payout:
+       Driver can withdraw only positive balance.
+       Admin approves payouts or marks as paid.
+
+5) SECURITY RULES
+   - Driver cannot see customer documents or sensitive info.
+   - Customer cannot see driver documents.
+   - Restaurant cannot see others’ data.
+   - Only Admin can modify commissions, payouts, block/unblock, verify KYC.
+   - Drivers can only see their own earnings.
+   - All wallet values must be server-side computed, not client-side.
+
+6) STATUS FLOWS (DO NOT MODIFY)
+   Rides → requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled  
+   Food → placed → accepted → preparing → ready_for_pickup → picked_up → delivered/cancelled  
+   Parcel → requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled  
+
+7) ONBOARDING RULES
+   Driver onboarding must be completed + KYC approved before earnings are available.
+
+8) NOTIFICATIONS
+   Payout submitted → driver notified.  
+   Payout approved → driver notified.
+
+9) DEVELOPMENT RULES
+   - No breaking changes.
+   - No schema changes unless additive + absolutely required.
+   - Update replit.md with all changes.
+   - Complete the task fully in this one prompt.
+
+
+---------------------------------------------------------------------
+D4: COMPLETE DRIVER EARNINGS & PAYOUT DASHBOARD (FULL IMPLEMENTATION)
+---------------------------------------------------------------------
+
+GOAL
+Build and integrate the full Driver Earnings Dashboard across:
+   • Driver App (main earnings dashboard + payout page)
+   • Admin Panel (payout approvals + negative balance tracking)
+   • Wallet System (accurate transaction logic)
+   • Rides, Food, Parcel earnings aggregation
+
+Deliver the entire D4 end-to-end in this single task.
+
+---------------------------------------------------------------------
+PART 1 — DRIVER EARNINGS DASHBOARD (FRONTEND + BACKEND)
+---------------------------------------------------------------------
+
+Build a dashboard on /driver/earnings with:
+
+1) TOP SUMMARY CARDS
+   - “Available Balance” (wallet balance)
+   - “Pending Payouts”
+   - “Total Earned (All Time)”
+   - “This Week’s Earnings”
+   - “Negative Balance (if any)” — shown only when < 0
+
+2) EARNINGS BREAKDOWN TABS
+   Tab 1: Rides  
+   Tab 2: Food Delivery  
+   Tab 3: Parcel Delivery  
+   Tab 4: All Transactions
+
+3) EACH TAB SHOWS:
+   - Date
+   - Service type (Ride/Food/Parcel)
+   - Gross amount
+   - Commission
+   - Net earning
+   - Payment method (Cash/Online)
+   - Order/Ride ID
+   - Status (Completed)
+
+4) BACKEND ENDPOINTS (CREATE IF MISSING)
+   GET /api/driver/earnings-summary  
+   GET /api/driver/earnings?type=rides  
+   GET /api/driver/earnings?type=food  
+   GET /api/driver/earnings?type=parcel  
+   GET /api/driver/transactions  
+
+   Requirements:
+   - Must aggregate from rides, food_orders, deliveries
+   - Must compute commission values correctly
+   - Must compute weekly/monthly earnings
+
+---------------------------------------------------------------------
+PART 2 — PAYOUT REQUEST PAGE (/driver/payouts)
+---------------------------------------------------------------------
+
+Driver can request payout:
+   - Input: amount (<= wallet_balance)
+   - Payout method: bank transfer or default payout method already stored
+   - Create payout entry in payouts table:
+       status = "pending"
+       driver_id
+       amount
+       requested_at
+
+Backend:
+   POST /api/driver/payouts/request  
+Validation:
+   - Amount <= wallet_balance
+   - Cannot request if negative balance
+
+UI:
+   - “Request Payout” button
+   - Show history list:
+       pending, approved, rejected
+       amount + date + status badge
+
+---------------------------------------------------------------------
+PART 3 — ADMIN PANEL PAYOUT MANAGEMENT
+---------------------------------------------------------------------
+
+Create/extend Admin page:
+
+/admin/payouts
+
+Admin sees:
+   - Driver name
+   - Country
+   - Amount
+   - Wallet balance
+   - Payout method
+   - Requested at
+   - Buttons:
+       • Approve  
+       • Reject  
+
+Backend:
+   POST /api/admin/payouts/approve  
+   POST /api/admin/payouts/reject  
+
+Logic:
+   - Approve:
+       1) Deduct amount from driver wallet
+       2) Mark payout as “approved”
+       3) Add wallet transaction with appropriate tags
+       4) Send notification to driver
+   - Reject:
+       1) Mark payout as “rejected”
+       2) Notify driver
+
+---------------------------------------------------------------------
+PART 4 — NEGATIVE BALANCE (CASH COMMISSION LOGIC)
+---------------------------------------------------------------------
+
+When rides/food are cash:
+   - Driver receives full amount
+   - SafeGo commission becomes negative balance
+
+Implement automatic weekly settlement reminder.
+
+Admin Panel → Drivers:
+   - Add “Negative Balance” column
+   - Show value in red if < 0
+
+---------------------------------------------------------------------
+PART 5 — TESTING (REQUIRED)
+---------------------------------------------------------------------
+
+You must test:
+   • Driver with online payments  
+   • Driver with cash payments  
+   • Driver with negative balance  
+   • Mixed rides/food/parcel  
+   • Payout request + admin approval  
+   • All summary cards  
+   • Pagination/performance on tables  
+
+---------------------------------------------------------------------
+DELIVERABLES
+---------------------------------------------------------------------
+
+- Full Driver Earnings Dashboard
+- Full Payout Request System
+- Full Admin Payout Management
+- Negative Balance logic
+- All endpoints working
+- UI/UX polished and mobile-friendly
+- Update replit.md with:
+   • Implementation details
+   • Testing instructions
+   • List of files changed
+
+Complete EVERYTHING above in this single prompt without requiring follow-ups.

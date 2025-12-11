@@ -1,0 +1,115 @@
+PHASE 11 — CUSTOMER-FACING DYNAMIC PRICING DISPLAY (SAFEGO COMPLIANT)
+
+1. Scope
+Build a fully customer-visible dynamic pricing layer that shows real-time:
+• Surge pricing
+• Discounts & promotions
+• Operational status (open/closed, split shifts)
+• Delivery coverage
+• Preparation-time adjustments
+• Cross-role RBAC enforcement
+
+2. Roles (Mandatory)
+Customer:
+    • Can view restaurant dynamic pricing, discounts, surge multipliers, delivery coverage.
+Driver:
+    • No access to pricing display; only sees delivery pay logic (unchanged).
+Restaurant:
+    • Provides all pricing configuration (delivery zones, surge, hours, throttling).
+Admin:
+    • Oversight: can view everything, override when needed, no direct modification unless flagged.
+
+3. Data Collections (Always Required)
+• restaurants
+• restaurant_settings (hours, surge, delivery zones, prep times)
+• promotions
+• coupons
+• orders
+• customers
+• audit_logs
+• auth_users
+
+4. Endpoints (Frontend + Backend)
+4.1 Backend API
+GET /api/customer/restaurants/:id/status
+    • Already implemented. Keep unchanged.
+
+GET /api/customer/restaurants/:id/pricing
+    • Returns:
+        – basePriceMultiplier
+        – surgeMultiplier
+        – discountPercent
+        – activePromotions[]
+        – couponEligibility
+        – prepTimeMinutes
+        – realTimeOpenStatus
+        – deliveryZoneEligible (true/false)
+        – throttlingLimitReached (true/false)
+        – dynamicPricingBreakdown object
+
+4.2 Frontend
+Add new dynamic pricing panel on:
+    /customer/restaurants/[id]
+
+Sections:
+    • Real-time surge indicator (color-coded)
+    • Discount badge
+    • Promotion summary (best offer highlighted)
+    • Delivery eligibility banner
+    • Prep time estimation block
+    • “Why is my price changing?” info modal with full breakdown
+
+5. Business Logic Requirements
+• Surge multiplier comes from operational settings.
+• If throttling enabled → show “High demand adjusting prices.”
+• If discount + surge overlap → apply discount after surge.
+• If customer is outside coverage → show disabled order button.
+• Required ordering:
+        finalPrice = basePrice * surgeMultiplier
+        finalPrice = finalPrice – discountAmount
+
+6. Security & SafeGo Compliance
+• KYC: Customer must be verified to see location-based surge.
+• RBAC:
+        Customer → canViewPricing
+        Restaurant OWNER → canEditPricing
+        Admin → canReviewPricing
+• All pricing responses must be signed URLs where applicable.
+• No sensitive fields leak (internal config, raw formulas).
+• Full audit logging:
+        "pricing_view", "pricing_calculation_export", "pricing_overridden"
+
+7. UI Requirements
+• Responsive card layout for pricing block.
+• Surge indicator:
+        green (normal), yellow (mild surge), red (heavy surge).
+• Tooltip explaining each adjustment.
+• Show promotion codes as tags.
+• Show “Estimated final price” dynamically.
+
+8. Non-breaking Rule
+• Do not modify any existing Phase 1–10 logic.
+• Additive only.
+• Pricing endpoint must not affect checkout logic.
+• Follow existing design patterns from menu, gallery & settings UIs.
+
+9. Deliverables
+• Backend endpoint: /pricing
+• Pricing calculation utility
+• Pricing breakdown modal UI
+• Updated restaurant customer page
+• Unit tests + audit logging
+
+10. Security Phase Applied
+Phase: “Operational Exposure Hardening”
+Includes:
+    • RBAC tightening
+    • KYC gating
+    • Signed URLs
+    • Non-breaking additive updates only
+
+11. Acceptance Criteria
+• Customer sees correct surge/discount breakdown.
+• All scenarios tested: open/closed, split-shift, heavy surge, discount stack, zone not eligible.
+• Admin logs reflect every pricing fetch.
+• No leakage of internal settings.

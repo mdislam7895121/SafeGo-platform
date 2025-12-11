@@ -1,0 +1,60 @@
+Fix the "License Issuing State" dropdown in the USA Driver License step.
+
+Context:
+- Route: /partner/driver/register
+- Step: Driver License (USA drivers)
+- Issue: The dropdown opens and shows all US states, but after selecting a state the field clears and no value remains selected.
+
+You MUST keep all existing SafeGo global rules intact:
+- 4 roles: customer, driver, restaurant, admin (no mixing).
+- 3 services: ride-hailing, food delivery, parcel delivery.
+- Country KYC rules for BD and US must remain unchanged.
+- No changes to rides, food_orders, deliveries schemas, commission logic, or admin permissions.
+This task is ONLY about the Driver License state field UI + form binding.
+
+Bug symptoms:
+- The user can open the "License Issuing State" select.
+- States are visible.
+- When a state is tapped/clicked, the dropdown closes but no state appears as selected.
+- Submitting the form likely sends an empty license_state.
+
+Required fix:
+
+1) Controlled value must be bound correctly
+   - Ensure the select component's `value` is bound to a single source of truth, e.g.:
+       value = form.license_state
+   - Do NOT bind to a different field like `form.state` or `address.state`.
+
+2) onChange handler must update the same field
+   - When the user selects an option, it must call:
+       setForm(prev => ({ ...prev, license_state: selectedValue }))
+     or the equivalent in your form library (React Hook Form, Formik, etc.).
+   - Make sure there is no mismatch between the option `value` and what you save.
+
+3) Option values vs labels
+   - Check that each option's `value` matches what is stored:
+       Example:
+         value="NY", label="New York"
+         value="NJ", label="New Jersey"
+   - Do not use full labels as value if your form expects abbreviations.
+
+4) Initial value
+   - Initial value should be either:
+       "" (empty) or the driver's previously saved license_state.
+   - Do NOT reset the select to "" on every render or validation error.
+
+5) No auto-overwrite
+   - Make sure no effect or validation logic overwrites `license_state` immediately after change.
+   - Remove any code that forces `license_state` to follow the home address state.
+
+6) Testing
+   - In mobile preview:
+       - Open the dropdown, select "New York".
+       - The field must show "New York" (or "NY") as selected and keep that state.
+   - Submit the form and check that the backend receives a non-empty license_state.
+
+Non-breaking:
+- Do not change any other KYC fields.
+- Do not touch Bangladesh flows.
+- Do not rename any existing fields in the database.
+- Only fix the binding of the "License Issuing State" select so it persists the selected value.

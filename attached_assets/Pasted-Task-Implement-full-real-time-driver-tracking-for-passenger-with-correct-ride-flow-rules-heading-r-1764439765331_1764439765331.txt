@@ -1,0 +1,124 @@
+Task: Implement full real-time driver tracking for passenger with correct ride-flow rules, heading rotation, and before/after pickup behavior. Follow ALL SafeGo global rules exactly. DO NOT break any existing code, files, flows, or logic. Make changes incrementally, safely, and only inside the correct components. No refactors. No renaming. No deletion of existing flows. Only ADD what is required.
+
+GOAL  
+Passenger must see:  
+1) Before pickup → Driver coming to passenger  
+2) After pickup → Driver going to dropoff  
+3) Driver arrow must rotate in real-time based on movement direction (heading)  
+4) Must work on BOTH desktop + mobile  
+5) Must not break pricing, promos, payouts, status engine, or ride-flow state machine  
+
+CORE RULES  
+You MUST follow these SafeGo system rules:  
+• Keep the unified booking flow intact  
+• Keep all Status Flow Engine rules intact  
+• Keep all ride phases exactly as existing backend states  
+• NEVER break promo logic  
+• NEVER modify fares, distance, time, or pricing code  
+• NEVER modify driver earnings or payout logic  
+• NEVER leak any sensitive driver info  
+• Only update UI + live location behavior  
+
+FILES TO EDIT (ONLY these)  
+1) client/src/pages/customer/unified-booking.tsx  
+2) client/src/components/maps/PassengerLiveMap.tsx (or whatever the live-map component file is named—search and modify the correct file)  
+3) client/src/lib/liveLocation/driver-stream.ts (ONLY if needed to read WebSocket/SSE)  
+NO OTHER FILES.
+
+IMPLEMENTATION REQUIREMENTS
+
+1) Detect ride phases  
+Map backend ride-status values to UI phases without changing backend values:
+
+const isBeforePickup = status === 'DRIVER_ASSIGNED' || status === 'EN_ROUTE_TO_PICKUP';
+const isAfterPickup = status === 'PICKED_UP' || status === 'EN_ROUTE_TO_DROPOFF';
+
+Do NOT change the backend. Only derive UI logic.
+
+2) Render correct polylines  
+If isBeforePickup → route from driver → pickup  
+If isAfterPickup → route from driver → dropoff  
+
+3) Real-time heading rotation  
+ADD inside PassengerLiveMap:
+
+function calculateBearing(from, to) {  
+  const toRad = deg => (deg * Math.PI) / 180;  
+  const toDeg = rad => (rad * 180) / Math.PI;  
+  const lat1 = toRad(from.lat);  
+  const lat2 = toRad(to.lat);  
+  const dLon = toRad(to.lng - from.lng);  
+  const y = Math.sin(dLon) * Math.cos(lat2);  
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);  
+  let bearing = toDeg(Math.atan2(y, x));  
+  return (bearing + 360) % 360;  
+}
+
+Maintain:
+
+const [driverHeading, setDriverHeading] = useState(0);  
+const prevRef = useRef(null);
+
+On each update:
+
+if (prevRef.current) {  
+  const bearing = calculateBearing(prevRef.current, next);  
+  setDriverHeading(bearing);  
+}  
+prevRef.current = next;
+
+4) Rotate marker without breaking map  
+Use your existing map library exactly.
+
+Leaflet example (modify to match your icon):
+
+<Marker
+  position={driverLatLng}
+  icon={driverIcon}
+  rotationAngle={driverHeading}
+  rotationOrigin="center"
+/>
+
+DO NOT switch map libraries.
+
+5) Keep auto-centering smooth  
+Only auto-center when driver approaches viewport edge.  
+Never fight user panning.
+
+6) Mobile layout rules  
+• Live map must occupy main area  
+• Bottom sheet must show ETA, car info, cancel button  
+• All scrolling must be vertical  
+• Car list scrolling must not block fare-details  
+NO overflow bugs allowed.
+
+7) View Live Map button fix  
+In unified-booking.tsx ensure:
+
+<button onClick={() => setShowLiveMap(true)}>View live map</button>
+
+And ensure the component is actually rendered:
+
+{showLiveMap && <PassengerLiveMap rideId={rideId} />}
+
+Fix ONLY this logic. Do NOT add new states.
+
+8) DO NOT break existing code  
+You must NOT touch:  
+• Pricing  
+• Promo banners  
+• Saver logic  
+• Booking fees  
+• Route selection buttons  
+• Fares UI  
+• Bottom confirmation button  
+Only modify live driver tracking.
+
+9) Output at end  
+You MUST return:  
+• Exact list of modified files  
+• Exact code blocks inserted  
+• Confirm nothing else was touched  
+• Confirm Ride Flow remains intact  
+• Confirm Status Engine unchanged  
+• Confirm mobile + desktop tested by Agent preview

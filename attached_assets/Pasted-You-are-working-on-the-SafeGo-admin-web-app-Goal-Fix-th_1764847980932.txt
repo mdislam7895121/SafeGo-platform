@@ -1,0 +1,94 @@
+You are working on the SafeGo admin web app.
+
+Goal:
+Fix the incomplete admin sections so that:
+1) the People & KYC page at /admin/people-kyc loads a proper UI instead of a blank screen, and
+2) the Feature Flags admin page is visible and working inside the admin navigation (e.g., /admin/feature-flags).
+
+Context:
+- I can open /admin/safety and see the Safety & Risk Center UI.
+- When I open /admin/people-kyc I only see a blank white page.
+- I do not see any “Feature Flags” page or menu item in the admin panel.
+- Recent work already added Safety & Risk Center, RiskEvent, RiskCase, RiskCaseNote, FeatureFlag, and RiskCase models, and fixed TypeScript errors in admin-phase1.ts.
+
+Tasks (do ALL of these):
+
+1. Diagnose People & KYC page
+   - Find the route, page, or component that serves /admin/people-kyc on the frontend.
+   - Check for:
+     - missing or incorrect import paths
+     - runtime errors in the console
+     - components that return null/empty state
+     - bad layout wrappers that hide content on mobile
+   - Fix the implementation so the page always renders a visible layout with:
+     - Page title: “People & KYC”
+     - Tabs or filters for: All Users, Drivers, Shop Partners, Restaurants, Ticket Operators
+     - Basic columns: Name, Email, Role, Country, KYC Status (Pending/Approved/Rejected), Last Updated
+   - Implement a minimal data fetch that uses the existing user/partner/KYC structures already defined in the backend. If needed, create a small API wrapper or hook (e.g., usePeopleKycList) that:
+     - is authenticated
+     - uses the existing admin-safe API client
+     - gracefully handles loading and empty states.
+
+2. Wire People & KYC into admin navigation
+   - Ensure there is a stable navigation link to /admin/people-kyc in the admin sidebar or menu (for example under “People & KYC” or “Trust & Safety” section).
+   - Make sure the nav item is visible only for admins with appropriate roles (e.g., SUPER_ADMIN, SAFETY_ADMIN, COMPLIANCE_ADMIN).
+   - Add an active state so that when I am on /admin/people-kyc, the menu item is highlighted.
+
+3. Implement the Feature Flags admin page
+   - Create a dedicated route and page for Feature Flags, e.g. /admin/feature-flags.
+   - Add it to the admin navigation (for example under “Settings” or “Platform Controls”) as “Feature Flags”.
+   - On this page, implement a table view backed by the existing FeatureFlag model with at least:
+     - key (string, unique)
+     - name / displayName
+     - description
+     - environment (e.g., global, BD, US, staging, production)
+     - status (ON/OFF)
+     - createdAt / updatedAt
+   - Provide basic actions:
+     - toggle ON/OFF for a flag
+     - read-only view of flag details
+   - Enforce security:
+     - Only SUPER_ADMIN / PLATFORM_ADMIN can see or modify feature flags.
+     - Use the existing authenticateToken middleware and role checks on the API routes.
+     - Log all changes to feature flags into the audit log system, including admin id, action type, flag key, old value, new value, and timestamp.
+
+4. Backend routes and API alignment
+   - Locate or create the API routes for:
+     - listing feature flags
+     - updating a feature flag (ON/OFF, description, etc.)
+   - Ensure these routes:
+     - are under an authenticated admin namespace
+     - perform strict role checks
+     - validate incoming payloads (no arbitrary keys, only existing flags are updated)
+     - write proper audit log entries.
+   - Verify that any existing FeatureFlag / EntityType.FEATURE_FLAG / RiskEvent-related code stays consistent and does not break.
+
+5. UX and mobile layout
+   - Specifically test /admin/people-kyc and /admin/feature-flags on a narrow/mobile viewport.
+   - Fix any layout issues so that:
+     - Tables are scrollable horizontally if needed.
+     - Header, filters and actions remain visible and usable.
+     - No completely blank white screens appear; always show a clear “No data found” or similar when lists are empty.
+
+6. Automated checks and regression safety
+   - Add or update tests (unit and/or integration) for:
+     - rendering the People & KYC page without crashing
+     - rendering the Feature Flags page for an authorized admin
+     - rejecting access for non-admin users
+   - Run the existing admin E2E tests and, if needed, add small flows that:
+     - navigate to /admin/people-kyc and verify that at least one tab and the empty state render
+     - navigate to /admin/feature-flags and verify that existing flags are listed and can be toggled.
+   - Make sure there are no new TypeScript errors or ESLint errors related to these pages.
+
+7. Report back clearly
+   - After implementing everything, summarize EXACTLY what you changed:
+     - files added/modified (frontend and backend)
+     - new routes and nav items
+     - security/role checks
+     - tests added or updated
+   - Then start the app and confirm:
+     - /admin/people-kyc shows the People & KYC UI (not a blank page)
+     - /admin/safety still works as before
+     - /admin/feature-flags exists in the menu and works for an admin user.
+
+Do NOT propose new future ideas now. Focus only on getting People & KYC and Feature Flags fully visible, secure, and working in the existing SafeGo admin panel.

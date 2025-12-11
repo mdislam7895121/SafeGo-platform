@@ -1,0 +1,88 @@
+Proceed with Phase 6.
+
+PHASE 6 – Restaurant Staff Management System (SafeGo Eats)
+
+Requirements:
+- Additive only. Do NOT modify or remove any existing fields or routes.
+- Maintain full RBAC, BD/US KYC rules, and restaurant_id scoping.
+- Phase 1–5 features must remain intact.
+- Independent from rides and parcel modules.
+
+Build the following:
+
+1. Staff Management Dashboard (/restaurant/staff)
+   - List all STAFF users under this restaurant_id
+   - Columns: name, phone, role, status (active/blocked), last_login
+   - OWNER only can access this dashboard
+   - STAFF cannot see this page
+
+2. Add Staff Flow (/restaurant/staff/new)
+   - owner adds a new staff with:
+     - name
+     - phone
+     - email
+     - role: STAFF
+     - temporary password
+   - Staff receives notification to set permanent password
+   - Must enforce BD/US KYC gating (restaurant must be verified before adding staff)
+
+3. Staff Permissions Management (/restaurant/staff/:id)
+   OWNER must be able to toggle:
+   - can_edit_categories (boolean)
+   - can_edit_items (boolean)
+   - can_toggle_availability (boolean)
+   - can_use_bulk_tools (boolean)
+   - can_view_analytics (boolean)
+   - can_view_payouts (view-only, no request)
+   - can_manage_orders (limited)
+   - staff_active (true/false)
+
+4. Staff Activity Log
+   - Track staff actions:
+     - item availability change
+     - menu edits (if allowed)
+     - order status changes
+     - payouts view attempts
+   - Store logs in security_audit_log with:
+     - staff_id
+     - restaurant_id
+     - action_type
+     - timestamp
+   - OWNER can view all activity logs of staff
+   - STAFF cannot view logs
+
+5. Staff Authentication Integration
+   - STAFF should login using existing auth system
+   - login must check:
+     - role == STAFF
+     - restaurant_id matches
+     - staff_active == true
+   - STAFF cannot access OWNER-only pages (payouts, analytics, staff dashboard)
+
+6. Admin Panel Extensions
+   - Admin can view staff list per restaurant (read-only)
+   - Admin can block/unblock staff
+   - Admin can audit staff actions globally
+   - No admin editing of staff permissions (OWNER only)
+
+7. Security
+   - Strict RBAC on all endpoints
+   - No cross-restaurant access
+   - OWNER can manage STAFF only within same restaurant_id
+   - All create/update/delete actions logged in audit log
+
+Backend Endpoints (add-only):
+- GET /api/restaurant/staff
+- POST /api/restaurant/staff
+- GET /api/restaurant/staff/:id
+- PATCH /api/restaurant/staff/:id
+- POST /api/restaurant/staff/:id/block
+- GET /api/restaurant/staff/activity-log
+
+Frontend:
+- Staff list page
+- Staff create form
+- Staff edit/permissions page
+- Activity log viewer
+
+Finish full Phase 6 before moving to Phase 7.

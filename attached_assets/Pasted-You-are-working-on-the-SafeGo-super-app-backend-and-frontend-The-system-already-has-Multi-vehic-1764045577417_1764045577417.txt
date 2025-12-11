@@ -1,0 +1,307 @@
+You are working on the SafeGo super-app backend and frontend. The system already has:
+
+- Multi-vehicle drivers with KYC and documents
+- Driver public profile card for customers (Uber/Lyft-style)
+- Driver earnings & payout dashboard (D4)
+- Driver promotions & bonuses with date strip and professional cards (D5–D7)
+- Driver Support & Help Center with tickets and a sidebar link
+- Admin dashboards for users, drivers, restaurants, KYC, promotions, and support
+
+Your task is to fully implement **D8: Country-Specific Payment & Payout Configuration for Drivers** in ONE complete pass, following all SafeGo Master Rules from the user message. Do not leave TODOs or partial implementations. Do not break any existing flows.
+
+## 1. Analyze existing payment/payout/wallet implementation
+
+1. Inspect the current schema and code:
+   - Prisma schema (wallets, payouts, payments, driver_profiles, any existing payout config tables).
+   - Driver wallet and payout pages.
+   - Any existing payout or wallet-related API routes for driver/admin.
+
+2. IMPORTANT: Reuse existing tables/fields where possible instead of creating duplicates.
+   - If there is already a wallet/payout structure, extend it carefully instead of redesigning.
+   - Do not remove or rename existing columns in a way that breaks current code.
+
+3. Document the current state briefly in `replit.md` under a new section `D8 – Current Payment/Payout State` before you change anything.
+
+## 2. Data Model: Country-Specific Payout Config
+
+Add or extend schema to support **per-country, per-service** payout configuration while maintaining backwards compatibility.
+
+1. Create or extend a table/model like `PayoutConfig` with at least:
+
+   - `id` (UUID)
+   - `countryCode` (e.g. "US", "BD")
+   - `serviceType` (enum: "RIDE" | "FOOD" | "PARCEL" | "GLOBAL")
+   - `currency` (string, e.g. "USD", "BDT")
+   - `minPayoutAmount` (Decimal)
+   - `payoutSchedule` (enum: "INSTANT" | "DAILY" | "WEEKLY" | "MONTHLY" | "MANUAL_ONLY")
+   - `payoutDayOfWeek` (optional, 0–6 if WEEKLY)
+   - `payoutDayOfMonth` (optional, 1–28 if MONTHLY)
+   - `platformFeeType` (enum: "NONE" | "FLAT" | "PERCENT")
+   - `platformFeeValue` (Decimal)
+   - `isActive` (boolean)
+   - `createdAt`, `updatedAt`
+
+2. If a `wallets` or `driverWallet` model does not exist, ensure there is a `Wallet` model with:
+
+   - `id`
+   - `userId` or `driverProfileId` (whichever is already used in the project; keep consistent)
+   - `countryCode`
+   - `currency`
+   - `balance` (Decimal)
+   - `holdAmount` (Decimal, default 0)
+   - `createdAt`, `updatedAt`
+
+3. Ensure there is a `WalletTransaction` model to track all balance changes:
+
+   - `id`
+   - `walletId`
+   - `type` (enum: "EARNING" | "ADJUSTMENT" | "PAYOUT" | "PROMOTION_BONUS" | "REVERSAL")
+   - `amount` (Decimal, positive value)
+   - `direction` (enum: "CREDIT" | "DEBIT")
+   - `serviceType` (enum like above)
+   - Optional references: `rideId`, `foodOrderId`, `deliveryId`, `payoutId`, `promotionId`
+   - `description`
+   - `createdAt`
+
+4. Ensure there is a `Payout` model:
+
+   - `id`
+   - `walletId`
+   - `driverProfileId` (or consistent owner field)
+   - `countryCode`
+   - `amount` (Decimal)
+   - `feeAmount` (Decimal)
+   - `netAmount` (Decimal) // amount - fee
+   - `status` (enum: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "CANCELLED")
+   - `failureReason` (optional string)
+   - `payoutMethodId` (see next subsection)
+   - `requestedAt`, `processedAt`, `createdAt`, `updatedAt`
+
+5. Add payout method models if missing:
+
+   - `PayoutMethod` (master definition):
+     - `id`
+     - `countryCode`
+     - `type` (enum: "BANK_TRANSFER" | "MOBILE_MONEY" | "CASH" | "OTHER")
+     - `displayName` (e.g. "US Bank Account", "bKash", "Nagad")
+     - `isActive`
+     - Optional config JSON field for future provider settings.
+
+   - `DriverPayoutMethod`:
+     - `id`
+     - `driverProfileId`
+     - `payoutMethodId`
+     - `maskedDetails` (e.g. bank last 4, mobile wallet partially masked)
+     - `isPrimary`
+     - `isActive`
+     - `createdAt`, `updatedAt`
+
+6. Create migrations and apply them. Do not drop existing wallet/payout tables. If something already exists and conflicts by name, align your models to the existing structure and update your plan accordingly.
+
+## 3. Business Rules
+
+Implement these core rules across backend and frontend:
+
+1. **KYC enforcement:**
+   - Drivers with `KYC` status not equal to `APPROVED` must not be able to:
+     - Add new payout methods.
+     - Request payouts.
+   - Show a clear error message to the driver and a link/button to the KYC documents page.
+
+2. **Country-specific logic:**
+   - Determine driver country from `driver_profile.countryCode` or equivalent.
+   - Resolve payout config in this priority:
+     1. Exact match `(countryCode, serviceType="RIDE")`
+     2. `(countryCode, serviceType="GLOBAL")`
+     3. Fallback to a safe default (no payouts allowed) if nothing is configured.
+   - Respect `currency`, `minPayoutAmount`, and configured fees.
+
+3. **Wallet-based payouts:**
+   - Payouts must use `wallet.balance - wallet.holdAmount` as available balance.
+   - If requested `amount` is:
+     - less than `minPayoutAmount` → reject with clear message.
+     - greater than available balance → reject with "Insufficient balance".
+   - Calculate `feeAmount` from config:
+     - `NONE` → fee = 0.
+     - `FLAT` → fee = `platformFeeValue`.
+     - `PERCENT` → fee = `amount * platformFeeValue / 100`.
+   - `netAmount = amount - feeAmount`. If `netAmount <= 0`, reject as invalid.
+
+4. **Payout scheduling:**
+   - Implement a basic scheduler-friendly design:
+     - Add a field `nextEligiblePayoutAt` to `Wallet` or derive from transactions & config.
+     - Implement backend logic that checks if the requested payout respects `payoutSchedule`, `payoutDayOfWeek`, and `payoutDayOfMonth`.
+   - For this task, you do NOT have to build a cron job. Instead:
+     - Expose an admin endpoint to simulate scheduled payouts for testing (e.g. process all eligible payouts for today).
+
+## 4. Backend APIs
+
+Implement or update the following routes with proper auth and role checks:
+
+### Driver APIs
+
+1. `GET /api/driver/wallet/summary`
+   - Returns wallet balance, currency, holdAmount, country, and a small summary:
+     - totalEarnings
+     - totalPayouts
+     - nextEligiblePayoutDate (if schedule-based)
+     - current payout rules from `PayoutConfig` (min amount, fee type, fee value, schedule).
+
+2. `GET /api/driver/wallet/transactions`
+   - Paginated list of `WalletTransaction` for the authenticated driver, filterable by:
+     - date range
+     - type
+     - serviceType
+
+3. `GET /api/driver/payout-methods`
+   - Returns driver’s active payout methods and which one is primary, with masked details.
+
+4. `POST /api/driver/payout-methods`
+   - Creates a new payout method for the driver (according to their country).
+   - Accepts country-appropriate fields:
+     - USA: bank name, last4, routing/account masked; DO NOT store full sensitive details in plain text.
+     - BD: mobile wallet provider + masked number, or bank-related masked details.
+   - Enforces that KYC must be APPROVED before creating payout methods.
+
+5. `PATCH /api/driver/payout-methods/:id/set-primary`
+   - Marks a payout method as primary and unsets any previous primary.
+
+6. `DELETE /api/driver/payout-methods/:id`
+   - Soft-disable a payout method (`isActive = false`) if there are no pending payouts using it.
+
+7. `POST /api/driver/payouts`
+   - Body: `{ amount, payoutMethodId }`
+   - Validates:
+     - Driver authenticated and KYC APPROVED.
+     - Payout method belongs to driver and is active.
+     - Country config exists and is active.
+     - Amount ≥ minPayoutAmount and ≤ available wallet balance.
+     - Schedule rules.
+   - Creates a `Payout` with status `PENDING` and a corresponding `WalletTransaction` (DEBIT with type `PAYOUT`) in a single transaction.
+   - Returns updated wallet summary and payout record.
+
+### Admin APIs
+
+1. `GET /api/admin/payout-configs`
+   - List payout configs with filters by `countryCode` and `serviceType`.
+
+2. `POST /api/admin/payout-configs`
+   - Create a payout config for a country and service type.
+   - Validate that there is at most one active config per `(countryCode, serviceType)`.
+
+3. `PATCH /api/admin/payout-configs/:id`
+   - Update payout config fields (schedule, min amount, fee type/value, isActive).
+   - Ensure updates don’t break existing payouts (e.g., keep currencies consistent if there are active wallets).
+
+4. `GET /api/admin/payouts`
+   - Paginated list of payouts for all drivers, filterable by:
+     - country
+     - status
+     - driver email
+     - date range
+
+5. `POST /api/admin/payouts/:id/mark-processed`
+   - Marks a payout as `SUCCESS` or `FAILED` (based on payload) and sets `processedAt`.
+   - On failure, refund the amount and fee back to the wallet via a `WalletTransaction` reversal.
+
+6. `POST /api/admin/payouts/simulate-schedule-run`
+   - Simulate scheduled payouts for testing:
+     - Find all drivers eligible for automatic payouts today based on config.
+     - Create payouts and wallet transactions accordingly.
+   - This is only for admin test usage, not exposed to drivers.
+
+Make sure all routes return consistent JSON structures with `{ success, data, error }` style, and handle `null` responses defensively so that frontend does not crash when `json()` is called.
+
+## 5. Frontend: Driver Experience
+
+Update driver-facing pages, without breaking existing designs:
+
+1. **Wallet / Earnings page (driver side):**
+   - Show:
+     - Wallet balance with correct currency symbol (USD or BDT).
+     - Min payout amount and fee information in a small “Payout rules” card.
+     - Clear banner if KYC is not approved, with a link to the KYC documents page.
+   - Add a “Request Payout” flow that lets the driver:
+     - Choose a payout method.
+     - Enter an amount (pre-fill with "Max available" option).
+     - See a small breakdown: `amount`, `fee`, `net payout`.
+   - Show validation errors returned from backend in a friendly toast.
+
+2. **Payout Methods UI:**
+   - In the driver Account/Wallet section, add UI to:
+     - List existing payout methods (with masked details).
+     - Add a new payout method (fields depend on driver country).
+     - Set primary method and delete (soft disable) methods.
+
+3. **Wallet History:**
+   - Show a simple transaction list:
+     - Date/time
+     - Type & service (e.g., "Ride earning", "Promotion bonus", "Payout")
+     - Amount with +/− and currency.
+
+Keep the look visually aligned with existing SafeGo driver UI (no drastic styling changes).
+
+## 6. Frontend: Admin Experience
+
+Add or enhance an admin page for payout configuration and monitoring:
+
+1. **Payout Config Page (e.g., `/admin/payout-configs`):**
+   - Table listing:
+     - Country
+     - Service Type
+     - Currency
+     - Min payout
+     - Fee type/value
+     - Schedule and day-of-week/day-of-month where applicable
+     - Active toggle
+   - Provide dialogs/forms to create and edit configs with inline validation.
+
+2. **Admin Payout Monitoring:**
+   - On an existing or new page (e.g., `/admin/payouts`):
+     - Show a table of payouts with filters for country, status, date range, driver email.
+     - Allow admin to mark payouts as processed or failed, with an optional note.
+
+## 7. Security, Validation, and Edge Cases
+
+1. Validate all numeric and enum fields on both backend and frontend:
+   - Reject invalid enum values or negative amounts.
+   - Ensure decimal math uses a safe approach (e.g., Prisma Decimal, not plain JS floats).
+
+2. Ensure all payout-related APIs:
+   - Use the same auth middleware already used for other driver/admin endpoints.
+   - Check that the `walletId` and `driverProfileId` for a payout really belong to the authenticated driver.
+
+3. Handle edge cases:
+   - KYC revoked after payout request but before processing ⇒ admin can still mark payout FAILED and use reversal logic.
+   - Config disabled while pending payouts exist ⇒ existing payouts continue, but new requests follow current active config rules.
+
+## 8. Backward Compatibility
+
+1. Do not remove or break existing fields used by:
+   - Driver earnings dashboard (D4).
+   - Existing payout history or wallet views, if any.
+
+2. If you need to rename fields or move logic, do so in a way that:
+   - Existing pages still render correctly.
+   - You adapt the old code to use the new models without changing feature behavior.
+
+Document any such changes clearly in `replit.md`.
+
+## 9. Documentation & Testing
+
+1. Update `replit.md` with a new section: `D8 – Country-Specific Payment & Payout Configuration` describing:
+   - New/updated models and relationships.
+   - New APIs and their request/response shapes.
+   - Business rules for payouts and fees per country.
+   - How to test USA vs Bangladesh drivers.
+
+2. Add a short manual test checklist for:
+   - USA driver with APPROVED KYC requesting payout, success path.
+   - BD driver with APPROVED KYC with mobile money payout.
+   - Driver with PENDING KYC trying to request payout (should be blocked).
+   - Admin creating configs for US/BD and changing fee/schedule.
+   - Admin marking a payout SUCCESS and FAILED (with refund).
+
+3. Ensure the dev server runs without TypeScript/Prisma/runtime errors and that existing major features (rides, promotions, support, driver profile) still work.
+
+When you are done, leave a concise summary in the task log explaining what you implemented for D8 and confirming that no existing flows were broken.

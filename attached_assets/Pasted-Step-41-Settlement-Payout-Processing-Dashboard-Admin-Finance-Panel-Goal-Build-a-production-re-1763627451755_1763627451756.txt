@@ -1,0 +1,352 @@
+Step 41 – Settlement & Payout Processing Dashboard (Admin Finance Panel)
+
+Goal
+Build a production-ready, finance-focused Settlement & Payout Processing layer for SafeGo that sits on top of the existing wallet and commission systems. This step must not break any existing driver, customer, restaurant, parcel, KYC, settlement, or notification flows.
+
+High-Level Objectives
+1. Extend the existing Wallet Settlement System to support real payout processing flows.
+2. Provide admins with a clear dashboard to review, approve, and manage payouts.
+3. Respect existing RBAC, audit logging, document expiry rules, and notification infrastructure.
+4. Keep all changes backward compatible and incremental.
+
+Important Constraints
+1. Do NOT break any existing database schema used in production data. Only additive migrations are allowed.
+2. Do NOT change the core commission calculation logic that was already implemented.
+3. Reuse:
+   - Existing Wallet and Settlement data structures where possible
+   - Existing Wallet Settlement Dashboard at /admin/settlement
+   - Existing RBAC and audit logging helper
+   - Existing Notification System (for payout status alerts)
+4. No emojis anywhere in new UI text.
+5. Do not expose full sensitive payment details (only masked and last-four style where needed).
+
+1. Data Model Enhancements (Backend)
+
+Use the existing ORM/migration style in this codebase. Extend the system with minimal, additive models:
+
+1.1 PayoutAccount (if not already formalized)
+- id
+- userId (FK to driver/restaurant/customer user)
+- userType ("driver" | "restaurant" | "customer")
+- provider ("bank" | "bkash" | "nagad" | "rocket" | "wise" | "stripe" | "paypal" or similar)
+- accountLabel (short name admin can see, e.g., "BD Bank - Main")
+- maskedAccountNumber (e.g., last 4 digits only)
+- routingInfo (optional, non-sensitive description like bank name; do not store secrets such as full IBAN if not already present in schema)
+- isDefault (boolean)
+- countryCode
+- createdAt, updatedAt
+- status ("pending_verification" | "verified" | "disabled")
+
+If there is already a PayoutAccount concept used by the wallet settlement system, do not duplicate it. Instead:
+- Align this PayoutAccount model with the existing structure.
+- Only add missing fields if absolutely necessary and backward compatible.
+
+1.2 PayoutRequest
+Represents a pending, processing, or completed payout for a wallet.
+
+Fields:
+- id
+- userId
+- userType ("driver" | "restaurant")
+- payoutAccountId (FK to PayoutAccount)
+- walletId (or reference to the wallet/ledger record)
+- amount (decimal, positive)
+- currency
+- type ("auto_weekly" | "manual_request")
+- status ("pending" | "processing" | "completed" | "failed" | "cancelled")
+- failureReason (nullable, short text)
+- scheduledFor (nullable timestamp for auto payouts)
+- processedAt (nullable timestamp)
+- createdAt, updatedAt
+- batchId (FK to PayoutBatch, see below, nullable)
+
+1.3 PayoutBatch
+Optional grouping for finance operations (weekly runs):
+
+- id
+- batchType ("driver" | "restaurant" | "mixed")
+- periodStart, periodEnd (date range covered)
+- totalPayoutCount
+- totalPayoutAmount
+- status ("created" | "processing" | "completed" | "partially_failed" | "failed")
+- createdByAdminId
+- createdAt, updatedAt
+
+Indexing:
+- Proper indexes by (userId, userType), status, createdAt, batchId to allow efficient querying and listing.
+
+Security Note:
+- Do not store raw secrets (API keys, access tokens) in these models.
+- Do not add or change any password/SSN/NID handling here.
+
+2. Backend Logic and Services
+
+2.1 Payout Eligibility and Creation
+
+Implement a backend service for creating PayoutRequest entries using existing settlement and wallet systems:
+
+- A helper service, e.g., createPayoutRequestsForPeriod(periodStart, periodEnd, type), that:
+  - Finds all eligible wallets (driver and restaurant) that:
+    - Have a positive payable balance over the configured minimum payout threshold (reuse existing global settings if available, or add a setting).
+    - Have a verified payout account.
+  - Creates PayoutRequest rows with status="pending", type="auto_weekly", associated with a new PayoutBatch.
+  - Does not modify any wallet balance yet (actual deduction happens on completion or when the underlying settlement logic already models that).
+
+- Optionally, another helper for manual payouts:
+  - createManualPayoutRequest(userId, userType, amount, payoutAccountId) with validation rules:
+    - Only finance admins can call it.
+    - Amount must be less than or equal to available wallet balance.
+    - Must attach to a batch or mark as batchId=null for ad-hoc payouts.
+
+2.2 Processing and Status Transitions
+
+Implement a backend service for:
+
+- Starting payout processing:
+  - Mark selected PayoutRequest items as "processing" with optimistic concurrency checks (only pending can be changed).
+  - Optionally integrate with an external provider interface abstraction (e.g., a mocked PaymentProvider interface) but do not hardcode real gateways in this step. Focus on a clean abstraction layer that can be implemented later.
+
+- Completing payouts:
+  - On success:
+    - Mark PayoutRequest as "completed"
+    - Update wallet/settlement tables accurately to reflect that amount is paid out (if this is not already handled by the existing settlement logic).
+    - Update PayoutBatch stats and status.
+    - Fire notification(s) to the affected user using the existing notification system.
+
+  - On failure:
+    - Mark PayoutRequest as "failed"
+    - Store a short, non-sensitive failureReason.
+    - Do not lose track of the wallet funds; leave them as owed in the existing wallet logic.
+    - Optionally allow retries later.
+
+- Cancelling payouts:
+  - Only allow cancellation while status="pending".
+  - Keep an audit log entry for cancellations.
+
+2.3 Global Settings Integration
+
+Use the existing Global Settings panel and backend config infrastructure to add payout-related settings in the "Settlement" or "Commission/Settlement" tab:
+
+- Minimum payout amount per country and userType.
+- Weekly payout day/time (e.g., Monday 02:00 UTC).
+- Default payout method priority (e.g., bank first, then mobile wallet).
+- Whether manual cashout requests are enabled or disabled.
+
+Do not duplicate configuration logic; reuse existing settings storage mechanism.
+
+2.4 RBAC and Audit Logging
+
+- Define new capabilities for payout operations, for example:
+  - "VIEW_PAYOUTS"
+  - "PROCESS_PAYOUTS"
+  - "CREATE_MANUAL_PAYOUT"
+  - "VIEW_PAYOUT_BATCHES"
+
+- Enforce these capabilities on all new payout-related APIs.
+
+- Use the existing audit logging helper to log:
+  - Payout batch creation
+  - Payout processing start
+  - Payout completion
+  - Payout failure (include failureReason, but no secrets)
+  - Manual payout creation
+  - Payout cancellation
+
+Audit metadata must not include full account numbers or any sensitive credentials.
+
+3. API Endpoints
+
+Implement admin-only endpoints for managing payouts, consistent with existing routing style:
+
+3.1 List Payout Requests
+- GET /api/admin/payouts
+- Query parameters:
+  - page, pageSize
+  - userType (driver/restaurant)
+  - status
+  - dateFrom, dateTo (for createdAt)
+  - batchId (optional)
+- Response:
+  - Paginated list of payout requests
+  - Aggregate summaries (e.g., total amount for current filter) if feasible
+
+3.2 Get Single Payout Request
+- GET /api/admin/payouts/:id
+- Returns detailed info including:
+  - User basic info (email, name)
+  - PayoutAccount label and maskedAccountNumber
+  - Wallet summary (current balance, last payout date)
+  - Status history if available
+
+3.3 Create Payout Batch (Auto)
+- POST /api/admin/payout-batches
+- Body:
+  - periodStart
+  - periodEnd
+  - optional filters (country, userType)
+- Behavior:
+  - Requires PROCESS_PAYOUTS capability.
+  - Creates a PayoutBatch and associated PayoutRequest entries using the helper described above.
+  - Returns summary: count, total amount.
+
+3.4 Process Payout Batch
+- POST /api/admin/payout-batches/:id/process
+- Marks eligible PayoutRequests as processing and invokes the provider abstraction (for now, you can simulate success/failure).
+- Must be idempotent and safe to call twice.
+
+3.5 Manual Payout (Optional in this step but prepare the API)
+- POST /api/admin/payouts/manual
+- Body:
+  - userId, userType
+  - payoutAccountId
+  - amount
+- Requires CREATE_MANUAL_PAYOUT capability.
+
+3.6 Payout Status Actions
+- POST /api/admin/payouts/:id/complete
+- POST /api/admin/payouts/:id/fail
+- POST /api/admin/payouts/:id/cancel
+- All require appropriate permissions, use audit logging, and validate state transitions.
+
+All endpoints must:
+- Be protected via existing admin authentication.
+- Validate requests using the validation layer (e.g., Zod schemas) already introduced in previous steps.
+- Return consistent error structures without leaking internal errors.
+
+4. Admin UI – Settlement & Payout Dashboard
+
+Extend the existing Wallet Settlement System UI instead of creating a duplicate page.
+
+4.1 Route
+- Reuse /admin/settlement route.
+- Add a new tab or section for "Payout Processing" under this page.
+
+4.2 Layout
+
+Top-level:
+- Summary cards:
+  - Pending Payouts (count + amount)
+  - Processing Payouts
+  - Completed Today
+  - Failed Payouts (with subtle warning styling)
+
+Tabs inside the page:
+1) "Overview"
+   - Shows existing total pending commission and wallet stats (from previous implementation).
+2) "Payout Queue"
+   - Table of PayoutRequests with filters.
+3) "Batches"
+   - List of payout batches with stats and actions.
+
+4.3 Payout Queue Table
+
+Columns:
+- Created At (formatted date/time)
+- User Type (Driver/Restaurant)
+- User Name / Email
+- Country
+- Amount
+- Payout Method label (from PayoutAccount)
+- Status
+- Actions (View, Mark Completed, Mark Failed, Cancel if pending)
+
+Filtering:
+- Status filter
+- UserType filter
+- Country filter
+- Date range filter
+
+Row click:
+- Opens a side panel showing:
+  - Payout details
+  - Wallet summary (trips/orders, total earnings, total commission, net payable)
+  - PayoutAccount masked details
+  - Status history if present
+  - Audit log link (e.g., "View related activity in Activity Log") if feasible
+
+4.4 Batches Tab
+
+Table columns:
+- Batch ID
+- Type (Drivers, Restaurants, Mixed)
+- Period (periodStart – periodEnd)
+- Count of payouts
+- Total amount
+- Status
+- Actions:
+  - View details (list of payouts in the batch)
+  - Process batch (if allowed and not already processing/completed)
+
+Batch details view should reuse the existing table components and respect pagination.
+
+4.5 No UI for editing data directly
+
+- Admins should not be able to arbitrarily edit payout amounts once created via this UI.
+- All destructive or critical operations (cancel, mark failed, mark completed) must require confirmation modals.
+
+5. Notifications Integration
+
+- On payout completion, send a notification to the user using the existing notification framework:
+  - Example: "Your payout of $X has been processed to [account label]."
+- On payout failure, send a notification with a general, non-sensitive message:
+  - Example: "Your payout could not be processed. Please update your payout information or contact support."
+
+Use existing notification types and channels; do not reinvent the notification infrastructure.
+
+6. Security and Compliance
+
+Before considering this step complete:
+
+1) Every new payout endpoint must enforce:
+   - Admin authentication
+   - Capability checks (RBAC)
+   - Validation via the existing validation layer
+
+2) Audit logs:
+   - Confirm that all critical actions (batch creation, processing, completion, failure, cancellation, manual payout) create audit entries.
+
+3) Sensitive data:
+   - Only masked payout account numbers are shown in the UI.
+   - No tokens, API keys, full bank account numbers, or SSN/NID are stored or logged.
+
+4) Backward compatibility:
+   - Existing Wallet Settlement Dashboard screens continue to work.
+   - Existing commission reports and analytics remain unchanged.
+
+7. Testing Checklist
+
+Implement and run an end-to-end test scenario:
+
+1) Configure payout settings in the Global Settings panel (minimum amount, weekly schedule).
+2) Create test drivers and restaurants with:
+   - Earned commission and wallet balances.
+   - Verified payout accounts.
+3) Run a test payout batch for a period:
+   - Confirm PayoutRequests are created correctly.
+   - Confirm batch statistics (count, total amount).
+4) Use the Payout Queue tab:
+   - Filter by status, userType, country, date.
+   - Open detail panels and verify data accuracy.
+5) Process a batch:
+   - Simulate success and failure outcomes.
+   - Check:
+     - Status transitions
+     - Wallet balances
+     - Notifications
+     - Audit logs
+6) Try unauthorized access:
+   - A role without PROCESS_PAYOUTS must not see or use sensitive actions.
+7) Confirm that:
+   - No emoji appears anywhere.
+   - No full SSN/NID or full account numbers appear in UI or logs.
+   - Performance is acceptable when listing a realistic number of payout records.
+
+Documentation
+- Update replit.md with:
+  - Data model changes
+  - New endpoints and permissions
+  - How finance admins should use the payout dashboard
+  - Any limitations or future extension points
+
+Final expectation
+The Settlement & Payout Processing Dashboard should be finance-team ready, secure, auditable, and fully integrated with the existing SafeGo admin ecosystem, without breaking any previous behavior.

@@ -1,0 +1,118 @@
+SAFEGO GLOBAL — FIX CUSTOMER RIDE MAP LAYOUT (INLINE + ROUTE MODAL)
+
+This change is purely frontend. It must be ADDITIVE and must not break any
+SafeGo core rules (roles, KYC, rides/food_orders/deliveries, commissions, etc.).
+
+====================================================
+1) CONTEXT
+====================================================
+Customer Ride screen (/customer, mode=Ride) now has:
+- An inline map preview in the booking card.
+- A "Route Map" modal overlay.
+
+Bug:
+- When opening the Route Map, the map renders as a small tile in the middle
+  instead of a full-screen map.
+- The small map "floats" above, even though the modal background is full.
+- Likely causes: bad container sizing, wrong position, and/or Leaflet
+  not receiving a proper invalidateSize() call when modal opens.
+
+Goal:
+- Make the inline map look clean and fixed-height inside the booking card.
+- Make the Route Map modal show ONE map instance that fills the modal.
+- When the modal is closed, no small map fragment should remain floating.
+
+====================================================
+2) INLINE MAP REQUIREMENTS
+====================================================
+For the inline map inside the Ride booking page:
+
+- Container should have a fixed height on mobile and desktop, e.g.:
+  - mobile: ~200–240px
+  - desktop: ~260–300px
+- Use CSS classes like:
+  - width: 100%
+  - overflow: hidden
+  - border-radius consistent with card design
+
+- The map tiles must fill the container without overlapping or tiling
+  beyond the visible box.
+
+Implementation:
+- Ensure the inline map component has its own wrapper:
+  e.g. <RideInlineMap /> with a dedicated div (position: relative; height set).
+- Leaflet map should be initialised with the container size already defined.
+- If needed, hook into onResize or use a useEffect to call map.invalidateSize()
+  when the inline map becomes visible.
+
+====================================================
+3) ROUTE MAP MODAL REQUIREMENTS
+====================================================
+The "Route Map" modal must:
+
+- Use a full-screen fixed overlay container, e.g.:
+  - position: fixed;
+  - inset: 0;
+  - display: flex;
+  - flex-direction: column;
+- Title bar at top ("Route Map" + close icon).
+- Map area should take all remaining vertical space:
+  - flex: 1;
+  - min-height: 0;  // important so map can fill
+- Bottom area for the "Done" button only.
+
+Map sizing:
+- The Leaflet map inside the modal should fill the available map area:
+  - width: 100%;
+  - height: 100%;
+- On modal open:
+  - After the component mounts and is visible, call map.invalidateSize()
+    to fix tile positioning.
+
+Very important:
+- Only ONE map instance inside the modal.
+- Do NOT nest the inline map component inside the modal.
+- The modal should have its own dedicated map component or re-use the map
+  logic but with a separate container DOM node.
+
+====================================================
+4) MODAL OPEN/CLOSE BEHAVIOR
+====================================================
+- Default state: Route Map modal closed.
+- It should only open when:
+  - user taps an explicit "Route Map" / "View Route" button OR
+  - there is an active ride and user selects the route view.
+
+- When closing:
+  - Unmount the modal component completely (conditional rendering).
+  - Clean up any map listeners.
+  - No residual map div should stay floating over the booking UI.
+
+- Ensure ESC and overlay click (if enabled) also close the modal.
+
+====================================================
+5) NON-BREAKING & ROLE SAFETY
+====================================================
+- Do NOT change any backend APIs or schemas.
+- Do NOT touch rides collection logic or status flow.
+- Keep all existing role access rules intact:
+  - Only customers see this route map in /customer.
+  - Drivers/admin views remain unchanged.
+
+====================================================
+6) FILES TO UPDATE (EXAMPLE)
+====================================================
+Frontend only, likely:
+
+- client/src/modules/customer/ride/RidePage.tsx
+- client/src/components/ride/RideInlineMap.tsx (new or existing)
+- client/src/components/ride/RouteMapModal.tsx
+- client/src/styles/ride-map.css (or Tailwind classes)
+
+Do not rename existing exports; add or adjust layouts and styles only.
+
+Test:
+- Mobile viewport (iPhone) and desktop.
+- Open Ride page with no active ride → inline map correct, no modal.
+- Open Route Map from appropriate button → full-screen map ok.
+- Close Route Map → returns cleanly, no floating small map.

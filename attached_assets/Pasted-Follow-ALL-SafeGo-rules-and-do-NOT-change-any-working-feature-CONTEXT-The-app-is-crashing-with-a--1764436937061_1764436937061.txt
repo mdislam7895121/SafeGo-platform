@@ -1,0 +1,59 @@
+Follow ALL SafeGo rules and do NOT change any working feature.
+
+CONTEXT:
+The app is crashing with a JSX syntax error:
+
+  File: client/src/pages/customer/unified-booking.tsx
+  Error: "Expected corresponding JSX closing tag for <div> (around line 1685)"
+
+Previously you claimed to fix it, but the same error still appears.  
+That means the JSX tree is still unbalanced.
+
+YOUR TASK:
+Fix ONLY the JSX structure in unified-booking.tsx so that the file compiles again.  
+Do NOT change any business logic, layout logic, pricing, routes, or promo behavior.
+
+DO THIS STEP BY STEP:
+
+1. Open `client/src/pages/customer/unified-booking.tsx`.
+
+2. Search in this file for ALL of the following patterns:
+   - `</>`
+   - `<></>`
+   - Any `<div>` that does not have a matching `</div>` near it.
+
+3. Around lines 1650–1705, PRINT for me (in your answer) the exact JSX snippet BEFORE changes:
+   - From 10 lines above the error to 10 lines below it.
+   - Do NOT summarize. Show the raw JSX for that block.
+
+4. Now fix the JSX in that block carefully:
+   - If you find a stray `</>` with no matching opening `<>`, either:
+       a) remove the `</>` entirely, or
+       b) replace the whole wrapper with a proper fragment: `<> ... </>`.
+   - Make sure every `<div>` has a matching `</div>`.
+   - Make sure parentheses used in `return (` ... `)` and ternaries `condition ? (...) : (...)`
+     are all balanced.
+   - Do NOT wrap large sections in a new `<div>` unless absolutely required by JSX.
+   - Do NOT introduce any new components or props.
+
+5. After editing, run a TypeScript/JSX check for this file ONLY:
+   - Ensure there are **zero** syntax errors in `unified-booking.tsx`.
+   - If there is still any JSX error, repeat step 3–4 until it is clean.
+
+6. Very important: Do NOT modify anything unrelated to the JSX error:
+   - Do NOT change card design, promo UI, route buttons, scroll behavior, or confirm button.
+   - Do NOT change any variables, functions, hooks, or conditional logic.
+   - Do NOT rename any components or props.
+
+7. When you are done:
+   - Confirm that `/customer` (unified booking page) builds and loads without crashing.
+   - Confirm again that:
+       * routes buttons still show 3 options,
+       * ride list still scrolls on mobile,
+       * Fare details still expand,
+       * Confirm button still works.
+
+8. In your final answer, show:
+   - The BEFORE snippet (from step 3),
+   - The AFTER snippet (only the lines you changed),
+   - A clear sentence: “No other logic or layout was modified; only JSX tags were fixed.”

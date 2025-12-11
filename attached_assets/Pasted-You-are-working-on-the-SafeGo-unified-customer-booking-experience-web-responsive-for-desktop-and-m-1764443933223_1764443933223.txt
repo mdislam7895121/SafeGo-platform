@@ -1,0 +1,116 @@
+You are working on the SafeGo unified customer booking experience (web, responsive for desktop and mobile). The ride flow, pricing, promotions, and UI are already working and must NOT be broken. Your task is ONLY to fix and finalize the live driver tracking so it behaves like Uber.
+
+Current problem
+- After a ride is booked, the driver icon sometimes appears far away (e.g., ~20 miles from pickup) and moves along the full pickup → dropoff route in a way that looks like it is going in the “wrong” direction from the passenger.
+- The polyline and driver animation are not clearly separated between the “going to pickup” phase and the “going to dropoff” phase.
+- As a result, the passenger can see the car moving away from the pickup address, which is confusing and not Uber-like.
+
+Goal
+Implement a clean, Uber-style live tracking model with clear ride phases and correct map behavior, without breaking any existing flows (Ride, Eats, Parcel, promotions, pricing, or commission logic).
+
+Files / scope
+- Focus on the customer ride experience, especially:
+  - `client/src/pages/customer/unified-booking.tsx`
+  - Any related hooks/components used for live tracking, driver status, route calculation, and map rendering.
+- Do not remove or break:
+  - Existing pricing and promo logic
+  - Existing commission / service fee logic
+  - Existing responsive layout, route selection UI, or ride confirmation flow.
+
+High-level behavior requirements
+
+1. Explicit ride phases
+Introduce (or use, if already present) a clear ride status state machine for the customer side, with at least:
+- `EN_ROUTE_TO_PICKUP`
+- `EN_ROUTE_TO_DROPOFF`
+- `COMPLETED`
+- `CANCELLED`
+
+You may already have other states like `PENDING`, `DRIVER_ASSIGNED`, etc. Reuse them as appropriate. The important part: for live tracking, we must distinguish “driver going to pickup” from “driver going to dropoff”.
+
+2. Separate routes for each phase
+Right now it appears there is a single polyline for pickup → dropoff and the driver moves along it for the whole trip. Instead, explicitly manage TWO logical routes:
+
+- `driverToPickupRoute`:
+  - Source: driver’s current location
+  - Target: pickup location
+
+- `pickupToDropoffRoute`:
+  - Source: pickup location
+  - Target: dropoff location
+
+Rules:
+- When status is `EN_ROUTE_TO_PICKUP`, show and animate ONLY `driverToPickupRoute`. The driver marker must move from driver location toward pickup.
+- When status switches to `EN_ROUTE_TO_DROPOFF` (after pickup is “completed”), show and animate ONLY `pickupToDropoffRoute`. The driver marker must move from pickup toward dropoff.
+- Do not animate the car in both directions along the same polyline. The direction must always match the current phase.
+
+3. Driver starting location for demo / simulation
+For demo purposes, the driver must not start 20+ miles away in a random direction.
+
+Implement a simple, deterministic approach so that:
+- When a ride is accepted, choose a simulated driver starting point within a small radius of the pickup (for example 1–3 miles), in a plausible direction along a nearby road.
+- The initial ETA and distance for the pickup phase must be computed along the `driverToPickupRoute` from this starting point.
+- This way, when the customer enters “188 Sutter Ave” and a driver is assigned, they see the driver approaching them, not driving away from them on the highway.
+
+4. Animation and heading (arrow) direction
+The car icon should always point in the direction of travel along the current route segment.
+
+Implementation details:
+- Use the polyline points for the active route (either `driverToPickupRoute` or `pickupToDropoffRoute`).
+- For each animation step, compute the bearing/heading using the current point and the next point on the route (standard lat/lng → bearing calculation).
+- Apply this heading to the driver marker so that the arrow/car rotates to match the road direction.
+- Ensure interpolation between points is smooth (you already mentioned using position interpolation; reuse that, just make sure it uses the correct route for the current phase).
+
+5. Phase-specific ETA / distance and labels
+The UI text must always match the current phase:
+
+- When `EN_ROUTE_TO_PICKUP`:
+  - Show “Pickup in ~X min”, “Distance: Y mi” where X and Y are from `driverToPickupRoute`.
+  - The small “fastest / route” header can still show the total trip ETA and distance, but the main emphasis should be on time until pickup.
+  - Map: focus/center between driver and pickup, or lean toward the driver while keeping pickup visible when possible.
+
+- When `EN_ROUTE_TO_DROPOFF`:
+  - Show “Dropoff in ~X min”, “Distance: Y mi” where X and Y are from `pickupToDropoffRoute`.
+  - Map: focus between driver and dropoff.
+
+- When `COMPLETED` or `CANCELLED`:
+  - Stop live animation timers and either show a final summary or navigate back to the appropriate page (depending on the existing flow).
+
+6. “View live map” behavior
+The “View live map” button should:
+- Open a full-width (or responsive) map view that uses the SAME logic described above:
+  - Active route = phase-dependent (`driverToPickupRoute` or `pickupToDropoffRoute`).
+  - Driver marker animates along that route.
+  - The map is centered to keep both driver and target (pickup or dropoff) visible as much as possible.
+- Do NOT create a separate inconsistent tracking mode. Reuse the common tracking state/hooks so that the small panel and the full live map are in sync.
+
+7. Keep everything responsive and device-friendly
+- Desktop layout must stay as it is now (side panel + map on the right).
+- On mobile:
+  - The live tracking view should stack appropriately (e.g., map on top and status panel at the bottom), but still use the same state and logic.
+  - Do not break existing ride, route selection, or confirmation UI.
+
+8. Code quality and safety
+- Do not hardcode secrets, API keys, or sensitive config in the frontend.
+- Keep all network calls and sensitive logic in the existing safe layers (backend or env-configured services).
+- Add small inline comments near the new state machine and route logic describing what each phase does, so that it is easy to maintain.
+- Run the app, simulate a full ride:
+  1) Assign driver and approach pickup,
+  2) Simulate pickup and switch to dropoff,
+  3) Complete trip,
+  and verify the map and status panels behave consistently in each step.
+
+What to deliver
+- Updated code in `unified-booking.tsx` and any supporting hooks/components implementing:
+  - Phase-based live tracking (`EN_ROUTE_TO_PICKUP`, `EN_ROUTE_TO_DROPOFF`, etc.).
+  - Separate `driverToPickupRoute` and `pickupToDropoffRoute`.
+  - Correct driver starting positions for demo.
+  - Proper arrow heading rotation and smooth animation.
+  - Correct ETA/distance and labels per phase.
+  - Consistent “View live map” behavior.
+- Confirm in your summary that:
+  - The driver no longer appears to be driving away from the passenger,
+  - The animation direction always matches the current phase,
+  - Desktop and mobile both remain fully working.
+
+Please carefully read and respect all these requirements, avoid shortcuts, and do not regress any existing Ride/Eats/Parcel features or the pricing/commission logic.

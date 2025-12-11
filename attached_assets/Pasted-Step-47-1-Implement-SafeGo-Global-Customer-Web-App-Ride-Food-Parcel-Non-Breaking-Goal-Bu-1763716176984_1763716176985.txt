@@ -1,0 +1,365 @@
+Step 47.1 – Implement SafeGo Global Customer Web App (Ride + Food + Parcel) – Non-Breaking
+
+Goal:
+Build the first version of the SafeGo “Customer Web App” (browser UI) on top of the existing SafeGo backend, without breaking any current admin, driver, restaurant, wallet, payout, tax, or security behavior.
+
+This is a new frontend layer only.
+
+Core constraints (must follow):
+- Do NOT change existing backend schemas, routes, or admin UI in any breaking way.
+- Only ADD new components, pages, routes, and API calls.
+- Reuse existing backend endpoints for:
+  - customers
+  - rides
+  - food_orders
+  - deliveries
+  - wallets
+  - notifications
+- Respect all SafeGo rules:
+  - 4 roles (customer, driver, restaurant, admin) – this app is ONLY for “customer”.
+  - 3 services: ride-hailing, food delivery, parcel delivery.
+  - Country-specific KYC for BD and US customers.
+  - Status flows for rides, food_orders, deliveries.
+  - Security & RBAC: customers cannot see driver docs or admin data.
+  - Commission & payouts logic must stay unchanged.
+
+Security phase:
+- Apply our “Security Phase 3 – Secure UX + Strict Auth” rules:
+  - Only authenticated customers can access this app.
+  - Use existing auth/session/JWT mechanism.
+  - Never expose internal IDs, secret tokens, or raw SSN/NID in the UI.
+  - Respect existing masking helpers for NID/SSN.
+
+High-level structure:
+Create a new “Customer Web App” with these routes:
+
+- /app/customer/login
+- /app/customer/register
+- /app/customer/dashboard
+- /app/customer/rides/new
+- /app/customer/rides/:id
+- /app/customer/food
+- /app/customer/food/orders/:id
+- /app/customer/parcel/new
+- /app/customer/parcel/:id
+- /app/customer/profile
+- /app/customer/profile/kyc
+- /app/customer/wallet
+- /app/customer/notifications
+
+Use the existing frontend stack that the project is already using (React/Next/etc). Keep styles consistent with the admin panel: neutral, clean, no emojis.
+
+────────────────────────────────
+1. Authentication & Onboarding (Customer)
+────────────────────────────────
+
+Pages:
+1) /app/customer/login
+   - Email + password login form (or whatever existing login method is supported).
+   - Call existing login endpoint for customer role.
+   - On success → redirect to /app/customer/dashboard.
+   - Show basic error messages on failure, no sensitive details.
+
+2) /app/customer/register
+   - Multi-step onboarding flow (non-breaking, frontend only):
+     Step 1 – Basic info:
+       - fullName
+       - email
+       - phone
+       - password
+       - country (BD or US)
+     Step 2 – Address:
+       - For BD:
+         • present_address (with subfields)
+         • permanent_address
+         • district (zilla)
+         • upazila/thana
+       - For US:
+         • home_address (street, city, state, ZIP)
+     Step 3 – KYC:
+       - For BD customers (mandatory):
+         • father_name
+         • date_of_birth
+         • NID number
+         • NID front image upload
+         • NID back image upload
+       - For US customers:
+         • date_of_birth
+         • government_id_type (DL / State ID / Passport)
+         • government_id_last4
+         • optional ID image upload if backend supports
+     Step 4 – Emergency Contact:
+       - name
+       - phone
+       - relation
+
+   - On completion:
+     - Create customer via existing backend endpoint.
+     - Set verification_status = "pending" and is_verified = false.
+     - Show “Pending verification” screen.
+   - Do NOT auto-verify on frontend. Admin handles verification.
+
+KYC rules:
+- BD customer:
+  - father_name, present_address, permanent_address, NID number + front/back images are REQUIRED.
+- US customer:
+  - date_of_birth, home_address, emergency contact, government_id_type, government_id_last4 are REQUIRED.
+
+Access rules:
+- Block access to booking pages if:
+  - verification_status != "approved"
+  - or is_verified != true.
+- In that case, show a “KYC pending” banner + read-only dashboard.
+
+────────────────────────────────
+2. Customer Dashboard (Home)
+────────────────────────────────
+
+Route: /app/customer/dashboard
+
+Layout:
+- Header:
+  - SafeGo logo
+  - Customer name
+  - Country flag (BD/US based on profile country)
+  - Profile & Logout button
+- Main content:
+  - Quick actions:
+    • “Book a Ride”
+    • “Order Food”
+    • “Send a Parcel”
+  - Cards showing:
+    • Last ride (if any)
+    • Last food order
+    • Last parcel delivery
+  - Status chips:
+    • If any ride/food/parcel is in “in_progress/on_the_way/requested” state, show it prominently.
+
+Data sources:
+- Use existing backend endpoints for:
+  - recent rides (rides collection)
+  - recent food_orders
+  - recent deliveries
+
+Important:
+- Respect status flows:
+  - Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+  - Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x
+  - Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+- Only show customer’s own data.
+
+────────────────────────────────
+3. Ride-Hailing Flow (Customer side)
+────────────────────────────────
+
+Route: /app/customer/rides/new
+
+UI:
+- Pickup location selector (address + map if available).
+- Drop-off location selector.
+- Service selector:
+  - SafeGo X, SafeGo XL, SafeGo XXL, SafeGo Premium, SafeGo Premium XL, SafeGo Premium XXL, SafeGo Comfort (use existing serviceType options).
+- Fare estimate:
+  - Call existing estimate endpoint if available.
+- Payment method:
+  - Cash / Card / Wallet depending on what backend supports.
+- “Request Ride” button.
+
+Behavior:
+- On submit:
+  - Create a new ride in the rides collection using existing API.
+  - Initial status must be "requested".
+  - After request, redirect to /app/customer/rides/:id tracking page.
+
+Route: /app/customer/rides/:id
+- Show:
+  - Driver (name + rating, but NOT any license/NID docs).
+  - Car info (make/model/plate).
+  - Live status (according to ride status flow).
+  - Map tracking if already wired; otherwise, status text + timestamps.
+- Allow:
+  - Cancel ride button if current status allows cancellation (as per backend logic).
+
+Security:
+- Ensure the customer can only view rides where ride.customer_id == current user.
+- Never display driver documents (NID, license images, etc.).
+
+────────────────────────────────
+4. Food Delivery Flow
+────────────────────────────────
+
+Route: /app/customer/food
+
+UI:
+- List of restaurants (from existing restaurants collection).
+- Filters:
+  - Cuisine type, delivery time, rating.
+- On restaurant click → restaurant menu page (if backend menus exist) or simple placeholder card.
+
+Order creation:
+- Add items to cart with quantities.
+- Show summary: items, subtotal, delivery fee (from backend), tax (from Tax & Fees rules if already wired).
+- Choose delivery address (reuse profile address or new address).
+- Choose payment method (cash/online/wallet depending on backend support).
+- “Place Order” button.
+
+On submit:
+- Create new food_orders record with:
+  - customer_id
+  - restaurant_id
+  - items
+  - prices
+  - address
+  - initial status: "placed"
+- Redirect to /app/customer/food/orders/:id
+
+Tracking page:
+- Show status progress:
+  - placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x
+
+Security:
+- Customer only sees their own food_orders.
+- Never expose internal restaurant documents.
+
+────────────────────────────────
+5. Parcel Delivery Flow
+────────────────────────────────
+
+Route: /app/customer/parcel/new
+
+UI:
+- Sender details:
+  - Pre-filled from customer profile (name, phone, address).
+- Receiver details:
+  - name, phone, address.
+- Parcel details:
+  - size tier, weight tier, optional notes.
+- Payment:
+  - Cash / online / wallet (whatever backend supports).
+- “Send Parcel” button.
+
+On submit:
+- Create a record in deliveries collection:
+  - sender = current customer
+  - receiver info
+  - status: "requested"
+  - pickup & drop addresses
+- Redirect to /app/customer/parcel/:id tracking page.
+
+Tracking:
+- Show parcel status:
+  - requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+
+Security:
+- Customer only sees deliveries where they are sender (and maybe receiver if your backend supports that concept).
+
+────────────────────────────────
+6. Customer Profile & KYC Page
+────────────────────────────────
+
+Route: /app/customer/profile
+
+Sections:
+- Basic info (read-only fields from backend).
+- Address info.
+- Country flag + locale.
+
+Button: “Manage KYC & Documents” → /app/customer/profile/kyc
+
+Route: /app/customer/profile/kyc
+
+For BD:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number (masked)
+- NID front/back document preview thumbnails (if allowed by backend).
+
+For US:
+- date_of_birth
+- home_address
+- government_id_type
+- government_id_last4 (masked)
+- optional ID document thumbnails.
+
+Rules:
+- NID/ID numbers must appear masked (reuse existing masking logic).
+- Do NOT allow customers to see any internal verification notes.
+- KYC status indicator:
+  - Pending / Approved / Rejected (with generic message, no internal admin comments leaked).
+
+────────────────────────────────
+7. Wallet & Payments View
+────────────────────────────────
+
+Route: /app/customer/wallet
+
+UI:
+- Current wallet balance (read from existing wallet endpoint).
+- Recent transactions:
+  - type (ride payment, food order, parcel, refund, top-up)
+  - amount
+  - timestamp
+  - reference id (ride/order/delivery)
+
+Rules:
+- Read-only for now (no manual balance changes).
+- Respect existing currency and localization rules.
+
+Do NOT change any commission or payout logic.
+
+────────────────────────────────
+8. Notifications Center
+────────────────────────────────
+
+Route: /app/customer/notifications
+
+UI:
+- List recent notifications related to:
+  - ride status updates
+  - food order updates
+  - parcel updates
+  - verification decisions
+- Fields:
+  - title
+  - body
+  - createdAt
+  - read/unread state (if backend supports)
+- Integrate with existing notifications endpoint or add a thin read-only layer on top of current events.
+
+────────────────────────────────
+9. Security & Non-Breaking Rules (Important)
+────────────────────────────────
+
+- Do NOT change or delete any existing admin, driver, restaurant, wallet, payout, or tax behavior.
+- Do NOT rename or remove fields in rides, food_orders, deliveries.
+- Only consume existing APIs; if a new read-only endpoint is needed, add it alongside existing ones without changing old behavior.
+- Enforce proper auth:
+  - Only logged-in customers can access /app/customer/* routes.
+  - Drivers, restaurants, and admins must NOT be able to access customer pages via UI.
+- Never show:
+  - driver NID
+  - driver license images
+  - any SSN full values
+  - raw document URLs.
+
+────────────────────────────────
+10. What to update / where
+
+- Add new customer web app routes under the existing frontend (e.g. /app/customer/...).
+- Use existing API client layer to call backend.
+- If you need to add 1-2 small helpers (e.g. safeNumber, safeArray) for the customer UI, reuse the same style as admin.
+
+After implementation:
+- Test with demo data:
+  - BD customer (KYC pending + KYC approved).
+  - US customer (NYC).
+- Confirm:
+  - They can register → get pending → cannot book until approved.
+  - After admin approval, they can:
+    • book a ride,
+    • place a food order,
+    • send a parcel,
+    • see all in dashboard, rides, food, parcel pages.
+- Ensure no existing admin panel feature is broken.

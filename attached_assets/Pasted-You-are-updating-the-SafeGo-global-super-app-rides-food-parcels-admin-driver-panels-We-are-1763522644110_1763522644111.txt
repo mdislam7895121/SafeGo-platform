@@ -1,0 +1,231 @@
+You are updating the SafeGo global super-app (rides, food, parcels) admin + driver panels.
+
+We are on STEP 25 ONLY.
+Customer Bangladesh identity profile is ALREADY implemented and working.
+Now extend the SAME pattern to DRIVERS for Bangladesh only.
+
+GOAL
+- Add a secure Bangladesh Identity Profile for DRIVERS.
+- Reuse the same design and security approach already used for CUSTOMER Bangladesh identity.
+- Do NOT break any existing flows (rides, food, parcel, payouts, KYC, etc.).
+
+TECH STACK CONTEXT (DO NOT CHANGE GLOBALLY)
+- Backend: Node/TypeScript with Prisma + PostgreSQL
+- Frontend: React/TypeScript + TanStack Query
+- Auth: JWT-based, roles: customer, driver, restaurant, admin
+- Countries: BD (Bangladesh), US (United States)
+- KYC system already exists for drivers & customers.
+- An ENCRYPTION_KEY env var is already set and in use for encrypting sensitive customer identity data (e.g., NID). REUSE that; do NOT create a new key.
+
+SECURITY PHASE IN THIS STEP
+- We are applying: Data Protection & KYC Hardening
+  - Field-level validation for BD identity fields
+  - Encryption at rest for NID
+  - Strict RBAC (admin-only for management, driver-only for self-view/edit)
+
+IMPORTANT RULES
+- Non-breaking change: No breaking migrations, no removal of columns, and no changes to public APIs that other parts of the app depend on.
+- Reuse existing patterns: Wherever possible, mirror the customer Bangladesh identity implementation for drivers.
+- No plaintext logging: Never log NID or other sensitive identity data.
+- Keep all admin routes protected by existing admin-only guards.
+
+TASKS
+
+1) Inspect existing Bangladesh identity implementation for CUSTOMERS
+- Find the Prisma models, services, and API routes used for customer Bangladesh identity.
+- Identify:
+  - Which table/model stores Bangladesh-specific identity (e.g., CustomerBangladeshIdentity or similar)
+  - How NID encryption/decryption is implemented (utility functions, middleware, etc.)
+  - How the admin and customer frontends render and edit these fields.
+- You must follow the SAME pattern for drivers to keep the codebase consistent.
+
+2) Extend the data model for DRIVER Bangladesh identity
+- If there is NO driver-specific Bangladesh identity model yet:
+  - Create a dedicated model/table for driver Bangladesh identity, analogous to the customer one.
+  - It should be linked 1:1 to the driver entity.
+
+- Required Bangladesh-specific fields for DRIVERS:
+  - fullName (string, required)
+  - fatherName (string, required)
+  - phoneNumber (string, required; BD format, see validation below)
+  - village (string, required)
+  - postOffice (string, required)
+  - thana (string, required)
+  - district (string, required)
+  - presentAddress (string, required)
+  - permanentAddress (string, required)
+  - nidEncrypted (string, optional; encrypted NID value at rest)
+
+- Constraints:
+  - Make this model optional and attach it ONLY for drivers whose countryCode is BD.
+  - For existing drivers, the absence of this record must NOT break anything.
+  - Do NOT alter or remove any existing driver KYC fields (only extend).
+
+3) Implement secure NID encryption/decryption for DRIVERS
+- Reuse the SAME encryption utilities used for customer NID:
+  - Use the ENCRYPTION_KEY from process.env (already configured).
+  - NID must NEVER be stored in plaintext in the database.
+  - Provide utility functions like:
+    - encryptNidForDriver(plainNid: string): string
+    - decryptNidForDriver(cipherText: string): string
+  - If customer utilities are generic enough, reuse them instead of duplicating.
+
+- Rules:
+  - Do not log plaintext NID to console or logs.
+  - When returning NID to the frontend:
+    - For admin views: allow a "Show NID" toggle that fetches and decrypts securely.
+    - For driver self-view: allow them to view only their own NID, with the same "Show" toggle.
+  - Masking: Default display should be masked (e.g., ****1234), unless explicitly toggled.
+
+4) Backend API endpoints for DRIVER Bangladesh identity
+Add or extend API routes consistent with existing conventions.
+
+- Admin APIs (role: admin only):
+  - GET /api/admin/drivers/:driverId/bd-identity
+    - Returns all BD identity fields for that driver (masked NID by default).
+  - PUT /api/admin/drivers/:driverId/bd-identity
+    - Allows admin to update Bangladesh identity fields for the driver.
+    - All fields validated.
+    - NID encryption applied if a new NID is provided.
+  - These must enforce:
+    - Role check (admin only).
+    - Country check (only for BD drivers; return 404 or validation error for non-BD).
+
+- Driver APIs (role: driver only):
+  - GET /api/driver/bd-identity
+    - Returns the driver’s own BD identity info.
+  - PUT /api/driver/bd-identity
+    - Allows driver to update their own BD identity data (subject to validation).
+    - May trigger KYC re-review if identity is modified.
+  - Enforce:
+    - The driver can ONLY modify their own record.
+    - Country must be BD; otherwise, respond with appropriate error (e.g., 400/403).
+
+5) Validation rules (Bangladesh-specific)
+Implement robust validation (both backend and, where appropriate, frontend):
+
+- fullName, fatherName, village, postOffice, thana, district, presentAddress, permanentAddress:
+  - Non-empty strings, trimmed.
+  - Reasonable max length (e.g., 2–100 chars).
+
+- phoneNumber:
+  - Required.
+  - Must follow Bangladesh mobile number pattern:
+    - Start with "01".
+    - Total 11 digits.
+    - Only numeric characters.
+
+- NID:
+  - Optional field.
+  - When provided:
+    - Only digits.
+    - Length: allow known BD NID lengths (10, 13, or 17 digits).
+  - Must be encrypted before saving.
+
+- Error handling:
+  - Return clear validation errors in a standardized format already used by the app.
+  - Do not expose internal implementation details.
+
+6) Frontend – Admin Driver Details page (Bangladesh section)
+On the admin driver details page (where you currently show driver stats, trips, etc.), add a dedicated section for Bangladesh Identity, but ONLY when the driver’s country is BD.
+
+- Section: “Bangladesh Identity Information”
+  - Fields (read-only view mode):
+    - Full Name
+    - Father’s Name
+    - Phone Number
+    - Village
+    - Post Office
+    - Thana
+    - District
+    - Present Address
+    - Permanent Address
+    - NID Number (masked by default, with a “Show NID” toggle similar to customer)
+
+  - Action:
+    - “Edit Profile” button opens a modal or side panel.
+    - The edit form must mirror the customer BD identity edit form style and UX.
+
+- Edit modal:
+  - Same fields as above, with proper labels and placeholders.
+  - Uses TanStack Query + mutations consistent with existing patterns.
+  - Shows validation errors inline.
+  - On success:
+    - Closes modal.
+    - Refetches identity data using query invalidation.
+    - Shows a success toast (matching existing design).
+
+7) Frontend – Driver self profile (Bangladesh section)
+On the driver dashboard/profile area:
+
+- If country = BD:
+  - Show a “Bangladesh Identity” section similar to customer self-profile.
+  - Allow driver to:
+    - View their current data.
+    - Edit their own BD identity info.
+  - NID field:
+    - Masked by default.
+    - Show NID on explicit toggle.
+  - If identity is incomplete or missing:
+    - Show a non-blocking warning / helper text (e.g., “Complete your Bangladesh identity details to speed up KYC approval.”).
+
+- If country != BD:
+  - Do not render Bangladesh-specific section.
+
+8) KYC integration behavior
+- If a BD driver updates their identity:
+  - Optionally mark their KYC status as "pending re-review" if that is already the pattern used for customer identity changes.
+  - Admin KYC views should show when a driver’s identity was last updated.
+
+- Ensure:
+  - Existing KYC flows for drivers (for US and other countries) are untouched.
+  - No change to core ride-matching or payout logic in this step.
+
+9) Security & quality checklist (must confirm in your summary)
+At the end, confirm ALL of the following:
+
+- ✅ No breaking database changes
+  - Existing data remains valid.
+  - Migrations are additive only.
+
+- ✅ Reused existing encryption utilities and ENCRYPTION_KEY
+  - No new keys introduced.
+  - No plaintext NID stored or logged.
+
+- ✅ Strict RBAC
+  - Admin APIs require admin role.
+  - Driver APIs restricted to the authenticated driver.
+  - No customer or restaurant user can access driver identity data.
+
+- ✅ Input validation
+  - All BD-specific fields validated on the backend.
+  - Frontend shows clear validation messages.
+
+- ✅ No changes to:
+  - Ride-matching logic
+  - Commission calculations
+  - Wallet & payouts
+  - Non-BD countries’ identity flows
+
+10) Testing plan (you must execute and describe)
+Perform end-to-end tests and list them in your final summary:
+
+1. Create or pick an existing BD driver.
+2. As the driver:
+   - Open driver profile.
+   - Fill Bangladesh Identity fields and submit.
+   - Confirm success message and that data persists after reload.
+3. As admin:
+   - Open /admin/drivers and go to that driver’s detail page.
+   - Verify BD identity section shows correct data.
+   - Use “Edit Profile” to modify some fields and (optionally) NID.
+   - Confirm that the data is updated and NID remains encrypted in the database.
+4. Confirm that:
+   - A US driver does NOT show any Bangladesh Identity section.
+   - Customer BD identity pages still work exactly as before.
+   - No console or network errors appear in browser devtools.
+
+In your final message, provide:
+- A concise summary of code changes (models, APIs, frontend components).
+- Confirmation that all security and non-breaking requirements above are satisfied.
+- Any follow-up TODOs you recommend for future phases, but DO NOT implement them now.

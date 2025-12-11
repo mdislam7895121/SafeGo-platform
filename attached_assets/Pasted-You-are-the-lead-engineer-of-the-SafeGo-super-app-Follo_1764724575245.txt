@@ -1,0 +1,151 @@
+You are the lead engineer of the SafeGo super-app. Follow ALL SafeGo master rules and do not break any of them.
+
+====================================================
+[GLOBAL SAFEGO RULES – ALWAYS APPLY]
+====================================================
+
+1. Core roles (must always exist and keep working)
+   - customer: uses services (rides, food, parcel, tickets, rentals, e-shop, etc.).
+   - driver: drives & delivers (rides + parcel + food + rentals).
+   - restaurant: manages menus, orders, prep & dispatch.
+   - admin: manages platform, KYC, payouts, settings, regional modules.
+   - Additional regional BD roles (must NOT break the 4 core roles):
+     - ticket_operator (BD only)
+     - shop_partner (BD only)
+   - Never rename or delete these roles. Only extend.
+
+2. Global app surfaces
+   - Customer app: Ride / Eats / Parcel / BD-Tickets / BD-Rentals / BD-Shops in one unified interface.
+   - Driver app: online/offline toggle, ride/parcel/food/rental tasks.
+   - Restaurant dashboard: menus, orders, payouts.
+   - Admin panel: user management, KYC approvals, regional expansion dashboards, analytics.
+
+3. Country-specific rules
+   - United States:
+     - NO “case taking” / legal-style ticketing anywhere.
+     - Standard KYC for drivers, restaurants (DL, SSN last4, etc. – demo only).
+   - Bangladesh:
+     - ticket_operator and shop_partner roles allowed.
+     - BD-only Ticket & Rental and BD E-Shop modules must be clearly scoped under BD region.
+     - KYC fields follow local convention (NID, father’s name, present/permanent address, etc.).
+   - Never mix BD-only features into US flows. US users must not see BD-only roles or forms.
+
+4. Admin panel – mandatory capabilities
+   - User management with role filter, status & country badges.
+   - KYC approvals with tabs: Drivers, Customers, Restaurants, Shop Partners, Ticket Operators.
+   - Regional dashboards (e.g. BD Expansion) for metrics and configuration.
+   - Ability to view demo data but clearly separate from live/real data.
+
+5. Data collections (must always exist in backend)
+   - rides
+   - food_orders
+   - deliveries
+   - tickets (for BD bus tickets)
+   - rentals (for BD car/bus rentals)
+   - shops and shop_products (for BD E-Shop)
+   - payouts, commissions
+   - audit logs (basic)
+
+6. Commission & payouts (keep logic intact)
+   - Every paid transaction (ride, food, parcel, ticket, rental, shop_order) must:
+     - calculate platform commission,
+     - store net amount for partner,
+     - mark payout status (pending, processing, paid).
+   - For BD demo flows, calculations can be simple percentages but must be explicit and centralized.
+
+7. Security rules (ALWAYS mention which phases you apply)
+   - Phase S1 – Auth & RBAC:
+     - All protected routes must check for authenticated user and proper role.
+   - Phase S2 – Validation & Data Guards:
+     - Validate inputs (Zod / schema). Reject invalid data with safe error messages.
+   - Phase S3 – Isolation:
+     - Never expose other users’ data. Scope queries by userId / shopId / region.
+   - Phase S4 – Logging:
+     - Log only what is needed to debug; do not log passwords or secrets.
+   - Phase S5 – Abuse protection (basic):
+     - Do not create endpoints that can be spammed without minimal checks.
+
+8. Onboarding & status flows (BD roles)
+   - ticket_operator and shop_partner must always pass:
+     1) signup → 2) onboarding / setup → 3) KYC approval → 4) dashboard access.
+   - Do NOT auto-approve in backend without a clear “demo only” flag.
+   - If setup is incomplete, redirect to setup/onboarding pages, not to dashboards.
+
+9. Demo vs real data
+   - Demo data is allowed but must be clearly recognizable (demo label, banner).
+   - Customer must be able to:
+     - browse demo items without login,
+     - see a clear “Login to order real items” message when not authenticated.
+
+10. Implementation constraints for this task
+   - DO NOT break existing USA flows (ride/eats/parcel).
+   - DO NOT change global navigation structure.
+   - Focus only on BD E-Shop customer experience, plus minimal backend needed.
+   - Keep all strings, labels, and messages for BD customer side in Bangla where appropriate.
+
+====================================================
+[TASK: BD E-SHOP PRODUCT DETAILS PAGE + ADD TO CART]
+====================================================
+
+Goal:
+Implement a complete, demo-ready **Product Details & Add-to-Cart experience** for the Bangladesh E-Shop module so that:
+
+- A BD customer can:
+  - open /customer/bd-shops,
+  - click a shop, browse its products,
+  - tap a product to see full details,
+  - adjust quantity,
+  - add to cart or start checkout.
+- Guests (not logged-in) can:
+  - browse shops and products,
+  - see a clear banner that data is demo and they must log in to place real orders.
+
+Assume the following current context from the codebase (adjust names if they differ after inspection):
+- Customer BD shop list route: `client/src/pages/customer/bd-shops.tsx`
+- Shop details / product listing route: something like `client/src/pages/customer/bd-shop-details.tsx` (or similar).
+- BD shop API base: `/api/bd/shops`
+- Cart system already exists for other verticals (rides/food/parcel) via a shared hook/context.
+
+You must FIRST read the existing implementation for BD shops, products, and cart to align with current patterns and avoid duplication.
+
+---------------------------------------------
+1) Analysis & planning (no code yet)
+---------------------------------------------
+1. Inspect:
+   - `client/src/pages/customer/bd-shops*.tsx`
+   - `client/src/pages/customer/bd-shop-details*.tsx` (or any BD shop details page)
+   - Any BD-specific hooks or utils under `client/src/lib` or `client/src/hooks` (especially cart related).
+   - Backend handlers:
+     - `/api/bd/shops`
+     - any `/api/bd/shop-products` or similar.
+   - Existing TypeScript types/interfaces for:
+     - Shop
+     - Product / ShopProduct
+2. Confirm:
+   - Where product demo data is seeded (e.g. `prisma/seed/bd_shops.ts` or similar).
+   - What fields are currently present for products.
+3. Based on that, design a simple, consistent data contract for a single product details API, e.g.:
+
+   ```ts
+   type BdShopProductDetail = {
+     id: string;
+     shopId: string;
+     shopName: string;
+     shopSlug: string;
+     name: string;
+     slug: string;
+     type: "grocery" | "electronics" | "pharmacy" | "fashion" | "mobile" | "general_store" | "other";
+     thumbnailUrl: string | null;
+     imageGallery: string[];  // can be empty
+     price: number;
+     originalPrice?: number | null;
+     unitLabel: string;       // "১ কেজি", "১ পিস", etc.
+     shortDescription?: string | null;
+     longDescription?: string | null;
+     rating?: number | null;
+     inStock: boolean;
+     stockQty?: number | null;
+     tags: string[];
+     demo: boolean;           // true for seeded demo products
+     distanceKm?: number | null; // from customer location, if available
+   };

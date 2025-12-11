@@ -1,0 +1,188 @@
+SAFEGO GLOBAL MASTER RULES  (DO NOT SKIP OR MODIFY)
+
+Always support all 4 roles separately:
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must have:
+- Onboarding
+- Country-specific KYC
+- Permissions
+- Independent dashboards
+- Independent status flows
+- Role separation (no shared access)
+
+===========================================================
+GLOBAL SERVICES
+===========================================================
+SafeGo must always support these 3 features worldwide:
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+Countries supported:
+- Bangladesh (BD)
+- United States (US)
+
+===========================================================
+COUNTRY-SPECIFIC KYC
+===========================================================
+
+CUSTOMER KYC:
+
+BD:
+- full_name
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- phone_number
+- NID_number + front/back image
+- emergency_contact (name, phone, relation)
+- verification_status
+- is_verified
+- rejection_reason
+
+US:
+- full_name
+- date_of_birth
+- home_address
+- government_id_type
+- government_id_last4
+- emergency_contact fields
+- verification_status
+- is_verified
+- rejection_reason
+
+DRIVER KYC:
+
+BD driver:
+- BD customer KYC + driver license front/back
+- vehicle info
+- driver_wallet_balance (can be negative)
+- driver_status
+- is_blocked
+
+US driver:
+- US customer KYC + driver_license_image + expiry
+- ssn_last4 (optional)
+- vehicle info
+- driver_wallet_balance
+- driver_status
+- is_blocked
+
+RESTAURANT (MERCHANT) KYC:
+
+BD:
+- owner personal BD KYC
+- restaurant_legal_name
+- trade_license_number (optional)
+- verification fields
+
+US:
+- owner personal US KYC
+- restaurant_legal_name
+- EIN_last4
+- verification fields
+
+All roles onboarding must end with:
+- verification_status = "pending"
+- is_verified = false
+- core actions blocked until admin approval.
+
+===========================================================
+CORE COLLECTIONS  (DO NOT REMOVE ANY EXISTING FIELDS)
+===========================================================
+
+1) rides
+2) food_orders
+3) deliveries
+
+All must include:
+- identity fields
+- all address + geolocation
+- fees + commission
+- timestamps
+- payment logic
+- full status flows
+- ratings + feedback
+
+===========================================================
+COMMISSION RULES  (MANDATORY)
+===========================================================
+
+RIDE CASH:
+- Driver keeps all cash.
+- SafeGo commission = negative driver_wallet_balance.
+
+FOOD CASH:
+- Restaurant keeps all cash.
+- SafeGo commission = negative restaurant_wallet_balance.
+
+ONLINE PAYMENT:
+- SafeGo keeps commission automatically.
+
+Admin can mark settlements as paid.
+
+===========================================================
+ADMIN PANEL  (MANDATORY)
+===========================================================
+Admin must be able to:
+- Approve/reject customers/drivers/restaurants
+- View full KYC
+- View/set rejection_reason
+- Block/unblock any profile
+- Update pricing & commissions
+- View & settle wallet balances
+- View rides, food_orders, deliveries
+
+===========================================================
+SECURITY RULES
+===========================================================
+- Customers cannot view driver or restaurant KYC documents.
+- Drivers cannot view customer KYC.
+- Restaurants cannot view other restaurants.
+- Only Admin may change verification, commission, blocking.
+- Users may update only their own profiles.
+- Public APIs may not expose sensitive data (NID, SSN, government_id_last4).
+
+===========================================================
+STATUS FLOWS (DO NOT RENAME)
+===========================================================
+
+Ride:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcel:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+===========================================================
+ONBOARDING  (ALL ROLES)
+===========================================================
+Multi-step:
+1) Basic info
+2) Address
+3) ID/KYC upload (country-specific)
+4) Emergency contact
+5) Verification pending screen
+
+===========================================================
+NOTIFICATIONS
+===========================================================
+- Ride alerts
+- Food order updates
+- Parcel updates
+- Verification approvals/rejections
+- Admin announcements
+
+===========================================================
+NON-BREAKING DEVELOPMENT RULE
+===========================================================
+- Never rename or delete existing fields, screens, or routes.
+- Only add new fields/endpoints/screens.
+- Maintain backward compatibility across SafeGo modules.

@@ -1,0 +1,135 @@
+You are working on the SafeGo global platform.  
+Your job in THIS task: 
+
+1) Change the driver flow AFTER application submission so that:
+   - The driver is redirected to the Driver Dashboard (home) — not stuck forever on the Under Review page.
+   - The Go Online action is blocked when verification is still pending, and shows an Uber-style “Your documents are under review” message.
+2) Keep the separate Driver Status page (`/partner/driver/status`) to show full application details when the driver wants to view them.
+3) Respect ALL SafeGo master rules (roles, KYC, admin verification, collections, commission, security, status flows, notifications) and make changes NON-BREAKING.
+
+======================================================
+A) SAFEGO MASTER RULES (SUMMARY – DO NOT BREAK)
+======================================================
+
+1) Roles (must stay separate)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   Each role has:
+   - Its own onboarding flow
+   - Its own dashboard
+   - Its own permissions and status flows
+   No cross-access to sensitive data between roles.
+
+2) Services (must be supported end-to-end)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+3) Country-specific KYC (BD vs US)
+   - Bangladesh (BD) drivers:
+     - father_name, date_of_birth, present_address, permanent_address
+     - NID_number, NID_front_image, NID_back_image
+     - emergency_contact_name / phone / relation
+     - verification_status, is_verified
+
+   - United States (US) drivers:
+     - date_of_birth, home_address
+     - emergency_contact_name / phone / relation
+     - government_id_type, government_id_last4
+     - driver_license_number, driver_license_image_front, driver_license_image_back, driver_license_expiry
+     - ssn_last4 (optional)
+     - for NYC: TLC license images if needed
+     - verification_status, is_verified
+
+   - For NYC: FHV Number must NOT be required in the UI. TLC images are sufficient (do not delete DB column, just don’t require it).
+
+4) Admin panel must:
+   - Approve / reject / block drivers, customers, restaurants
+   - Set `verification_status`, `is_verified`, and `rejection_reason`
+   - Control pricing, fees, commissions
+   - Manage payouts and negative balances
+
+5) Collections – must keep:
+   - rides
+   - food_orders
+   - deliveries
+
+   Each with:
+   - customer_id, driver_id (and restaurant_id for food_orders)
+   - pickup/dropoff addresses + geolocation
+   - fees, commission, driver/restaurant earnings
+   - payment_method, payment_status, transaction_id
+   - full status flows (rides, food, parcel)
+   - ratings and feedback
+
+6) Commission rules:
+   - Cash ride: driver keeps cash, SafeGo commission becomes negative balance in driver_wallet_balance.
+   - Cash food order: restaurant keeps cash, commission becomes negative balance in restaurant_wallet.
+   - Online payments: SafeGo keeps commission automatically.
+   - Admin can settle balances.
+
+7) Security:
+   - Drivers can’t see customer NID or sensitive documents.
+   - Customers can’t see driver documents.
+   - Restaurants can’t see other restaurants.
+   - Only Admin can change pricing, commission, verification, blocking.
+   - Users can update only THEIR own profile.
+
+8) Onboarding:
+   - Multi-step (basic info, address, KYC, emergency contact).
+   - After submission: `verification_status = "pending"`, `is_verified = false`.
+   - No access to live operations until approved by Admin.
+
+9) Notifications:
+   - New ride/order/parcel alerts
+   - Status updates
+   - Verification approval/rejection
+   - Important admin messages
+
+10) Non-breaking:
+   - Do NOT remove or rename existing API/DB fields or routes.
+   - Only add logic, components, and optional fields.
+
+======================================================
+B) NEW DRIVER FLOW AFTER APPLICATION SUBMISSION
+======================================================
+
+Current behavior (buggy):
+- After final KYC submit, the driver is sent to `/partner/driver/status` which shows:
+  “Your Application Is Under Review” + application details.
+- The driver gets stuck here and cannot reach the Driver Dashboard to see the Go Online button.
+
+DESIRED behavior (Uber-style):
+
+1) After final driver KYC submission succeeds:
+   - Backend sets:
+     - verification_status = "pending"
+     - is_verified = false
+   - FRONTEND must:
+     - Redirect the driver to the **Driver Dashboard** (driver home), not the Under Review page.
+       Example destination route (use the correct one from the codebase):
+       - `/driver`
+       - or `/partner/driver/dashboard`
+       - or similar.
+
+2) On Driver Dashboard:
+   - There MUST be:
+     - A clear Go Online / Go Offline control.
+     - A visible “View Application Status” link or button that opens `/partner/driver/status` (or equivalent).
+
+3) When the driver taps Go Online:
+   - The app must check the driver verification flags:
+
+   PSEUDOCODE:
+
+   ```ts
+   if (!driver.is_verified || driver.verification_status !== 'approved') {
+     // Block going online
+     showUnderReviewModalOrBanner();
+   } else {
+     // Allow going online
+     setOnlineStatus(true);
+   }

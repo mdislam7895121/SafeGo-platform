@@ -1,0 +1,70 @@
+Begin Phase R5: Restaurant Reviews & Ratings System
+
+Objective:
+Implement a fully-functional Reviews & Ratings module inside the SafeGo Eats Restaurant Portal. Follow all SafeGo global rules (roles: customer, restaurant, driver, admin), security standards, KYC gating, relational database rules, and non-breaking incremental architecture.
+
+R5 Requirements:
+1. Create backend models:
+   - Review
+   - ReviewReply
+   - Rating (1–5 stars)
+   - ReviewStatus enum (VISIBLE, HIDDEN, FLAGGED)
+   - Add foreign keys: customerId, restaurantId, orderId
+
+2. Functional Requirements:
+   - Only customers with completed/paid orders can leave reviews.
+   - Restaurant dashboard must show:
+       • New Reviews
+       • Rating Overview (avg rating, total reviews, 1–5 breakdown)
+       • Review moderation (Hide/Unhide/Flag)
+       • Reply to Review (one reply per review)
+   - Customers can:
+       • leave review (text + rating)
+       • edit review (within 24 hours)
+       • delete review (within 24 hours)
+   - Admin panel:
+       • global moderation
+       • flag review handling
+       • ban abusive users if needed
+
+3. UI Pages to Implement:
+   - /restaurant/reviews
+   - /restaurant/reviews/:id
+   - /customer/reviews
+   - /admin/reviews
+
+4. Security Rules:
+   - Enforce RBAC for all routes.
+   - Only verified/KYC-passed customers may post reviews.
+   - Sanitize all text inputs.
+   - Enforce rate limit: max 3 reviews per order.
+
+5. API Endpoints (Unified Format):
+   - POST /api/reviews            (create review)
+   - GET  /api/reviews/:id        (view single)
+   - GET  /api/reviews/restaurant/:id   (restaurant reviews)
+   - PATCH /api/reviews/:id       (edit)
+   - DELETE /api/reviews/:id      (delete)
+   - POST /api/reviews/:id/reply  (restaurant reply)
+   - PATCH /api/reviews/:id/hide  (admin/restaurant)
+   - PATCH /api/reviews/:id/flag  (customer/admin)
+   - GET /api/reviews/stats/:restaurantId (ratings summary)
+
+6. Architecture Requirements:
+   - Zero breaking changes.
+   - Review system must integrate with existing order + restaurant tables.
+   - Use cached rating summaries for faster load.
+   - Logs must include review changes & reply history.
+
+7. Performance Requirements:
+   - Paginated review loading (20 per page)
+   - Client-side filtering (rating count, latest, highest)
+   - Mobile-optimized UI
+
+8. Documentation:
+   - Update replit.md with full R5 description.
+   - Include ERD updates and route map.
+
+Deliverables:
+- Fully functional, production-ready R5 implementation.
+- Architect review before completion.

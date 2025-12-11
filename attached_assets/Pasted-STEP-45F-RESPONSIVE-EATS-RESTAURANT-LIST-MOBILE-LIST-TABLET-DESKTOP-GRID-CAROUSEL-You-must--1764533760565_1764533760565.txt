@@ -1,0 +1,307 @@
+STEP 45F – RESPONSIVE EATS RESTAURANT LIST: MOBILE = LIST, TABLET/DESKTOP = GRID/CAROUSEL
+
+You must follow ALL SafeGo Master Rules.  
+This step is a PURE UI/RESPONSIVE LAYOUT enhancement for the Customer app (SafeGo Eats).  
+Do NOT change any backend logic, KYC, commissions, payouts, wallets, or status flows.
+
+====================================================
+SAFEGO MASTER RULES (MANDATORY – OBEY, DON’T BREAK)
+====================================================
+
+ROLES (4 strictly separated roles):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role has:
+- Its own signup flow
+- Country-specific KYC (BD vs US)
+- Separate dashboard
+- Separate permissions
+- Separate status flows
+
+GLOBAL SERVICES (must stay working):
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+COUNTRY KYC REQUIREMENTS:
+
+Bangladesh (BD) – all users:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status ("pending" | "approved" | "rejected")
+- is_verified (boolean)
+
+United States (US):
+
+All users:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+US DRIVERS (extra):
+- driver_license_number
+- driver_license_image
+- driver_license_expiry
+- ssn_last4 (optional)
+- driver_background_check_status
+
+ADMIN PANEL (must keep all powers):
+- View/verify customers, drivers, restaurants (BD + US).
+- Approve/reject KYC with rejection_reason.
+- Configure pricing, fees, commissions for rides, food_orders, deliveries.
+- Block/unblock any user with reason and timestamps.
+- Manage payouts and settlements.
+- View driver_negative_balance and restaurant_negative_balance.
+- Mark balances as settled.
+- View audit logs for KYC, blocking, pricing, payouts.
+
+CORE COLLECTIONS (cannot be renamed or removed):
+1) rides
+2) food_orders
+3) deliveries
+
+Each includes:
+- Identity fields (customer_id, driver_id, restaurant_id, admin_id).
+- Addresses + geolocation (lat/lng).
+- Financials (base_price, distance_fee, service_fee, platform_commission_amount, driver_earnings_amount, restaurant_earnings_amount, total_amount_charged_to_customer, payment_method, payment_status).
+- Timestamps (created_at, updated_at, accepted_at, completed_at, cancelled_at).
+- Status fields that follow the required lifecycle.
+- Rating & feedback fields.
+
+COMMISSION & PAYOUT RULES (do NOT change):
+1) CASH ride:
+   - Driver gets full cash.
+   - SafeGo commission becomes driver_negative_balance in driver_wallet_balance.
+2) CASH food order:
+   - Restaurant gets full cash.
+   - SafeGo commission becomes restaurant_negative_balance in restaurant_wallet.
+3) ONLINE payment:
+   - SafeGo receives full payment and keeps commission automatically.
+4) Admin can settle balances and adjust wallets with audit logs.
+
+SECURITY RULES:
+- Customers cannot see driver/restaurant KYC documents.
+- Drivers cannot see customer KYC or government IDs.
+- Restaurants cannot see other restaurants’ data or balances.
+- Only Admin can change verification, blocking, pricing, commissions.
+- Users may update only their own profile (non-admin fields).
+- Sensitive numbers must be masked (last4) and never fully exposed.
+
+STATUS FLOWS (must remain intact):
+
+rides.status:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed  
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+food_orders.status:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered  
+or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+deliveries.status:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered  
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+ONBOARDING:
+- Multi-step: basic info → address → KYC upload → emergency contact.
+- verification_status = "pending", is_verified = false until Admin approves.
+- Unverified drivers/restaurants cannot take live jobs or orders.
+
+NOTIFICATIONS:
+- New ride alerts for drivers.
+- New food orders for restaurants.
+- Parcel updates.
+- Verification approval/rejection.
+- Critical admin notifications.
+
+DESKTOP EATS LAYOUT CONSTRAINT:
+- Do NOT redesign the approved desktop SafeGo Eats home layout from Step 43:
+  - `/customer/food` with cuisine chips, filters, “Popular Near You”, “Top Rated” sections, carousels/grid.
+- This step can ONLY adjust responsive behavior (list vs grid) based on screen width.
+
+NAVIGATION CONSTRAINT (FROM STEP 45E):
+- Customer Home = `/customer`.
+- Customer Eats Home (restaurant list) = `/customer/food`.
+- Home button must still go to `/customer`.
+- “Back to restaurants” button must still go to `/customer/food`.
+
+====================================================
+STEP 45F GOAL – RESPONSIVE RESTAURANT LIST
+====================================================
+
+Requirement from product owner:
+
+1) On **mobile** (small screens):
+   - Restaurant listing in SafeGo Eats should appear as a **vertical list** of restaurants (full-width cards, stacked one per row).
+   - Easy thumb scroll up/down, no horizontal page scroll.
+
+2) On **tablet + desktop** (medium and large screens):
+   - Use the existing **grid/carousel layout** from Step 43:
+     - Cuisine filter bar.
+     - Horizontal carousels (“Popular Near You”, “Top Rated”).
+     - Card grid look.
+
+3) Behavior must be responsive based on viewport width / breakpoints, not user-agent hacks.
+
+====================================================
+PHASE 1 – DEFINE RESPONSIVE BREAKPOINTS (CONFIGURABLE)
+====================================================
+
+Implement a central breakpoint config (ADD-ONLY), for example:
+
+- `mobileMaxWidth = 767`      // up to 767px = mobile
+- `tabletMinWidth = 768`
+- `desktopMinWidth = 1024`    // use your existing values if already defined
+
+Expose these in a config file so they can be customized later, but keep default values consistent with the current design system.
+
+====================================================
+PHASE 2 – CUSTOMER /customer/food VIEW LOGIC
+====================================================
+
+Target screen: Customer Eats home → `/customer/food`.
+
+Refactor (ADD-ONLY) so that the screen renders TWO presentation modes:
+
+1) **Mobile layout (list)**
+   - Activated when viewport width <= mobileMaxWidth.
+   - Main content:
+     - Simple vertical list of restaurants.
+     - Each restaurant is a full-width card (list-style) with:
+       - Image
+       - Name
+       - Cuisine
+       - Rating + review count
+       - ETA, fee (if any)
+       - “Open” badge
+     - List should be scrollable vertically (no horizontal scroll).
+   - Optional: Hide the map or show it in a compact toggle if currently present, but do not break other flows.
+   - Popular/Top Rated:
+     - May be shown as list sections one after another (e.g., a “Popular Near You” heading, then list).
+     - Simpler is fine for mobile.
+
+2) **Tablet/Desktop layout (grid + carousels)**
+   - Activated when viewport width > mobileMaxWidth.
+   - Must preserve the existing Step-43 layout:
+     - top filter bar (cuisines, price, open, favorites)
+     - “Popular Near You” horizontal carousel
+     - “Top Rated” carousel
+     - existing card sizes and spacing
+   - There should be **no change** here other than making sure classes/styles are responsive-aware.
+
+Implementation detail (example approaches; choose consistent with current stack):
+- Use conditional rendering:
+  - if `isMobile` → render `<EatsRestaurantListMobile />`
+  - else → render `<EatsRestaurantGridDesktop />`
+- Or use CSS utility classes (e.g. `hidden md:block`, `md:hidden`) to toggle blocks.
+
+====================================================
+PHASE 3 – RESTAURANT CARD COMPONENTS (REUSE)
+====================================================
+
+Create / reuse components:
+
+- `RestaurantCardList` (mobile):
+  - Full-width list item.
+  - Larger tap targets.
+  - Minimal shadows to avoid clutter.
+  - Entire row clickable to open restaurant detail.
+
+- `RestaurantCardGrid` (desktop/tablet):
+  - Current card design used in carousels/grid.
+  - No changes except responsiveness.
+
+Make sure both card types read from the same restaurant data model and do NOT duplicate business logic.
+
+====================================================
+PHASE 4 – MAP BEHAVIOR (RESPONSIVE)
+====================================================
+
+If `/customer/food` currently shows a side-by-side map on desktop:
+
+- Desktop/Tablet:
+  - Keep side-by-side grid + map as now (Step 43).
+- Mobile:
+  - Map should not force horizontal scroll.
+  - Options (ADD-ONLY, pick the one consistent with existing code):
+    - Show a small “View map” toggle which opens map as an overlay or full-screen page.
+    - Or move the map below the list as a secondary section.
+  - Priority: restaurant list must remain easy to scroll vertically; no horizontal page scroll.
+
+Do NOT remove map functionality; just adjust layout.
+
+====================================================
+PHASE 5 – NAVIGATION IN MOBILE VS DESKTOP
+====================================================
+
+- Navigation (Home button, BackToRestaurantsButton from Step 45E) must behave identically on mobile and desktop.
+- Ensure placing these buttons does not break responsive layout:
+  - Use flex or stack appropriately in headers.
+  - On mobile, they may be icon+text with enough tap size.
+
+====================================================
+PHASE 6 – DEMO & CUSTOMIZATION
+====================================================
+
+You MUST deliver this step as DEMO-READY and CUSTOMIZABLE:
+
+1) Demo:
+   - Populate demo restaurants for both BD and US so the mobile list and desktop grid can be visually inspected.
+   - Verify:
+     - On a narrow viewport or dev tools (mobile), the list view appears.
+     - On a larger viewport, the grid view appears.
+
+2) Customization:
+   - Breakpoints and whether to use list vs grid must be configurable via a single config file:
+     - e.g., `useListOnMobile = true`.
+   - Ensure changing these settings does NOT break any existing routes or data.
+
+====================================================
+PHASE 7 – TEST CASES (MANDATORY)
+====================================================
+
+You MUST test at least these viewport sizes:
+
+1) Width 375–430px (mobile):
+   - `/customer/food` shows vertical list of restaurants.
+   - No horizontal page scroll.
+   - Tapping a restaurant opens detail correctly; Back to restaurants works; Home works.
+
+2) Width 768–1024px (tablet):
+   - `/customer/food` shows grid / carousels as per desktop design (or tablet-optimized version).
+   - Map + grid align correctly.
+   - No regression in filters.
+
+3) Width 1280+ (desktop):
+   - Layout matches the approved Step 43 grid with carousels + map.
+   - No new layout bugs.
+
+Ensure:
+- No console errors.
+- No changes to rides, parcel flows, or non-Eats screens.
+
+====================================================
+FINAL REQUIREMENT
+====================================================
+
+Deliver Step 45F so that:
+
+- On mobile devices, SafeGo Eats restaurant list at `/customer/food` is a clean vertical list.
+- On tablet/desktop, `/customer/food` shows the existing grid/carousel layout exactly as before.
+- Navigation (Home and Back to restaurants) still works as defined in Step 45E.
+- All SafeGo global rules (roles, KYC, admin, commissions, status flows, security) remain intact.
+- Implementation is fully backward-compatible and ADD-ONLY.

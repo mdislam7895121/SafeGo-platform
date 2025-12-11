@@ -1,0 +1,60 @@
+You are the SafeGo architect working on step C4 (vehicle category selector for the rider app).
+
+BUG: On the live /customer ride planning page on mobile, the rider still does NOT see any vehicle category selector or car list. The screen only shows:
+- pickup & dropoff
+- "Estimated fare" block
+- route choices (Fastest, etc.)
+- "Request ride" button
+
+There is no horizontal vehicle carousel and no list of:
+SafeGo X, SafeGo Comfort, Comfort XL, SafeGo XL, SafeGo Black, SafeGo Black SUV, SafeGo WAV.
+
+Even though you say the mobile layout is fixed, the actual mobile UI is still the same as before.
+
+Fix this end-to-end:
+
+1. **Reproduce the bug**
+   - Run the app and open the real customer URL (/customer) in a mobile viewport (iPhone size).
+   - Go to the “Plan your ride” screen with pickup + destination filled.
+   - Verify that no vehicle selector is visible before the “Estimated fare” section.
+
+2. **Inspect the DOM and layout**
+   - Open `client/src/pages/rider/ride/options.tsx` (or the equivalent file) and verify exactly where the vehicle selector component is rendered.
+   - Confirm that the component (for example `VehicleCategorySelector`, `VehicleCategoryCard`, or similar) is actually mounted for the **customer** flow, not only for some internal test route.
+   - Check for any conditional rendering (feature flags, `isDesktop`, `isMobile`, or `isRideTypeEnabled`) that might hide the selector on mobile.
+
+3. **Mobile layout fix**
+   - Ensure the vehicle category selector is rendered **above** the "Estimated fare" card and below the route header, as a horizontal scroll carousel on mobile.
+   - Verify CSS and layout:
+     - The selector must be visible (no `display: none`, `overflow: hidden`, or media query that hides it on small screens).
+     - Make sure it uses a full-width container with horizontal scroll for the 7 categories.
+   - Keep the current desktop two-column layout unchanged.
+
+4. **Wire up pricing & selection**
+   - Each card must show:
+     - Category name (SafeGo X, Comfort, Comfort XL, XL, Black, Black SUV, WAV)
+     - Per-category price using the existing C2 pricing multipliers.
+     - Status/availability badge from C3 (e.g., number of drivers online; “Unavailable” if no eligible drivers).
+   - When a rider selects a category:
+     - Update the selected state (e.g., `selectedOption`).
+     - Pass the correct `rideTypeCode` into the fare calculation hook (`useFareCalculation`) and into the ride request payload.
+     - Visually indicate the selected category (highlighted card).
+
+5. **Protect existing logic**
+   - Do NOT change TLC rules, cross-state logic, or any regulatory fees (congestion, airport, AVF, BCF, HVRF, state surcharge, long trip, out-of-town, tolls).
+   - If no drivers are available for a category, the card should be disabled and clearly marked as unavailable, but the other categories must still be selectable.
+
+6. **Testing**
+   - Add or update tests to cover:
+     - Vehicle selector renders on mobile for a normal NYC trip.
+     - All 7 categories are present in the UI.
+     - Selecting a category updates `rideTypeCode` and recalculates fare.
+     - Categories with zero drivers are disabled and show an “unavailable” state.
+   - Run the tests and ensure they all pass.
+
+7. **Final verification**
+   - Restart the app.
+   - In the browser, again open `/customer` on a mobile viewport and go to the “Plan your ride” screen.
+   - Confirm that the vehicle carousel now appears before the “Estimated fare” block and that selecting different categories actually changes the price and selected type.
+
+When you are done, summarize exactly what was wrong (e.g., wrong route, conditional hiding on mobile, or CSS issue) and confirm that the mobile rider sees all 7 SafeGo vehicle categories and can select between them.

@@ -1,0 +1,60 @@
+C9 — Fix post-selection ride request map and layout
+
+Context:
+• On /customer/ride the SafeGo ride cards look correct and fares update properly.
+• After the rider presses “Request ride”, the next step no longer shows the route map or trip layout. The cards and fare logic work, but the map is missing or visually collapsed.
+
+Your job:
+Restore the full “Plan your ride / Ride request” experience with the map and route visible again, without changing any backend or pricing logic.
+
+Requirements:
+
+1. Verify the route request screen
+   • Check the page/component used for the post-selection step (likely /customer/ride-request or similar).
+   • Confirm that:
+       – The map component (e.g. RideMap, MapView, Leaflet/Mapbox container) is still being rendered.
+       – The pickup and dropoff markers and polyline use the same route data as before C7.
+
+2. Fix state wiring (if broken)
+   • Ensure the selected ride type and route data are passed correctly from /customer/ride to the request screen.
+   • Do NOT rename or remove fields used by pricing, dispatch, or promos.
+   • If the map is conditionally rendered (e.g. `route && selectedOption`), update it so it matches the current data shape, but do not change the underlying calculation logic.
+
+3. Fix layout so the map is visible
+   • Inspect the layout for the ride-request screen after C7.
+   • Make sure the map container has a visible height:
+       – On mobile: map should be clearly visible at the top (for example 35–45% of the viewport height).
+       – On desktop: map should appear on the left with ride summary on the right (if that was the previous layout), or on top with cards below.
+   • Fix any flex/grid settings where:
+       – `flex: 0` or `height: 0` might hide the map
+       – Overflow or z-index causes the fare card section to cover the map.
+   • Do NOT shrink or remove the fare summary. Just adjust spacing so both map and summary coexist.
+
+4. Keep all business logic unchanged
+   Do NOT modify:
+   • fare calculation or commission
+   • promo / “SafeGo Everyday Saver” logic
+   • driver matching / dispatch logic
+   • route engine or distance/time calculation
+   Only touch rendering and layout for the map + trip header section.
+
+5. UX expectations for the fixed screen
+   After pressing “Request ride”:
+   • The rider should see the map with:
+       – pickup marker A
+       – dropoff marker B
+       – the same polyline route as on /customer/ride
+   • Below or beside the map:
+       – Selected SafeGo category (e.g. SafeGo X)
+       – Confirmed fare and ETA
+       – Route options (Fastest / alternate routes) just like before.
+   • Scrolling should not be required just to see the map on a normal phone screen.
+
+6. Testing
+   • Test on mobile and desktop:
+       – From /customer/ride, pick any category (SafeGo X, SafeGo Comfort, Black, etc.).
+       – Click “Request ride”.
+       – Verify the map, markers, and route are visible and correct.
+   • Confirm that all prices, promos, and commissions still match the values shown on the ride card.
+
+Document briefly in the code comments which layout changes you made so the architect can review later.

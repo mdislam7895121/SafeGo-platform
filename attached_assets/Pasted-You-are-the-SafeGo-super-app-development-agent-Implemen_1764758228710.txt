@@ -1,0 +1,207 @@
+You are the SafeGo super-app development agent.
+Implement the following feature in ONE complete production-ready pass.
+
+====================================================
+🔥 FEATURE: Customer Profile → Partner Upgrade Hub
+====================================================
+
+GOAL:
+Every customer (BD + USA) must see a new section in their Profile page:
+
+"Become a Partner"
+
+Inside this section, show a grid of premium glow-cards for these roles:
+
+1. Ride Driver
+2. Delivery Driver
+3. Restaurant Owner
+4. Shop Partner (BD-only)
+5. Ticket & Rental Operator (BD-only)
+
+USA users should ONLY see:
+- Ride Driver
+- Delivery Driver
+- Restaurant Owner
+
+BD users should see ALL FIVE.
+
+====================================================
+🔥 REQUIREMENTS – UI (Premium Glow Card Design)
+====================================================
+
+Each partner option will be shown as a modern premium card with:
+
+• White background
+• 16px corner radius
+• Dynamic hairline glow border  
+  Gradient: #0066FF → #00C6FF → #8A2BE2  
+• Soft halo glow:  
+  0px 0px 8px rgba(0,102,255,0.25)  
+  0px 0px 14px rgba(0,198,255,0.15)
+
+• Card content:
+  - Top icon (role-specific)
+  - Bold title (font-weight: 700)
+  - Semi-bold subtitle (font-weight: 600)
+  - Bold call-to-action button
+
+• Hover/press effect:
+  transform: scale(0.985);
+  border-width: 2px;
+  transition: 0.22s ease;
+
+====================================================
+🔥 ROLE CARDS
+====================================================
+
+CARD 1: Ride Driver
+- Icon: car
+- Title: "Ride Driver"
+- Subtitle: "Earn by giving safe rides"
+- Button: "Become a Ride Driver"
+- On click → /partner/ride/start
+
+CARD 2: Delivery Driver
+- Icon: bike/box
+- Title: "Delivery Driver"
+- Subtitle: "Deliver food and parcels"
+- Button: "Become a Delivery Driver"
+- On click → /partner/delivery/start
+
+CARD 3: Restaurant Owner
+- Icon: restaurant/shop-front
+- Title: "Restaurant Partner"
+- Subtitle: "Join SafeGo Eats"
+- Button: "Open Restaurant Dashboard"
+- On click → /partner/restaurant/start
+
+BD-ONLY CARDS:
+
+CARD 4: Shop Partner
+- Icon: store/shop
+- Title: "Shop Partner"
+- Subtitle: "Sell products on SafeGo Shops"
+- Button: "Become Shop Partner"
+- On click → /partner/shop/start
+
+CARD 5: Ticket & Rental Operator
+- Icon: bus/ticket
+- Title: "Tickets & Rentals"
+- Subtitle: "Manage routes, schedules and rentals"
+- Button: "Become Operator"
+- On click → /partner/ticket/start
+
+====================================================
+🔥 BACKEND LOGIC
+====================================================
+
+When a card is clicked:
+
+1. Check user authentication.
+2. Determine user country.
+3. Load or create a partner_profile for that role with fields:
+   - user_id
+   - role: (ride_driver | delivery_driver | restaurant | shop_partner | ticket_operator)
+   - country (BD/US)
+   - partner_status (draft)
+   - trust_level (customer_basic)
+
+4. Redirect the user to the correct onboarding flow.
+
+====================================================
+🔥 ONBOARDING ROUTE CREATION
+====================================================
+
+Create the following routes:
+
+/partner/ride/start  
+/partner/delivery/start  
+/partner/restaurant/start  
+/partner/shop/start (BD only)
+/partner/ticket/start (BD only)
+
+Each start page loads:
+
+- If partner_profile exists → show dashboard with checklist  
+- If not → start Step 1 (business basic info)
+
+====================================================
+🔥 COUNTRY RULES
+====================================================
+
+BD users see:
+- ride driver
+- delivery driver
+- restaurant
+- shop partner
+- ticket operator
+
+USA users see:
+- ride driver
+- delivery driver
+- restaurant
+
+BD KYC requirements stay in place:
+- father_name
+- present_address
+- nid_number
+- images etc.
+
+USA drivers require:
+- DOB
+- home_address
+- driver_license_number, driver_license_image
+
+====================================================
+🔥 FRONTEND LOCATION (IMPORTANT)
+====================================================
+
+Modify this page:
+
+/customer/profile
+
+Add a new section:
+
+"🚀 Become a Partner"
+
+Then show the dynamic card grid.
+
+====================================================
+🔥 SECURITY (S1–S5)
+====================================================
+
+S1 – Auth & Role  
+- Only logged-in users can start onboarding
+- Prevent role spoofing
+
+S2 – Validation  
+- Validate business_name, phone, etc.
+
+S3 – Isolation  
+- Partner can access only their own profile
+
+S4 – Audit Logs  
+- Log PARTNER_ONBOARDING_STARTED
+
+S5 – Abuse Protection  
+- Rate-limit onboarding attempts
+
+====================================================
+🔥 FINISHING CONDITIONS
+====================================================
+
+1. After implementation, login as BD customer:
+   - Visit /customer/profile
+   - Confirm all 5 cards appear
+   - Click one → onboarding starts
+
+2. Login as USA customer:
+   - Visit profile → only 3 cards appear
+
+3. All routes must open without errors.
+
+4. All cards must show premium glow styling.
+
+====================================================
+END OF TASK
+====================================================

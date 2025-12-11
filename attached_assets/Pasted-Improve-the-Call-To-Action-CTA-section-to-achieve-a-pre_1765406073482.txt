@@ -1,0 +1,69 @@
+Improve the Call To Action (CTA) section to achieve a premium Uber-level UI polish without changing any text, routing, logic, or backend.
+
+Enhance ONLY the visuals and spacing. Keep HTML structure and component boundaries the same.
+
+### REQUIRED IMPROVEMENTS
+
+1) Background
+- Keep the current gradient (#0054F5 → #0131A0) but add:
+  - A subtle highlight layer: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent).
+  - Slight vignette: inset shadow around edges to give depth.
+
+2) Title & Subtitle
+- Increase vertical spacing consistency:
+  - Title bottom margin: ~14–16px
+  - Subtitle bottom margin: ~40px
+
+3) App Store + Google Play badges
+- Upgrade to premium-style badges:
+  - Background: #000 with 98% opacity (rich black)
+  - Outer shadow: 0 10px 24px rgba(0,0,0,0.38)
+  - Inner subtle gloss: inset 0 1px 0 rgba(255,255,255,0.1)
+  - Rounded corners: 14–16px
+  - On hover:
+    - Lift: transform translateY(-3px)
+    - Increase brightness: filter brightness(1.1)
+
+4) Improve badge alignment
+- Ensure badges are vertically centered
+- Set exact horizontal gap: 28px desktop, 16px tablet, wrap on mobile
+- Make badge icons slightly larger (5–8%)
+
+5) Improve the Become a Partner button
+- Style:
+  - Full-pill shape with radius ~40px
+  - Background: white
+  - Text color: brand blue #0054F5
+  - Shadow: 0 6px 16px rgba(0,0,0,0.25)
+- Hover:
+  - transform: translateY(-2px)
+  - shadow: stronger 0 8px 22px rgba(0,0,0,0.28)
+- Active click:
+  - transform: translateY(0)
+
+6) Max-width and centering
+- Wrap everything inside a centered container with:
+  - max-width: 900–1040px
+  - padding-left/right: 24px on mobile, 32px tablet
+
+7) Responsiveness
+- Mobile:
+  - Reduce title font slightly
+  - Badges stack vertically with equal spacing
+- Tablet:
+  - Badges in 1 row but closer together
+- Desktop:
+  - Maintain perfect center alignment
+
+8) Accessibility
+- Ensure badges keep aria-labels
+- Maintain keyboard focus ring: white outline 2px
+
+### IMPORTANT
+- Do not modify any backend API, routing, or config.
+- Do not touch footer or any other sections.
+- Only polish this specific CTA component visually.
+
+After finishing:
+- Render a desktop screenshot of the updated CTA.
+- Summarize all improvements.

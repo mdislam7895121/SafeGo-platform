@@ -1,0 +1,174 @@
+You are updating the SafeGo Rider Web App.
+
+Follow ALL existing SafeGo rules:
+- Do NOT change any backend or business logic:
+  - route calculation
+  - pricing and commission
+  - promos and discounts
+  - ride creation / matching
+  - location search and geocoding
+- Only adjust the MOBILE (< 768px) layout and interactions.
+- Desktop and tablet layouts (>= 768px) must remain visually and structurally the same.
+
+Goal:
+On MOBILE ONLY, give riders a clear way to see the FULL map and choose their preferred route before confirming the ride — without breaking any existing logic. The behavior should feel similar to Uber: choose route first, then confirm the ride.
+
+Scope:
+- Page: `client/src/pages/rider/ride-request.tsx` (or equivalent)
+- Components:
+  - The bottom sticky bar that currently shows the “Request ride” button
+  - The map + route options area (Fastest / alternative routes)
+
+--------------------------------
+1. Introduce a mobile-only “Route Explorer” state
+--------------------------------
+1. Add a new piece of UI state in the ride-request page:
+   - Example: `const [isRouteExplorerOpen, setIsRouteExplorerOpen] = useState(false);`
+   - This state must be used ONLY for mobile-specific layout changes.
+
+2. Wrap all mobile-only behavior in a viewport/breakpoint check:
+   - Either reuse an existing responsive hook, or create a small utility:
+     - `const isMobile = useMediaQuery('(max-width: 767px)');`
+   - All new UI described below must only render when `isMobile === true`.
+
+3. Desktop behavior:
+   - When `!isMobile`, ignore `isRouteExplorerOpen` and keep the existing layout:
+     - Left column: Plan your ride, promo, ride list, Request ride button
+     - Right column: map with selected route
+   - Do NOT modify any desktop JSX or styles except for minor className additions if strictly needed.
+
+--------------------------------
+2. Replace the mobile bottom bar with a 2-step control
+--------------------------------
+On MOBILE ONLY:
+
+1. Locate the sticky bottom area that currently renders the main `Request ride` button.
+
+2. Replace this with logic:
+
+   - If `!isRouteExplorerOpen`:
+     - Render a single large primary button:
+       - Label: **“Choose your route”**
+       - Full-width, same visual style as the existing `Request ride` primary button (SafeGo blue, white text, rounded corners).
+       - On press: `setIsRouteExplorerOpen(true);`
+
+   - If `isRouteExplorerOpen`:
+     - Render:
+       - A compact top row above the main button:
+         - Left-aligned text: `Choose your favorite route on the map`
+         - Right-aligned small text/button: `Back to ride details`
+           - Tapping this calls `setIsRouteExplorerOpen(false);`
+       - A large primary button below:
+         - Label: **“Request ride”**
+         - This MUST call the same handler/function as the previous Request ride button (e.g. `handleRequestRide()`).
+         - Do NOT change the business logic for requesting a ride.
+
+3. Ensure:
+   - The `Request ride` API call, validations, and error handling remain exactly the same.
+   - The button is disabled/enabled under the same conditions as before (e.g. missing pickup/dropoff, no selected vehicle).
+
+--------------------------------
+3. Expand map view when Route Explorer is open (mobile)
+--------------------------------
+When `isRouteExplorerOpen && isMobile`:
+
+1. Adjust the layout so the map gets more vertical space:
+   - Reduce or temporarily hide parts of the ride details list under the map.
+   - Recommended approach:
+     - Keep the address header and promo banner visible.
+     - Under that, make the map container take most of the remaining vertical height.
+     - Hide the long ride list section OR collapse it into a small summary while Route Explorer is open.
+
+2. The map container should:
+   - Maintain the existing map instance (do NOT remount the map if possible).
+   - Continue to show the selected origin/destination and selected route as it currently does.
+   - Avoid layout shifts or jumpy animations; use CSS height adjustments rather than unmounting.
+
+--------------------------------
+4. Route chips overlay on the map (mobile Route Explorer)
+--------------------------------
+When `isRouteExplorerOpen && isMobile`:
+
+1. Add an overlay card on top of the map, anchored at the bottom (above the sticky bottom bar):
+
+   - Full-width with horizontal padding.
+   - White background, rounded corners (12–16px).
+   - Slight shadow: `0 4px 12px rgba(0,0,0,0.12)`.
+   - Inside, render a horizontal scrollable list of route “chips”.
+
+2. Each route chip should correspond to an existing route option (e.g. Fastest + alternatives):
+   - Reuse the current route data structure and selectedRoute state.
+   - Do NOT compute new routes; just present the existing ones.
+
+3. For each route chip, show:
+   - Route label: e.g. `Fastest`, `Route 2`, or the current label from the data.
+   - A short meta line:
+     - `XX min • YY mi` (or whatever fields are already available).
+   - Visual style:
+     - Rounded pill (border-radius ~9999px or 16px).
+     - Padding: 8–12px horizontal, 6–8px vertical.
+     - Default background: `#F9FAFB`.
+     - Selected route background: SafeGo light blue (`#EFF6FF`) with blue border `#2563EB`.
+     - Label font-weight: 500, meta text smaller and gray (`#6B7280`).
+
+4. Interaction:
+   - Tapping a chip sets the same `selectedRoute` state that is used by the existing route selection UI (e.g. the buttons under Fare details).
+   - When a chip becomes selected:
+     - The map should highlight that route (reusing existing behaviour).
+     - The fare summary, ETA, and any other details should update using existing logic.
+
+5. Accessibility:
+   - Make the chips keyboard focusable.
+   - Add `aria-pressed` on the selected chip to reflect its state.
+
+--------------------------------
+5. Keep the existing desktop route selector intact
+--------------------------------
+- Do NOT remove or break the current route buttons/controls that appear in the fare details / route section.
+- On mobile, you may hide or visually downplay those controls while Route Explorer is open to avoid duplication, but:
+  - They must still function as before if visible.
+  - They must still exist on desktop exactly as now.
+
+--------------------------------
+6. Behaviour when leaving Route Explorer
+--------------------------------
+1. When the rider taps “Back to ride details”:
+   - `setIsRouteExplorerOpen(false);`
+   - Restore the original mobile layout (map height and ride list) while preserving:
+     - current `selectedRoute`
+     - current selected vehicle category
+     - all pricing / promo state
+
+2. When the rider taps “Request ride” while in Route Explorer:
+   - Call the existing `handleRequestRide` function or equivalent.
+   - Stay in Route Explorer until navigation to the next page happens (if that’s the current behavior) — do not add extra redirects.
+
+--------------------------------
+7. Testing checklist
+--------------------------------
+After implementing:
+
+1. Mobile viewport (e.g. iPhone 14 size):
+   - Enter pickup + dropoff.
+   - Select a vehicle.
+   - Tap “Choose your route”.
+   - Verify:
+     - Map becomes visually dominant.
+     - Route chips appear over the map, showing correct names and times.
+     - Selecting different chips updates the selected route and map path.
+     - The bottom button label is “Request ride” and submits the ride exactly as before.
+
+2. Tap “Back to ride details”:
+   - Layout returns to the previous mobile view.
+   - Selected route and pricing remain unchanged.
+
+3. Desktop viewport:
+   - Nothing about the layout or behavior changes.
+   - Route buttons under fare details still work.
+   - Request ride still functions normally.
+
+4. Confirm there are no console errors, and any existing tests continue to pass.
+
+Document briefly in code comments that:
+- `isRouteExplorerOpen` is a mobile-only UI state.
+- No business logic is implemented in the new components; they only orchestrate layout and route selection based on existing state.

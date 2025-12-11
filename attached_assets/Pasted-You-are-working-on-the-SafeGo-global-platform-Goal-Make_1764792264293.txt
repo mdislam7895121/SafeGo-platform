@@ -1,0 +1,494 @@
+You are working on the SafeGo global platform.
+
+Goal:
+Make ALL partner cards fully working so that any logged-in customer can become:
+- Ride-hailing driver
+- Delivery driver (food + parcel)
+- Restaurant partner
+
+The system must follow SafeGo company rules, be globally consistent (BD + US), and be publish-ready in one pass. No "half-ready" or "coming soon only" behavior is allowed except where explicitly controlled by configuration flags.
+
+You MUST respect all SafeGo master rules below, then implement the full partner flows end-to-end.
+
+==================================================
+A) SAFEGO MASTER RULES (ALWAYS ON)
+==================================================
+
+1) Roles – 4 separate roles (no mixed access):
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   Each role MUST have its own:
+   - onboarding / KYC flow
+   - dashboard
+   - permissions
+   - status flows
+
+   Do NOT mix dashboards or permissions between roles.
+
+2) Global services:
+   SafeGo supports three major services:
+   - Ride-hailing (passenger rides)
+   - Food delivery
+   - Parcel / delivery
+
+   Partners are the supply side of these services:
+   - Drivers: serve rides + parcel (and optionally food delivery)
+   - Restaurants: serve food orders
+
+3) Country-specific KYC (mandatory branching BD vs US):
+
+   For Bangladesh ("BD"):
+   - All users (customer/driver/restaurant) require:
+     - father_name
+     - date_of_birth
+     - present_address
+     - permanent_address
+     - NID_number
+     - NID_front_image
+     - NID_back_image
+     - emergency_contact_name
+     - emergency_contact_phone
+     - verification_status ("pending" | "approved" | "rejected")
+     - is_verified (boolean)
+
+   For United States ("US"):
+   - All customers:
+     - date_of_birth
+     - home_address
+     - emergency_contact_name
+     - emergency_contact_phone
+     - government_id_type
+     - government_id_last4
+     - verification_status
+     - is_verified
+
+   - Additional for DRIVERS (US):
+     - driver_license_number
+     - driver_license_image
+     - driver_license_expiry
+     - ssn_last4 (optional)
+
+   - Additional for RESTAURANTS (US):
+     - business_name
+     - business_address
+     - tax_id_last4
+
+4) Admin panel – capabilities to preserve and integrate:
+   - Review and verify customers, drivers, restaurants
+   - Approve/reject KYC, store rejection_reason
+   - Update pricing, fees, commissions
+   - Block/unblock any user or partner
+   - Manage payouts and settlements
+   - See driver negative balances
+   - See restaurant negative balances
+
+5) Core collections (must stay intact):
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must contain:
+   - identity fields (customer_id, driver_id, restaurant_id where needed)
+   - pickup & dropoff addresses + geolocation (lat, lng)
+   - price, fees, SafeGo commission
+   - payment method + transaction id (for online)
+   - timestamps for all status transitions
+   - full status flow
+   - rating & feedback
+
+6) Commission & payout rules:
+   - If customer pays CASH for ride:
+     - Driver collects full cash from customer.
+     - SafeGo commission recorded as negative driver_wallet_balance.
+     - Driver must settle weekly.
+
+   - If customer pays CASH for food order:
+     - Restaurant collects full cash.
+     - SafeGo commission recorded as negative restaurant_wallet.
+
+   - If payment is ONLINE:
+     - SafeGo keeps commission automatically.
+     - Driver/restaurant receives net payout.
+
+   - Admin can settle balances and mark them paid.
+
+   NOTE: For US region, cash options can be disabled by configuration, but the commission logic must remain consistent for markets where cash is enabled.
+
+7) Security rules:
+   - Customers cannot view driver documents (NID, license, etc).
+   - Drivers cannot view customers’ NID or sensitive identity fields.
+   - Restaurants cannot view other restaurants’ data.
+   - Only Admin can change:
+     - pricing
+     - commission rates
+     - verification_status
+     - block/unblock flags
+   - Users can update ONLY their own profile.
+   - No sensitive identity data in logs, client-side storage, or error toasts.
+
+8) Status flows (must NOT be broken):
+
+   Rides:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+   Food:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+   Parcel:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+9) Onboarding rules:
+   - Signup is CUSTOMER-ONLY.
+   - After login, a customer can create partner roles through Partner onboarding flows:
+     - driver_ride
+     - driver_delivery
+     - restaurant
+   - Each partner profile:
+     - belongs to a customer_id
+     - has its own verification_status and is_verified flag
+     - remains blocked from going online until approved by Admin.
+
+10) Notifications:
+   - New ride/parcel jobs for drivers
+   - Food order updates for restaurants/drivers
+   - Partner verification approval/rejection
+   - Important admin notifications (payout issues, policy changes, etc.)
+
+==================================================
+B) CURRENT STATE (FROM SCREENSHOTS)
+==================================================
+
+Existing Restaurant onboarding page at route:
+   /partner/restaurant/start
+
+UI shows:
+   - Header: Join SafeGo Eats
+   - A step list:
+       1. Restaurant Information (current)
+       2. Menu Setup
+       3. Photos & Branding
+       4. Business Documents
+       5. Bank/Payout Setup
+       6. KYC Verification
+   - At the bottom: "Coming Soon" section with "Join Waitlist" button.
+
+Problems:
+   - Partner cards on /customer are not consistently opening onboarding flows.
+   - Generic error toast appears when tapping partner cards.
+   - Restaurant onboarding screen exists but may be locked behind "Coming Soon".
+   - Driver partner flows (ride, delivery) are not fully wired end-to-end.
+   - Users cannot complete onboarding and become active partners from the customer app.
+
+Your job: 
+Turn ALL partner flows (ride driver, delivery driver, restaurant) into fully functional onboarding → verification → dashboard access flows, controlled by configuration for region availability, with no dead ends or generic "system error" toasts.
+
+==================================================
+C) PARTNER CARD BEHAVIOR ON /customer
+==================================================
+
+1) Audit the "SafeGo Partner Programs" section on the /customer app:
+   - Cards:
+     - Ride share driver
+     - Delivery driver
+     - Restaurant partner
+   - Each card has a "Start" button.
+
+2) Replace wrong / failing behavior with:
+   - If NOT authenticated:
+       - Show a toast: "Please sign in to become a SafeGo partner."
+       - Redirect to /login?returnTo=/customer/partners?kind=<driver_ride|driver_delivery|restaurant>
+   - If authenticated as CUSTOMER:
+       - Navigate to the correct partner onboarding route:
+
+         Ride share driver:
+           → /partner/driver/ride/start
+
+         Delivery driver:
+           → /partner/driver/delivery/start
+
+         Restaurant partner:
+           → /partner/restaurant/start
+
+   - Do NOT call partner creation APIs directly from the card click.
+   - No generic "system error" toast is allowed here; all errors must be handled meaningfully.
+
+==================================================
+D) PARTNER DATA MODELS (ADD ONLY, DO NOT BREAK)
+==================================================
+
+Re-use or extend existing models; do NOT rename or remove existing fields.
+
+1) drivers table/collection:
+   Required fields:
+   - id
+   - customer_id (FK to customers)
+   - driver_type ("ride" | "delivery" | "ride_delivery")
+   - country_code
+   - status ("draft" | "pending_review" | "approved" | "rejected" | "suspended")
+   - verification_status (same as status or mapped)
+   - is_verified (boolean)
+   - vehicle_type (car, motorbike, bicycle, etc)
+   - vehicle_make, vehicle_model, vehicle_year
+   - vehicle_plate_number
+   - driver_license_number (US only)
+   - driver_license_image
+   - driver_license_expiry
+   - nid_number / nid_images (BD only)
+   - emergency_contact_name, emergency_contact_phone
+   - bank_account / payout details
+   - rejection_reason (nullable)
+
+2) restaurants table/collection:
+   - id
+   - customer_id (FK)
+   - country_code
+   - restaurant_name
+   - cuisine_type
+   - restaurant_address
+   - business_documents (license, permits, etc)
+   - bank/payout details
+   - status / verification_status / is_verified
+   - tax_id_last4 (US)
+   - nid / local docs (BD)
+   - emergency_contact_name, emergency_contact_phone
+   - rejection_reason
+
+3) DO NOT alter core collections (rides, food_orders, deliveries) beyond adding FK references to driver/restaurant if missing.
+
+==================================================
+E) RESTAURANT ONBOARDING FLOW (SAFEGO EATS)
+==================================================
+
+Use the existing /partner/restaurant/start page as the entry point and make it fully functional.
+
+1) Steps layout:
+   - Restaurant Information
+   - Menu Setup
+   - Photos & Branding
+   - Business Documents
+   - Bank/Payout Setup
+   - KYC Verification
+
+2) Behavior:
+   - Each step must:
+       - Load current draft state from the restaurant profile.
+       - Save edits on "Continue".
+   - User can move forward step-by-step and back to previous steps.
+   - Validation:
+       - Required fields must be enforced per country_code (BD vs US).
+   - At the end of KYC Verification:
+       - Set status = "pending_review"
+       - verification_status = "pending"
+       - is_verified = false
+
+3) "Coming Soon / Join Waitlist" handling:
+   - DO NOT hard-block onboarding with "Coming Soon".
+   - Introduce a configuration object, e.g.:
+
+       SAFEGO_PARTNER_AVAILABILITY = {
+         restaurant: {
+           BD: true,
+           US: true,        // set false if we need to disable onboarding in US
+         },
+         driver_ride: { ... },
+         driver_delivery: { ... }
+       };
+
+   - If availability is true for the user’s country:
+       - Hide or repurpose the "Coming Soon" banner to an info note (e.g. "Typical approval time: 3-5 business days").
+   - If availability is false:
+       - Allow user to join waitlist WITHOUT breaking existing onboarding logic.
+       - Do NOT show a red "system error" toast; show a clear, friendly message.
+
+==================================================
+F) DRIVER ONBOARDING FLOWS (RIDE + DELIVERY)
+==================================================
+
+1) Entry routes:
+   - /partner/driver/ride/start
+   - /partner/driver/delivery/start
+
+   These routes MUST be accessible only to logged-in customers.
+
+2) Shared step structure:
+   - Step 1 – Driver Information:
+       - name (pre-filled from customer profile, read-only where appropriate)
+       - phone (pre-filled)
+       - country_code
+   - Step 2 – Vehicle Information:
+       - vehicle_type (car, motorbike, bicycle, etc – depending on service)
+       - vehicle_make/model/year
+       - plate_number
+   - Step 3 – Documents:
+       - For BD:
+           - NID_number
+           - NID_front_image
+           - NID_back_image
+       - For US:
+           - driver_license_number
+           - driver_license_image
+           - driver_license_expiry
+           - government_id_type + government_id_last4
+           - ssn_last4 (optional)
+   - Step 4 – Bank/Payout Setup:
+       - payout_method (bank, mobile money, etc as per region)
+       - account fields (never shown to customers or other roles)
+   - Step 5 – KYC Verification summary:
+       - Show captured details.
+       - On confirm:
+           - Save record in `drivers` table.
+           - Set status = "pending_review"
+           - verification_status = "pending"
+           - is_verified = false.
+
+3) Config: which services a driver can serve
+   - driver_type values:
+       - For ride-only onboarding: "ride"
+       - For delivery-only onboarding: "delivery"
+       - In future, allow combined "ride_delivery" via config.
+
+4) After approval (Admin):
+   - Driver can:
+       - Go online for rides and/or parcel jobs.
+       - Appear in matching engine for:
+           - rides collection
+           - deliveries collection
+           - and food_orders delivery if configured.
+
+==================================================
+G) ADMIN VERIFICATION FLOWS (INTEGRATION)
+==================================================
+
+You must connect the new partner onboarding with the Admin panel:
+
+1) Add or extend the Admin lists:
+   - Pending restaurants
+   - Pending drivers
+
+2) For each pending partner:
+   - Admin can open detail view with:
+       - All submitted information
+       - Uploaded documents
+       - KYC fields (BD/US)
+       - Date submitted
+
+3) Admin actions:
+   - Approve:
+       - Set status = "approved"
+       - verification_status = "approved"
+       - is_verified = true
+       - Create any necessary references in other tables (e.g., enable "Go online" toggles).
+       - Send notification to user (see Notifications below).
+
+   - Reject:
+       - Set status = "rejected"
+       - verification_status = "rejected"
+       - Store rejection_reason (required)
+       - Send notification to user.
+
+   - Suspend / Block:
+       - Keep record but mark them as blocked/unavailable.
+       - This must not delete existing rides/food_orders/deliveries history.
+
+==================================================
+H) NOTIFICATIONS (FOR PARTNER LIFECYCLE)
+==================================================
+
+Implement or connect to existing notification system:
+
+1) On onboarding submission:
+   - To customer user:
+     - "Your partner application has been submitted and is pending review."
+
+2) On approval:
+   - To customer user:
+     - "Your SafeGo partner account is approved. You can now start receiving rides/orders."
+
+3) On rejection:
+   - To customer user:
+     - "Your partner application was rejected. Reason: <rejection_reason>."
+
+4) On suspension:
+   - To partner:
+     - "Your partner account has been temporarily suspended. Please contact support."
+
+Ensure notifications respect role separation and do not reveal internal admin notes.
+
+==================================================
+I) SECURITY & ACCESS CONTROL
+==================================================
+
+- Partner onboarding pages (/partner/*) must:
+   - require a logged-in customer session;
+   - redirect to login otherwise.
+
+- Driver and Restaurant dashboards must:
+   - only be accessible if:
+       - a partner profile exists for that customer_id, AND
+       - status is not "rejected", AND
+       - admin has not blocked that partner.
+
+- Sensitive documents (NID, license, business docs):
+   - Stored securely on server-side.
+   - Never exposed to customers or other partners.
+   - Accessible only:
+       - to the owner (preview of their own files),
+       - to Admin in review screens.
+
+==================================================
+J) NON-BREAKING REQUIREMENTS
+==================================================
+
+You MUST keep the current system stable:
+
+- Do NOT rename or remove existing database fields, APIs, or routes.
+- /partner/restaurant/start must continue to exist (extend it; do not delete).
+- Existing /customer, /admin, driver, and restaurant features must keep working.
+- Only ADD:
+   - new fields where needed,
+   - new components/screens,
+   - new routes under /partner,
+   - new admin views for verification,
+   - configuration for partner availability.
+
+If something is currently live, your changes MUST be backward-compatible.
+
+==================================================
+K) ACCEPTANCE CRITERIA (SELF-TEST BEFORE DONE)
+==================================================
+
+1) From /customer → SafeGo Partner Programs:
+   - Tapping "Ride share driver":
+       - If logged out → login + returnTo.
+       - If logged in → opens /partner/driver/ride/start onboarding.
+   - Tapping "Delivery driver":
+       - Similar, opens /partner/driver/delivery/start.
+   - Tapping "Restaurant partner":
+       - Opens /partner/restaurant/start.
+
+2) A new customer can complete:
+   - Full restaurant onboarding from start to KYC submit.
+   - Full driver ride onboarding.
+   - Full driver delivery onboarding.
+
+3) After Admin approval:
+   - Driver can go online and receive rides/parcel jobs.
+   - Restaurant can receive food_orders in the SafeGo Eats flow.
+
+4) No "system error, please try again" toasts when using partner cards properly.
+   - Only clear, specific messages for auth / availability / validation.
+
+5) All existing:
+   - rides / food_orders / deliveries behavior,
+   - commission rules,
+   - admin pricing/commission/payout management,
+   - security rules
+ remain fully functional.
+
+Implement this as a single, coherent release so that partner cards are production-ready without further manual fixes.

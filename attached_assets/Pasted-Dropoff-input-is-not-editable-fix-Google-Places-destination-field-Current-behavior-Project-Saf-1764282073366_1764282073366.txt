@@ -1,0 +1,56 @@
+Dropoff input is not editable – fix Google Places destination field
+
+Current behavior
+- Project: SafeGo customer web app on Replit.
+- Pickup field works: I can type and select a Google Places suggestion.
+- Destination field ("Where to?") is broken:
+  - I cannot type anything in the destination box (keyboard appears but text does not stay), OR
+  - sometimes suggestions show but tapping them does not update the input.
+- Effect: The user cannot set a dropoff address, so price and route cannot be calculated.
+
+Your tasks
+
+1. Find the destination input implementation
+   - Locate the component used for the destination/dropoff field on the customer home page, likely something like:
+     - `GooglePlacesInput`, `LocationSearchInput`, or similar
+     - in `client/src/components` or `client/src/pages/customer`.
+   - Identify the props/state that control the destination field (value, onChange, onSelect, disabled, readOnly, etc.).
+
+2. Make the destination input fully editable
+   - Ensure the destination input is a normal controlled text input:
+     - `value` is bound to destination state.
+     - `onChange` updates that destination state as the user types.
+   - Remove or fix anything that prevents typing:
+     - No `readOnly` or `disabled` flags for the destination field when the user is entering an address.
+     - No `pointer-events: none`, overlay div, or z-index hack blocking taps on mobile.
+   - Make sure no `onBlur` or `useEffect` logic is immediately resetting the value and making the box look empty or frozen.
+
+3. Fix Google Places selection for destination
+   - When the user taps a suggestion in the dropdown:
+     - The destination input value must be set to the formatted address from Google (e.g., `"170-21 Jamaica Ave, Queens, NY, USA"`).
+     - The internal destination state must store `place_id`, `lat`, and `lng`.
+   - Use the same working logic as the pickup field (reuse the same hook/handler pattern from pickup for destination).
+
+4. Do not break pickup or maps
+   - Keep the existing behavior for:
+     - pickup/current location detection,
+     - reverse geocoding,
+     - route directions and price estimation.
+   - Do not change any Google Maps API key or CSP configuration.
+
+5. Testing scenarios
+   - Scenario 1: Desktop and mobile
+     - Pickup: `188 Sutter Ave, Brooklyn, NY 11212, USA`.
+     - Destination field: user types `"170-21"` and selects `"170-21 Jamaica Ave"` from suggestions.
+     - Confirm:
+       - User can type freely in the destination box.
+       - After selection, the full address appears in the input.
+       - Internal destination state has place_id and coordinates.
+   - Scenario 2:
+     - Tap "See prices".
+     - Confirm the app uses these same pickup and destination values without asking for the addresses again on the next screen.
+
+6. Report back
+   - List which files and components you changed.
+   - Explain what was preventing typing and how you fixed it.
+   - Confirm that both typing and suggestion selection now work correctly in the destination input on both desktop and mobile.

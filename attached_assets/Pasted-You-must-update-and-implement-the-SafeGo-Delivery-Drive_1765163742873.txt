@@ -1,0 +1,213 @@
+You must update and implement the SafeGo Delivery Driver Onboarding + KYC system following ALL SafeGo Master Rules.  
+This prompt is complete and final. Build exactly as written. Do not remove or rename any fields. Only ADD if needed.
+
+=====================================================
+A) ROLES — Must support all four roles:
+1. Customer  
+2. Driver  
+3. Restaurant (Merchant)  
+4. Admin  
+
+Drivers must have separate onboarding flows and permissions.  
+Customers cannot view driver documents.  
+Restaurants cannot view any driver data.  
+Only admin can approve KYC.
+
+=====================================================
+B) GLOBAL APP LOGIC — Required
+SafeGo supports 3 services:
+1. Ride-hailing  
+2. Food delivery  
+3. Parcel delivery  
+
+Delivery drivers must work for Food + Parcel + Ride if approved.  
+But onboarding is the same.
+
+=====================================================
+C) COUNTRY-SPECIFIC KYC RULES — MANDATORY
+
+Implement a country selection first step:
+• Bangladesh (BD)  
+• United States (US)  
+
+Then apply different KYC fields depending on country.
+
+-----------------------------------------------------
+BANGLADESH (BD) DRIVER FIELDS (MANDATORY):
+- full_name  
+- father_name  
+- date_of_birth  
+- present_address  
+- permanent_address  
+- emergency_contact_name  
+- emergency_contact_phone  
+- nid_number  
+- nid_front_image  
+- nid_back_image  
+- profile_photo  
+- driving_license_number  
+- driving_license_front  
+- driving_license_back  
+- vehicle_registration  
+- insurance_document (optional)  
+- verification_status ("pending", "approved", "rejected")  
+- is_verified (boolean)
+
+-----------------------------------------------------
+UNITED STATES (US) DRIVER FIELDS (MANDATORY):
+- full_name  
+- date_of_birth  
+- home_address  
+- emergency_contact_name  
+- emergency_contact_phone  
+- government_id_type  
+- government_id_last4  
+- government_id_front_image  
+- government_id_back_image  
+- ssn_last4  
+- background_check_consent (boolean)  
+- profile_photo  
+- delivery_method: "car" | "bike" | "walking"
+
+If delivery_method = "car":
+- driver_license_front  
+- driver_license_back  
+- vehicle_registration  
+- insurance_card  
+
+If delivery_method = "bike":
+- government_id_front_image  
+- government_id_back_image  
+- profile_photo  
+
+If delivery_method = "walking":
+- government_id_front_image  
+- government_id_back_image  
+- profile_photo  
+
+Add:
+- verification_status ("pending", "approved", "rejected")  
+- is_verified (boolean)
+
+=====================================================
+D) ONBOARDING FLOW — REQUIRED STEPS
+
+Build a 7-step onboarding wizard:
+
+1. Select Country (BD or US)  
+2. Personal Info  
+3. Address Info  
+4. Government ID Upload  
+5. Delivery Method (US only)  
+6. Vehicle Documents (if applicable)  
+7. Final Review → Submit
+
+After submission:
+- Lock fields  
+- verification_status = "pending"  
+- Driver cannot access any service until admin approves
+
+=====================================================
+E) ADMIN PANEL — MUST INCLUDE
+
+Admin must get a full Driver Verification module:
+
+- See driver list  
+- View all submitted documents  
+- Approve / Reject  
+- Add rejection_reason  
+- Block / Unblock driver  
+- Update driver status  
+- Manage driver negative balance  
+- Manage payouts  
+- Mark settled balances  
+
+=====================================================
+F) COLLECTIONS — MUST EXIST
+
+1. rides  
+   - ride_id  
+   - customer_id  
+   - driver_id  
+   - pickup_address + geolocation  
+   - dropoff_address + geolocation  
+   - fees, commission, payment_method  
+   - timestamps  
+   - full status flow:  
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed | cancelled_x  
+   - rating + feedback
+
+2. food_orders  
+   - order_id  
+   - customer_id  
+   - restaurant_id  
+   - driver_id  
+   - items  
+   - fees, commission  
+   - addresses + geo  
+   - payment  
+   - status flow:  
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered | cancelled_x  
+   - rating + feedback
+
+3. deliveries (parcel)  
+   - delivery_id  
+   - customer_id  
+   - driver_id  
+   - sender_address + geo  
+   - receiver_address + geo  
+   - fees + commission  
+   - payment  
+   - status flow:  
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered | cancelled_x  
+   - rating + feedback
+
+=====================================================
+G) COMMISSION & PAYOUT RULES — APPLY EVERYWHERE
+
+1. If customer pays CASH:
+   - Driver receives all cash  
+   - SafeGo commission becomes NEGATIVE BALANCE in driver_wallet_balance  
+   - Driver must settle weekly
+
+2. If food order is CASH:
+   - Restaurant keeps cash  
+   - Commission becomes negative balance in restaurant_wallet
+
+3. Online payment:
+   - SafeGo automatically keeps commission
+
+Admin can settle all balances.
+
+=====================================================
+H) SECURITY RULES — MUST ENFORCE
+
+- Customers cannot see any driver sensitive documents  
+- Drivers cannot see customer IDs  
+- Restaurants cannot see drivers  
+- Only admin can manage verification, pricing, access  
+- Users may edit only their own profile  
+
+=====================================================
+I) NOTIFICATIONS — MUST IMPLEMENT
+
+- New ride request  
+- New food pickup  
+- Parcel pickup  
+- Verification approval/rejection  
+- Important admin notices  
+
+=====================================================
+J) OUTPUT REQUIREMENT
+
+You must:
+• Build the full Delivery Driver KYC UI  
+• Build backend API routes following existing structure  
+• Add all missing validations  
+• Ensure this does NOT break any existing SafeGo features  
+• Keep all existing collections  
+• Only ADD new fields if required  
+• Make the system publish-ready
+
+=====================================================
+END OF PROMPT

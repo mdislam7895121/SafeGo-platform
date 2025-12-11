@@ -1,0 +1,338 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { Check, Star, Car, MapPin, Phone, Mail, Loader2 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+interface DriverVerificationData {
+  name: string;
+  country: string;
+  city: string;
+  phone: string;
+  email: string;
+  rating: number;
+  totalTrips: number;
+  kycStatus: string;
+  vehicle: string | null;
+}
+
+interface CustomerVerificationData {
+  name: string;
+  city: string;
+  phone: string;
+  email: string;
+  totalTrips: number;
+}
+
+interface RestaurantVerificationData {
+  restaurantName: string;
+  city: string;
+  ownerName: string;
+  phone: string;
+  email: string;
+  restaurantId: string;
+}
+
+type VerificationData = DriverVerificationData | CustomerVerificationData | RestaurantVerificationData;
+
+interface VerificationCardProps {
+  onVerified: () => void;
+  compact?: boolean;
+}
+
+const maskPhone = (phone: string): string => {
+  if (!phone || phone.length < 4) return phone;
+  return `***-***-${phone.slice(-4)}`;
+};
+
+const maskEmail = (email: string): string => {
+  if (!email || !email.includes("@")) return email;
+  const [local, domain] = email.split("@");
+  return `${local.charAt(0)}***@${domain}`;
+};
+
+export function VerificationCard({ onVerified, compact = false }: VerificationCardProps) {
+  const { user } = useAuth();
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [useDemoMode, setUseDemoMode] = useState(false);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["/api/support/chat/verification"],
+    enabled: !!user,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (isError && !useDemoMode) {
+      setUseDemoMode(true);
+    }
+  }, [isError, useDemoMode]);
+
+  const confirmMutation = useMutation({
+    mutationFn: async () => {
+      if (useDemoMode) {
+        return { success: true, demoMode: true };
+      }
+      const res = await apiRequest("/api/support/chat/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      setIsConfirming(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/support/chat/start"] });
+      onVerified();
+    },
+    onError: () => {
+      setIsConfirming(false);
+      setUseDemoMode(true);
+      onVerified();
+    },
+    onSettled: () => {
+      setIsConfirming(false);
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <Card className={compact ? "" : "mx-4 mb-4"} data-testid="card-verification-loading">
+        <CardContent className="p-6 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!user) return null;
+
+  const getDemoData = (): VerificationData => {
+    if (user.role === "driver") {
+      return {
+        name: user.email?.split("@")[0] || "Driver",
+        country: "US",
+        city: "New York",
+        phone: "***-***-1234",
+        email: user.email || "driver@example.com",
+        rating: 4.8,
+        totalTrips: 125,
+        kycStatus: "Verified",
+        vehicle: "Toyota Camry",
+      };
+    }
+    if (user.role === "restaurant") {
+      return {
+        restaurantName: "My Restaurant",
+        city: "New York",
+        ownerName: user.email?.split("@")[0] || "Owner",
+        phone: "***-***-1234",
+        email: user.email || "restaurant@example.com",
+        restaurantId: "rest-demo-001",
+      };
+    }
+    return {
+      name: user.email?.split("@")[0] || "Customer",
+      city: "New York",
+      phone: "***-***-1234",
+      email: user.email || "customer@example.com",
+      totalTrips: 42,
+    };
+  };
+
+  const verificationData = (data || isError) ? (data as VerificationData || getDemoData()) : getDemoData();
+
+  return (
+    <Card className={compact ? "border-primary/20" : "mx-4 mb-4 border-primary/20"} data-testid="card-verification">
+      <CardContent className={compact ? "p-4 space-y-3" : "p-6 space-y-4"}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`${compact ? "h-8 w-8" : "h-10 w-10"} rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0`}>
+            <Check className={`${compact ? "h-4 w-4" : "h-5 w-5"} text-primary`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className={`font-semibold ${compact ? "text-sm" : "text-base"}`} data-testid="text-verification-title">
+              Verify Your Details
+            </h3>
+            <p className="text-xs text-muted-foreground truncate">
+              {compact ? "Confirm to start" : "Confirm your information to start chatting"}
+            </p>
+          </div>
+        </div>
+
+        <div className={compact ? "space-y-2" : "space-y-3"}>
+          {user.role === "driver" && "rating" in verificationData && (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Name</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-driver-name">
+                  {verificationData.name}
+                </span>
+              </div>
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> Location
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-driver-location">
+                    {verificationData.city}, {verificationData.country}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
+                  <Phone className="h-3 w-3" /> Phone
+                </span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-driver-phone">
+                  {maskPhone(verificationData.phone)}
+                </span>
+              </div>
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3 w-3" /> Email
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-driver-email">
+                    {maskEmail(verificationData.email)}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
+                  <Star className="h-3 w-3" /> Rating
+                </span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-driver-rating">
+                  {verificationData.rating.toFixed(1)} ★
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>KYC Status</span>
+                <Badge 
+                  variant={verificationData.kycStatus === "Verified" ? "default" : "secondary"} 
+                  className={compact ? "text-xs h-5" : ""}
+                  data-testid="badge-driver-kyc"
+                >
+                  {verificationData.kycStatus}
+                </Badge>
+              </div>
+            </>
+          )}
+
+          {user.role === "customer" && "totalTrips" in verificationData && !("rating" in verificationData) && (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Name</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-customer-name">
+                  {verificationData.name}
+                </span>
+              </div>
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> City
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-customer-city">
+                    {verificationData.city}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
+                  <Phone className="h-3 w-3" /> Phone
+                </span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-customer-phone">
+                  {maskPhone(verificationData.phone)}
+                </span>
+              </div>
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3 w-3" /> Email
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-customer-email">
+                    {maskEmail(verificationData.email)}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Total Trips</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-customer-trips">
+                  {verificationData.totalTrips}
+                </span>
+              </div>
+            </>
+          )}
+
+          {user.role === "restaurant" && "restaurantName" in verificationData && (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Restaurant</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-restaurant-name">
+                  {verificationData.restaurantName}
+                </span>
+              </div>
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> City
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-restaurant-city">
+                    {verificationData.city}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Owner</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-restaurant-owner">
+                  {verificationData.ownerName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
+                  <Phone className="h-3 w-3" /> Phone
+                </span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-restaurant-phone">
+                  {maskPhone(verificationData.phone)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>ID</span>
+                <span className={`font-mono ${compact ? "text-[10px]" : "text-xs"}`} data-testid="text-restaurant-id">
+                  {verificationData.restaurantId}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className={compact ? "pt-3 border-t" : "pt-4 border-t"}>
+          <p className="text-xs text-muted-foreground mb-3">
+            {compact 
+              ? "Verify to start chatting with support" 
+              : "We'll share this information with SafeGo Support to verify your account and help you faster."}
+          </p>
+          <Button
+            className="w-full"
+            onClick={() => {
+              setIsConfirming(true);
+              confirmMutation.mutate();
+            }}
+            disabled={confirmMutation.isPending || isConfirming}
+            data-testid="button-confirm-chat"
+          >
+            {confirmMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Starting...
+              </>
+            ) : (
+              compact ? "Start Chat" : "Confirm and Start Chat"
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

@@ -1,0 +1,87 @@
+Step 29 — Enhance Driver Management for multi-country visibility (Bangladesh + USA)
+
+Goal
+Improve the existing admin “Driver Management” page so that an admin can clearly see:
+- Which drivers are from Bangladesh vs USA
+- Filter drivers by country without breaking any existing flows
+
+IMPORTANT CONSTRAINTS
+- Do NOT break or change any logic from previous steps:
+  - Step 26 (Parcel Admin Management)
+  - Step 27 (Bangladesh + USA driver identity fields)
+  - Step 28 (driver document uploads + vehicle info)
+- No destructive database migrations (no column rename/drop).
+- Keep all existing security rules (RBAC, auth, input validation) exactly as they are.
+
+High-Level Requirements
+1. Show driver country clearly on the Driver Management list.
+2. Add a country filter (All / Bangladesh / United States).
+3. Ensure everything works with existing pagination, status filters, and verification filters.
+4. Keep this change UI/API-only as much as possible, no schema redesign.
+
+Backend Tasks
+1. Reuse existing country data
+   - First, re-use the existing country source already in the system:
+     - Prefer the same field used for customers, e.g. user.countryCode or similar.
+   - Do NOT rename or remove any existing fields.
+   - If drivers currently have no reliable country field at all:
+     - Add a minimal, backward-compatible country field using the same pattern as customers
+       (e.g., countryCode 'BD' / 'US') with a safe default.
+     - This must be an additive change only (new nullable column), no destructive actions.
+
+2. Extend driver listing API (if needed)
+   - For the admin driver list endpoint (the one powering /admin/drivers), add an optional “country” filter parameter.
+     - Supported values: "ALL" (default), "BD", "US".
+   - Implement filtering only when a specific country is provided; otherwise return all drivers as today.
+   - Validate inputs strictly (allow only known country codes).
+   - Keep existing filters (status, verification, pagination) working exactly the same.
+
+3. Security & Validation
+   - Ensure only admin-role accounts can call this API (RBAC already in place; do NOT weaken it).
+   - Do not expose any new sensitive fields beyond the country code.
+   - Log errors safely without leaking PII.
+
+Frontend Tasks (Admin: /admin/drivers)
+1. Country filter control
+   - In the “Search & Filters” section, add a new dropdown:
+     - Label: Country
+     - Options:
+       - All Countries (default)
+       - Bangladesh (BD)
+       - United States (US)
+   - Bind this dropdown to the “country” filter in the driver list query.
+   - Persist selection in the URL query string so that refresh/deeplink keeps the same filters.
+
+2. Show country in the driver list
+   - In each driver row/card, clearly show the driver’s country:
+     - For example:
+       - "BD" or "Bangladesh" for Bangladeshi drivers
+       - "US" or "United States" for US drivers
+   - Place it near the email and vehicle type so an admin can quickly see both identity and region.
+   - Keep the existing fields (rating, trips, earnings) unchanged.
+
+3. UI/UX polish
+   - Make sure the total driver count respects the filters (e.g., “23 total” reflects current filter results).
+   - When no driver matches the country filter, show an empty-state message like
+     “No drivers found for the selected country and filters”.
+
+Testing Checklist
+- Admin can open /admin/drivers and see the new country filter.
+- Default view (All Countries) behaves exactly like before this change.
+- Selecting “Bangladesh” shows only BD drivers.
+- Selecting “United States” shows only US drivers.
+- Status and verification filters still work combined with the new country filter.
+- No errors appear in the console or server logs for normal usage.
+- Non-admin users still cannot access any admin driver endpoints or pages.
+
+Security Phase Applied
+- Phase: Admin UI & API hardening
+  - RBAC preserved (admin-only).
+  - No new sensitive PII fields added (only country code).
+  - Inputs validated and constrained (country filter).
+  - No schema or data destructive operations (only additive if needed).
+
+Once you’re done, summarize:
+- Any backend changes (endpoints/params).
+- Any frontend changes (new filters, columns).
+- Confirmation that all tests above passed and that the change is backward-compatible.

@@ -1,0 +1,138 @@
+TASK: Add all missing legal pages for the SafeGo landing website and link them properly.
+
+REQUIREMENTS:
+1. Create three new pages:
+   - /privacy (Privacy Policy)
+   - /terms (Terms of Service)
+   - /cookies (Cookie Policy)
+
+2. These pages must use the same landing page layout:
+   - Same header (SafeGo logo, nav links, region selector)
+   - Same footer (company, services, partners, support links)
+   - Clean, readable text section layout
+   - Mobile responsive
+
+3. Add these footer links across the whole site:
+   - Terms of Service → /terms
+   - Privacy Policy → /privacy
+   - Cookie Policy → /cookies
+
+4. Make sure none of these pages return 404.
+
+5. Use the following exact text for each policy:
+
+---------------------------------------
+PRIVACY POLICY (/privacy)
+---------------------------------------
+Privacy Policy – SafeGo
+
+1. Introduction
+SafeGo (“we”, “us”, “our”) provides ride, food delivery, and parcel services. This Privacy Policy explains how we collect, use, and protect your information when you visit safegoglobal.com or use our apps and services.
+
+2. Information we collect
+We may collect:
+- Account information (name, phone number, email, password)
+- Trip and delivery information (pickup/drop-off, route, time, distance)
+- Payment-related information (masked card details)
+- Device information (IP, browser, OS, crash logs)
+- Support messages and communication logs
+
+3. How we use your information
+- Create and manage accounts
+- Provide rides and deliveries
+- Calculate pricing and payouts
+- Detect and prevent fraud
+- Improve app performance
+- Communicate trip/order updates
+
+4. Sharing
+We share information only with:
+- Drivers, couriers, restaurants, and shop partners
+- Payment processors
+- Cloud hosting and analytics providers
+- Law enforcement when required
+
+We do not sell your personal data.
+
+5. Security
+- HTTPS encryption
+- Access control
+- Activity logs and monitoring
+No system is perfect, but we work to reduce risk.
+
+6. Data retention
+We keep data only as long as legally required or for service operations.
+
+7. Your rights
+You may request access, correction, or deletion where permitted by law.
+
+8. Contact
+support@safegoglobal.com
+Last updated: 2025
+
+---------------------------------------
+TERMS OF SERVICE (/terms)
+---------------------------------------
+Terms of Service – SafeGo
+
+1. Agreement
+By using SafeGo, you agree to these Terms.
+
+2. Eligibility
+Must be 18 or older.
+
+3. Your Account
+You are responsible for your login credentials.
+
+4. Platform Role
+SafeGo connects users with independent drivers, couriers, and restaurant partners.
+
+5. Payments
+You authorize SafeGo to process payments for trips, deliveries, fees, and adjustments.
+
+6. Cancellation
+Cancellation or no-show fees may apply.
+
+7. Prohibited actions
+- Illegal use
+- Fraudulent activity
+- Threats or harassment
+- System tampering or hacking
+
+8. Liability
+SafeGo is not responsible for indirect damages. Maximum liability is the cost of your trip/order.
+
+9. Governing Law
+Bangladesh law applies.
+
+10. Contact
+support@safegoglobal.com
+
+---------------------------------------
+COOKIE POLICY (/cookies)
+---------------------------------------
+Cookie Policy – SafeGo
+
+We use cookies to:
+- Keep you logged in
+- Remember preferences
+- Measure performance and analytics
+
+Types:
+1. Essential cookies (required)
+2. Functional cookies
+3. Analytics cookies
+
+You may control cookies through your browser settings.
+
+---------------------------------------
+
+6. After creating the pages:
+   - Test all three URLs.
+   - Ensure navigation does not break.
+   - Ensure mobile view works.
+
+7. Do not change hero, services, partner, FAQ, or ride page.
+8. Only add the legal pages + footer links.
+
+Deliver the finalized build.

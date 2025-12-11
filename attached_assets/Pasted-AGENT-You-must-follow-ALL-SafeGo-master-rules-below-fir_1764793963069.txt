@@ -1,0 +1,196 @@
+AGENT:  
+You must follow ALL SafeGo master rules below **first**, then implement the country-specific Partner Card tagline system for Bangladesh and USA exactly as described.
+
+==================================================
+A) SAFEGO MASTER RULES (MUST ALWAYS APPLY)
+==================================================
+
+1) ROLES (4 distinct roles — never mixed):
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+   Each role must have:
+     • its own onboarding
+     • its own KYC (BD vs US)
+     • its own dashboard
+     • its own permissions
+     • its own status flows
+
+2) GLOBAL SERVICES (3 core services):
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+   These must always be supported.
+
+3) COUNTRY-SPECIFIC KYC (MANDATORY BRANCHING):
+
+   BANGLADESH (BD):
+     - father_name
+     - date_of_birth
+     - present_address
+     - permanent_address
+     - NID_number
+     - NID_front_image
+     - NID_back_image
+     - emergency_contact_name
+     - emergency_contact_phone
+     - verification_status
+     - is_verified
+
+   UNITED STATES (US):
+     - date_of_birth
+     - home_address
+     - emergency_contact_name
+     - emergency_contact_phone
+     - government_id_type
+     - government_id_last4
+     - (drivers) driver_license_number + image + expiry
+     - (drivers) ssn_last4 (optional)
+     - verification_status
+     - is_verified
+
+4) ADMIN PANEL (must never break):
+   - verify customers/drivers/restaurants
+   - approve/reject KYC + rejection_reason
+   - update pricing, fees, commissions
+   - block/unblock
+   - manage payouts
+   - view negative balances
+
+5) MANDATORY COLLECTIONS:
+   - rides
+   - food_orders
+   - deliveries
+   Each must contain:
+     • identity fields (customer_id, driver_id, restaurant_id)
+     • addresses + geolocation
+     • fees + commission
+     • payment details
+     • timestamps
+     • complete status flow
+     • rating & feedback
+
+6) COMMISSION RULES:
+   - CASH ride → driver keeps cash; commission becomes driver negative balance
+   - CASH food → restaurant keeps cash; commission becomes negative restaurant balance
+   - ONLINE → SafeGo keeps commission automatically
+   - Admin settles balances
+
+7) SECURITY RULES:
+   - customer cannot view driver documents
+   - driver cannot view customer ID docs
+   - restaurants cannot view each other
+   - only Admin can approve KYC, change pricing/commission, block/unblock
+   - users can update only their own profile
+
+8) STATUS FLOWS (never remove):
+   RIDE:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+   FOOD:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+   PARCEL:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+
+9) ONBOARDING RULES:
+   Customer signup only creates customer accounts.
+   Drivers & restaurants created **after login** via separate onboarding flows.
+
+10) NOTIFICATIONS:
+   - ride alerts, order updates, delivery updates
+   - verification approval/rejection
+   - admin important notifications
+
+==================================================
+B) TASK — IMPLEMENT COUNTRY-SPECIFIC PARTNER CARD TEXTS
+==================================================
+
+You must configure Partner Cards to show different taglines based on country_code ("BD" or "US").
+
+------------------------------------------
+1) BANGLADESH (BD) — 5 Partner Cards
+------------------------------------------
+
+MASTER TAGLINE (top of section, BD):
+  “আপনার সময়কে আয়ে পরিণত করুন। SafeGo–তে পার্টনার হোন।”
+
+BD PARTNER CARDS (short & powerful):
+
+1) Ride Share Driver
+   “নিজের মতো চালান, প্রতিদিন আয় করুন।”
+
+2) Delivery Driver (Food + Parcel)
+   “ডেলিভারি দিন, আয় বাড়ান।”
+
+3) Restaurant Partner
+   “নতুন গ্রাহক পান, অর্ডার বাড়ান।”
+
+4) Tickets Partner
+   “টিকিট অনলাইনে দিন, বিক্রি বাড়ান।”
+
+5) Shop Partner
+   “দোকান অনলাইনে আনুন, বেশি ক্রেতা পান।”
+
+
+------------------------------------------
+2) UNITED STATES (US) — 3 Partner Cards
+------------------------------------------
+
+MASTER TAGLINE (top of section, US):
+  “Turn your time into income. Become a SafeGo Partner.”
+
+USA PARTNER CARDS (short & powerful):
+
+1) Ride Share Driver
+   “Drive your way. Earn every day.”
+
+2) Food & Parcel Delivery Driver
+   “Deliver more. Earn more.”
+
+3) Restaurant Partner
+   “Reach more customers. Grow your orders.”
+
+
+==================================================
+C) IMPLEMENTATION INSTRUCTIONS
+==================================================
+
+1) Add a country-aware text module:
+   getPartnerCardText(country_code, partner_type)
+
+2) If country_code == "BD":
+      load 5 Bangla texts
+   If country_code == "US":
+      load 3 English texts
+   If another country:
+      default to English fallback
+
+3) USA MUST NOT show:
+   - Shop Partner
+   - Tickets Partner
+
+4) BD MUST show all 5 cards.
+
+5) Do NOT remove or break any existing logic.
+   Only ADD:
+     - text config
+     - internationalization
+     - conditional rendering.
+
+6) Ensure UI responsiveness for all text lengths.
+
+7) Ensure no card shows “coming soon” unless controlled by config.
+
+==================================================
+D) ACCEPTANCE CRITERIA
+==================================================
+
+✓ Bangladesh user sees 5 Bangla partner cards  
+✓ USA user sees 3 English partner cards  
+✓ Master tagline changes based on country  
+✓ No SafeGo feature breaks  
+✓ Role/KYC rules remain intact  
+✓ Admin/driver/restaurant systems unaffected  
+✓ Fully publish-ready implementation  
+
+Execute all changes in one coherent update.

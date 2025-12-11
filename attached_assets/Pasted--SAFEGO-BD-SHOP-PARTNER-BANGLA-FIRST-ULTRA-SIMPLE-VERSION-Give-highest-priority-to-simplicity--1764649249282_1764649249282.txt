@@ -1,0 +1,169 @@
+# SAFEGO BD SHOP PARTNER – BANGLA-FIRST ULTRA-SIMPLE VERSION
+# (Give highest priority to simplicity, Bangla language, and zero learning curve)
+
+You must implement a Bangladesh-only Shop Partner experience that is:
+1. As simple as water (“পানির মতো সহজ”)
+2. Fully in Bangla language (UI+labels)
+3. Requires no training or technical knowledge
+4. Zero-complexity product listing
+5. Supports full SafeGo rules without breaking anything
+6. Designed for shopkeepers with minimal education
+
+All rules from the SafeGo master ruleset MUST remain intact.
+Do not modify or break any existing backend logic.
+
+===================================================
+A) BANGLA-FIRST UI (MANDATORY)
+===================================================
+All text for the Shop Partner dashboard MUST be in natural Bangla.
+
+Examples:
+- “দোকান সেটআপ”
+- “পণ্য যোগ করুন”
+- “দাম”
+- “ছবি তুলুন”
+- “সেভ”
+- “অর্ডার দেখুন”
+- “ডেলিভারি প্রস্তুত”
+- “আপনার দোকান এখনো অনুমোদিত হয়নি”
+
+No English except product names.
+
+===================================================
+B) ULTRA-SIMPLE ONBOARDING
+===================================================
+Create a 3-step “super simple” setup wizard that any non-technical Bangladeshi can complete:
+
+### Step 1: দোকানের তথ্য
+Fields:
+- দোকানের নাম (shop_name)
+- দোকানের ধরণ (dropdown with icons: মুদিখানা, মোবাইল দোকান, কসমেটিক্স, স্টেশনারি…)
+- দোকানের ঠিকানা (shop_address)
+- মানচিত্রে দোকান দেখান (tap-to-pin)
+- দোকানের লোগো (optional: “ছবি তুলুন” button)
+
+UI rules:
+- Very large buttons
+- Bangla instructions under each field
+- Single page, big font
+
+### Step 2: প্রয়োজনীয় সেটিংস
+Fields:
+- ঘরে ডেলিভারি চালু/বন্ধ (toggle)
+- ডেলিভারি দূরত্ব (3km / 5km / 10km — big buttons)
+- অর্ডার প্রস্তুতির সময় (dropdown: ১০/২০/৩০ মিনিট)
+
+### Step 3: প্রথম পণ্য যোগ করুন (Super Simple Form)
+Fields:
+- পণ্যের নাম
+- দাম (৳)
+- ক্যাটাগরি (dropdown)
+- ছবি (button: “ছবি তুলুন”)
+
+Rules:
+- Only 4 fields
+- No extra complexity
+- After first item → redirect to “আমার দোকান”
+
+===================================================
+C) ULTRA-SIMPLE PRODUCT SYSTEM
+===================================================
+Create a product management system so simple even a low-literacy person can use it.
+
+### Product List Page
+- Big button: “নতুন পণ্য যোগ করুন”
+- List view:
+  - product_photo (thumbnail)
+  - product_name (Bangla-friendly)
+  - price (৳)
+  - Toggle: “চালু / বন্ধ”
+  - Edit button: “সম্পাদনা”
+  - Duplicate button: “কপি করুন”
+
+### Add / Edit Product Form (Bangla)
+Required:
+- পণ্যের নাম
+- দাম
+- ক্যাটাগরি
+- ছবি (single image)
+
+Optional:
+- বর্ণনা (short Bangla text)
+- মাপ/ইউনিট (kg, piece, pack…)
+- স্টক পরিমাণ
+
+UX rules:
+- ONE field per line
+- Big font
+- Bangla placeholder text
+- Simple success message: “পণ্য সংরক্ষণ হয়েছে”
+
+===================================================
+D) BANGLA ORDER DASHBOARD (SUPER SIMPLE)
+===================================================
+Create a very simple order dashboard:
+
+Order list (Bangla labels):
+- “নতুন অর্ডার”
+- “গ্রাহকের নাম”
+- “মোট টাকা”
+- “অর্ডারের সময়”
+- “স্ট্যাটাস”
+
+Action buttons:
+- “অর্ডার গ্রহণ করুন”
+- “প্যাকিং চলছে”
+- “ডেলিভারি প্রস্তুত”
+- “ডেলিভারি হয়েছে”
+
+Status flow (MUST follow backend rules):
+placed → accepted → packing → ready_for_pickup → picked_up → delivered
+
+===================================================
+E) CUSTOMER SIDE – DOORDASH-STYLE BANGLA STORE
+===================================================
+Customer app will show a beautiful BD-only e-store similar to DoorDash.
+
+Home Screen (BD Only):
+- “দোকান”
+- Show verified shops near the customer
+
+Storefront:
+- Shop cover banner
+- Shop logo
+- Shop name (Bangla)
+- Shop type
+- Rating
+- Estimated delivery time
+- Category chips (Bangla)
+- Product list (image + name + price + + button)
+- Search bar: “এই দোকানে খুঁজুন…”
+
+Cart Page:
+- Items
+- Quantity buttons
+- Delivery fee
+- Total
+- “অর্ডার দিন”
+
+Checkout uses existing customer flow.
+
+===================================================
+F) STRICT ROLE ISOLATION
+===================================================
+- Shop Partners only see their own data
+- Cannot access other shops
+- Cannot access customer sensitive data
+- Cannot alter any system-wide logic
+
+===================================================
+G) TECHNICAL NOTES (DO NOT BREAK ANYTHING)
+===================================================
+- Use existing `/api/shop-partner/*` endpoints only
+- No backend changes are allowed
+- Only create frontend + UI logic
+- BD-only feature flag so US users do not see this module
+
+===================================================
+END OF TASK
+===================================================

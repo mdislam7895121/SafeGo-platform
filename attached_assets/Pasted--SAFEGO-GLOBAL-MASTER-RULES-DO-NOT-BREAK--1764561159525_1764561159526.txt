@@ -1,0 +1,237 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK)
+====================================
+
+ROLES (4 separate roles, never mixed in UI or permissions)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must keep:
+- separate sign-up flow
+- separate KYC rules (BD vs US)
+- own dashboard and permissions
+- separate status flows
+
+SERVICES (MUST all stay supported)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+====================================
+KYC RULES (COUNTRY-SPECIFIC, KEEP AS-IS)
+====================================
+
+BANGLADESH (BD) – mandatory fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified (boolean)
+
+UNITED STATES (US) – mandatory fields:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (for drivers)
+- driver_license_image_url
+- driver_license_expiry
+- ssn_last4 (optional, drivers)
+- verification_status
+- is_verified (boolean)
+
+====================================
+ONBOARDING RULES (ALL ROLES)
+====================================
+- Multi-step onboarding:
+  1) Basic info
+  2) Address
+  3) ID/KYC upload (BD/US-specific)
+  4) Emergency contact
+- After completion:
+  - verification_status = "pending"
+  - Block access to rides/food/parcel until admin sets verification_status = "approved".
+
+====================================
+ADMIN PANEL CAPABILITIES (KEEP)
+====================================
+Admin must always be able to:
+- Verify customers, drivers, restaurants (approve/reject) and set:
+  - verification_status
+  - rejection_reason
+- Block/unblock any user or restaurant
+- Update pricing, fees, commissions per:
+  - country
+  - service type (rides, food, parcel)
+- Manage payouts:
+  - view driver negative balance
+  - view restaurant negative balance
+  - mark balances as settled/paid
+
+====================================
+CORE COLLECTIONS (NO SCHEMA BREAKING)
+====================================
+
+1) rides
+   - ride_id
+   - customer_id
+   - driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng
+   - dropoff_lat, dropoff_lng
+   - service_type (e.g. safego_go, safego_xl, etc.)
+   - fare_amount, tax_amount
+   - safego_commission_amount
+   - driver_earnings_amount
+   - payment_method (cash, card, wallet)
+   - status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     OR cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - order_id
+   - customer_id
+   - driver_id
+   - restaurant_id
+   - restaurant_address, restaurant_lat, restaurant_lng
+   - delivery_address, delivery_lat, delivery_lng
+   - items
+   - subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount
+   - restaurant_payout_amount
+   - payment_method
+   - status:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     OR cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+3) deliveries
+   - delivery_id
+   - customer_id
+   - driver_id
+   - pickup_address, pickup_lat, pickup_lng
+   - dropoff_address, dropoff_lat, dropoff_lng
+   - package_description, package_size
+   - delivery_fee
+   - safego_commission_amount
+   - driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     OR cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+====================================
+COMMISSION & PAYOUT RULES (KEEP EXACT)
+====================================
+1) Ride – CASH:
+   - Customer pays cash to driver.
+   - Driver keeps full cash.
+   - SafeGo commission is recorded as negative driver_wallet_balance.
+   - Driver must settle weekly; admin can mark as paid.
+
+2) Food order – CASH:
+   - Customer pays cash to restaurant.
+   - Restaurant keeps full cash.
+   - SafeGo commission is recorded as negative restaurant_wallet_balance.
+
+3) ONLINE payments (card/wallet):
+   - SafeGo collects full payment.
+   - SafeGo keeps safego_commission_amount automatically.
+   - Driver/restaurant receive net payout only.
+
+4) Admin can settle driver/restaurant negative balances and mark paid.
+
+====================================
+SECURITY RULES (DO NOT RELAX)
+====================================
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer KYC or sensitive information.
+- Restaurants cannot view data of other restaurants.
+- Only admin can:
+  - change pricing, commissions
+  - change verification_status
+  - block/unblock users
+- Any user can only update their own profile.
+
+====================================
+STATUS FLOWS (DO NOT CHANGE)
+====================================
+Ride statuses:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+Food statuses:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+
+Parcel statuses:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+====================================
+NOTIFICATIONS (KEEP)
+====================================
+- New ride/food/parcel alerts for drivers
+- Status updates for customers & drivers
+- Verification approval / rejection
+- Payout / settlement updates
+- Important admin announcements
+
+====================================
+THIS TASK (FRONTEND ONLY): ALIGN LEFT & RIGHT FOOTER BUTTONS SYMMETRICALLY
+====================================
+
+Screen: /driver/map  (SafeGo driver map screen)
+
+We are focusing ONLY on the three floating footer controls that sit on top of the map:
+
+1) Center pill button:
+   - “Go Online / Go Offline”
+   - Already centered at the bottom of the map.
+2) Left circular FAB (bottom-left):
+   - Trip selector (current screenshot: grid icon).
+3) Right circular FAB (bottom-right):
+   - Trip menu / current trip (three horizontal lines).
+
+THE GOAL:
+- The left and right circular buttons must be **perfect mirror positions**:
+  - Same bottom distance from the edge.
+  - Same horizontal margin (left vs right).
+  - Same size, shape, and vertical alignment.
+- Center pill remains perfectly centered.
+- No backend or business logic changes.
+
+------------------------------------
+A) DEFINE THE MAP CONTAINER AS POSITION CONTEXT
+------------------------------------
+1. Locate the main map wrapper in client/src/pages/driver/map.tsx (or equivalent).
+   This is the container that holds:
+   - the map component
+   - the center Go Online button
+   - the left and right footer FABs.
+
+2. Ensure this wrapper has:
+   - `position: relative;`
+   This makes it the positioning context for the footer buttons.
+
+   Example (JSX with Tailwind-style classes):
+
+   ```tsx
+   <div className="driver-map-container relative w-full h-full">
+     {/* map + floating buttons live here */}
+   </div>

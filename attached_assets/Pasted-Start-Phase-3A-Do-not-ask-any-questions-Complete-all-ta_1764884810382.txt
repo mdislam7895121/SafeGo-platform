@@ -1,0 +1,32 @@
+Start Phase-3A.
+
+Do not ask any questions. Complete all tasks in one continuous workflow.
+
+Implement the remaining admin features exactly as listed below:
+
+1. Admin Analytics Dashboard with real-time charts, revenue metrics, fraud alerts, and heatmaps.
+2. Enterprise Search Engine across all entities with fuzzy matching, filters, ranking, and auto-suggestions.
+3. Global Export Center supporting CSV, PDF, and JSON for all admin modules, with scheduled export to email.
+4. Fraud Detection Module with suspicious-login detection, device fingerprinting, and multi-account flagging.
+5. Admin Session Security including browser session listing, force-logout actions, and suspicious IP auto-blocking.
+6. Emergency Kill-Switch for platform-wide pause, payment freeze, and feature flag override.
+7. Incident Response Playbook integration with workflows, auto-assignment, timeline logs, and admin notes.
+8. Internal Customer Support Panel with safe admin impersonation (full audit logging).
+9. Partner Compliance Center for document expiry alerts, missing-document flags, and KYC revalidation automation.
+10. System Health Monitor for CPU, database load, memory, queue delays, error trending, and live alerts.
+11. Admin Push Notification Tool with geo-targeting and role-targeting options.
+12. Payment Verification Console for failed payments, disputes, settlement delays, and reconciliation.
+13. Policy Update Manager with version-controlled publications and acceptance logs.
+14. Auto Backup & Recovery Panel with DB snapshots, rollbacks, restore testing, and integrity validation.
+15. Full Audit Visibility Console showing every admin action, IP, location, userAgent, and hash-chain validation.
+
+Use the enterprise UI components, maintain all security standards, RBAC rules, environment separation, audit logging, and mobile responsiveness.
+
+After completing all features:
+- run regression tests,
+- optimize performance,
+- verify environments,
+- update documentation,
+- generate FINAL ADMIN PHASE-3A REPORT.
+
+Finish only when everything is fully implemented and validated.

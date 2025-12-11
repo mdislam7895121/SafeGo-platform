@@ -1,0 +1,169 @@
+You must now implement SafeGo Master Serial Tasks 43–47 (Data Rights + Data Retention Layer) in ONE unified, non-breaking update. All SafeGo Master Rules remain fully enforced.
+
+=====================================================================
+SECTION 0 — NON-BREAKING REQUIREMENTS
+=====================================================================
+Do NOT modify:
+• KYC flows  
+• authentication system  
+• settlement/finance logic  
+• fraud prevention  
+• rating/reputation logic  
+• ride/food/parcel collections or flows  
+
+All data rights features must be ADDITIVE and BACKWARD COMPATIBLE.
+
+=====================================================================
+SECTION 1 — TASK SET (43–47)
+=====================================================================
+
+---------------------------------------------------------------------
+TASK 43 — Data Export Automation (“Download My Data”)
+---------------------------------------------------------------------
+Create endpoint:
+GET /api/user/data-export
+
+Features:
+• Compile all user-related data:
+    - profile  
+    - KYC (with restricted fields per role)  
+    - rides history  
+    - deliveries  
+    - food orders  
+    - settlement records  
+    - device history  
+    - login logs  
+    - ratings  
+    - fraud events that involve user  
+
+• Generate:
+    - JSON file  
+    - downloadable ZIP  
+
+• Add background job for large exports  
+• Add logs in data_request_logs table  
+
+UI:
+• Customer/Driver/Restaurant/Partner → Settings → “Download My Data”
+
+---------------------------------------------------------------------
+TASK 44 — Delete My Account (GDPR-style full automation)
+---------------------------------------------------------------------
+Create endpoint:
+POST /api/user/delete-request
+
+Flow:
+1. User submits delete request  
+2. System schedules async deletion (72 hours delay)
+3. User receives confirmation notification  
+4. Delete must:
+    • anonymize all ride/order records  
+    • preserve finance records (legal compliance)  
+    • wipe device IDs  
+    • wipe login history  
+    • wipe ratings submitted BY the user  
+5. Add table: delete_requests  
+
+Admin Panel:
+• See delete requests  
+• Approve/deny (rare cases)  
+
+---------------------------------------------------------------------
+TASK 45 — Data Retention Engine
+---------------------------------------------------------------------
+Implement scheduled retention rules:
+• Login logs → keep 12 months  
+• Device fingerprints → keep 6 months  
+• Fraud logs → keep 24 months  
+• Ratings logs → keep 24 months  
+• Admin audit logs → keep 7 years  
+• Settlement/finance → keep 7 years (mandatory)  
+• Location traces → keep 30 days only  
+
+Create:
+retention_engine.ts  
+Runs daily at 03:00 local time.
+
+Log all actions in retention_logs table.
+
+---------------------------------------------------------------------
+TASK 46 — Policy Auto-Versioning System
+---------------------------------------------------------------------
+Create table:
+policy_versions  
+Fields:
+- id
+- type (terms, privacy, refund, safety)
+- version
+- content
+- published_at
+- is_active
+
+Features:
+• When admin updates a policy, auto-create version N+1  
+• Users must accept NEW version at next login  
+• Store accepted_version in user_profiles  
+
+If mismatch:
+→ redirect to policy acceptance screen
+
+---------------------------------------------------------------------
+TASK 47 — Backup & Disaster Recovery Checklist (App-Level Simulation)
+---------------------------------------------------------------------
+Create:
+backup_status table
+
+Implement internal admin-only endpoints:
+GET /api/admin/backup/check  
+POST /api/admin/backup/trigger (simulation mode)
+
+Features:
+• Validate:
+    - DB health  
+    - file storage access  
+    - policy versioning  
+    - fraud/rating engine states  
+    - cache integrity  
+
+Admin Panel:
+• New page “Backup & Recovery Status”  
+
+=====================================================================
+SECTION 2 — DATABASE ADDITIONS (NON-BREAKING)
+=====================================================================
+Add tables:
+• data_request_logs  
+• delete_requests  
+• retention_logs  
+• policy_versions  
+• backup_status  
+
+=====================================================================
+SECTION 3 — ADMIN PANEL UPDATES
+=====================================================================
+Add module:
+**Data Governance Center**
+
+Tabs:
+1. Data Export Logs  
+2. Delete Requests  
+3. Retention Logs  
+4. Policy Version History  
+5. Backup & Recovery Status  
+
+=====================================================================
+SECTION 4 — VALIDATION REQUIREMENTS
+=====================================================================
+Before marking complete:
+• Data export must not leak sensitive fields  
+• Delete request must anonymize instead of deleting transactional data  
+• Retention engine must not delete mandatory finance/audit logs  
+• Policy version mismatch must enforce re-acceptance  
+• Backup check must not break server  
+
+=====================================================================
+SECTION 5 — COMPLETION MESSAGE
+=====================================================================
+When finished, respond:
+
+“Tasks 43–47 (Data Rights + Retention Layer) fully implemented, validated, and SafeGo Master Rules compliant.”

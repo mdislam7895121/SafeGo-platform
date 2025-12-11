@@ -1,0 +1,66 @@
+Now that the SafeGo Delivery Driver 7-step onboarding and country-specific KYC system is fully completed, proceed to the next mandatory SafeGo phase.
+
+Implement the Driver Dashboard + Go-Online Engine according to the SafeGo Master Rules.
+
+=====================================================
+A) DRIVER DASHBOARD REQUIREMENTS
+
+When a driver logs in, show:
+
+1. verification_status badge  
+   - pending → block everything except profile  
+   - approved → allow Go-Online  
+   - rejected → block and show rejection_reason  
+
+2. Earnings Summary  
+   - today's earnings  
+   - weekly earnings  
+   - negative balance (commission owed)
+
+3. Online/Offline Toggle  
+   - disabled until is_verified = true  
+   - when turned ON → start real-time location updates  
+
+4. Navigation Cards  
+   - Ride Tasks  
+   - Food Delivery Tasks  
+   - Parcel Delivery Tasks  
+   (show counters for pending/active tasks)
+
+5. Notification Center  
+   - verification approval/rejection  
+   - new tasks  
+   - payout updates  
+
+=====================================================
+B) DRIVER GO-ONLINE ENGINE
+
+Implement the following:
+
+- Driver cannot go online if verification_status != "approved"  
+- When going online → update driver_status = "available"  
+- Start location engine  
+- Register driver in matching pool for all 3 services:
+  ride-hailing, food delivery, parcel delivery  
+
+- When offline → driver_status = "offline"  
+- Stop location engine  
+
+=====================================================
+C) BACKEND REQUIREMENTS
+
+Add/update API routes (ADD ONLY — do not modify or remove existing):
+
+- GET /driver/dashboard  
+- POST /driver/go-online  
+- POST /driver/go-offline  
+- POST /driver/update-location  
+
+=====================================================
+D) UI REQUIREMENTS
+
+Build a clean, professional driver dashboard UI compatible with mobile and desktop.
+
+=====================================================
+Follow ALL SafeGo Master Rules and DO NOT break any existing logic.
+Produce a publish-ready implementation.

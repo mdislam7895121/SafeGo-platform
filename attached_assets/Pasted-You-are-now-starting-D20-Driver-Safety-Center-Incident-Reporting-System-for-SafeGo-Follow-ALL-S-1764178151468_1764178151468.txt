@@ -1,0 +1,100 @@
+You are now starting D20: Driver Safety Center & Incident Reporting System for SafeGo.
+
+Follow ALL SafeGo global rules, all D-series architecture patterns, RBAC, KYC-gating, API consistency, UI structure, TypeScript patterns, and database integration rules.
+
+Build D20 fully in one go with no breaking changes.
+
+--------------------------------------------
+D20 Scope Overview
+--------------------------------------------
+Create a complete Driver Safety Center containing:
+
+1. Safety Home Page
+   • Driver safety score (demo placeholder)
+   • Monthly safety summary
+   • Quick-access safety buttons
+
+2. Emergency Toolkit (Emergency Panel)
+   • Emergency SOS trigger (dummy endpoint)
+   • Quick message to support
+   • Auto-share location (mock, no real GPS)
+
+3. Safety Incident Reporting
+   • Report incident form (dropdown + description + date)
+   • Categories:
+       - Rider misconduct
+       - Vehicle damage
+       - Payment dispute (non-financial)
+       - Lost & Found
+       - Harassment/Threat
+       - Unsafe location issue
+   • Upload optional images (mock upload)
+   • Submit incident → save in database
+
+4. Safety Incident History
+   • Paginated list of all previous safety reports
+   • Status:
+       - Submitted
+       - Under Review
+       - Resolved
+   • Clicking an item opens full details
+
+5. Backend Requirements
+   • Create model: DriverSafetyIncident
+       - id
+       - driverId
+       - category
+       - description
+       - date
+       - status
+       - attachments (optional)
+       - createdAt
+   • API routes under /api/driver/safety/*
+       GET /incidents
+       POST /report
+       GET /incidents/:id
+
+   • RBAC: Only role=driver and verified drivers can access.
+   • KYC gating same as D15–D19.
+   • Pagination same as D16 and D17.
+
+6. UI Requirements (Driver app)
+   Pages to create:
+   • /driver/safety
+   • /driver/safety/report
+   • /driver/safety/history
+   • /driver/safety/history/:id
+   • /driver/safety/emergency
+
+   All using existing driver layout components.
+
+7. Navigation
+   Add “Safety Center” under driver sidebar (below Support).
+
+--------------------------------------------
+Deliverables
+--------------------------------------------
+1. All UI pages ready and connected.
+2. Fully working backend API.
+3. Database migration/model added.
+4. Safety history list + details working.
+5. Demo seed script: add 5 demo safety incidents.
+6. Update documentation (replit.md)
+   • Add D20 section
+   • Add endpoints
+   • Add UI navigation info
+
+--------------------------------------------
+Architect Requirements
+--------------------------------------------
+• Must follow D-series code patterns.
+• Must not break D15 chat support or D16 wallet.
+• Use same data-testid patterns.
+• Ensure clean pagination.
+• Ensure endpoint security.
+
+--------------------------------------------
+Complete in one continuous workflow.
+--------------------------------------------
+
+Begin work on D20 now.

@@ -1,0 +1,221 @@
+Upgrade the Restaurant Menu Item categories to a two-level system: Main Category + Subcategory.
+
+Goal:
+Make it easy for restaurant owners to select a primary food category first, then choose one or more subcategories from a predefined library, while still allowing custom entries. Preserve all existing SafeGo rules and avoid breaking existing data.
+
+Scope:
+- Pages:
+  - /restaurant/menu
+  - /restaurant/menu/add (or the modal used by “Add First Item” and normal “Add Item”)
+- Affects:
+  - Menu item creation and edit flows
+  - Menu item data model (categories)
+
+A. Data Model
+
+1. Introduce a two-level category structure in the menu item model:
+   - primaryCategory: string (required)
+   - subCategories: string[] (optional, but recommended)
+
+2. Backwards compatibility:
+   - If existing items currently use `category` or `categories: string[]`:
+     - Map them as follows:
+       - If `primaryCategory` is empty and `category` exists → set `primaryCategory = category`.
+       - If `primaryCategory` is empty and `categories` exists → set:
+         - `primaryCategory = categories[0]`
+         - `subCategories = categories.slice(1)`
+   - Keep old fields only if needed for migration, but the new UI should read/write using:
+     - `primaryCategory`
+     - `subCategories`
+
+3. API update:
+   - Ensure create/update/get menu item endpoints send and return:
+     - primaryCategory: string
+     - subCategories: string[]
+   - Do not change other request/response fields.
+   - Ensure all existing menu operations remain functional.
+
+B. Category Library (Config-Driven)
+
+1. Create a central config file (for example `menuCategoryConfig.ts`) that exports a nested structure:
+
+   - Example structure:
+     - Burgers
+       - Beef Burger
+       - Chicken Burger
+       - Veggie Burger
+       - Cheeseburger
+       - Double Patty
+       - Sliders
+     - Pizza
+       - Margherita
+       - Pepperoni
+       - Meat Lovers
+       - Veggie Pizza
+       - Cheese Lovers
+       - Thin Crust
+       - Deep Dish
+     - Fried Chicken
+       - Chicken Wings
+       - Chicken Strips
+       - Spicy Fried Chicken
+       - Family Bucket
+     - Rice & Curry
+       - Plain Rice
+       - Fried Rice
+       - Chicken Curry
+       - Beef Curry
+       - Vegetable Curry
+     - Biryani & Polao
+       - Chicken Biryani
+       - Mutton Biryani
+       - Beef Biryani
+       - Kacchi Biryani
+       - Polao Set
+     - Noodles & Pasta
+       - Chow Mein
+       - Hakka Noodles
+       - Stir-fry Noodles
+       - White Sauce Pasta
+       - Red Sauce Pasta
+     - Breakfast
+       - Paratha Set
+       - Bread & Omelette
+       - Pancakes
+       - Sandwich Breakfast
+     - Snacks & Appetizers
+       - French Fries
+       - Wedges
+       - Nuggets
+       - Spring Rolls
+       - Samosa
+     - Beverages
+       - Soft Drinks (Can/Bottle)
+       - Bottled Water
+       - Energy Drink
+       - Iced Tea
+     - Hot Drinks
+       - Milk Tea
+       - Black Tea
+       - Coffee
+       - Hot Chocolate
+     - Cold Drinks & Juice
+       - Fresh Juice
+       - Lassi
+       - Smoothies
+       - Milkshake
+     - Desserts & Ice Cream
+       - Ice Cream Scoop
+       - Sundae
+       - Cake Slice
+       - Brownie
+       - Custard / Pudding
+     - Combos & Meal Deals
+       - Burger Combo
+       - Rice Combo
+       - Family Meal
+       - Kids Combo
+     - Kids Menu
+       - Kids Burger
+       - Kids Nuggets Meal
+       - Kids Pasta
+     - Vegetarian
+       - Veg Burger
+       - Veg Pizza
+       - Veg Rice Bowl
+       - Veg Curry
+     - Vegan
+       - Vegan Burger
+       - Vegan Salad
+       - Vegan Bowl
+     - Halal Specials
+       - Halal Chicken Menu
+       - Halal Beef Menu
+       - Halal Combo
+
+2. This library must be:
+   - Easy to extend later.
+   - Not hard-coded deep inside components.
+   - Used as the single source of truth for category/subcategory dropdowns.
+
+C. UI/UX – Menu Item Form
+
+1. Replace the existing category input with two fields:
+   - Field 1: Main Category (required)
+     - Single-select dropdown.
+     - Options = keys from the category config (B1).
+     - With search-as-you-type on mobile and desktop.
+   - Field 2: Subcategory (optional multi-select)
+     - Multi-select checkbox dropdown.
+     - Options depend on the selected Main Category.
+     - When Main Category changes, reset Subcategory selections.
+
+2. Interaction details:
+   - When user selects Main Category:
+     - Load corresponding subcategory list from the config.
+   - Subcategory selector:
+     - Multi-select with checkboxes.
+     - Selected subcategories shown as chips/pills.
+     - Allow clearing one chip at a time.
+
+3. Custom entries:
+   - For Main Category:
+     - Show an option at the bottom: “Create new main category: <typed text>”.
+     - If selected, save as `primaryCategory` even if not in config.
+   - For Subcategory:
+     - Show an option: “Create new subcategory: <typed text>”.
+     - Append to `subCategories` for that item only (do NOT modify the global config).
+   - Custom entries must look visually distinct (e.g., tagged as “Custom” in UX if you choose, but not required by me).
+
+4. Validation rules:
+   - primaryCategory is required.
+   - At least one subcategory is recommended, but not strictly required:
+     - If no subcategory selected, show a gentle warning (non-blocking).
+   - Error message examples:
+     - “Please select a main category.”
+   - Keep all existing field validations (name, price, description, etc.) unchanged.
+
+D. Responsiveness & Accessibility
+
+1. Make sure both dropdowns work properly on:
+   - Mobile (320px+)
+   - Tablet (768px+)
+   - Desktop (1024px+)
+
+2. Requirements:
+   - No horizontal scrolling.
+   - Dropdowns should be keyboard-accessible.
+   - Chips should wrap on multiple lines instead of overflowing.
+
+E. Regression & Testing
+
+1. Backwards compatibility:
+   - Verify existing menu items still render correctly on /restaurant/menu.
+   - Editing an old item should pre-fill:
+     - Main Category: mapped from previous `category` or first element of `categories`.
+     - Subcategories: mapped from remaining elements (if `categories` existed).
+
+2. New workflows to test:
+   - Create a new item using only predefined main + subcategories.
+   - Create a new item with:
+     - Predefined main category.
+     - Custom subcategory.
+   - Create a new item with:
+     - Custom main category.
+     - Custom subcategory.
+   - Edit an existing item and change:
+     - Only subcategories.
+     - Both main and subcategories.
+
+3. Confirm that:
+   - Data is saved correctly to the database.
+   - All menu lists, filters, and any category-based displays still work or degrade gracefully.
+
+After implementation:
+- Run the app and test on /restaurant/menu:
+  - Click “Add First Item” and verify:
+    - Main Category dropdown appears and loads the config categories.
+    - Subcategory dropdown updates based on selected main category.
+    - Custom categories/subcategories can be added.
+    - Item saves successfully and reloads with correct main + subcategories.
+- Do not change any payout, support center, or KYC logic in this task.

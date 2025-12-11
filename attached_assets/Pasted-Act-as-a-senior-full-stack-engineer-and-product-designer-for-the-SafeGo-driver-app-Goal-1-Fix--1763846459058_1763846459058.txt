@@ -1,0 +1,173 @@
+Act as a senior full-stack engineer and product designer for the SafeGo driver app.
+
+🎯 Goal
+1) Fix the current Support Chat 500 error.
+2) Replace the ticket-based support flow with a modern live chat system:
+   - First layer: FAQ/robot assistant (bot replies).
+   - Second layer: human support agent escalation when needed.
+   - No more “ticket numbers” UX for drivers.
+
+Follow all existing SafeGo conventions:
+- Four roles: customer, driver, restaurant/merchant, admin.
+- Keep all existing auth, KYC, payouts, wallet, and tax logic unchanged.
+- Do not break any existing URLs or working features.
+- Maintain TypeScript, Prisma, TanStack Query, and Zod validation patterns already in the project.
+- Preserve security: drivers can only see their own data; admins get full audit logs.
+
+====================================
+1) FIX CURRENT SUPPORT ERROR FIRST
+====================================
+
+Current issue:
+- On the Support page, clicking **“Create New Ticket”** shows a red 500 error panel.
+- The error text mentions `invalid prisma.supportConversation.create` and fields like `adminUserId` or `userType` being missing.
+
+Required fix:
+- Locate the backend service used by the Support page (likely under `server/services/support/` or similar) and the Prisma model for support conversations/messages.
+- Update the `createConversation` logic so that:
+  - It **always** saves:
+    - `userId` = logged-in driver’s id
+    - `userType` = `"driver"`
+    - `status` = `"open"`
+  - Any `adminUserId` field must be **optional** on creation (can be `null` or omitted).
+  - Zod schema must allow this (no required `adminUserId` at creation time).
+- Make sure the API returns a clean JSON response (no stack traces) and the frontend shows a nice error toast if something still goes wrong.
+
+After this step:
+- Clicking “Create New Ticket” should at least create a conversation entry without 500 errors (even though we are going to replace the UX).
+
+====================================
+2) REPLACE TICKET UX WITH LIVE CHAT
+====================================
+
+We no longer want a “ticket number” style interface. Instead we want a simple live chat like messaging.
+
+2.1 Driver-facing page
+
+Route:
+- Keep the existing driver support route (e.g. `/driver/support` or `/driver/help`).
+- Page title: **Support Chat**
+
+Layout:
+- Top: `SafeGo Support` header with short description: “Chat with SafeGo support or get instant answers.”
+- Main area:
+  1) If no conversation exists:
+     - A centered panel with a button: **“Start Chat”**
+  2) If conversation exists:
+     - A chat window:
+       - Message list (bubble style, newest at bottom).
+       - Input box with “Type a message…” + **Send** button.
+       - Optional quick-reply chips above the input:
+         - “Payments & Wallet”
+         - “Trips & Riders”
+         - “Account & Documents”
+         - “Tax information”
+         - “App or map issues”
+
+Behavior:
+- When driver taps **Start Chat**:
+  - Call an API to create (or reuse) a single **active** conversation for this driver.
+  - Then show the chat window with:
+    - A system message: “You’re now connected to SafeGo Support.”
+    - An immediate **bot** message: “Hi [first name], I’m SafeGo Assistant. How can I help you today?”
+- Only one active conversation per driver at a time (reuse if exists; do not create duplicates).
+
+2.2 Conversation model
+
+Use or extend the existing Prisma models. If needed, create:
+
+- `SupportConversation`:
+  - `id`
+  - `userId` (driver id)
+  - `userType` = `"driver"`
+  - `status` = `"open" | "pending" | "closed"`
+  - `assignedAdminId` (nullable; admin user id when escalated)
+  - `createdAt`, `updatedAt`
+
+- `SupportMessage`:
+  - `id`
+  - `conversationId`
+  - `senderType` = `"driver" | "bot" | "admin" | "system"`
+  - `senderId` (nullable for bot/system)
+  - `content` (text)
+  - `createdAt`
+
+Constraints:
+- Driver can only load messages for conversations where `userId = currentUser.id`.
+- Admins can load messages for any conversation.
+- All operations are fully audited (timestamps, senderType).
+
+2.3 Bot/FAQ assistant (first layer)
+
+We don’t need real AI here; just rule-based answers.
+
+Implementation:
+- On driver message, call an API `POST /api/support/messages` which:
+  - Saves the driver message.
+  - Runs a simple routing function on the backend (safe and deterministic) that:
+    - Looks for keywords and picks a bot response template:
+      - Wallet/payments: basic explanation + link to Wallet page.
+      - Vehicle/documents: explain how to upload documents and link to Documents / Vehicles pages.
+      - Tax: explain 1099 vs Bangladesh tax summaries and link to Tax Info page.
+      - Trips/riders: explain where to see trip history and how to report rider issues.
+      - Account/profile: explain where to edit phone, email, address.
+    - Saves a `senderType = "bot"` message with the chosen text.
+- Return the driver message + bot message so the frontend can update chat immediately.
+
+2.4 Escalation to human support
+
+We need a clean way for the driver to talk to a real person if the bot can’t solve the problem.
+
+Driver side:
+- Always show a small link under the input:
+  - Text: “Need more help? Contact live support.”
+- When the driver taps it:
+  - Call an API `POST /api/support/escalate` that:
+    - Sets `status = "pending"` or `"open"` with `assignedAdminId = null` (to be picked up by any admin).
+    - Adds a system message: “Your conversation has been forwarded to a SafeGo support agent.”
+
+Admin side (minimal for now):
+- In the admin panel, add a simple **Support** section:
+  - List view:
+    - All open/pending conversations
+    - Columns: Driver name, country, createdAt, status, last message preview.
+  - Detail view for a single conversation:
+    - Shows all messages, newest at bottom.
+    - Admin text box + “Send reply” button, which posts messages with `senderType = "admin"` and sets `assignedAdminId` to the current admin.
+
+Real-time behavior:
+- Use **short polling** with TanStack Query on both driver and admin chat views:
+  - Poll every 3–5 seconds for new messages for the active conversation.
+  - This avoids adding websockets while still feeling responsive.
+
+====================================
+3) FRONTEND DETAILS & SAFETY
+====================================
+
+- Keep the Support route under the driver layout; do not break `Help Center` or email support sections.
+- The **Start Chat** / **Support Chat** button on the `/driver/help` page should now open this chat UI instead of creating a “ticket”.
+- Do not expose internal ids (conversationId, adminId) to the driver UI.
+- Make sure error states are handled gracefully:
+  - If the API fails, show a toast “Something went wrong. Please try again.”
+  - Never show raw Prisma or stack trace errors to the driver.
+
+Security:
+- Reuse existing authentication middleware.
+- Make sure all support APIs are:
+  - `driver` scoped for `/driver/support` endpoints.
+  - `admin` scoped for admin support endpoints.
+- Validate all inputs with Zod (content length, no empty messages, etc.).
+
+Testing checklist:
+- Driver can open `/driver/help` or `/driver/support`, tap **Start Chat**, and see bot greeting.
+- Driver can send messages and receive bot replies.
+- Driver can press “Need more help? Contact live support” to escalate.
+- Admin can see the escalated conversation in the admin Support section and reply.
+- Driver sees admin replies in near real-time via polling.
+- No 500 errors appear in the UI; all errors use clean toasts.
+
+When everything is done:
+- Please summarize:
+  - Models created/changed.
+  - APIs added/changed.
+  - Any limitations or future improvements (file attachments, typing indicator, etc.).

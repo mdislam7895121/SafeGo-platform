@@ -1,0 +1,47 @@
+The Partner Onboarding Center is not complete. Please finish the full onboarding system exactly as specified below. This must match all four partner types and include country-aware logic.
+
+Complete these four onboarding flows with full database integration:
+
+1. DRIVER / COURIER ONBOARDING (Bangladesh + USA)
+Fields: full_name, phone, email, city, service_type (ride/delivery), vehicle_type, country
+Save under: admin.driversOnboarding
+Statuses: New → In Review → Approved → Rejected
+
+2. RESTAURANT ONBOARDING (Bangladesh only)
+Fields: restaurant_name, owner_name, phone, email, city, cuisine, country=Bangladesh
+Save under: admin.restaurantsOnboarding
+Statuses: New → In Review → Approved → Rejected
+
+3. SHOP ONBOARDING (Bangladesh only)
+Fields: shop_name, owner_name, phone, category, city, country=Bangladesh
+Save under: admin.shopsOnboarding
+Statuses: New → In Review → Approved → Rejected
+
+4. TICKET PARTNER ONBOARDING (Bangladesh only)
+Fields: business_name, contact_person, phone, ticket_type, city, country=Bangladesh
+Save under: admin.ticketsOnboarding
+Statuses: New → In Review → Approved → Rejected
+
+REQUIREMENTS:
+– Create separate frontend pages for each onboarding type
+– Show only Bangladesh-specific forms when the landing page region is Bangladesh
+– Show only driver onboarding when region is USA
+– Save each form into its respective admin database table
+– Create 4 separate admin panels:
+    • /admin/onboarding/drivers
+    • /admin/onboarding/restaurants
+    • /admin/onboarding/shops
+    • /admin/onboarding/tickets
+– Each admin page must support:
+    • Status update buttons
+    • Notes field
+    • Filters: Country, City, Status
+    • Search by name or phone
+
+SECURITY:
+– Validate all inputs
+– Add rate limiting to all onboarding endpoints
+– Add logging for onboarding submissions
+
+After finishing, test all four flows, and show me screenshots from all four admin onboarding lists. 
+Make sure everything works region-wise (Bangladesh vs USA).

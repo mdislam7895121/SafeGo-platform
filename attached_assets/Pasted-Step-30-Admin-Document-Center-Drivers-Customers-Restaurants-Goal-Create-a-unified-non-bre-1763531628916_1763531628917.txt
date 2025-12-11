@@ -1,0 +1,222 @@
+Step 30 – Admin Document Center (Drivers, Customers, Restaurants)
+
+Goal
+Create a unified, non-breaking “Document Center” in the admin panel where admins can review, filter, and approve/reject uploaded KYC and vehicle documents for:
+- Drivers
+- Customers
+- Restaurants
+
+This step must NOT change any existing schemas or KYC flows introduced in previous steps (Bangladesh + USA identity fields, document uploads, driver management, customer management, parcel management, etc.). It is a read/review + status-control layer on top of the existing data.
+
+High-Level Requirements
+
+1. New Management Card in Admin Dashboard
+- In the main admin dashboard (/admin), under the “Management” section, add a new card:
+  - Title: Document Center
+  - Subtitle: Review all driver, customer, and restaurant documents
+- Clicking this card should navigate to a new route:
+  - /admin/documents
+
+2. Document Center Layout
+- Create a new page at /admin/documents with the following structure:
+  - Page title: Document Center
+  - Subtitle: Review and manage uploaded verification documents
+- Inside the page, add three primary tabs (or segmented controls):
+  - Tab 1: Drivers
+  - Tab 2: Customers
+  - Tab 3: Restaurants
+- Default tab: Drivers
+
+3. Common Filtering Controls (top of page)
+For all three tabs, show a shared filter bar with:
+
+- Search box:
+  - Placeholder:
+    - Drivers tab: "Search by driver email..."
+    - Customers tab: "Search by customer email..."
+    - Restaurants tab: "Search by restaurant email..."
+  - Should filter results by user’s email.
+
+- Country filter:
+  - Dropdown values (based on existing country codes already used in the system):
+    - All Countries
+    - Bangladesh
+    - United States
+  - Must reuse existing user.countryCode or equivalent field (NO new schema).
+
+- Status filter:
+  - Dropdown values:
+    - All Statuses
+    - Pending Review
+    - Approved
+    - Rejected
+  - This status must map to the existing KYC / document review status model already used in previous steps (no new status system).
+
+4. Drivers Tab – Document Table
+
+4.1 Data source
+- Use existing driver + driver identity + document upload tables/models that were created in the previous KYC/document-upload steps.
+- Do NOT add new columns or tables. Only read and update existing status/metadata fields.
+
+4.2 Table columns (Drivers tab)
+For each driver row, show:
+
+- Email: driver’s email
+- Country: show Bangladesh / United States with flag or code (reusing the same logic as /admin/drivers country badge)
+- KYC Status: Pending / Verified / Rejected (reuse existing KYC status)
+- Document Status: Pending Review / Approved / Rejected (reuse existing document review status field, if any, or map from existing flags)
+- Required Documents (per country):
+  - For Bangladesh drivers:
+    - Profile Photo (image)
+    - NID Front + Back
+    - Driving License (image)
+    - Vehicle Registration Documents (one or more files)
+  - For US drivers (non-New York):
+    - Profile Photo
+    - Driver License (image)
+    - Vehicle Registration Documents
+  - For New York (US-NY) drivers:
+    - Profile Photo
+    - DMV License (image)
+    - TLC License (image)
+    - Vehicle Registration Documents
+- Last Updated: last document updated/modified timestamp
+
+4.3 Row actions (Drivers tab)
+- "Review" button:
+  - Opens a side panel or modal with detailed view of all documents for that driver:
+    - Basic identity info (name, country, etc.)
+    - Thumbnails or links for all uploaded documents (profile photo, licenses, NID, registration docs, etc.)
+    - For sensitive docs (NID), show masked preview or “Click to view” with secure loading.
+  - The panel should show:
+    - Current KYC status
+    - Current document review status
+    - Admin notes (if such field exists; if not, DO NOT add new schema).
+
+- "Approve" button:
+  - Sets the appropriate document review status to Approved.
+  - If appropriate and consistent with existing flows, also updates KYC status to Verified (only if all required docs for that country are present).
+  - Must reuse existing mutation endpoints for updating KYC/document status, or add new, minimal endpoints WITHOUT changing schema.
+
+- "Reject" button:
+  - Sets the document review status to Rejected and, if appropriate, KYC status to Rejected.
+  - If there is an existing field for reason/notes, reuse it. If not present, keep this simple (status only) to avoid schema changes.
+
+5. Customers Tab – Document Table
+
+5.1 Data source
+- Use existing customer + Bangladesh identity/KYC models and uploaded NID documents from earlier steps.
+- NO schema changes.
+
+5.2 Table columns (Customers tab)
+- Email
+- Country
+- KYC Status
+- Document Status
+- Required BD fields (if customer is Bangladesh):
+  - Full Name
+  - Father’s Name
+  - Phone
+  - Village
+  - Post Office
+  - Thana
+  - District
+  - NID (must be present – non-optional in BD)
+- For non-BD countries (e.g., US customers), if there are no identity documents, just show a simple “No documents” indicator.
+- Last Updated
+
+5.3 Row actions (Customers tab)
+- "Review" button:
+  - Opens a panel/modal showing all identity fields and NID document (with secure viewing).
+- "Approve" / "Reject" buttons:
+  - Same behavior as Drivers: update document review + KYC status using existing flows.
+
+6. Restaurants Tab – Document Table
+
+6.1 Data source
+- Use existing restaurant owner / restaurant KYC models and any documents that are already stored (business license, trade license, tax ID, etc.) from earlier steps.
+- NO schema changes.
+
+6.2 Table columns (Restaurants tab)
+- Restaurant Name
+- Owner Email
+- Country
+- KYC Status
+- Document Status
+- Key Documents (short summary string like “Business License, Tax ID” based on what exists)
+- Last Updated
+
+6.3 Row actions
+- "Review" button:
+  - Show uploaded business documents clearly (license, tax ID, etc.)
+- "Approve" / "Reject" buttons:
+  - Same pattern as drivers/customers, reusing existing status fields.
+
+7. Navigation Integration
+
+- Add a link to the Document Center page in at least one of these places:
+  - Management section on /admin (card already defined above).
+  - Optionally, a link in the left sidebar or header navigation if such a pattern already exists.
+- Do NOT remove or rename existing management cards (KYC Approvals, Driver Management, Customer Management, Complaints, Wallet Settlement, etc.).
+- Document Center is an additional, focused tool for reviewing files, not a replacement for existing pages.
+
+8. Non-Breaking Constraints (Very Important)
+
+- Absolutely NO schema migrations or table changes.
+- No renaming of existing fields.
+- No change to KYC signup flows for drivers/customers/restaurants.
+- All new backend work should be:
+  - New read-only queries for listing documents.
+  - Minimal update endpoints for changing document/KYC statuses, reusing existing logic where possible.
+- All frontend additions must be new components/pages or minor integrations. Do not modify existing flows in a way that could break them.
+
+9. Security Requirements
+
+- RBAC:
+  - The entire /admin/documents route and all related API endpoints must be admin-only.
+  - Reuse existing admin auth/ProtectedRoute patterns.
+
+- Data Protection:
+  - Do NOT expose raw storage URLs directly in the frontend if they bypass permission checks.
+  - If you use signed URLs or secured endpoints for document viewing, make sure they are short-lived and checked against admin auth.
+  - Never log sensitive document URLs or raw NID values in server logs.
+
+- Privacy:
+  - Where possible, show masked versions (e.g., partially blurred or masked NID number) until the admin explicitly clicks “View”.
+  - Ensure there is no way for a non-admin (driver/customer/restaurant) to access the Document Center or its APIs.
+
+- Integrity:
+  - Changes to document status and KYC status must be auditable using the existing logging/audit patterns. If there is an audit log mechanism, reuse it. If not, at minimum, ensure no existing logs are removed.
+
+10. E2E Testing Checklist
+
+Please verify the following before considering Step 30 complete:
+
+1) Navigation:
+   - Document Center card is visible in admin dashboard and navigates to /admin/documents.
+   - Tabs for Drivers, Customers, Restaurants work and preserve filters.
+
+2) Filters:
+   - Country, status, and search filters work on all three tabs.
+   - URL reflects filter state where appropriate, similar to /admin/drivers.
+
+3) Drivers:
+   - BD driver with all required docs appears in list, can be reviewed, approved, and status updates correctly.
+   - US non-NY driver flows are intact.
+   - US NY driver shows required DMV + TLC fields in the review panel.
+   - No regressions on existing /admin/drivers page.
+
+4) Customers:
+   - Bangladeshi customer with NID appears correctly.
+   - Approve/Reject flows update KYC/document statuses without errors.
+
+5) Restaurants:
+   - Restaurant with uploaded business docs appears and can be reviewed.
+   - Status updates correctly.
+
+6) Security:
+   - Accessing /admin/documents or its APIs as a non-admin is blocked.
+   - No sensitive URLs or NID values leak in logs.
+   - Existing security & encryption logic for NID and documents remains intact.
+
+If anything would require a schema change or might break earlier steps (26–29), STOP and instead propose a minimal alternative that stays fully backward compatible.

@@ -1,0 +1,78 @@
+You are working on the SafeGo global super-app (rides + food + parcel) on Replit.
+
+Context:
+- The Admin Dashboard shows a correct customer count (e.g., 22 Customers).
+- The “Customer Management” page at `/admin/customers` loads, but the list is empty and shows: “No customers found matching your filters.”
+- Filters are in their default state: empty email search, status = “All Statuses”.
+- Driver and Restaurant management lists are already working correctly and must not be broken.
+
+Goal:
+Fix the admin Customer Management system so that:
+1) The customer list page loads all customers by default (matching the count shown on the dashboard).
+2) Filters (email search + status filter: Pending, Verified, Suspended, Blocked) work exactly like the driver/restaurant management filters.
+3) The implementation follows the same patterns already used for Driver and Restaurant management, with no breaking changes.
+
+Detailed requirements:
+
+1. Backend – Customer list endpoint
+- Locate the backend API used by the admin Customer Management page (likely something like `/api/admin/customers`).
+- Ensure that:
+  - It returns all customer accounts by default when no filters are provided.
+  - It correctly scopes by user role = “customer” (do not mix with drivers/restaurants).
+  - It supports filtering by:
+    • Email substring (case-insensitive).
+    • Status: pending, verified, suspended, blocked (or whatever states are defined in the schema).
+  - It supports pagination in the same way as driver/restaurant lists (page, pageSize, totalCount), but default behaviour should still return visible results when filters are empty.
+- Avoid over-restrictive `where` conditions that result in zero rows (for example, wrong role filter, wrong status filter, or country mismatch).
+- Keep all admin-only protections AND do not expose any unsafe fields (e.g., passwords, sensitive secrets).
+
+2. Frontend – Customer Management page
+- File(s) mentioned in the last work: 
+  - `client/src/pages/admin/customers.tsx`
+  - `client/src/pages/admin/customer-details.tsx`
+- Make the customer list behave like the driver management list:
+  - On initial page load, call the customer list API with default filters (no email, status=ALL).
+  - Display rows for each customer in the returned dataset.
+  - Keep the existing filter UI, but wire it correctly to the endpoint parameters (email / status / pagination).
+  - Make sure “All Statuses” truly does not filter anything out.
+- When a row is clicked:
+  - Navigate to the existing customer details page.
+  - Show core information: email, country, KYC status, account status, recent activity summary (reuse whatever data is already available from the backend).
+- Ensure the list automatically refreshes when filters or pagination change, using the same pattern as driver and restaurant pages (TanStack Query, etc.).
+
+3. Security phase to apply
+- Apply our SafeGo Security Roadmap Phase: “Access Control & Data Scoping”.
+- Requirements:
+  - Keep admin-only access enforcement on all new/updated routes (ProtectedRoute on frontend, role-based checks on backend).
+  - Do NOT expose passwords or sensitive PII beyond what is already visible in existing admin views.
+  - Keep all changes read-only for customers (no destructive actions added in this task).
+
+4. Non-breaking and consistency requirements
+- Do NOT modify existing driver or restaurant management behaviour.
+- Do NOT change public (non-admin) customer flows (signup, login, KYC, ride/food/parcel flows).
+- Follow the same patterns and coding style already used for:
+  - Driver Management list/details
+  - Restaurant Management list/details
+- If there is any shared helper for building queries (status filters, pagination), extend it instead of duplicating logic.
+
+5. Testing and verification
+- Add or update tests (or at least logged manual test notes) confirming:
+  - Admin login → Admin Dashboard shows a non-zero “Customers” count.
+  - Clicking the Customers card opens `/admin/customers` and now shows the list of customers (not empty) with correct pagination.
+  - Email search works (partial match).
+  - Status filter works for at least two conditions (e.g., Pending vs Verified).
+  - No errors in browser console or server logs.
+- Re-run the end-to-end tests for:
+  - New customer registration.
+  - Admin KYC approval.
+  - Customer status changes reflected correctly in the admin Customer Management list.
+
+6. Documentation
+- Update `replit.md`:
+  - Briefly document the admin Customer Management API (endpoint, filters, pagination).
+  - Note that this change is non-breaking and keeps all admin security protections.
+
+When finished, summarize:
+- What was wrong with the previous query or filter logic.
+- What exact changes you made (files + main functions).
+- How the new Customer Management list behaves now.

@@ -1,0 +1,68 @@
+You are the SafeGo Enterprise Admin Architect.
+Continue Phase-4 admin development exactly in this order.
+Do not ask questions. Do not give options. Execute each task fully and verify with logs, UI, backend, and database before moving to the next task.
+
+========================================
+PHASE-4 ADMIN TASKS (1–10)
+========================================
+
+1. Complaint Resolution Center (Full CRUD + Intelligence)
+   - Implement complaint triage panel (status, severity, category, SLA timer)
+   - Add audit logging for every action
+   - Add AI-assisted summary + recommended resolution
+   - Add filter/search/sort
+   - Ensure PATCH mutations use correct backend fields
+
+2. Refund Center (Rules + Workflow)
+   - Add refund eligibility engine
+   - Add fraud-risk scoring per refund
+   - Add refund approval workflow with roles (Agent > Supervisor > Admin)
+   - Add CSV export + audit trail
+
+3. Legal Requests Center
+   - Add official request intake (law enforcement, subpoena, info requests)
+   - Add secure evidence upload bucket (signed URLs)
+   - Add redaction pipeline for PII
+   - Add access-restricted view using RBACv2
+
+4. Incident Response Hub (Safety + Risk)
+   - Add triage actions: assignTo, severity, status transitions
+   - Add timeline view (event history)
+   - Add environment-aware notifications
+   - Ensure all operations write tamper-proof audit chain hashes
+
+5. Driver Violation Management
+   - Add violation intake, scoring, penalty rules
+   - Add automated consequences (warning, suspension, ban)
+   - Add appeal workflow
+   - Add cross-link to Safety Events + Intelligence Dashboard
+
+6. Customer Trust & Safety Review Board
+   - Add case review queue
+   - Add committee decision recording
+   - Add decision letter generator (English + Bangla templates)
+   - Add AI-assisted decision explanation
+
+7. Policy Enforcement Engine
+   - Add configurable policy rules for rides/eats/tickets/shop
+   - Add enforcement logs
+   - Add policy versioning + rollout flags
+   - Link with Feature Flags v3 environment rules
+
+8. Admin Communication Inbox
+   - Add internal messages + broadcast notices
+   - Add role-scoped delivery
+   - Add read/unread sync using WebSockets
+   - Add announcement composer with attachments
+
+9. Global Export Center
+   - Add exports for Complaints, Refunds, Incidents, Legal Requests
+   - Add PDF/CSV/JSON secure export endpoints
+   - Add hash-verified checksum for export authenticity
+   - Add download history per admin
+
+10. Admin Activity Monitor (Real-Time)
+   - Add real-time view of admin actions
+   - Add IP, device, geo flags
+   - Add anomaly detection (suspicious access)
+   - Add automatic risk alerts to Super Admin

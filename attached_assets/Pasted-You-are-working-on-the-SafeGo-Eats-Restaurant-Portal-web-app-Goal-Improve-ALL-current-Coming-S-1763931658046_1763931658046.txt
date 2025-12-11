@@ -1,0 +1,159 @@
+You are working on the SafeGo Eats Restaurant Portal (web app).
+
+Goal: Improve ALL current “Coming Soon” placeholder pages for restaurants, WITHOUT breaking any routes, back-end logic, or future implementation plans.
+
+Scope – Restaurant portal placeholder pages:
+- Orders → Scheduled Orders: /restaurant/orders/scheduled
+- Promotions → Featured Items: /restaurant/promotions/featured
+- Ratings & Reviews → Complaints / Issues: /restaurant/reviews/complaints
+- Store Settings → Store Profile: /restaurant/settings/profile
+- Store Settings → Staff & Roles: /restaurant/settings/staff
+- Store Settings → Devices & Printers: /restaurant/settings/devices
+- Documents & Compliance → Business Documents: /restaurant/documents/business
+- Documents & Compliance → Health & Safety: /restaurant/documents/health
+- Documents & Compliance → KYC / Verification: /restaurant/documents/kyc
+- Support → Help Center: /restaurant/support/help
+- Plus any other restaurant routes that currently show the generic “Coming Soon” block with a small info icon and paragraph.
+
+High-level requirements:
+1. DO NOT remove or change any route, layout shell, or navigation entry. These are reserved for future phases.
+2. Keep these pages as placeholders (no real business logic, no forms, no API calls), but make the UI professional and consistent.
+3. Respect existing SafeGo global rules:
+   - KYC & RBAC security model
+   - No exposure of sensitive data
+   - No fake functionality that could confuse real users
+4. The implementation must be fully additive and non-breaking.
+
+Design: unified “Feature Coming Soon” layout
+Create a reusable component, for example:
+- `FeaturePlaceholderLayout` (or similar name) under a shared components folder already used in the restaurant client.
+Responsibilities:
+- Take props like:
+  - `title`
+  - `subtitle`
+  - `icon` (optional, using existing icon set if available)
+  - `plannedCapabilities` (string list)
+  - `statusTag` (e.g. "Planned", "In design", "Future release")
+  - `infoNote` (small muted text)
+- Render a clean, centered layout with:
+  - Main title (page feature name)
+  - Short subtitle (1–2 sentences, no more)
+  - A status pill (e.g. “Planned – Not yet available”) in a subtle style
+  - Optional icon in a circle/soft card
+  - A bulleted list “What you’ll be able to do here” using `plannedCapabilities`
+  - A secondary note explaining that the feature will be enabled in a later phase and navigation is already wired
+  - A small “Back to Dashboard” button/link using the existing button styles and routing helpers
+
+Apply the unified placeholder to each target page:
+For every page listed in the Scope, replace the current raw “This is a placeholder / Coming Soon” block with the new `FeaturePlaceholderLayout`, using appropriate copy. Example guidelines:
+
+1) Scheduled Orders
+- title: "Scheduled Orders"
+- subtitle: "Manage orders that customers schedule for future delivery or pickup."
+- plannedCapabilities:
+  - "View upcoming scheduled orders and time windows"
+  - "Modify preparation and pickup times"
+  - "Pause or resume accepting scheduled orders"
+- statusTag: "Planned feature"
+- infoNote: Mention that scheduled order routing is already configured for a future release.
+
+2) Featured Items
+- title: "Featured Items"
+- subtitle: "Highlight special menu items to increase visibility and sales."
+- plannedCapabilities:
+  - "Pin signature dishes to the top of your menu"
+  - "Run time-limited spotlights on items"
+  - "Track performance of featured items"
+- statusTag: "In planning"
+- infoNote: Similar small note about future rollout.
+
+3) Complaints / Issues
+- title: "Complaints & Issues"
+- subtitle: "Central place to review and respond to customer complaints."
+- plannedCapabilities:
+  - "View complaints linked to specific orders"
+  - "Respond with suggested resolutions"
+  - "Escalate issues to SafeGo support when needed"
+- statusTag: "Future release"
+
+4) Store Profile
+- title: "Store Profile"
+- subtitle: "Manage your restaurant identity, branding, and public details."
+- plannedCapabilities:
+  - "Update restaurant name, description, and categories"
+  - "Configure branding elements and photos"
+  - "Control what customers see in the SafeGo Eats app"
+
+5) Staff & Roles
+- title: "Staff & Roles"
+- subtitle: "Manage staff accounts and permissions for your restaurant."
+- plannedCapabilities:
+  - "Invite staff and assign roles"
+  - "Control who can manage orders, menus, and payouts"
+  - "Audit key staff actions for security"
+
+6) Devices & Printers
+- title: "Devices & Printers"
+- subtitle: "Connect tablets and receipt printers used in your restaurant."
+- plannedCapabilities:
+  - "Register front-of-house and kitchen devices"
+  - "Configure receipt printer settings"
+  - "Monitor online/offline device status"
+
+7) Business Documents
+- title: "Business Documents"
+- subtitle: "Upload and manage your business licenses and permits."
+- plannedCapabilities:
+  - "Store scanned licenses and certificates"
+  - "Track expiry dates and compliance reminders"
+  - "Share documents securely with SafeGo support"
+
+8) Health & Safety
+- title: "Health & Safety"
+- subtitle: "Manage health certificates and safety compliance."
+- plannedCapabilities:
+  - "Upload health inspection documents"
+  - "Track safety certifications and expiry"
+  - "Provide proof of compliance to delivery partners"
+
+9) KYC / Verification
+- title: "KYC / Verification"
+- subtitle: "Complete identity and business verification for your restaurant."
+- plannedCapabilities:
+  - "Submit country-specific documents (Bangladesh NID/passport, US EIN/SSN, etc.)"
+  - "Track verification status and required actions"
+  - "Protect your account with stronger identity checks"
+- IMPORTANT: Do NOT implement upload forms or actual verification flows here yet. This remains a visual placeholder only.
+
+10) Help Center
+- title: "Help Center"
+- subtitle: "Find answers to common questions about using SafeGo Eats."
+- plannedCapabilities:
+  - "Browse frequently asked questions"
+  - "Learn how to manage orders, menus, and payouts"
+  - "Get tips to improve your restaurant performance"
+
+Responsiveness:
+- Ensure `FeaturePlaceholderLayout` works well on:
+  - Large desktop (current layout)
+  - Small laptop
+  - Tablet
+  - Mobile viewports
+- Use the existing design system: typography scales, spacing, and card components already used on other restaurant pages.
+- Avoid horizontal scrolling: content should stack vertically and center nicely on narrow screens.
+
+Security & UX constraints:
+- No dummy forms, no fake buttons that look “active”.
+- Only simple informational UI and safe navigation (e.g. back to dashboard).
+- Do not expose any internal IDs or implementation details beyond what is already shown in the layout shell.
+
+Non-breaking requirement:
+- After changes, all previous phases (1–12) must remain fully functional.
+- No changes to APIs, Prisma models, or back-end logic.
+- Only additive frontend refactor/cleanup for the placeholder content.
+
+Finally:
+- Update any relevant documentation file (e.g. replit.md) to:
+  - List which placeholder pages now use `FeaturePlaceholderLayout`
+  - Confirm this is a purely presentational enhancement, safe for production.
+- Run the app, navigate through each of the updated pages in restaurant mode, and verify there are no runtime errors or route issues.

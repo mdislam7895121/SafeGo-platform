@@ -1,0 +1,107 @@
+Before moving to any new feature, you must now run a complete SafeGo-wide validation of the Profile Picture System.
+
+This validation must follow SafeGo Master Rules, Security Rules, Role Isolation, and Non-Breaking Architecture rules. No step can be skipped.
+
+====================================================
+PHASE 1 — API VALIDATION
+====================================================
+Test the following for ALL 4 roles (Customer, Driver, Restaurant Partner, Admin):
+
+1. Upload photo endpoint:
+   - Accepts valid JPG/PNG/WEBP under 5MB
+   - Rejects invalid formats
+   - Rejects oversized files
+   - Stores optimized image (512x512)
+   - Stores thumbnail (128x128)
+   - Updates database correctly
+   - Returns correct URLs
+   - Does not affect KYC fields
+   - Rejects unauthorized updates to other accounts
+
+2. Delete photo endpoint:
+   - Only deletes own photo
+   - Clears DB fields
+   - Logs audit event
+
+3. Permissions:
+   - Customer cannot modify driver images
+   - Driver cannot modify customer images
+   - Restaurant cannot modify other restaurants
+   - Admin cannot override users without explicit admin permission logic
+
+====================================================
+PHASE 2 — FRONTEND VALIDATION
+====================================================
+Test each app section on desktop + mobile:
+
+1. Customer App:
+   - Upload new photo
+   - Change photo
+   - Delete photo
+   - Thumbnail visible everywhere
+   - No broken layouts
+
+2. Driver Dashboard:
+   - Upload/change/delete working
+   - Thumbnail in header & sidebar loads correctly
+
+3. Restaurant Partner Dashboard:
+   - Full photo workflow working
+   - No layout break
+   - Correct default fallback avatar
+
+4. Admin Panel:
+   - Admin can ONLY update own photo
+   - Cannot modify customers, drivers, restaurants
+   - No KYC images displayed
+
+====================================================
+PHASE 3 — SECURITY VALIDATION
+====================================================
+Run security checks:
+
+1. User cannot bypass role isolation
+2. No forced file upload bypass
+3. No unvalidated file types accepted
+4. URLs are sanitized
+5. No KYC exposure
+6. No route leakage
+7. No console errors
+8. No direct storage bucket exposure
+
+====================================================
+PHASE 4 — DATABASE VALIDATION
+====================================================
+Verify:
+
+- No existing fields were modified or renamed
+- No collections broken
+- No migration corrupted data
+- Rides / Food Orders / Deliveries unaffected
+- KYC untouched
+- Commission rules unaffected
+
+====================================================
+PHASE 5 — PRODUCER TEST
+====================================================
+Simulate:
+
+- Low bandwidth upload
+- Offline recover
+- Retry logic
+- Large photo rejection path
+- Slow image optimization
+
+====================================================
+PHASE 6 — FINAL REPORT
+====================================================
+Provide a full validation report including:
+
+- All tests passed or failed
+- Any unexpected behavior
+- Fixes applied (if needed)
+- Assurance of non-breaking changes
+- Confirmation that the system is PRODUCTION READY
+
+Only after all tests pass CLEANLY should you confirm:
+“Profile Picture System — FULLY VALIDATED”

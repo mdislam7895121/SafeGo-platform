@@ -1,0 +1,205 @@
+SAFEGO GLOBAL CONSTRAINTS – DO NOT BREAK
+
+- Do NOT change any of the four roles or their permissions: Customer, Driver, Restaurant (Merchant), Admin.
+- Do NOT change country-specific KYC and profile rules:
+  - BD: father_name, date_of_birth, present_address, permanent_address, NID (number + images), emergency contact, verification_status, is_verified.
+  - US: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, drivers: license + image + expiry (+ optional ssn_last4), verification_status, is_verified.
+- Do NOT rename or delete any existing database collections or fields for:
+  - rides, food_orders, deliveries
+  - wallets, commissions, payouts, balances
+- Do NOT break commission rules:
+  - Cash rides → driver keeps cash, SafeGo commission becomes negative driver_wallet_balance.
+  - Cash food orders → restaurant keeps cash, commission becomes negative restaurant_wallet_balance.
+  - Online payment → SafeGo keeps commission automatically.
+  - Admin can settle and mark negative balances as paid.
+- Do NOT weaken security rules:
+  - Customers cannot see driver documents.
+  - Drivers cannot see customer NID or sensitive info.
+  - Restaurants cannot see each other’s data.
+  - Only Admin can change pricing, commissions, verification, blocking.
+  - Users can only update their own profile.
+- Do NOT break status flows:
+  - rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+  - food_orders: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+  - deliveries: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+- Do NOT change existing APIs or routes; only add missing navigation controls and fix broken links in a backward-compatible way.
+
+TASK: FULL ADMIN DASHBOARD NAVIGATION & BACK-BUTTON AUDIT
+
+Goal: Make the entire SafeGo Admin Console feel professional and complete by:
+- ensuring every sub-page has a clear way to go back,
+- fixing any button/link that does nothing or shows 404,
+- keeping the existing glow-card design and layout.
+
+Work ONLY on the Admin Panel frontend (React/Next/etc.), not on backend logic.
+
+====================================================
+1) GLOBAL NAVIGATION PATTERN
+====================================================
+
+Implement a consistent navigation pattern across ALL admin sections:
+
+- For every sub-page (anything that is not the main `/admin` dashboard), add:
+  - A top-left Back button:
+      - icon: left arrow
+      - label: “Back to [Parent Section]”
+  - OR a breadcrumb:
+      - e.g., Dashboard / Restaurants / Restaurant Details
+- The Back button should:
+  - first try `router.back()` (history),
+  - or fall back to the appropriate parent route:
+      - Promotions Center → `/admin/promotions`
+      - Create Promotion → `/admin/promotions`
+      - Restaurant Management → `/admin/restaurants`
+      - Add Restaurant → `/admin/restaurants`
+      - Driver Management → `/admin/drivers`
+      - Add Driver → `/admin/drivers`
+      - User Management → `/admin/users`
+      - Wallets → `/admin/wallets`
+      - Payouts → `/admin/payouts`
+      - KYC Approvals → `/admin/kyc-approvals`
+      - Safety & Risk Center → `/admin/safety`
+      - Document Center → `/admin/documents`
+      - People & KYC Center → `/admin/people-kyc`
+      - Promotions Center → `/admin/promotions`
+      - Parcels → `/admin/parcels`
+      - Any ride/food/delivery detail page → its respective list page.
+
+Make sure the Back control is:
+- visible on laptop and tablet widths,
+- aligned with the page title (same header row).
+
+====================================================
+2) FULL CLICK-ACTION & LINK AUDIT
+====================================================
+
+Go through the Admin Dashboard and test EVERY interactive element:
+
+Sections to cover at minimum:
+- Main Dashboard:
+  - Real-Time Analytics cards
+  - Quick Actions (Add Driver, Add Restaurant, Create Promotion, Adjust Pricing)
+  - Platform Overview cards
+  - Management cards (Onboarding Overview, Notification Center, People & KYC Center, Safety & Risk Center, KYC Approvals, Document Center)
+- Users / People & KYC:
+  - Users list, filters, row actions (view, edit, block/unblock)
+- Drivers:
+  - Drivers list, Pending KYC, Suspended, Blocked, details pages
+- Restaurants:
+  - Restaurant Management (list, filters, Columns button, details, edit)
+  - Add Restaurant flow
+- Parcels:
+  - Parcel Delivery Statistics, parcel list, parcel detail pages
+- Rides / Orders:
+  - rides, food_orders, deliveries lists and detail pages (if present)
+- Promotions:
+  - Promotions Center
+  - Promotion Types (Driver Promotions, Ride Promotions, Referral Bonuses, Opportunity Bonuses)
+  - Quick Stats cards
+  - Create Promotion page
+- Wallets & Payouts:
+  - Wallets, Payouts, negative balance views
+- KYC & Safety:
+  - Onboarding Overview
+  - KYC Approvals
+  - Safety & Risk Center
+  - Document Center
+- Notification Center
+- Any “Profile” or “Settings” pages for Admin.
+
+For each button/link/icon:
+- If it should open a page and instead:
+  - does nothing, or
+  - shows 404 “Page Not Found”,
+  then:
+    - either wire it to the correct existing route, OR
+    - create a minimal placeholder page (with the correct header + Back button + stub content) if that page is required but not yet implemented.
+
+- If an action is not ready for this phase:
+  - disable the button (with a tooltip “Coming soon”) instead of leaving a dead or broken link.
+
+Examples to explicitly verify/fix:
+- Quick Action “Create Promotion” → must go to `/admin/promotions?action=create` or proper create page (no 404).
+- Add Driver, Add Restaurant → must go to working onboarding forms.
+- Management cards → must open their respective sections (no dead clicks).
+- Any “View details” row actions → must open a detail view or be clearly disabled.
+
+====================================================
+3) BACK BUTTON PLACEMENT RULES (BY MODULE)
+====================================================
+
+For each detail / inner page, add specific Back behavior:
+
+- Restaurant detail / edit pages:
+  - Back → to `/admin/restaurants` (keeping current filters if possible).
+
+- Driver detail / edit pages:
+  - Back → to `/admin/drivers`.
+
+- User detail pages:
+  - Back → to `/admin/users`.
+
+- Individual ride / food_order / delivery detail:
+  - Back → to respective list (rides / food_orders / deliveries).
+
+- Promotion detail / edit:
+  - Back → Promotions Center.
+
+- Wallet or payout detail:
+  - Back → Wallets / Payouts list respectively.
+
+- KYC request detail:
+  - Back → KYC Approvals list.
+
+- Safety / risk case detail:
+  - Back → Safety & Risk Center.
+
+Each of these pages should show:
+- Page title,
+- Optional breadcrumb,
+- Left-aligned Back button in the header row.
+
+====================================================
+4) CONSISTENCY & VISUAL RULES
+====================================================
+
+- Back button design:
+  - Use the same icon, size, and text style on all pages.
+  - Place it in the same relative position in the header on every inner page.
+
+- Keep the existing glow-card design and spacing:
+  - Do NOT remove glow effects.
+  - Ensure new Back button and breadcrumbs visually match the existing design system.
+
+- Do NOT create duplicate routes:
+  - Reuse the existing admin routes where they already exist.
+  - Only register new routes when needed to remove 404s.
+
+====================================================
+5) TESTING SCENARIOS
+====================================================
+
+After implementing:
+
+1. From main Admin Dashboard:
+   - Click into each Management card → verify:
+     - target page loads,
+     - Back button appears,
+     - Back returns to the Dashboard or parent listing correctly.
+
+2. From each list page:
+   - Open a detail/edit view → use Back → confirm it returns to the same list page (ideally same filters).
+
+3. Quick Actions:
+   - Click each Quick Action → verify the page opens and has Back navigation.
+
+4. Promotions Center:
+   - Verify all Promotion Type cards are clickable where expected.
+   - Verify Quick Stats cards behave correctly (if clickable) or are visually static.
+   - Click Create Promotion → no 404, Back works.
+
+5. Any remaining link that opens a 404 or does nothing:
+   - Fix it or clearly disable it with a tooltip.
+
+Goal:
+The SafeGo Admin Dashboard should feel complete and professional: every page reachable from the dashboard must also make it easy to go back, and no visible button or card should be dead or broken.

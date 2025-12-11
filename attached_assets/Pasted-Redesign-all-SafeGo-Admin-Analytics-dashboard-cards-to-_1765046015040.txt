@@ -1,0 +1,142 @@
+Redesign all SafeGo Admin Analytics dashboard cards to a clean, modern, Uber-level enterprise UI.
+Apply all rules consistently across ALL cards. Do not skip any rule.
+
+========================================================
+1. CARD STRUCTURE & LAYOUT (UNIVERSAL RULES)
+========================================================
+- Background: #FFFFFF
+- Padding: 24px uniform (top/bottom/left/right)
+- Border-radius: 14px
+- Shadow: rgba(0,0,0,0.04) 0px 4px 16px
+- All cards must have IDENTICAL height.
+- Follow strict 8px spacing grid for inside elements.
+
+========================================================
+2. TYPOGRAPHY SYSTEM (MUST BE CONSISTENT)
+========================================================
+Label (top-left):
+- Font-size: 14px
+- Font-weight: 500
+- Color: #6B7280
+
+Main Number:
+- Font-size: 32px
+- Font-weight: 600
+- Color: #111827
+
+Change Indicator (bottom-left):
+- Font-size: 12px
+- Font-weight: 400
+- Colors:
+    Positive → #22C55E
+    Negative → #EF4444
+    Neutral → #9CA3AF
+- Icons must match the direction (↑ positive, ↓ negative)
+
+========================================================
+3. ICON DESIGN (WATERMARK STYLE)
+========================================================
+- Place soft icon in top-right of card.
+- Icon size: 36–40px
+- Opacity: 10–12%
+- Icon must never distract; only decorative watermark.
+
+========================================================
+4. VISUAL HIERARCHY RULES
+========================================================
+- Label always top-left.
+- Big number vertically centered (with equal breathing space).
+- Change indicator always bottom-left.
+- No elements may float to random positions.
+- Alignment MUST be pixel-perfect across all cards.
+
+========================================================
+5. COLOR STRATEGY (MINIMAL & PREMIUM)
+========================================================
+Use a very limited palette:
+- White (#FFFFFF)
+- Dark gray (#111827)
+- Muted gray (#6B7280)
+- Accent green (#22C55E)
+- Accent red (#EF4444)
+- Neutral gray (#9CA3AF)
+
+Do not use random colors anywhere.
+
+========================================================
+6. LOGIC FIXES FOR DATA ACCURACY
+========================================================
+- Failure Rate cannot be negative. If total=0 → failure=0%.
+- Growth cannot be negative unless actual decrease happened.
+- Active rides = statuses [accepted, driver_arriving, in_progress]
+- Total orders = rides + food_orders + deliveries
+- Realtime metrics must update smoothly.
+
+========================================================
+7. ANIMATION RULES (PREMIUM FEEL)
+========================================================
+- Use smooth number-counter animation (200–300ms)
+- Ease-out transitions, no sudden jumps.
+- Hover effect:
+   scale(1.01) + shadow: rgba(0,0,0,0.06)
+
+========================================================
+8. REALTIME CONNECTION INDICATOR FIX
+========================================================
+Replace the large yellow banner with:
+- Small badge, top-right aligned
+- Background: #FEF3C7
+- Text: #92400E
+- Padding: 6px 12px
+- Border-radius: 6px
+- Must NOT shift layout or push cards downward.
+
+========================================================
+9. RESPONSIVE DESIGN RULES
+========================================================
+Desktop:
+- 4 or 5 column layout
+Tablet:
+- 3 column
+Mobile:
+- 2 column
+- Maintain equal spacing and proportions.
+
+Cards must never break, overflow, or misalign.
+
+========================================================
+10. PERFORMANCE REQUIREMENTS
+========================================================
+- Do not recalculate metrics every render.
+- Cache for 5 seconds.
+- Use optimized state updates.
+- No flicker or layout jumps allowed.
+
+========================================================
+11. FINAL VISUAL TARGET
+========================================================
+The final cards must visually match:
+- Uber Fleet Dashboard
+- DoorDash Merchant Analytics
+- Bolt Admin Console
+- Airbnb Host Dashboard styling
+
+Clean, minimal, aligned, premium.
+
+========================================================
+12. TESTING REQUIREMENTS
+========================================================
+Test with:
+- Zero data
+- Heavy data
+- Slow internet
+- Disconnected state
+- Reconnection state
+- Mobile + Desktop breakpoints
+
+Fix any visual/logic issue.
+
+========================================================
+GOAL:
+Deliver a pixel-perfect, production-ready, enterprise-grade analytics card system for SafeGo Admin Dashboard with consistent spacing, typography, shadow, radius, color logic, and animations.
+========================================================

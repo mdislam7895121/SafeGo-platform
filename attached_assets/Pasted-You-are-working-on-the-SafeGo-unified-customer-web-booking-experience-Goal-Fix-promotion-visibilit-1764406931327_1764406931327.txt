@@ -1,0 +1,153 @@
+You are working on the SafeGo unified customer web booking experience.
+
+Goal
+Fix promotion visibility on the NEW unified desktop booking page at /customer (and /customer/unified-booking if that route is used). The current layout and pricing work fine, but the active promo is not visible on the ride cards even though the promo engine and discounts are applied internally.
+
+STRICT RULES
+- Do NOT change any business logic:
+  - No changes to fare calculation, commission, tips, taxes, fees.
+  - No changes to promo rules, eligibility, or discount math.
+  - No changes to dispatch, routing, driver matching, or payment flows.
+- Only update UI / data binding so that existing promo data is clearly shown.
+- Keep the current desktop layout exactly as it is (header, 3-tab service switcher, map on the right, ride list on the left).
+
+STEP 1 – Find the unified desktop booking page
+1. Locate the React (or Next/Remix) component used for the desktop customer booking page:
+   - This is the page that shows:
+     - SafeGo logo + top navigation (Ride / Eats / Parcel).
+     - Address capsule with “188 Sutter Ave → Connecticut” and route summary (“94.9 mi • 1h 44m • 3 routes”).
+     - “Choose a ride” list with cards like:
+       - SafeGo X
+       - SafeGo Comfort
+       - SafeGo Comfort XL
+       - SafeGo XL
+       - SafeGo Black
+     - Map on the right.
+   - Typical component names might be similar to:
+     - `CustomerHome`, `CustomerBookingPage`, `UnifiedBookingPage`, `CustomerRideLayout`, etc.
+2. Identify the child component that renders each ride option card:
+   - For example: `RideOptionCard`, `VehicleCard`, `RideChoiceCard`, or similar.
+   - Confirm that this card receives pricing props (current price, base price, etc.).
+
+STEP 2 – Confirm what promo data is available
+1. Search the codebase for the promo state used in the unified booking flow:
+   - Look for variables and hooks such as:
+     - `promo`, `appliedPromo`, `activePromo`, `pricingContext.promo`, `discount`, `savings`, `promotion`, `everydaySaver`, etc.
+2. In the unified booking page component, log the promo-related data to the console (temporarily) to confirm:
+   - Whether an active promo object exists when the user has a discount.
+   - Whether you have both:
+     - original (undiscounted) price, and
+     - final (discounted) price.
+3. IMPORTANT: Do NOT change any calculation. Just confirm:
+   - `originalPrice` (before discount).
+   - `finalPrice` (after discount).
+   - `savings = originalPrice - finalPrice`.
+   - `promoName` (e.g. “SafeGo Everyday Saver”, “15% off your ride”).
+
+STEP 3 – Pass promo data into the ride cards
+1. In the unified booking page container, extend the props passed into each ride card so that every card receives:
+   - `originalPrice` (number or money object).
+   - `finalPrice` (number or money object).
+   - `savingsAmount` (number).
+   - `hasDiscount` (boolean).
+   - `promoName` (string, can be undefined if no promo applies).
+2. The rule:
+   - If the ride has no discount, pass:
+     - `originalPrice = finalPrice`
+     - `savingsAmount = 0`
+     - `hasDiscount = false`
+     - `promoName = undefined`
+   - If the ride has a discount, pass:
+     - `originalPrice` = price before discount.
+     - `finalPrice` = actual charged price.
+     - `savingsAmount` = `originalPrice - finalPrice` (absolute value).
+     - `hasDiscount = true`
+     - `promoName` = the active promo label (e.g. “SafeGo Everyday Saver”).
+
+Do NOT change how prices are computed. Use whatever values the pricing engine already provides.
+
+STEP 4 – Global promo banner above “Choose a ride”
+1. In the unified booking page UI, above the “Choose a ride” title (or directly below the address capsule), add a single global promo banner that only renders when there is any active promo on the page.
+2. Design:
+   - Full-width pill/card with light green background:
+     - background: `#ECFDF3`
+     - border-radius: `9999px` (pill).
+     - padding: `8px 16px`.
+   - Left side: green lightning icon (you can reuse existing promo icon if one exists).
+   - Text:
+     - Primary: promo name, e.g. “SafeGo Everyday Saver”.
+     - Secondary: short description, e.g. “15% off your ride” or “You save on this trip”.
+3. Logic:
+   - Show this banner only if `activePromo` or `promoName` is present.
+   - If there is no active promo, the banner must not render at all.
+
+STEP 5 – Promo presentation on each ride card (desktop)
+Update the ride card component (e.g. `RideOptionCard`), but do NOT change its layout structure (image, title, time, capacity, etc.). Just inject the promo UI around the price.
+
+1. Price block:
+   - If `hasDiscount` is false:
+     - Show the current price exactly as now (e.g. “$245.34”), bold, main color.
+   - If `hasDiscount` is true:
+     - Original price (struck-through):
+       - smaller font, grey color `#6B7280`.
+       - displayed ABOVE or to the right of the final price.
+       - e.g. `$259.85` with a strikethrough.
+     - Final price:
+       - bold, main price color (near-black) e.g. `#111827`.
+       - slightly larger font than original.
+2. Savings / Saver badge:
+   - If `hasDiscount` is true:
+     - Under the price, show one or both:
+       - Text: `You save $X.XX` in SafeGo green.
+         - Use color `#16A34A`, small but readable font.
+       - Small green pill badge on the card top-right or near the price:
+         - text: “Saver” or mapped from `promoName` if needed.
+         - For example a pill: background `#DCFCE7`, text `#166534`.
+   - If `hasDiscount` is false:
+     - Do NOT render any savings text or saver badge.
+3. Keep the rest of the card EXACTLY as is:
+   - Car image
+   - Title (SafeGo X, SafeGo Comfort, etc.)
+   - ETA “2 min away”
+   - Capacity icon
+   - “Popular” badge, “Limited” badge, etc.
+   - Selection border.
+
+STEP 6 – Ensure ONLY the new unified design is used
+Right now the user sometimes sees two different ride layouts. Clean this up:
+
+1. Search for any legacy ride selection routes/components:
+   - e.g. `/customer/ride`, `/customer/ride-request`, or old `RideSelectionPage`.
+2. Confirm which route is the canonical one for desktop now:
+   - It should be the unified booking page that shows:
+     - Header with “Ride / Eats / Parcel” toggles.
+     - Address capsule + route summary.
+     - Left column list of ride cards.
+     - Right column map.
+3. For desktop:
+   - Ensure `/customer` (or the main link from the home page) routes ONLY to the new unified booking layout.
+   - If other old pages still exist, keep them only if the system relies on them internally, but DO NOT link to them from the customer nav.
+
+IMPORTANT: Do not delete old code blindly. If you need to leave legacy components in the repo, just make sure they are not used for the normal desktop path.
+
+STEP 7 – Visual checks (desktop)
+After implementation:
+
+1. Apply a known promo (e.g. SafeGo Everyday Saver) so that discounts are active.
+2. On the desktop `/customer` page, verify:
+   - The green promo banner appears above “Choose a ride”.
+   - Each discounted ride card shows:
+     - Original price with strikethrough.
+     - Final price clearly.
+     - “You save $X.XX” and/or a green “Saver” badge.
+   - Rides without discounts show only a normal price, no savings text.
+3. Confirm:
+   - Map and header layout are unchanged.
+   - Address capsule bar remains identical.
+   - No logic or totals changed; only presentation.
+
+When you’re done, summarize EXACTLY what you changed:
+- Which components.
+- Which props were added or connected.
+- How you prevent any business logic changes.
+- How a developer can later reuse the promo UI for the Eats and Parcel tabs.

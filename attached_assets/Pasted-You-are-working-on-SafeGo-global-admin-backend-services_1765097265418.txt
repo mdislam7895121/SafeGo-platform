@@ -1,0 +1,340 @@
+You are working on SafeGo global (admin + backend + services).
+Your job now is to FIX ALL CURRENT ISSUES and make the platform READY TO PUBLISH,
+without breaking any existing SafeGo rules or schemas.
+
+=========================
+0) SAFEGO MASTER RULES
+=========================
+You MUST follow these, and you are NOT allowed to simplify/remove them.
+
+(1) ROLES (4 only; never mix access)
+- customer
+- driver
+- restaurant (merchant)
+- admin
+
+Each role has its own:
+- signup/onboarding
+- KYC rules
+- dashboard
+- permissions
+- status flows
+
+(2) SERVICES (3 must always exist)
+- ride-hailing
+- food delivery
+- parcel delivery
+
+(3) COUNTRY-SPECIFIC KYC (BD vs US)
+
+Bangladesh (BD) – must stay as-is:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front/back images)
+- emergency contact details
+- verification_status, is_verified
+
+United States (US) – extend but do NOT break:
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- drivers: driver_license_number + image + expiry
+- drivers: ssn_last4 (optional)
+- verification_status, is_verified
+
+(4) ADMIN PANEL – must keep working
+Admin can:
+- verify customers, drivers, restaurants
+- approve/reject KYC with rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view driver/restaurant negative balances
+
+(5) CORE COLLECTIONS – do NOT change schemas
+- rides
+- food_orders
+- deliveries
+
+Each already includes:
+- identities (customer_id, driver_id, restaurant_id…)
+- addresses + geolocation
+- commission + fees
+- payment details
+- timestamps
+- rating + feedback
+
+(6) COMMISSION & PAYOUT RULES
+- Cash ride: driver keeps cash, SafeGo commission → negative driver_wallet_balance (weekly settlement).
+- Cash food: restaurant keeps cash, commission → negative restaurant_wallet.
+- Online payment: SafeGo keeps commission automatically.
+- Admin can settle and mark paid.
+
+(7) SECURITY RULES
+- Customers cannot view driver KYC docs (license, NID, SSN, TLC, etc.).
+- Drivers cannot view customer NID/SSN or sensitive info.
+- Restaurants cannot view other restaurants.
+- Only admin can change pricing, commission, verification, blocking.
+- Users can edit only their own profile.
+
+(8) STATUS FLOWS (do not rename)
+Rides:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+(9) ONBOARDING RULE
+- Public signup = customer-only.
+- Drivers, delivery partners, restaurants are created later via onboarding flows after login.
+- New partners start with verification_status = "pending" and blocked until admin approves.
+
+(10) NOTIFICATIONS
+Keep all existing notifications (rides, food orders, parcel updates, KYC decisions, admin alerts).
+
+All your changes MUST be backward-compatible and additive.
+
+=====================================
+1) SCOPE OF THIS TASK (GLOBAL QA)
+=====================================
+Fix ALL currently known issues so SafeGo is publish-ready, including:
+
+- Admin console: back buttons, 404 pages, blank pages (Activity Log), header consistency.
+- Security section: Safety & Risk Center, Activity Log, Access Reviews.
+- Enterprise Tools + Intelligence layer: missing back buttons.
+- SafePilot AI: placement, visibility, crisis/scan behavior.
+- BD Expansion dashboard: layout + SafePilot button.
+- Customer web ride screen: membership / partner discoverability cards.
+- USA driver onboarding: personal info address field, license step fields, NYC rules must remain, 403 permission error on submit.
+- Feature Flags, Releases & Publish, Settings: ensure no broken empty pages.
+- Fix any remaining console errors and navigation glitches.
+
+DO NOT redesign features. Your job is to restore and fix what is already designed.
+
+=====================================
+2) ADMIN CONSOLE – NAVIGATION & BACK BUTTONS
+=====================================
+
+(2.1) Global back button behavior
+- On ALL admin sub-pages (People & KYC, Safety & Risk, Fraud, Threat Center, Activity Logs, Access Reviews, Enterprise Tools, Intelligence, Feature Flags, Releases & Publish, Settings):
+  - The top-left “Back to …” link and breadcrumb arrow MUST navigate correctly to the parent section.
+  - Example: Periodic Access Review → "Back to Security" must take you back to /admin/security (or equivalent).
+
+(2.2) 404 routes
+- Any admin menu item that currently shows “404 Page Not Found” must get a valid page, even if it’s a simple empty state.
+- Do NOT remove menu items.
+- Minimum requirement: title, description, empty-state card, and working back link.
+
+=====================================
+3) SECURITY SECTION – SAFETY, ACTIVITY LOG, ACCESS REVIEWS
+=====================================
+
+(3.1) Safety & Risk Center
+- Ensure /admin/safety-center loads the Safety & Risk dashboard, not 404.
+- Cards: Open Cases, Critical Cases, Today’s Events, Unresolved – must render with correct counts (0 allowed).
+- List area must show an empty-state message (e.g., “No risk cases found”) instead of blank screen.
+
+(3.2) Activity Logs
+- /admin/activity-log must NOT be blank.
+- Show a table or list of recent admin activities (or an empty-state message if truly zero logs).
+- Ensure paging/filter components render without crashing.
+- Back to Security link must work.
+
+(3.3) Periodic Access Review (/admin/access-reviews)
+- The page already loads, but:
+  - “Back to Security” must navigate correctly.
+  - SafePilot floating button must NOT hide under the bottom edge. Adjust z-index and margin so it sits clearly above content.
+  - Keep current layout; just fix navigation and SafePilot placement.
+
+=====================================
+4) ENTERPRISE TOOLS & INTELLIGENCE LAYER
+=====================================
+
+(4.1) Back buttons
+- For all Enterprise tools pages and Intelligence layer pages:
+  - Add/confirm a working back button that returns to the previous admin section or main dashboard.
+- Use the same minimal header style already applied on payouts-reports and revenue-analytics.
+
+(4.2) Minimal header consistency
+- The minimal header design used on payouts-reports and revenue-analytics must be applied consistently to the remaining admin pages (the “remaining 23 pages”).
+- Do NOT change page content, only header style and breadcrumbs.
+
+=====================================
+5) SAFEPILOT AI – PLACEMENT & BEHAVIOR
+=====================================
+
+(5.1) Floating button placement
+- The SafePilot AI button must:
+  - Always appear on the bottom-right corner of admin pages.
+  - Have a fixed offset (e.g., 24px from right and bottom).
+  - NEVER be cut off by the screen edge (mobile or desktop).
+  - Not overlap critical UI (such as bottom navigation in mobile previews).
+
+(5.2) SafePilot panel
+- When opened:
+  - Use the new SafePilot shield-AI logo as implemented assets.
+  - Tabs Intel / Context / Chat must remain.
+  - Crisis, Scan, Optimize actions must display cleanly; no duplicate icons.
+- If there is no data for a Crisis scan:
+  - Show a safe empty state (e.g., “No crisis events available for this view yet”) instead of red “Failed to generate crisis report”.
+
+(5.3) Availability
+- SafePilot should be available on:
+  - Security pages (Safety, Fraud, Threat, Activity Log, Access Reviews),
+  - BD Expansion dashboard,
+  - Other key admin dashboards as already wired.
+- Do NOT enable SafePilot for customer-facing pages unless this was already implemented.
+
+=====================================
+6) BD EXPANSION DASHBOARD (ADMIN)
+=====================================
+
+- Review /admin/bd-expansion:
+  - Ensure all cards and charts render properly on mobile.
+  - Text and icons are not cut off.
+  - The “কমিশন ও আয় বিশ্লেষণ” section shows the three commission lines correctly.
+- SafePilot floating button must sit cleanly on top of the dashboard, not overlapping critical data.
+
+=====================================
+7) CUSTOMER RIDE SCREEN (USA) – MEMBERSHIP / PARTNER DISCOVERY
+=====================================
+
+- On the customer ride screen (Available rides + Explore services):
+  - Ensure the “Become a member / partner” discovery cards/CTA section for USA is present as designed earlier.
+  - These cards should explain partner options (driver, delivery, restaurant, etc.) and link to the appropriate partner landing or onboarding explainer.
+  - They must NOT directly create roles; they should send the customer to the partner onboarding start page after login, respecting the rule: customer signup only, partner via onboarding.
+
+=====================================
+8) USA DRIVER ONBOARDING – PERSONAL INFO
+=====================================
+
+(8.1) Home address (US standard)
+- Replace/ensure the USA driver home address uses a structured US format:
+  - street_address1 (required)
+  - street_address2 (optional)
+  - city (required)
+  - state (required, dropdown of US states)
+  - zip_code (required, 5-digit or ZIP+4)
+- Do NOT use a single free-text “Your home address” field.
+- Persist this structure in the existing home_address model; if necessary, compose into a single string internally without breaking schema.
+
+(8.2) Other personal info fields
+- Ensure for USA drivers:
+  - Phone number is loaded from the logged-in customer profile and editable or clearly linked to profile editing.
+  - Date of birth is present.
+  - Emergency contact: name, phone, and relationship are all present and validated.
+  - ssn_last4 (optional, 4 digits max) is supported where required; never store full SSN.
+
+(8.3) Country branching
+- These changes apply only when:
+  - country == "US" AND onboarding role == "driver".
+- BD driver onboarding KYC (father_name, NID, etc.) must remain unchanged.
+
+=====================================
+9) USA DRIVER ONBOARDING – DRIVER LICENSE STEP
+=====================================
+
+Current issues: cannot type in license number; state dropdown selection not persisting; expiration date required error.
+
+Fix as follows:
+
+(9.1) Driver License Number
+- Make the field fully editable.
+- Remove any binding to user name or profile name.
+- Bind value only to a field like form.licenseNumber.
+- onChange must update this field.
+- Placeholder: "Enter your license number".
+
+(9.2) License Issuing State
+- Ensure dropdown options list all US states (NY, NJ, etc.).
+- value must be bound to a single field, e.g., form.licenseState.
+- onChange must update that same field.
+- Do NOT reset the value after selection.
+- Validation: required.
+
+(9.3) License Expiration Date
+- Date picker must open and allow future date selection.
+- Store value in form.licenseExpiry (or equivalent).
+- Validation: required and cannot be past date.
+
+(9.4) License images
+- Front and back uploads must work on mobile and desktop.
+- Show clear error if files missing on submit.
+- Do NOT change storage paths or schema names, just ensure the UI works.
+
+=====================================
+10) USA DRIVER ONBOARDING – VEHICLE & NYC COMPLIANCE
+=====================================
+
+(10.1) Vehicle step (all US)
+- Ensure the vehicle step lets the user enter:
+  - vehicle type, make, model, year, color
+  - plate_number
+  - vehicle_registration_image
+  - vehicle_insurance_image
+- All fields must save and reload correctly if the form is revisited.
+
+(10.2) NYC-specific compliance (5 boroughs only)
+- If driver operates in NYC 5 boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten Island), ensure the extra TLC/FHV step still exists and works:
+  - tlc_license_number + front/back images
+  - fhv_number_or_barcode + image
+  - dmv_inspection_date + expiry + document image
+- Do NOT remove or simplify these NYC fields.
+- For non-NYC US drivers, skip this step.
+
+=====================================
+11) DRIVER SUBMISSION – 403 PERMISSION ERROR
+=====================================
+
+Current bug: submitting USA driver application shows 403 {"error":"Insufficient permissions"}.
+
+Fix:
+- Allow any authenticated customer to submit their own driver onboarding via the driver registration endpoint.
+- Keep approval/rejection strictly admin-only.
+
+Implementation:
+- For the POST /partner/driver/register (or equivalent):
+  - Authorize role: "customer" to create a driver onboarding record for themselves.
+- Do NOT require "admin" or existing "driver" role for submission.
+- Maintain:
+  - verification_status = "pending"
+  - driver remains inactive until admin approval.
+
+=====================================
+12) FEATURE FLAGS, RELEASES & PUBLISH, SETTINGS
+=====================================
+
+- Feature Flags:
+  - Ensure page shows an empty state (“No feature flags yet”) without errors.
+- Releases & Publish:
+  - Ensure admin can open the page, see an empty state, and create a release (even if dummy).
+- Settings:
+  - Global Settings tabs (Profile, General, Theme, KYC Rules, Commission, Tax & Fees, Settlement, Notifications, Security) must all load without errors.
+  - Do not change existing values; just ensure UI is working.
+
+=====================================
+13) QA & PUBLISH-READY CHECKLIST
+=====================================
+
+- Run through:
+  - Admin main dashboard
+  - Security pages (Safety, Fraud, Threat, Activity, Access Reviews)
+  - Enterprise tools
+  - Intelligence layer
+  - Feature Flags, Releases & Publish, Global Settings
+  - BD Expansion dashboard
+  - Customer ride screen (including USA)
+  - USA driver onboarding full flow (all steps, including NYC case)
+- Fix any console errors (JS exceptions, 404s, failed network calls).
+- Confirm:
+  - All back buttons work.
+  - SafePilot AI button is visible and clickable (not hidden or clipped).
+  - All KYC forms can be completed and submitted without UI or permission errors.
+  - No role mix or data leakage across roles.
+
+The end state should be: SafeGo web app is stable, publish-ready, and follows all SafeGo master rules with no broken screens or forms.

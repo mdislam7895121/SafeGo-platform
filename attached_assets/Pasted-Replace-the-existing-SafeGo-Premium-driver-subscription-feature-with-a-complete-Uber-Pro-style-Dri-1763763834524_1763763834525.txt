@@ -1,0 +1,52 @@
+Replace the existing “SafeGo Premium” driver subscription feature with a complete Uber Pro–style Driver Loyalty Points Tier System. Follow all SafeGo company rules and do not break any existing driver dashboard, routes, or onboarding flows.
+
+System Requirements:
+
+1. Remove subscription logic entirely from the driver app.
+   - Delete any monthly pricing UI, subscription state fields, and related checks.
+   - Keep the navigation link, but rename it to “SafeGo Points.”
+
+2. Create a full tier system based on points:
+   - Blue = 500 points
+   - Gold = 1000 points
+   - Premium = 2000 points
+   - Diamond = 3000 points
+
+3. Driver-facing UI for “SafeGo Points” page:
+   - Show current tier
+   - Show total accumulated points
+   - Show progress bar with next-tier milestone
+   - Show a full list of tier benefits
+   - Add a section “How you earn points” with a simple rules explanation
+   - No emojis, clean Uber-style spacing and typography
+
+4. Points Calculation Engine:
+   - Each trip grants points (make placeholder values)
+   - Leave a function where multiplier rules can be added later
+   - Store point totals per driver with audit-safe updates
+   - Ensure the engine is compatible with both US and BD drivers
+
+5. Admin Panel Additions:
+   Create a new “Points & Tiers Management” module with:
+   - Tier definitions (name, required points, color tag)
+   - Tier benefits editor (admin can add/remove benefits per tier)
+   - Points rules configuration (per-trip base, multipliers, bonus events)
+   - All updates logged for audit
+
+6. Migration Rules:
+   - Keep the old route working, but redirect all references of “SafeGo Premium” to the new “SafeGo Points” page
+   - Ensure no subscription fields remain in the database or UI
+   - Do not break any existing driver features or onboarding pages
+
+7. Design Rules:
+   - Uber-style layout only: left-aligned content, white background, light grey dividers, no emojis
+   - Clean sections with clear headings
+   - Fully mobile-responsive
+
+Implement the full system above. After building it, show me:
+- Updated routes
+- Updated UI components
+- Updated admin modules
+- Any new API endpoints
+- Migration notes
+- Testing checklist

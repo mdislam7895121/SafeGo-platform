@@ -1,0 +1,78 @@
+You are the lead engineer for the SafeGo web app.
+Follow ALL existing SafeGo master rules (single working flow, no half-broken UX, security intact).
+
+BUG SUMMARY
+On the `/login` page, the “Sign up” / “লাইনআপ” link does nothing when tapped on mobile preview. This means the customer cannot open the signup screen at all. The product owner must be able to:
+
+- open `/login`
+- tap “Sign up”
+- see the new minimal customer signup page at `/signup`
+- register successfully
+
+Your job is to FIX this end-to-end in one loop.
+
+------------------------------------------------
+TASK A – Fix the Sign up link on `/login`
+
+1. Locate the login page component (for example `client/src/pages/login.tsx` or similar).
+2. Find the “Don’t have an account? Sign up” / “লাইনআপ” text.
+3. Ensure that:
+   - It is a real navigation element:
+     - If using React Router: `<Link to="/signup">Sign up</Link>`
+     - If using Next.js: `<Link href="/signup">Sign up</Link>`
+     - Or a plain `<a href="/signup">Sign up</a>` (no `preventDefault`).
+   - There is NO onClick handler that prevents navigation or calls a missing function.
+   - There is no `pointer-events: none`, `disabled`, or invisible overlay on top of this element.
+
+4. Check the HTML/CSS around the footer area of the login form:
+   - Make sure nothing with higher `z-index` covers the “Sign up” link.
+   - On mobile layout, the link must remain inside the visible area and be physically tappable.
+
+5. Confirm in code that `/login` → Sign up now navigates to `/signup` route.
+
+------------------------------------------------
+TASK B – Ensure `/signup` route and page are working
+
+1. Confirm there is a proper `/signup` (or equivalent) route configured in the router:
+   - Route path: `/signup`
+   - Component: the new minimal customer signup form you already designed (email, password, confirm password).
+2. If `/signup` does not exist yet, create it now using the new signup design already agreed with the product owner.
+3. Hook the signup form to the existing registration API:
+   - On submit, call the correct backend endpoint (e.g. `POST /api/auth/register`).
+   - Create a new user with role = `customer` only.
+   - Handle errors: email in use, weak password, validation errors.
+4. After successful signup:
+   - Either auto-login and redirect to the main customer home,
+   - OR redirect back to `/login` with a clear success message.
+   - Do NOT touch partner onboarding logic in this task.
+
+------------------------------------------------
+TASK C – Remove access to old/broken signup flows
+
+1. Search the frontend for any old “lineup” or legacy signup pages/routes.
+2. Make sure:
+   - No buttons or links anywhere still point to those old routes.
+   - All “Create account / লাইনআপ” links point ONLY to `/signup`.
+3. If you must keep the old component for now, it must not be reachable from any live route.
+
+------------------------------------------------
+TASK D – Test like a real BD customer (you must actually run this)
+
+1. Start the dev server and open the app in the built-in browser/mobile preview.
+2. Go to `/login`.
+3. Tap “Sign up” / “Sign up”:
+   - Confirm the URL changes to `/signup` and the new signup UI is visible.
+4. Register with a fresh test email and strong password.
+5. Confirm:
+   - The API call succeeds.
+   - You can log in with this new account.
+   - In the Admin Users list, this account appears as role `customer`, country `BD` as per existing logic.
+
+------------------------------------------------
+REPORT BACK
+
+When finished, summarize clearly:
+- Which file(s) you changed for the login page link.
+- How the `/signup` route is configured.
+- A short step-by-step of the manual test you performed (from `/login` to successful signup).
+- Confirm explicitly that there is no other signup/lineup route reachable from the UI anymore.

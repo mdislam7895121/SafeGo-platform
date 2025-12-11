@@ -1,0 +1,243 @@
+You are the SafeGo architect–developer. Read and follow ALL SafeGo master rules first, then do the C-3 task.
+
+========================
+SAFEGO MASTER RULES
+========================
+
+1) Core actors (always present)
+- Customer (rider, eater, parcel-sender/receiver)
+- Driver (rides, delivery, parcel)
+- Restaurant / Merchant (for food + shops)
+- Admin (global + ops + finance + risk)
+
+2) Global product scope
+- One super-app for:
+  • Ride hailing (point-to-point, multi-stop, scheduled)
+  • Food delivery (restaurant menus, cart, checkout, orders)
+  • Parcel / courier (door-to-door small package)
+- Same identity, wallet, payouts, safety, support system across all three.
+- Country modes:
+  • US mode (SSN last-4, driver license, TLC/DMV, bank account types, Stripe-style payouts)
+  • Bangladesh mode (NID, bKash/Nagad, local bank routing, local address formats)
+- Mode is set per environment/tenant; do not mix validation rules.
+
+3) Mandatory admin panels
+- Super Admin:
+  • User/driver/restaurant management, KYC approval, documents, suspensions.
+  • Global configuration: fees, surge, promo rules, supported countries, nav providers.
+  • Security: audit logs, role-based access, incident overview.
+- Operations / Support Admin:
+  • Ticketing, chat transcripts, manual trip/order adjustments, refunds.
+  • Escalations, fraud flags, safety incidents review.
+- Finance Admin:
+  • Payout runs, adjustments, chargebacks, invoices, tax exports, commission reports.
+- Analytics Admin:
+  • Overview dashboards for rides, food, parcels, cohorts, funnel, retention.
+
+4) Mandatory data collections / domains
+- rides (trips), ride_events, ride_payments, ride_disputes
+- food_orders, order_items, menus, menu_items, restaurant_payouts
+- deliveries (parcels), delivery_events, delivery_payments
+- wallet_accounts, wallet_transactions, promo_uses, referral_links
+- driver_profiles, driver_vehicles, driver_documents, driver_payout_methods
+- restaurant_profiles, restaurant_documents, restaurant_bank_accounts
+- notifications (in-app, push, sms, email)
+- support_tickets, chat_threads, safety_incidents, audit_logs
+
+5) Commission & payouts (must always be consistent)
+- Platform takes commission per ride/order/delivery; commission rules can vary by city and product type.
+- Net earnings = gross fare – platform commission – taxes/fees.
+- Payoutable balance per driver/restaurant is tracked in wallet_accounts and mirrored in their “Earnings / Wallet” UI.
+- Payout methods:
+  • US: bank account (checking/savings), debit card (instant payout), PayPal (optional).
+  • BD: bank account, mobile wallet (bKash/Nagad), possibly cash-collection settlement.
+- Payouts are only allowed for KYC-approved accounts; all payout changes require extra verification (2FA + password re-check).
+
+6) Security roadmap (must reference correct phase every time)
+- Phase 1 (already implemented): HTTPS security headers (HSTS, CSP, CORS), basic rate limiting on sensitive routes, password verification on payout changes.
+- Phase 2 (already implemented): OTP service, device/session security, tamper-proof audit logs, enhanced payout 2FA.
+- Phase 3 (future): SIEM integration, anomaly detection on trips/payments, bug bounty program, automated security scans.
+For new work now: only use Phases 1–2 capabilities; DO NOT “pretend” SIEM/bug-bounty exist until we actually build them.
+
+7) Onboarding requirements
+- Drivers:
+  • Must complete country-specific identity + vehicle docs before going online.
+  • For NYC (TLC/T-License) we have extra fields and document types.
+- Restaurants:
+  • Business/KYC, bank setup, menu and opening hours before receiving live orders.
+- Customers:
+  • Basic profile + verified phone; payment method before first trip/order (except cash-only flows where allowed).
+
+8) Status flows (cannot be broken)
+- Trip status: REQUESTED → DRIVER_ASSIGNED → DRIVER_EN_ROUTE_PICKUP → DRIVER_ARRIVED → TRIP_STARTED → TRIP_COMPLETED → (optional) DISPUTED/CANCELED.
+- Order status: PLACED → ACCEPTED → IN_KITCHEN → PICKUP_READY → DRIVER_EN_ROUTE → DELIVERED → (optional) FAILED/CANCELED.
+- Payout status: PENDING → PROCESSING → PAID → FAILED (with reason).
+All UI must respect backend validation; no illegal jumps.
+
+9) Safety & support (must be wired, not just visual)
+- Driver Safety Center + Rider Safety Center with:
+  • Quick access to emergency contacts, in-trip incident reporting, share trip status.
+- Support:
+  • Live chat + ticket creation from driver, restaurant and customer apps.
+  • All events should generate audit log entries.
+
+10) General rules for code & prompts
+- Never break existing flows; treat everything as incremental, backward-compatible improvement.
+- Reuse existing components, hooks and API routes wherever possible; do not duplicate logic.
+- Assume current codebase already has:
+  • Driver header + drawer, notifications, language selector.
+  • Driver wallet, payouts, safety center, support, trust score, incentives, performance dashboards.
+- Always keep multi-tenant & multi-country in mind, but we are currently focusing on US driver flows unless explicitly stated.
+- If something already exists, extend/refine it instead of rebuilding.
+
+========================
+TASK: C-3 DRIVER ACTIVE TRIP EXPERIENCE – UBER-LEVEL POLISH
+========================
+
+Context (from current system)
+- Route: `/driver/trip/active` (or equivalent) already exists and is wired to the backend `driver-trips` routes.
+- Backend validates driver trip status transitions correctly (status validation already confirmed).
+- We have:
+  • Driver header with hamburger, bell, language globe, profile menu.
+  • Driver Safety Center, Support, trust score, incentives, wallet, etc.
+- C-3 “Driver Active Trip Screen” is marked complete but now needs a fully professional, Uber-like UX using a SafeGo-style map.
+
+Goal
+- Turn the existing C-3 active trip screen into a polished, Uber-level experience while keeping all existing logic working.
+- Use a dedicated internal map component (SafeGo Map) + optional external navigation integration (Google/Apple/Waze) honoring driver preferences.
+- Respect all SafeGo master rules above, especially security phases 1–2 and status flow constraints.
+
+Concrete requirements
+
+1) Architecture & analysis
+- First, scan the existing implementation of:
+  • `server/routes/driver-trips.ts` (or equivalent)
+  • Current driver active trip page/component (e.g. `client/src/pages/driver/trip/active.tsx` or similar)
+  • Any shared map or location hooks/components that already exist.
+- Do NOT remove or break current status validation or safety logic.
+- Identify and reuse existing:
+  • Driver navigation preferences (if present in settings/profile).
+  • Safety Center + Support links.
+  • Call/message actions with rider.
+
+2) SafeGoMap component (internal map engine)
+- Create or refactor a reusable `SafeGoMap` component under a shared folder (e.g. `client/src/components/maps/SafeGoMap.tsx`) if it doesn’t already exist.
+- The component must support:
+  • Center position (Lat/Lng) and zoom.
+  • Driver marker.
+  • Pickup marker.
+  • Dropoff marker.
+  • Optional route polyline to pickup and to dropoff.
+  • “Active leg” hint: `to_pickup`, `to_dropoff` or `none` to highlight the correct segment.
+- Internally use the map engine already chosen by the app (Mapbox/Leaflet/etc.). If none is wired yet, keep a graceful placeholder but design the API ready for a real map engine.
+- Optimize for mobile:
+  • Rounded corners, full-width on small screens, ~300–360px height.
+  • Ensure performance is acceptable on low-end devices.
+
+3) Active Trip screen layout (UX similar to Uber)
+- Use a vertical layout optimized for mobile web:
+  1) Top: Status + ETA bar
+     - Show human-friendly status label mapped from backend status:
+       • REQUESTED/ASSIGNED → “Heading to pickup”
+       • DRIVER_EN_ROUTE_PICKUP → “On the way to pickup”
+       • DRIVER_ARRIVED → “Waiting for rider”
+       • TRIP_STARTED → “On trip to destination”
+       • TRIP_COMPLETED → “Trip completed”
+     - Show ETA (if provided by backend) or a placeholder if not yet available.
+  2) Map section
+     - Embed `SafeGoMap` centered near the driver location.
+     - Highlight pickup or dropoff leg depending on current status:
+       • Before trip start: highlight route to pickup.
+       • After start: highlight route to dropoff.
+     - Ensure the map updates as driver location changes.
+  3) Trip details / bottom sheet
+     - Rider:
+       • Name + rating (if available).
+       • Pickup short address, dropoff short address.
+     - Actions row:
+       • Call rider (using click-to-call tel: link).
+       • Message rider (if chat exists; otherwise direct to Support).
+       • Safety button that opens the existing Driver Safety Center in a new drawer/page.
+     - Small info about payment type (cash/card) and estimated earnings for the trip if available.
+  4) Status / control buttons
+     - Large, primary buttons to progress through the trip status:
+       • REQUESTED/ASSIGNED → (handled in accept/decline flow, not here)
+       • DRIVER_EN_ROUTE_PICKUP → “Arriving at pickup”
+       • DRIVER_ARRIVED → “Start trip”
+       • TRIP_STARTED → “End trip”
+     - Disable or hide illegal transitions; honor backend validation strictly.
+     - Show a non-destructive “Cancel trip” / “Report issue” option that routes into Support/Safety, NOT to arbitrary status changes.
+  5) Navigation block
+     - Add a small panel:
+       • Dropdown / segmented control for preferred navigation app:
+         – SafeGo Map only
+         – Google Maps
+         – Apple Maps
+         – Waze
+         – System default
+       • “Open navigation” button:
+         – If SafeGo Map only: no external link; focus remains in-app.
+         – For Google/Apple/Waze/default: open the correct URL for the current leg (pickup vs dropoff) in a new tab/window.
+     - Persist the driver’s navigation preference using the existing settings/profile system if already present; otherwise store in local state for now.
+
+4) Real-time behavior (without over-engineering)
+- Implement light polling (e.g. every 10–15 seconds) to refresh:
+  • Driver location,
+  • Trip status,
+  • Updated ETA if backend provides it.
+- Ensure the UI handles:
+  • “No active trip” state with a friendly message + button back to driver home.
+  • Error state (e.g. 500 or network issue) with retry action.
+- Do NOT introduce WebSockets or heavy infra changes at this stage; keep it simple but reliable.
+
+5) Security & privacy (Phases 1–2, no Phase 3 yet)
+- Ensure:
+  • All API calls to `/api/driver/trips/active` and `/api/driver/trips/:id/status` use the existing authenticated driver session middleware.
+  • Do not expose unnecessary PII in the frontend; only show rider name + masked phone where applicable and short addresses.
+  • All status changes must go through the existing backend validation logic; no client-side override.
+  • Any active trip errors (e.g. forbidden status) should be surfaced as friendly messages, not raw error stacks.
+- Use Phase 2 features where relevant:
+  • If there is a sensitive action such as manual “Cancel trip” that affects payouts, ensure it’s logged in the tamper-proof audit log and routed via the existing APIs.
+- Do NOT add SIEM, anomaly detection or bug bounty hooks yet; those belong to Phase 3 and will be done later.
+
+6) Reuse existing SafeGo features
+- Make sure the header on `/driver/trip/active` uses the fully integrated driver header we recently wired:
+  • Hamburger menu controlling the drawer.
+  • Notification bell and list for trip-related notifications.
+  • Language globe that opens the language selector page.
+  • Profile dropdown with link to account/settings.
+- From the active trip screen:
+  • Safety button must open the existing Safety Center.
+  • Support button (if shown) must open the existing driver chat/support center, pre-filled with the current trip ID if possible (for better support context).
+
+7) Error handling & edge cases
+- Handle the case where backend returns 404 (no active trip) by showing a clean “No active trip” state instead of a red error.
+- If driver tries to change status but backend rejects the transition (e.g. race condition), show a clear toast/banner and refresh the trip data.
+- If location/route data is temporarily missing, keep the screen usable (show addresses and control buttons) while map shows a graceful fallback.
+
+8) UX polish check (mobile-first)
+- Verify on mobile viewport:
+  • Map is scrollable in the page but does not cause layout jitters.
+  • Bottom sheet / details area is finger-friendly: large touch targets, good spacing.
+  • Primary CTA button (status action) is clearly visible and not below the fold where possible.
+- Keep typography and spacing consistent with the rest of the driver app (reuse existing design system components if available).
+
+9) Deliverables
+- Updated or new files, for example (adapt to actual project structure):
+  • `client/src/components/maps/SafeGoMap.tsx`
+  • `client/src/pages/driver/trip/active.tsx` (or existing equivalent)
+  • Any shared hooks/helpers for driver active trip polling or navigation preferences.
+- No breaking changes to other driver screens (requests list, history, wallet, etc.).
+- Small inline comments where behavior might not be obvious (e.g. navigation URLs, status mapping).
+
+After implementing, run through this checklist:
+- [ ] Map shows driver + pickup + dropoff correctly for an active trip.
+- [ ] Status labels and buttons follow the allowed trip flow and are in sync with backend.
+- [ ] Safety and Support shortcuts work and pass the trip context where possible.
+- [ ] External navigation opens correctly for Google/Apple/Waze/default.
+- [ ] “No active trip” and error states are handled gracefully.
+- [ ] No new console errors; existing security headers, rate limiting and 2FA behavior remain intact.
+
+Now implement these changes and then give me:
+1) A short summary of what was changed (files + features).
+2) Any limitations or future improvements you recommend for a true, real-time Uber-level map experience.

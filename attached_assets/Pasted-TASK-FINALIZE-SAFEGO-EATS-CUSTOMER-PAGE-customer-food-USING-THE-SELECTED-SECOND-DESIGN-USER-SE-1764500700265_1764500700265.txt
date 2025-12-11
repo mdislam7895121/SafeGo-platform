@@ -1,0 +1,54 @@
+TASK: FINALIZE SAFEGO EATS CUSTOMER PAGE (/customer/food)
+USING THE SELECTED SECOND DESIGN.
+
+USER SELECTION:
+The final approved layout = SECOND DESIGN  
+(যেটায় বড় vertical restaurant cards, Bella’s Pizzeria / Bengal Tiger Kitchen-এর মতো layout)
+
+YOUR JOB:
+1) পুরা /customer/food পেজে কেবল FINAL vertical large-card layout ব্যবহার করতে হবে।  
+2) কোনো horizontal carousel, পুরানো ছোট কার্ড, বা আগের design render করা যাবে না।  
+3) সব restaurant image ঠিক করতে হবে (Bella’s / Sultan’s Biryani House-এ broken icon fix করা বাধ্যতামূলক)।  
+4) Mobile layout fully optimized করতে হবে (scroll smooth, spacing ঠিক, কোনো clipped item না)।  
+5) Desktop/Tablet layout ভাঙা যাবে না।  
+6) কোনো schema/API change করা যাবে না — strictly UI + demo image fixes.
+
+STEP A — Identify layouts
+- client/src/pages/customer/food/*  
+- client/src/components/eats/*  
+এখান থেকে:
+- FINAL large-card layout = রাখবে  
+- LEGACY layouts = render থেকে বাদ দেবে (delete না, শুধু import/usage বন্ধ)
+
+STEP B — Lock final layout everywhere
+- /customer/food main page সব restaurant list, filtered list (Top Rated, Mexican, Bengali) সব একটাই vertical large card layout ব্যবহার করবে।
+
+STEP C — Fix image data + fallback
+- seed-demo-restaurants.ts বা fix-demo-images.ts স্ক্রিপ্টে broken image URLs ঠিক করো  
+- All cards must use robust image fallback:
+    src = thumbnail || banner || image_url  
+    onError → safego_default_restaurant.png
+
+STEP D — Mobile layout rules
+- এক স্ক্রীনে ২–৩টা কার্ড partial view দেখাবে  
+- name ellipsis, no overflow  
+- favorite icon tap area ≥ 44px  
+- image object-fit: cover  
+- clean spacing, compact design
+
+STEP E — Scrolling & Filters
+- vertical scroll must work  
+- cuisine chips row → horizontal scrollable  
+- Top Rated, Open, Favorite, Filter সব কাজ করবে final layout-এই
+
+STEP F — Regression safety
+- Ride, Parcel, Admin, Restaurant dashboards must not break  
+- কোনো horizontal scroll বা clipping থাকবে না
+
+MANDATORY SELF-TEST BEFORE DONE:
+1) /customer/food (mobile 390px) full vertical card layout show  
+2) No legacy components  
+3) No broken images  
+4) Filters work  
+5) Restaurant detail images load with fallback  
+6) All scroll works  

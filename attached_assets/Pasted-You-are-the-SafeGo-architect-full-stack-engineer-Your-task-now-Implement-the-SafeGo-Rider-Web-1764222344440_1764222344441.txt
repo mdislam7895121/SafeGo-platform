@@ -1,0 +1,155 @@
+You are the SafeGo architect + full-stack engineer.
+
+Your task now:
+Implement the SafeGo **Rider Web App – Phase R1/R3: Professional Home & Navigation Shell** using the existing SafeGo codebase. Follow ALL SafeGo master rules below and DO NOT break any existing driver or restaurant features.
+
+────────────────────────
+SAFEGO MASTER RULES (ALWAYS ACTIVE)
+────────────────────────
+1) Global roles:
+   - Customer/Rider Web
+   - Driver Web
+   - Restaurant Web Dashboard
+   - Admin Panel (Super Admin + Ops)
+   All new rider features must NOT break existing Driver or Restaurant flows and must be compatible with the Admin panel.
+
+2) Core domains (must stay compatible):
+   - Rides (on-demand + later)
+   - Food delivery (SafeGo Eats)
+   - Parcel / Courier (SafeGo Courier)
+   - Wallet, payouts, loyalty, trust score, incentives
+   - Security hardening phases already implemented (headers, rate-limit, OTP, device/session security, audit logs, payout 2FA)
+
+3) KYC + compliance:
+   - USA riders: basic profile + phone verification required before payment; advanced KYC is optional (for high-risk/large payments).
+   - Bangladesh riders: local phone verification and minimal profile required.
+   - Do not bypass existing KYC guards; reuse existing backend checks only.
+
+4) Data & collections (must remain consistent):
+   - rides, ride_requests, riders, drivers, vehicles
+   - food_orders, restaurants, menus
+   - deliveries/parcels
+   - payments, payouts, wallets, notifications, audit_logs
+   All new rider UI must read/write through existing APIs or safe, minimal extensions.
+
+5) Commission & payouts:
+   - Keep existing commission and fare logic unchanged.
+   - Do not modify payout rules, only display data or call existing endpoints.
+
+6) Security phases:
+   - Phase 1+2 already active: security headers, rate limiting, OTP, device/session security, tamper-proof audit logs, payout 2FA.
+   - New work now is **UX/UI + light API wiring only**, no new high-risk endpoints.
+   - Reuse existing security middlewares and logging.
+
+7) Status flows (do not break):
+   - Rider side: request → matching → accepted → arriving → in-progress → completed / cancelled.
+   - Must stay consistent with driver and backend trip statuses.
+
+8) Onboarding:
+   - Unverified riders may browse, but any booking or payment must be gated behind existing auth/KYC.
+   - Do not weaken these requirements.
+
+────────────────────────
+TASK: RIDER HOME & NAVIGATION SHELL (R1/R3)
+────────────────────────
+Goal:
+Create a **professional, Uber-style but SafeGo-branded Rider Home screen** for the web app that is user-friendly and mobile-responsive. This is the main entry for rides, food, and parcel services.
+
+High-level requirements:
+1) Global layout:
+   - Route: `/rider/home` (or reuse existing rider home route if already defined).
+   - Use the existing rider layout / header pattern so it matches the current system and does NOT conflict with driver or restaurant layouts.
+   - Top bar:
+     - SafeGo logo / wordmark on the left.
+     - Center: primary section label, e.g. “Rides” / “Eats” / “Courier”.
+     - Right side: icons for:
+       - Notifications (bell) – wired to existing rider notification center route.
+       - Account/profile avatar – opens rider account/settings.
+   - Bottom (or top) tab switch:
+     - Three main tabs: **Rides | Eats | Courier**
+     - Switching tab only changes the content section; header and navigation remain.
+
+2) “Where to?” search block (rides focus):
+   - Large, prominent search input at the top, similar to Uber:
+     - Placeholder text: “Where to?”
+     - Search icon on the left.
+     - “Later” button on the right (for scheduling a ride later – this can link to existing “schedule ride” flow or a placeholder page if not implemented).
+   - On focus:
+     - Show a lightweight search panel (can be on the same page) with:
+       - Recent locations
+       - Saved places (Home, Work) if available from existing rider profile.
+   - The search result logic should call the existing location/geocoding API or reuse the current map/location service. If no service exists, implement a clean placeholder function and mark clearly with TODO comments.
+
+3) Recent & saved locations:
+   - Under the search box, show cards for:
+     - Last 3 recent destinations (e.g., “188 Sutter Ave”, “Home”, “JetBlue – JFK Terminal 5”).
+   - Each card:
+     - Left icon: clock (recent) or home/work icon.
+     - Label: main place name
+     - Sub-label: city / area
+   - Clicking a card:
+     - Pre-fills the search + moves rider into the next step of the booking flow (e.g., opens ride options page or pickup selection).
+
+4) Service suggestions grid:
+   - Section title: “Suggestions”
+   - Grid of tiles (at least 6–8 items):
+     - Ride
+     - Food
+     - Grocery
+     - Courier / Parcel
+     - Reserve (scheduled rides)
+     - Shuttle or Airport
+   - Each tile:
+     - Small icon or illustration (can be existing icon set).
+     - Label (single word).
+     - Optional “Promo”/badge support (data-driven from backend if available, otherwise placeholder with clear TODO).
+   - Click behaviour:
+     - For **Ride**: opens the ride booking flow (pickup/destination).
+     - For **Food**: routes to existing SafeGo Eats / restaurant search page.
+     - For **Courier**: routes to parcel booking flow (even if still basic).
+     - All routing must use existing Next.js/React router pattern for SafeGo.
+
+5) Content sections below (simple, non-breaking):
+   - Add 1–2 simple promo/education sections, for example:
+     - “Get to the airport on time” with a card + CTA (“Plan a ride”).
+     - “Order from your favourite restaurants” with CTA (“Browse restaurants”).
+   - These can be static components for now, with clear hooks for future dynamic promos.
+
+6) Navigation & responsiveness:
+   - Fully responsive:
+     - Mobile: main focus, single-column layout.
+     - Tablet/desktop: Home content centered with sensible max width.
+   - Ensure primary interactions are tap-friendly on mobile.
+   - All interactive elements must have `data-testid` attributes following existing naming conventions (e.g., `data-testid="rider-home-where-to"`, `rider-home-suggestion-ride`, etc.) for test coverage.
+
+7) Integration & safety:
+   - Do NOT modify driver or restaurant routes/components.
+   - Reuse existing shared components (buttons, inputs, cards) where possible.
+   - Ensure all API calls use existing client hooks/services; if something is missing, create a small, well-scoped utility without changing core security logic.
+   - Rider home should respect authentication:
+     - If the rider is not logged in, show sign-in prompts where appropriate before booking/checkout flows.
+     - But allow browsing of services (read-only) where it does not violate current rules.
+
+8) Testing & diagnostics:
+   - Add/extend tests (unit or integration) for:
+     - Rendering of Rider Home
+     - Tab switching (Rides/Eats/Courier)
+     - Clicking “Where to?” opens the search behaviour
+     - Suggestion tiles navigate to the correct route
+   - Ensure there are no TypeScript errors, lint issues, or failing tests.
+   - Keep existing logging/audit behaviour; add small logs only if really needed and consistent with current patterns.
+
+9) Deliverables:
+   - Updated Rider Home component/page.
+   - Any new small components created for:
+     - Suggestion grid tile
+     - Recent location card
+     - Layout wrappers if needed
+   - Updated routes/navigation to make `/rider/home` the primary entry point for rider after login.
+
+Finally:
+   - Summarize what you implemented.
+   - Confirm that the Rider Home is live at the correct route.
+   - List any remaining TODOs (e.g., real promo API, deeper search integration) WITHOUT breaking or half-implementing anything.
+
+Do all of this in a single, clean implementation pass without refactoring unrelated areas.

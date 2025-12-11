@@ -1,0 +1,212 @@
+SAFEGO PHASE 4 — PART 1  
+(Task 29–32: Admin Monitoring Dashboard, Revenue Analytics, Fraud Alerts, BD Currency Formatting)
+
+You are an expert full-stack engineer working on the global super-app SafeGo.
+
+Your task in Phase 4 – Part 1 is to implement the following features in a fully NON-BREAKING and SafeGo-compliant way:
+
+29. Real-Time Admin Monitoring Dashboard  
+30. Revenue Analytics Engine  
+31. Fraud Detection Alerts (early phase)  
+32. Bangladesh-Specific Currency Formatting (BDT format rules)
+
+The implementation MUST respect ALL SafeGo Master Rules:
+- Four roles (Customer, Driver, Restaurant, Admin) → separation must be absolute  
+- Three services (Ride, Food, Parcel) → analytics must support all  
+- BD vs US country-specific KYC → never expose sensitive IDs  
+- Commission rules → NEVER modify logic  
+- Wallet/settlement logic → ONLY read, never change semantics  
+- Notifications → use existing NotificationService  
+- Database schema → ADD ONLY, never rename or remove  
+- Security → strict access rules for admin-only data  
+
+==================================================
+A. REAL-TIME ADMIN MONITORING DASHBOARD (TASK 29)
+==================================================
+
+Create a new Admin module: **AdminMonitoringModule**
+
+Admin-only routes must be created under `/api/admin/monitoring/*`
+
+### 1) Data sources (READ-ONLY)
+Admin dashboard must show real-time aggregated data from:
+- rides
+- food_orders
+- deliveries
+- dispatch_sessions
+- driver_realtime_state
+- payments
+- wallet_transactions
+
+### 2) New endpoints (ADD ONLY)
+`GET /api/admin/monitoring/overview`
+Returns:
+- total_active_drivers
+- total_online_drivers
+- total_active_customers
+- rides_in_progress
+- food_orders_in_progress
+- parcels_in_progress
+- scheduled_parcels_pending
+- total_revenue_today
+- total_commission_today
+- pending_settlements (drivers/restaurants)
+- suspicious_activity_count (from fraud engine)
+
+`GET /api/admin/monitoring/live-map`
+Returns live:
+- driver locations  
+- active rides → pickup/dropoff  
+- active food → restaurant & customer  
+- active parcels → pickup/dropoff + scheduled  
+
+Note:
+- NEVER expose customer home address unless needed; only show coordinates & masked info  
+- NEVER expose KYC documents or ID numbers  
+
+### 3) WebSocket Admin Channel
+Admin joins room: `admin:monitoring`
+
+Real-time events:
+- new ride requested
+- driver assigned
+- ride started/completed
+- food order status changes
+- parcel scheduled / dispatched / delivered
+- fraud_alert_triggered
+
+==================================================
+B. REVENUE ANALYTICS ENGINE (TASK 30)
+==================================================
+
+Create new module: `AdminRevenueModule`
+
+### Data Model (ADD ONLY)
+Create table: `analytics_daily_revenue`
+- id
+- date
+- service_type ("ride" | "food" | "parcel")
+- total_fare
+- total_commission
+- total_partner_payout
+- total_online_payments
+- total_cash_collected_by_partners
+- country_code
+- created_at
+
+Analytics engine runs daily at midnight:
+- aggregates from:
+  - rides.final_fare_amount  
+  - wallet_transactions  
+  - platform_revenue_ledger  
+  - payments  
+
+### Endpoints
+`GET /api/admin/analytics/daily?date=YYYY-MM-DD`
+`GET /api/admin/analytics/summary?range=last_7_days`
+`GET /api/admin/analytics/service-breakdown?country=BD/US`
+
+### Admin Dashboard UI
+Show:
+- fare graph  
+- commission graph  
+- country split  
+- cash vs online ratio  
+- top earning drivers  
+- top restaurants  
+
+==================================================
+C. FRAUD DETECTION ALERTS (TASK 31 – PHASE 1 IMPLEMENTATION)
+==================================================
+
+Create module: `FraudDetectionModule`
+
+This is **Phase 1 (basic)** version, not advanced ML.
+
+### New Table: `fraud_alerts`
+- id
+- entity_type ("ride" | "food" | "parcel" | "wallet" | "payment")
+- entity_id
+- suspected_reason
+- severity ("low" | "medium" | "high")
+- detected_at
+- resolved_by_admin_id (nullable)
+- resolved_notes (nullable)
+
+### Fraud rules to implement:
+(ADD-ONLY, never block legitimate flows)
+
+1. Unusual cancellation patterns:
+- customer cancels 5+ rides within 10 minutes
+- driver repeatedly rejecting assignments within short windows
+
+2. Wallet anomalies:
+- driver_wallet_balance drops below threshold (e.g., -1000 BDT)
+- rapid negative balance increases within 1 day
+
+3. Payment anomalies:
+- repeated failed online payments by same card/customer
+
+4. Location anomalies:
+- driver jumps > 2 km instantly (GPS spoof detection)
+- customer pickup and dropoff identical repeatedly
+
+### When detected:
+- Create fraud_alerts entry  
+- Emit WebSocket event to `admin:monitoring`  
+- Send admin push notification (NotificationService)  
+- DO NOT block users automatically (admin must decide)  
+
+### Admin Endpoints:
+`GET /api/admin/fraud/alerts`
+`PATCH /api/admin/fraud/alerts/:id/resolve`
+
+==================================================
+D. BD-SPECIFIC CURRENCY FORMATTING (TASK 32)
+==================================================
+
+SafeGo must support:
+
+- BDT (৳) formatting  
+- Proper grouping: 1,00,000.00 (not US format)  
+- Currency switching by country_code  
+
+### Implementation:
+Add utility: `CurrencyFormattingService`
+
+Rules:
+- For BD (BDT):  
+  Format: ₹? (use “৳”) → “৳1,25,000.50”  
+  Grouping: 1, 2, 2 system  
+- For US (USD):  
+  Standard US format: “$12,345.67”  
+
+Use this service in:
+- customer receipts  
+- driver earnings  
+- restaurant payouts  
+- admin analytics  
+
+==================================================
+E. NON-BREAKING GUARANTEES
+==================================================
+
+This prompt MUST NOT:
+- modify any Phase 1/2/3 logic,
+- rename any existing column or route,
+- change commission or wallet calculations,
+- change dispatch or payment semantics.
+
+You MUST ONLY ADD:
+- new tables: analytics_daily_revenue, fraud_alerts
+- new admin routes
+- new admin UI panels
+- new service modules: Monitoring, Revenue, Fraud, CurrencyFormatting
+- new WebSocket channels (admin-only)
+
+After implementation:
+- Existing users must continue working as-is  
+- No migration should break old data  
+- All features must be fully backward compatible  
+
+End of Phase 4 – Part 1.

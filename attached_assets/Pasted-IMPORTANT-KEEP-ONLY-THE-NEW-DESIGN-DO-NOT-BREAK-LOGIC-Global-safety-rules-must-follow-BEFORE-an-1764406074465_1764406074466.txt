@@ -1,0 +1,151 @@
+IMPORTANT – KEEP ONLY THE NEW DESIGN, DO NOT BREAK LOGIC
+
+Global safety rules (must follow BEFORE any change):
+
+1. You are NOT allowed to change:
+   - Any backend API route or handler
+   - Any database schema or model
+   - Any fare, pricing, promo, commission, payout, or dispatch logic
+   - Any trip / booking / ride status logic
+   - Any URL paths (/customer, /customer/ride, /customer/ride-request, /customer/unified-booking, etc.)
+
+2. You ARE allowed to change ONLY:
+   - React / frontend components (JSX/TSX)
+   - Layout, styling, CSS, responsive behavior
+   - Which components/pages are rendered for each route
+
+If any previous prompt conflicts with these rules, THIS RULE WINS.
+
+--------------------------------
+GOAL
+
+Right now, the customer web flow is showing TWO different designs:
+
+- The OLD design (old booking layout / old ride cards / old headers)
+- The NEW design (unified-booking layout with SafeGo Ride / SafeGo Eats / SafeGo Parcel tabs, new address capsule and new 3D ride cards)
+
+I want to KEEP ONLY THE NEW DESIGN everywhere and COMPLETELY STOP rendering the old UI, without breaking any logic.
+
+Treat this as a cleanup / unification task.
+
+--------------------------------
+STEP 1 – Identify old vs new components
+
+1. Scan the codebase and list all main customer-facing pages:
+   - /customer
+   - /customer/ride
+   - /customer/ride-request
+   - /customer/unified-booking
+   - Any other customer routes that render booking or ride-selection UIs.
+
+2. For each of these pages, identify:
+   - Which components belong to the OLD design  
+     (old headers, old booking cards, old mobile layout, old “Choose a ride” sections, etc.)
+   - Which components belong to the NEW design  
+     (unified booking layout with three-service switcher, SafeGo Ride cards with 3D car images, new address capsule, “Choose your route” layout, etc.)
+
+3. Add short comments in the code for yourself like:
+// LEGACY CUSTOMER BOOKING LAYOUT – should be removed from render
+// NEW UNIFIED BOOKING LAYOUT – this is the one we keep
+
+Do NOT delete logic, only mark which is legacy vs new.
+
+--------------------------------
+STEP 2 – Choose a single primary layout for customers
+
+1. The primary customer experience should use ONLY the NEW unified booking layout, with:
+   - Top SafeGo header
+   - Service tabs: SafeGo Ride, SafeGo Eats, SafeGo Parcel
+   - Address capsule at the top of the map
+   - New ride card design and new route selection layout.
+
+2. Decide which route is the main entry for customers:
+   - Make `/customer` (or `/customer/unified-booking` if that’s already set) the single, unified main booking page that uses ONLY the new layout.
+
+3. For all other old routes such as:
+   - `/customer/ride`
+   - `/customer/ride-request`
+   - other legacy booking pages
+
+   Do NOT show any old design again. Instead:
+   - Either:
+       a) Redirect them to the main unified booking page, or  
+       b) Render the SAME new unified layout component there.
+   - Choose the simplest approach that does NOT break existing links.
+
+--------------------------------
+STEP 3 – Stop rendering the old UI
+
+1. For each page that still renders any old UI:
+   - Remove the JSX that renders old headers, old cards, old layout, or duplicate address bars.
+   - Replace the root UI with the new unified booking component.
+
+2. Do NOT delete the old components from the filesystem yet.
+   - Just stop importing and using them in any customer-facing pages.
+   - If you keep them, mark them clearly as LEGACY in comments so we know they are unused.
+
+3. Make sure:
+   - On laptop/desktop: the customer sees only the new unified booking design.
+   - On mobile view: the customer also sees only the new design (no duplicate layouts or mismatched screens).
+
+--------------------------------
+STEP 4 – Consistent design across devices
+
+1. Confirm that on both:
+   - Desktop width
+   - iPhone-sized mobile width
+
+   the same NEW design is used:
+   - Same header branding
+   - Same address capsule style
+   - Same SafeGo Ride / SafeGo Eats / SafeGo Parcel tabs
+   - Same 3D vehicle cards and route selection UI
+
+2. Fix any responsive issues where:
+   - Old components still appear on mobile
+   - Scroll shows an old layout underneath or above the new one
+   - Buttons (like “Request ride” or “Choose your route”) are clipped or partially off-screen.
+
+3. Ensure the address capsule does NOT show three different versions across different steps.
+   - When the user is:
+       a) Entering addresses
+       b) Seeing ride prices
+       c) Choosing favorite route
+     the address bar style must stay consistent and must use the NEW capsule design only.
+
+--------------------------------
+STEP 5 – Testing the whole customer flow
+
+Run a full manual test:
+
+1. From `/customer` main page:
+   - Enter pickup and dropoff
+   - Click “See prices” (or equivalent)
+   - Verify:
+       - Only the new design appears (no old booking layout).
+       - New ride cards are used.
+       - Map + routes work as before.
+
+2. Continue to route selection:
+   - Verify the address capsule is still the NEW design.
+   - Confirm:
+
+       - Routes are shown correctly.
+       - “Request ride” button is fully visible and clickable.
+       - No old UI flashes for 2 seconds and then disappears.
+
+3. Compare with previous behavior:
+   - Prices, promos and commission values must be identical.
+   - Any differences in numbers are a bug – fix them by reverting your own UI changes, NOT by changing pricing logic.
+
+--------------------------------
+STEP 6 – Clean-up and summary
+
+1. Once you are done:
+   - Confirm that NO customer-facing page renders the old UI.
+   - Confirm that all customer flows now show only the NEW unified booking design.
+
+2. In your summary back to me:
+   - List which files/pages previously used the old design.
+   - List which components are now considered LEGACY and unused.
+   - Confirm that all tests (desktop + mobile, ride booking end-to-end) passed without logic changes.

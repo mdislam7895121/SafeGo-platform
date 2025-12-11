@@ -1,0 +1,99 @@
+Act as a senior product designer and system architect for SafeGo.
+
+Goal: Upgrade the Driver Account Center by reorganizing and expanding the Vehicle Documents section without breaking any existing features.
+
+Follow all SafeGo conventions:
+– Four roles: customer, driver, restaurant, admin
+– Keep all existing KYC, payouts, referral, opportunity, SafeGo Points, wallet, and onboarding logic intact
+– Do not touch ride, food, or parcel flows
+– Do not modify Driver Dashboard components
+– Do not break any existing URLs, API endpoints, navigation items, or database models
+– All changes must be incremental and non-destructive
+
+========================================
+1. Move existing pages into Account Settings
+========================================
+Inside Driver → Account Settings page, add the following three subsections:
+
+A) Driver Requirements
+   – Documents
+   – Vehicles
+   – Tax Info
+
+B) App Preferences
+   – Map Settings (rename from Map Theme)
+   – Dark Mode
+
+Do not change routing. Only move navigation groups.
+
+========================================
+2. Update Map Settings (new rules)
+========================================
+Map Settings must show three selectable navigation providers:
+– Google Maps
+– Apple Maps
+– Waze
+
+Only one provider can be active at a time.
+Persist selection in driver preferences.
+
+========================================
+3. Expand Vehicle Documents (Global rules)
+========================================
+Every vehicle must support uploading the following documents:
+
+1. Vehicle Registration  
+   – File upload  
+   – Fields: status, expiryDate, lastUpdated  
+
+2. Vehicle Insurance  
+   – File upload  
+   – Fields: status, expiryDate, lastUpdated  
+
+3. Vehicle Inspection  
+   – File upload  
+   – Represents DMV/NYS Inspection where applicable  
+
+4. License Plate Number  
+   – Text field (not file)  
+   – Fields: plateNumber, country, state  
+   – Required for all vehicles  
+
+========================================
+4. NYC-specific requirements (if driver.market = "NYC_TLC")
+========================================
+
+Add an additional required document:
+
+5. TLC License (Diamond)
+   – Text input: TLC license number only  
+   – Not a file upload  
+   – Must show status indicators: pending / approved / rejected  
+
+========================================
+5. UI/UX rules (match Uber)
+========================================
+– White background, left-aligned layout, minimal spacing  
+– Grey card containers  
+– Document status pills: Pending / Approved / Expiring / Rejected  
+– Every document opens to its own detail view (Uber-style)  
+– Secure masking for sensitive fields  
+– Show “Required for verification” under each item  
+
+========================================
+6. Do NOT change anything else
+========================================
+No impact on:
+– Wallet  
+– Earnings  
+– Online/Offline  
+– Trips  
+– SafeGo Points logic  
+– Refer a Friend  
+– Opportunity Bonuses  
+– Notifications  
+– Driver onboarding progress  
+
+Make all changes safely, incrementally, following SafeGo architecture.
+
+Please proceed.

@@ -1,0 +1,167 @@
+You must now implement SafeGo Master Serial Tasks 29–36 (Security Hardening Layer) in ONE unified, non-breaking update. All SafeGo Master Rules remain fully enforced.
+
+=====================================================================
+SECTION 0 — UNBREAKABLE SAFEGO MASTER RULES
+=====================================================================
+You must NOT break:
+• BD/US KYC  
+• existing authentication/login  
+• ride/food/parcel status flows  
+• privacy & consent  
+• fraud prevention  
+• finance/settlement logic  
+• admin permissions and restrictions  
+
+All security upgrades must be additive and fully backward compatible.
+
+=====================================================================
+SECTION 1 — TASK SET (29–36)
+=====================================================================
+
+---------------------------------------------------------------------
+TASK 29 — JWT Rotation System
+---------------------------------------------------------------------
+Implement rotating JWTs:
+• Each login creates:
+    - access_token (short expiry)
+    - refresh_token (stored hashed)
+• On refresh:
+    - Issue new pair
+    - Invalidate old tokens
+• Add table: auth_tokens
+• Enforce:
+    - token reuse detection → fraud event + force logout
+
+---------------------------------------------------------------------
+TASK 30 — OTP Rate Limiting
+---------------------------------------------------------------------
+Add OTP throttling rules:
+• max 3 OTP/minute
+• max 8 OTP/hour
+• track by:
+    - phone number
+    - device_id
+    - IP address
+• If exceeded → block OTP temporarily and log security event
+
+---------------------------------------------------------------------
+TASK 31 — Login Attempt Throttling (Brute Force Protection)
+---------------------------------------------------------------------
+Rules:
+• 5 failed attempts → cooldown 5 minutes
+• 10 failed attempts → temporary account lock
+• Add table: login_attempts
+• If attacker switches IP → still detect by device fingerprint + account ID
+
+---------------------------------------------------------------------
+TASK 32 — Suspicious Login Alerts
+---------------------------------------------------------------------
+Trigger alerts when:
+• new country login
+• new device login
+• rapid IP changes
+• high-risk location detected
+
+Send:
+• Email + SMS (template-only implementation)
+• Log event to security_audit_logs
+
+---------------------------------------------------------------------
+TASK 33 — User Device History Log System
+---------------------------------------------------------------------
+Add:
+• device_history table
+
+Store:
+• device_id
+• model, OS
+• login timestamps
+• IP + geolocation
+• risk score from fraud module
+
+Customer/Driver panel:
+• “Your Devices” section
+• Allow user to remove old devices → force logout
+
+---------------------------------------------------------------------
+TASK 34 — Admin Activity Audit Log Expansion
+---------------------------------------------------------------------
+Extend finance logs to full admin logs:
+• admin_full_audit_logs table
+
+Track:
+• login
+• role changes
+• KYC approval/rejection
+• payout actions
+• setting changes
+• risk threshold edits
+• manual fraud override
+• settlement overrides
+
+Logs must be immutable.
+
+---------------------------------------------------------------------
+TASK 35 — API Rate Limit + Auto-Block System
+---------------------------------------------------------------------
+Rate limits:
+• auth routes: 20 req/min
+• public routes: 60 req/min
+• partner routes: 40 req/min
+• suspicious IP:
+    - auto-block for 30 minutes
+    - log event
+
+Add middleware: apiRateLimiter.ts
+
+---------------------------------------------------------------------
+TASK 36 — Cloud WAF Security Layer (Simulated)
+---------------------------------------------------------------------
+Simulate WAF-style protections:
+• SQLi pattern detection
+• XSS attempt detection
+• Path traversal blocking
+• Header validation
+• Invalid user-agent blocking
+
+Add:
+• wafMiddleware.ts
+• Log blocked attempts to waf_logs table
+
+=====================================================================
+SECTION 2 — DATABASE ADDITIONS (NON-BREAKING)
+=====================================================================
+Add tables:
+• auth_tokens
+• login_attempts
+• device_history
+• admin_full_audit_logs
+• waf_logs
+
+=====================================================================
+SECTION 3 — ADMIN PANEL UPDATES
+=====================================================================
+Add new page:
+**Security Center**
+Tabs:
+• Login Attempts
+• Device History
+• Admin Audit Logs
+• Rate Limit Blocks
+• WAF Logs
+
+=====================================================================
+SECTION 4 — VALIDATION & SAFETY
+=====================================================================
+Before completing:
+• Ensure existing login/signup not broken
+• Ensure partner onboarding unaffected
+• Ensure fraud prevention unchanged
+• Ensure finance logic unchanged
+
+=====================================================================
+SECTION 5 — COMPLETION MESSAGE
+=====================================================================
+When completed, respond:
+
+“Tasks 29–36 (Security Hardening Layer) fully implemented, validated, and SafeGo Master Rules compliant.”

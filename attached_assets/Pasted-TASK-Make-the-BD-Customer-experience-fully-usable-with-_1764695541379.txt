@@ -1,0 +1,289 @@
+TASK: Make the BD Customer experience fully usable with DEMO data for
+Tickets, Rentals, and Shops immediately after signup + login.
+
+Goal:
+- A brand new BD customer account (role=customer, countryCode="BD") should:
+  1) See tabs/entry points for:
+     - BD Tickets
+     - BD Rentals
+     - BD Shops
+  2) See demo data (example tickets, rentals, shops + products) even if
+     there are no real operators yet.
+  3) Be able to complete a full demo flow:
+     - Search → select → book ticket
+     - Choose rental vehicle → submit rental request
+     - Open shop → add item to cart → place order
+  4) All demo actions must respect SafeGo rules and use additive collections.
+
+====================================================
+1) CUSTOMER NAVIGATION (BD ONLY)
+====================================================
+
+Update the customer navigation so that:
+
+- For countryCode="BD", role="customer":
+  - The main customer screen (currently Ride/Eats/Parcel) must also show
+    clear entry points for BD services:
+    * "BD Tickets" (bus tickets)
+    * "BD Rentals" (car rentals)
+    * "BD Shops" (local e-store)
+
+- This can be:
+  - either new tiles/cards on the customer home screen, or
+  - an additional "Bangladesh" tab that shows these three options.
+
+- For countryCode!="BD" (e.g., US):
+  - These BD-specific entries must be completely hidden.
+
+Routing:
+- BD Tickets → /bd/ticket-search   (existing)
+- BD Rentals → /customer/bd-rentals
+- BD Shops   → /customer/bd-shops
+
+Make sure:
+- Only customer role can reach these URLs.
+- If a non-customer tries, redirect to their own dashboard or login.
+
+====================================================
+2) DEMO SEEDING – BD TICKETS
+====================================================
+
+Use the existing ticket_operator backend but add DEMO data support.
+
+2.1 Demo operator:
+- Create a special demo Ticket Operator for BD:
+  - operator_id = DEMO_TICKET_OPERATOR_BD (or similar)
+  - marked with is_demo = true
+  - countryCode="BD"
+
+2.2 Demo routes:
+- Seed at least 6–10 popular routes, e.g.:
+  - ঢাকা ↔ চট্টগ্রাম
+  - ঢাকা ↔ সিলেট
+  - ঢাকা ↔ রাজশাহী
+  - ঢাকা ↔ রংপুর
+  - ঢাকা ↔ কক্সবাজার
+- Every route must be TWO-WAY:
+  - ঢাকার দিক থেকে → গন্তব্য
+  - গন্তব্য থেকে → ঢাকা
+
+- Each route must include:
+  - route_id
+  - from_city, to_city
+  - operator_id (demo operator)
+  - bus_name (e.g., "Shohag Paribahan", "Green Line")
+  - bus_type (AC, Non-AC, Sleeper, etc.)
+  - departure_times (list)
+  - base_fare
+  - seat_layout reference (already implemented)
+
+2.3 Customer search (BD tickets):
+- If a BD customer searches any of these demo routes:
+  - show matching demo trips immediately.
+- If real operators exist for the same route:
+  - show real operators first, then demo as fallback.
+
+2.4 Demo booking:
+- When a BD customer completes a ticket booking on demo operator:
+  - create a "ticket_booking" record marked demo=true
+  - do NOT affect real operator wallet
+  - still follow status flow:
+    requested → confirmed → completed/cancelled_demo
+
+- This must not touch rides/food_orders/deliveries collections.
+
+====================================================
+3) DEMO SEEDING – BD RENTALS
+====================================================
+
+3.1 Demo rental vehicles:
+- Create a minimal rental_vehicles collection if it does not exist yet
+  (add-only, no breaking).
+  Fields:
+  - id
+  - operator_id (link to demo ticket_operator or dedicated demo rental operator)
+  - country_code ("BD")
+  - city ("Dhaka")
+  - vehicle_type (car, microbus, SUV, tourist_bus, bike)
+  - name/model
+  - seats
+  - base_price_per_day
+  - base_price_per_hour (optional)
+  - image_url
+  - is_available (default true)
+  - is_demo (true for demo vehicles)
+  - created_at, updated_at
+
+- Seed at least:
+  - 3 demo cars
+  - 2 demo microbuses
+  - 1 demo SUV
+  - 1 demo tourist bus
+
+3.2 Customer rentals page (/customer/bd-rentals):
+- Below the search + filter chips, show a scrollable list of cards.
+
+Rental card:
+- vehicle image
+- name/model (Bangla-friendly title)
+- type badge (কার / মাইক্রো / এসইউভি / ট্যুরিস্ট বাস / বাইক)
+- seats
+- price summary: "প্রতি দিন শুরু ২,৫০০ টাকা থেকে"
+- CTA: "বিস্তারিত দেখুন"
+
+On card tap:
+- open rental details page (new route):
+  /customer/bd-rentals/[id]
+- show:
+  - full image
+  - description
+  - pricing (per day/hour)
+  - pickup area in Bangla
+  - "রিকোয়েস্ট পাঠান" button
+
+3.3 Demo rental booking:
+- Submitting a rental request should:
+  - create a rental_booking record with:
+    * customer_id
+    * rental_vehicle_id
+    * start_date, end_date (or approximate)
+    * status flow:
+      requested → confirmed_demo → completed_demo OR cancelled_demo
+    * is_demo = true
+  - Display success screen with Bangla text:
+    "ডেমো বুকিং সফল হয়েছে – এটি শুধু পরীক্ষা করার জন্য।"
+
+- No impact on rides, food_orders, or deliveries collection.
+
+====================================================
+4) DEMO SEEDING – BD SHOPS
+====================================================
+
+4.1 Demo shop partners:
+- Create 3–5 demo shop_partner records for BD if none exist:
+  - Example categories:
+    * মুদি দোকান
+    * মোবাইল দোকান
+    * কসমেটিকস
+    * স্টেশনারি
+  - Each shop:
+    - has countryCode="BD"
+    - is_demo = true
+    - location in Dhaka
+
+4.2 Demo products:
+- For each demo shop, seed 10–20 products with minimal fields:
+  - id
+  - shop_id
+  - name (Bangla)
+  - price
+  - image_url (placeholder OK)
+  - category
+  - is_available
+  - is_demo = true
+
+4.3 Customer shops page (/customer/bd-shops):
+- Replace permanent “no shops” empty state.
+- Fetch shops from BD API (existing or new: GET /api/bd/shops).
+- If there are no real shops:
+  - return demo shops.
+- Display cards:
+  - shop logo
+  - shop name (Bangla)
+  - category tag
+  - approximate delivery time (e.g., "৩০–৪৫ মিনিট")
+  - "দোকান খুলুন" CTA.
+
+On card tap:
+- Navigate to existing shop storefront route for that shop_partner.
+- Show product grid using existing storefront engine, including:
+  - product image
+  - name
+  - price
+  - "কার্টে যোগ করুন" button.
+
+4.4 Demo shop order:
+- When placing an order on a demo shop:
+  - create a food_orders-style record or a dedicated shop_order
+    with is_demo = true.
+  - Follow a simplified status flow:
+    placed → accepted_demo → on_the_way_demo → delivered_demo
+  - Do not affect real restaurant or shop wallets.
+
+====================================================
+5) CUSTOMER FLOW AFTER SIGNUP
+====================================================
+
+For a brand new BD customer:
+
+- After signup + login (role=customer, countryCode="BD"):
+  - Redirect to a BD customer home where:
+    * Regular global services: Ride, Eats, Parcel
+    * BD-specific services: Tickets, Rentals, Shops
+    are all visible as separate options.
+
+- Customer should be able to:
+  1) Click into Tickets → search demo routes → book demo ticket.
+  2) Click into Rentals → see demo vehicles → send demo rental request.
+  3) Click into Shops → see demo shops → place demo order.
+
+- No KYC is required for customer to see demo data.
+
+====================================================
+6) SECURITY & GUARDS
+====================================================
+
+- Demo operators and demo shops must be treated like normal operators
+  from the customer perspective, but:
+  - Their internal records are flagged is_demo=true.
+  - They must still not expose any sensitive KYC data to customers.
+
+- Ensure:
+  - Only admin can see the internal is_demo flag and manage demo entities.
+  - Drivers/operators cannot see customer sensitive data.
+
+====================================================
+7) NON-BREAKING GUARANTEE
+====================================================
+
+- Do NOT modify existing schema of:
+  - rides
+  - food_orders
+  - deliveries
+- Only add:
+  - new collections (ticket_booking, rental_vehicles, rental_booking,
+    shop_order) or extend existing ones with additive fields (is_demo, etc.).
+- Do NOT rename existing enums, roles, or fields.
+- Do NOT change US flows or existing customer navigation for US.
+
+====================================================
+8) MODULES / FILES TO UPDATE (GUIDELINE)
+====================================================
+
+Frontend (additive only):
+- Customer navbar / home:
+  - client/src/modules/customer/CustomerHome.tsx
+  - or whichever module renders Ride/Eats/Parcel tabs
+- BD Tickets:
+  - reuse existing /bd/ticket-search, ensure it is reachable from BD home
+- BD Rentals:
+  - client/src/modules/customer/bd/BdRentalsPage.tsx
+  - client/src/modules/customer/bd/BdRentalDetailsPage.tsx
+- BD Shops:
+  - client/src/modules/customer/bd/BdShopsPage.tsx
+  - existing shop storefront module
+
+Backend (additive only):
+- BD ticket demo seeding and API helpers
+- BD rentals:
+  - rental_vehicles and rental_booking collections + customer API
+- BD shops demo seeding and /api/bd/shops endpoint
+
+All changes must be additive. After implementation, test:
+
+1) BD customer with no operators in DB:
+   - still sees demo tickets, rentals, shops, all usable.
+2) BD customer with real operators:
+   - sees real data first, demo only as fallback if needed.
+3) US customer:
+   - never sees BD-specific entries.

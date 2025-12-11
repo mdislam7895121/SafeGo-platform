@@ -1,0 +1,81 @@
+Act as a senior full-stack engineer and SafeGo system architect.
+
+Goal: Fix the "Edit Address" Save Address button so that it properly updates the driver profile and returns to Account Settings. The UI is already built; only the wiring and behavior need to work correctly.
+
+Context:
+- Current route: /driver/account/address (Edit Address screen)
+- Entry point: Account Settings → Address tile → Edit Address page
+- Form fields:
+  - streetAddress
+  - city
+  - state
+  - zipCode
+- After entering address and tapping "Save Address", nothing happens (no API call, no redirect, no error message).
+
+Follow all existing SafeGo conventions and rules:
+- Roles: customer, driver, restaurant, admin (do not break any other role flows).
+- Keep all existing KYC, payouts, tax info, vehicles, and documents untouched.
+- Do not touch ride, food, or parcel booking flows.
+- Do not break any existing URLs or navigation patterns.
+- Keep security rules: authenticated driver only, server-side validation, no trust on client, no leaking of other users’ data.
+
+Implementation tasks (do all of these):
+
+1) Wire up the form submit
+- Locate the Edit Address React/TSX component used for /driver/account/address.
+- Ensure there is a real onSubmit handler on the form and onClick handler on the "Save Address" button.
+- Prevent double submit and show a loading state while saving.
+
+2) Call the correct backend API
+- Reuse the existing driver profile update endpoint if it already exists (for example: PATCH /api/driver/profile or similar).
+- If there is a dedicated address update endpoint, use that instead. Do NOT invent a new route name if a standard one already exists.
+- Send a payload like:
+  {
+    streetAddress: string,
+    city: string,
+    state: string,
+    zipCode: string
+  }
+- Use the currently logged-in driver id from the existing auth/session layer. Never trust any id coming from the client.
+
+3) Validation rules
+- Client-side: basic required validation for all fields.
+- Zip/postal code:
+  - For US drivers: 5-digit numeric ZIP only for now (simple validation).
+  - For all other countries: allow any non-empty string (do not block international use).
+- If validation fails, show inline error messages under the corresponding field and do NOT call the API.
+
+4) Server-side validation and security
+- On the server, ensure:
+  - The request is authenticated as a driver.
+  - The driver can only update their own address (match user id from session/token).
+  - Use a schema (Zod or existing validation utilities) to validate streetAddress, city, state, zipCode.
+- Log the address change in an audit log table if SafeGo already uses one for profile changes.
+- Do not expose any other driver’s data in the response.
+
+5) Success behavior
+- On successful update:
+  - Show a success toast/banner: “Address updated successfully.”
+  - Navigate back to /driver/account.
+  - On the Account Settings screen, show the updated address preview if that UI exists.
+- Make sure the back navigation from the Edit Address page still works normally.
+
+6) Error handling
+- If the API returns a validation error, show those messages on the form.
+- If there is a network or server error, show a generic, safe message: “Unable to update address right now. Please try again later.”
+- Never show raw stack traces or internal error details.
+
+7) Testing and verification
+- Test with:
+  - A US driver (NY address) and verify:
+    - The address actually changes in the database/profile model.
+    - Refreshing /driver/account shows the new address.
+  - A non-US driver (e.g., Bangladesh) to ensure non-US zip/postal codes are accepted.
+- Confirm that:
+  - No other Account Settings sections are broken (Documents, Vehicles, Tax Info, Map Settings, etc.).
+  - Driver Profile, Wallet, SafeGo Points, and Opportunity continue to work as before.
+
+Deliverables:
+- Updated Edit Address page with a fully working Save Address flow.
+- Any necessary backend changes (controller, route, validation) to support updating the driver’s address securely.
+- Brief summary in the Agent log of what was changed (files, APIs, and how to roll back if needed).

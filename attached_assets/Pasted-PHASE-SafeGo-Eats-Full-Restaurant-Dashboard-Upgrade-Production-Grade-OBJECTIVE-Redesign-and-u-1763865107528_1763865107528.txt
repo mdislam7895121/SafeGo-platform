@@ -1,0 +1,186 @@
+PHASE: SafeGo Eats — Full Restaurant Dashboard Upgrade (Production Grade)
+
+OBJECTIVE:
+Redesign and upgrade the Restaurant Dashboard for SafeGo Eats (Food Delivery Phase) to a full Uber Eats–style operational control panel with support for large menus (minimum 500 menu items), real-time order management, and professional insights—without breaking any existing SafeGo backend modules, authentication, RBAC, or database schemas.
+
+GLOBAL RULES (MUST FOLLOW):
+- Do NOT break existing SafeGo routes, roles, RBAC, or API schemas.
+- Use SafeGo UI design system already in use (colors, typography, button shapes).
+- Keep all current security rules active.
+- All changes must be additive, not destructive.
+- Pages must remain performant even with 500+ menu items.
+- Ensure responsive design for mobile/tablet/desktop.
+- Must integrate with the existing SafeGo support system and wallet system.
+
+----------------------------------------------
+1. TOP HEADER (Uber Eats Style)
+----------------------------------------------
+Add a professional header with:
+- Restaurant name
+- City & Restaurant ID
+- “Verified & Active” status chip
+- ONLINE/OFFLINE toggle with live state:
+  - Online → “You’re receiving orders”
+  - Offline → “Not receiving orders now”
+- Small notification bell (unread orders count)
+
+----------------------------------------------
+2. KPI SUMMARY ROW (4 cards)
+----------------------------------------------
+Create a 4-card horizontal summary row:
+1) Today’s Orders (number)
+2) Today’s Earnings (after SafeGo fees)
+3) Active Orders (real-time)
+4) Restaurant Rating (avg + total ratings)
+
+Show empty state if no data exists.
+
+----------------------------------------------
+3. RESTAURANT HOME LAYOUT — TWO COLUMNS
+----------------------------------------------
+
+LEFT COLUMN — ORDERS AREA
+--------------------------------
+Section: Live Orders
+- Show list of all real-time orders with:
+  - Order ID
+  - Received timestamp
+  - Item summary (limit 3 items)
+  - Order type (Delivery / Pickup)
+  - Payment status
+  - Status badge (New, Accepted, Preparing, Ready, Out for Delivery, Completed)
+  - Actions:
+    - New: Accept / Reject
+    - Accepted: Mark Preparing
+    - Preparing: Mark Ready
+    - Ready: Mark Out for Delivery
+    - Completed: Auto-handled
+
+Section: Scheduled Orders
+- Show upcoming scheduled orders (use existing APIs)
+- Show empty state if none exist
+
+RIGHT COLUMN — INFO + WALLET + SHORTCUTS
+--------------------------------
+Card: Restaurant Info
+- Name
+- Address
+- Phone
+- Today’s opening hours
+- Button: Edit Restaurant Info
+
+Card: Wallet Snapshot
+- Current balance
+- Pending payouts
+- Next payout date
+- Button: Go to Wallet
+
+Card: Performance Insights
+- Weekly orders
+- Weekly earnings
+- Cancellation rate
+- Average preparation time
+
+Card: Quick Actions
+- Manage Menu
+- Order History
+- Wallet & Payouts
+- Support Chat
+
+----------------------------------------------
+4. NAVIGATION UPDATE (Required)
+----------------------------------------------
+Update navigation for Restaurant side to:
+
+- Dashboard
+- Orders (full page)
+- Menu (supports 500+ items)
+- Wallet
+- Settings
+- Support
+
+Navigation must not break existing routes.
+
+----------------------------------------------
+5. FULL MENU SYSTEM (MINIMUM 500 ITEMS)
+----------------------------------------------
+Upgrade Menu Management system with:
+
+A) Category System
+- Add categories (e.g., Burgers, Drinks, Rice Bowls, Veg, Non-Veg)
+- Each category can contain 50+ items
+- System must support minimum 500 items without lag
+
+B) Menu Item Structure
+Each item includes:
+- Name
+- Photo
+- Price
+- Description
+- Tags (spicy, vegan, halal, etc.)
+- Availability toggle
+- Variants (Small/Medium/Large)
+- Add-ons (fries, drinks, sauces)
+
+C) Bulk Actions
+- Bulk edit price
+- Bulk toggle availability
+- Bulk category reassign
+
+D) Speed Optimization (MANDATORY)
+- Virtualized list rendering
+- Pagination or infinite scroll
+- API calls must be batched
+- Avoid loading 500 photos at once (lazy loading)
+
+----------------------------------------------
+6. ORDERS PAGE (FULL PAGE)
+----------------------------------------------
+Create complete Uber Eats–style Orders Page with filters:
+
+FILTERS:
+- Status: New, Preparing, Ready, Completed, Cancelled
+- Order type: Delivery / Pickup
+- Time range: Today, This Week, Custom
+- Payment status
+
+EACH ORDER CARD MUST SHOW:
+- Order ID
+- Customer name
+- Items (expandable)
+- Delivery address
+- Rider info (when assigned)
+- Timeline history (auto-generated)
+- Chat button (links to Support)
+
+----------------------------------------------
+7. PERFORMANCE PAGE (OPTIONAL IF EASY)
+----------------------------------------------
+Charts for:
+- Daily orders
+- Weekly orders
+- Monthly revenue
+- Peak hours
+- Best selling items
+
+Backend must not be changed—generate charts from existing APIs.
+
+----------------------------------------------
+8. EMPTY STATES (REQUIRED)
+----------------------------------------------
+Show professional messages when no orders, no menu items, or no analytics.
+
+Example:
+“No live orders right now. You will see orders here when customers start ordering.”
+
+----------------------------------------------
+9. FINAL REQUIREMENTS
+----------------------------------------------
+- Maintain SafeGo security rules (RBAC, JWT, encryption).
+- Do not modify database schema.
+- All pages must be production-grade.
+- Keep loading states clean and modern.
+- Do not break driver/customer workflows.
+
+OUTPUT:
+Apply the redesign directly to the Restaurant Dashboard and related pages, create all new components/pages needed, and confirm once the SafeGo Eats Restaurant Phase is ready.

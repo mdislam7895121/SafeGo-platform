@@ -1,0 +1,62 @@
+Stop asking questions and stop applying partial fixes. You must now run a FULL SYSTEM AUDIT for all Bangladesh customer pages and repair everything in one complete pass.
+
+Authentication fix is NOT enough. You still have broken:
+- BD Tickets list (blank page)
+- BD Rentals list (“problem loading data” loop)
+- BD Shops list (“problem loading data”)
+- Category filters not working
+- Empty-state missing
+- Wrong collection mappings in multiple places
+- Shared hooks returning inconsistent data
+- Mobile responsive layout issues
+
+You must fix ALL OF THESE TOGETHER, not one by one.
+
+==============================
+YOUR MANDATORY OBJECTIVES
+==============================
+
+1. Audit every data-loading function used by:
+   - /customer/bd-tickets
+   - /customer/bd-rentals
+   - /customer/bd-shops
+
+2. Verify:
+   - Correct collection names used
+   - Correct country filter = "BD"
+   - Correct status filters (ACTIVE, PUBLISHED, AVAILABLE)
+   - Correct token usage
+   - No schema mismatches
+   - No silent error swallowing
+
+3. Fix ALL UI states properly:
+   - loading state
+   - true error state
+   - empty list state
+   - working list render
+
+4. Fix category filters for rentals and shops so they correctly filter by:
+   - vehicleType
+   - shopCategory (or the existing equivalent)
+
+5. Remove the fake “problem loading data” card from cases where the API is actually successful but empty.
+
+6. Confirm sample/demo data EXISTS for BD so the pages actually show items.
+
+7. After ALL BD marketplace pages work, run a regression audit to ensure:
+   - customer home still works
+   - ride booking not broken
+   - food delivery screens not broken
+   - parcel screens not broken
+   - driver app unaffected
+   - merchant dashboard unaffected
+   - admin dashboard still loads all resources
+
+8. DO NOT proceed with small, isolated patches.  
+You must complete all corrections in ONE continuous end-to-end implementation.
+
+Deliver a final summary at the end:
+- what was broken
+- what you fixed
+- proof that all pages load with real items
+- confirmation of successful regression test

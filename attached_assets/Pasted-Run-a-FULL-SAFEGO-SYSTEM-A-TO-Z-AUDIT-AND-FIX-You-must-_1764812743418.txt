@@ -1,0 +1,96 @@
+Run a FULL SAFEGO SYSTEM A-TO-Z AUDIT AND FIX.
+
+You must check every module, every flow, every role, every database field, and every API — and repair everything automatically without asking for confirmation.
+
+Your audit must cover ALL SafeGo features:
+
+1. Customer app  
+   - signup/login  
+   - ride booking  
+   - parcel  
+   - food ordering  
+   - e-shop browsing  
+   - notifications  
+   - wallet  
+   - messages  
+   - profile updates  
+
+2. Driver/Delivery app  
+   - signup + KYC (BD + USA rules)  
+   - vehicle info  
+   - ride accept/complete  
+   - delivery accept/complete  
+   - earnings, commission, wallet  
+   - profile + documents  
+   - address, availability, location update  
+
+3. Restaurant partners  
+   - signup  
+   - KYC rules  
+   - branding uploads  
+   - menu upload  
+   - orders  
+   - payment and payouts  
+   - admin view  
+
+4. Shop partners (e-shop)  
+   - signup  
+   - product uploads  
+   - branding  
+   - orders  
+   - payouts  
+   - admin mapping  
+
+5. Ticket operators  
+   - signup  
+   - events  
+   - sales  
+   - payouts  
+   - admin mapping  
+
+6. Admin System  
+   - onboarding overview  
+   - drivers  
+   - restaurants  
+   - shops  
+   - tickets  
+   - approvals  
+   - wallet and commission panel  
+   - full details view for every partner  
+   - permissions  
+   - missing links or broken pages  
+
+7. Database + API  
+   - fix schema mismatches  
+   - fix enum mismatches  
+   - fix broken relations  
+   - fix endpoints  
+   - fix signature problems  
+   - ensure all file uploads work  
+   - ensure all country rules applied  
+   - ensure all commissions and payouts calculate correctly  
+
+8. Security  
+   - verify all role permissions  
+   - fix token / session issues  
+   - verify encryption key usage  
+   - block unauthorized access  
+   - sanitize all uploads  
+   - country-specific onboarding verification  
+
+9. UI/UX  
+   - fix all detail views  
+   - fix all empty states  
+   - fix all images not loading  
+   - fix admin partner details not showing  
+   - ensure mobile + desktop both proper  
+
+Finally create:
+A single FINAL FULL_SYSTEM_AUDIT_REPORT.md with:
+- every problem found  
+- every fix applied  
+- every missing thing completed  
+- verification screenshots  
+- confirmation that the entire SafeGo system is production-ready.
+
+Do not ask me questions. Fix everything by yourself end-to-end.

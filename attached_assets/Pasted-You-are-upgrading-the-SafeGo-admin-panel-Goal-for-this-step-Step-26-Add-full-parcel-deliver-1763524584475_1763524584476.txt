@@ -1,0 +1,201 @@
+You are upgrading the SafeGo admin panel.
+
+Goal for this step (Step 26):
+Add full parcel (delivery) visibility and management for administrators:
+- Parcel statistics on the main admin dashboard
+- Parcel management list page
+- Parcel detail view
+- Non-breaking, secure, admin-only implementation
+
+Important constraints:
+- Do NOT break or modify existing ride, food, driver, customer, or restaurant logic.
+- Keep all changes backwards compatible with existing database schema and seed data.
+- Preserve all existing security rules, especially admin-only routes and authentication.
+- Follow the same patterns already used for drivers/customers (list + details + filters).
+
+Tech context (do NOT change these):
+- Stack: TypeScript, React, TanStack Query, Node/Express (or Next API routes) + Prisma + PostgreSQL (Neon).
+- Auth: Existing JWT / session system – do NOT replace it.
+- Roles: admin, customer, driver, restaurant. Only admin can access the new parcel views.
+- Collections: rides, food_orders, deliveries (parcels). Use the existing deliveries table/model.
+
+================================
+1. Dashboard: parcel statistics
+================================
+
+Extend the main admin dashboard to include parcel-related KPIs.
+
+Add a new section under “Platform Overview” and/or “Driver Statistics”:
+
+- Total Parcels: total number of deliveries (all time)
+- Active Parcels: deliveries with status in [“pending_pickup”, “assigned”, “in_transit”]
+- Delivered Today: count of deliveries with status “delivered” and deliveryDate = today (server time)
+- Cancelled Parcels: count of deliveries with status “cancelled”
+
+Requirements:
+- Use Prisma aggregate queries (count/group) optimized for performance.
+- Reuse the existing auto-refresh mechanism already used for driver stats (5-second polling).
+- Make dashboard cards clickable:
+  - Clicking “Total Parcels” or “Active Parcels” navigates to the new Parcel Management list with corresponding filters applied.
+- Respect existing country filters if already implemented (e.g., BD vs US); show only parcels that belong to the same country context used on the dashboard.
+
+
+================================
+2. Parcel Management list page
+================================
+
+Create a new admin route and page:
+
+- Route: /admin/parcels
+- File: client/src/pages/admin/parcels.tsx  (follow the same structure as drivers.tsx or customers.tsx)
+
+Features:
+- Top filters bar:
+  - Search by parcel ID or customer email (single search box, server-side filter).
+  - Status filter: [All, Pending pickup, Assigned, In transit, Delivered, Cancelled].
+  - Country filter: [All, BD, US] (or reuse existing country filter component).
+- Table/list columns:
+  - Parcel ID (shortened / human-readable code)
+  - Created At (date + time)
+  - Customer email
+  - Pickup location (short text)
+  - Dropoff location (short text)
+  - Status (with colored badge)
+  - Driver (email or "Not assigned")
+  - Price / fare
+  - Actions: "View" button
+
+Behaviour:
+- Server-side pagination (page, pageSize) using TanStack Query with proper query keys.
+- Preserve filter state in URL query params (?status=active&page=2&country=BD) like other admin pages.
+- Clicking “View” navigates to the parcel detail view: /admin/parcels/[id]
+
+
+================================
+3. Parcel Detail view
+================================
+
+Create a new admin route and page:
+
+- Route: /admin/parcels/:id
+- File: client/src/pages/admin/parcel-details.tsx (or similar, consistent naming)
+
+Display sections:
+
+A. Overview
+- Parcel ID
+- Created at
+- Country
+- Current status
+- Last status update time
+
+B. Participants
+- Customer: email, country, link to customer details page
+- Driver: email (if assigned), status (active/suspended), link to driver details page
+- (Optional) Restaurant if this parcel is tied to a food order
+
+C. Locations
+- Pickup address
+- Dropoff address
+- Distance estimate (if stored) or show "Not available"
+
+D. Financials
+- Base price
+- Fees / surcharge (if any)
+- Commission (platform share)
+- Driver payout
+- Final total amount
+
+E. Timeline (simple)
+- List of status changes with timestamps:
+  - created
+  - pending_pickup
+  - assigned
+  - in_transit
+  - delivered / cancelled
+
+Admin actions (for now, read-only):
+- No destructive actions in this step (no delete).
+- Allow only safe admin-only actions if already present in your code (e.g., re-open a complaint).
+- Add a "Back to parcels list" button.
+
+NOTE: This step is primarily about visibility, not operational control. We can add more powerful admin tools for parcels in later steps.
+
+
+================================
+4. Backend: parcel queries & API
+================================
+
+Implement new admin-only API endpoints or extend existing ones (depending on current structure).
+
+General rules:
+- Protect all routes with admin-only middleware (reuse the same guard as driver/customer admin APIs).
+- Use Prisma to query the deliveries table.
+- Reuse existing pagination + filters pattern.
+
+Endpoints (suggested):
+
+1) GET /api/admin/parcels
+   - Query params: page, pageSize, status, country, search
+   - Returns: list of parcels + pagination meta (total, page, pageSize)
+
+2) GET /api/admin/parcels/:id
+   - Returns: full details for the selected parcel, including:
+     - delivery record
+     - related customer
+     - related driver
+     - related order if applicable
+     - status history (if you have a timeline table; otherwise, use whatever is already stored)
+
+3) GET /api/admin/stats/parcels
+   - Returns агрегated metrics for the dashboard:
+     - totalParcels
+     - activeParcels
+     - deliveredToday
+     - cancelledParcels
+
+IMPORTANT:
+- Do not expose customer PII that is not already allowed on admin routes.
+- Do not expose any payment token or raw card information (if any exists in DB).
+- Use select clauses to restrict fields instead of returning entire records blindly.
+
+
+================================
+5. Security measures to apply in this step
+================================
+
+You MUST explicitly apply and/or confirm these security controls:
+
+1) RBAC:
+   - All new parcel admin endpoints use the same admin-only middleware as driver & customer management.
+   - Requests from non-admin roles (customer, driver, restaurant) must receive HTTP 403.
+
+2) Input validation:
+   - Validate page, pageSize, status, country, and search inputs.
+   - Enforce sane limits on pageSize (e.g., max 100).
+
+3) Data minimization:
+   - Do not include sensitive customer data in the parcel list response.
+   - Show only what is needed for the admin list and detail screens.
+
+4) Logging:
+   - If you add any new logs, avoid logging full addresses or PII in plain text.
+   - Log only parcel ID and high-level metadata.
+
+5) Non-breaking:
+   - Do not change the deliveries schema in this step.
+   - Do not change the customer, driver, or restaurant schemas.
+   - Do not modify existing ride or food order flows.
+   - All existing automated tests and flows must continue to pass.
+
+At the end:
+- Run a small set of end-to-end tests:
+  1) Admin opens dashboard and sees parcel metrics.
+  2) Admin clicks parcel metrics card and lands on /admin/parcels with filters.
+  3) Admin filters parcels by status and country.
+  4) Admin opens a parcel detail page and can see:
+     - customer, driver, pickup/dropoff, pricing info, and status timeline.
+- Confirm in the final message that:
+  - No security rules were weakened.
+  - No database schema changes were made.
+  - Existing ride/food/driver/customer features still work as before.

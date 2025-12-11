@@ -1,0 +1,54 @@
+You must follow ALL SafeGo master rules strictly.
+
+Do NOT change or delete any code yet. First, I want a complete status report of the SafeGo CUSTOMER web app only (not driver, not restaurant).
+
+Your job in this step:
+1) Scan the project structure and identify all pages and flows related to the customer app:
+   - Home / landing
+   - /customer/book (ride booking)
+   - /customer/unified-booking (Ride / Eats / Parcel)
+   - Post-booking ride tracking (driver on the way, pickup, in-trip, completed)
+   - Payments & promos
+   - Account / profile / settings
+   - Any other customer-only pages
+
+2) For each of the three core services, tell me what is COMPLETED vs PARTIALLY DONE vs NOT STARTED:
+   A. SafeGo Ride (customer side)
+      - Location detection & address inputs
+      - Route selection (3 routes)
+      - Pricing & promo display
+      - Booking confirmation flow
+      - Live driver tracking and ETA
+      - Cancel ride flow
+      - Trip summary / receipt
+
+   B. SafeGo Eats (customer side)
+      - Restaurant browse & search
+      - Menu and item selection
+      - Cart and checkout
+      - Order status tracking (accepted, being prepared, picked up, delivered)
+
+   C. SafeGo Parcel (customer side)
+      - Sender & receiver details
+      - Package details
+      - Pickup & dropoff selection
+      - Pricing, tracking, and delivery status
+
+3) For security, reliability, and UX, list what is already implemented vs missing:
+   - Input validation and basic security checks
+   - Error states and loading states
+   - Mobile responsiveness for all key screens
+   - Device-friendly layouts (same design logic on desktop and mobile)
+
+4) Output your findings as a clear checklist, in this structure:
+   - SECTION 1: SafeGo Ride – Customer
+   - SECTION 2: SafeGo Eats – Customer
+   - SECTION 3: SafeGo Parcel – Customer
+   - SECTION 4: Shared components (header, nav, promos, map, auth, etc.)
+   For each bullet, mark it as:
+      [DONE], [PARTIAL], or [NOT STARTED]
+   and add a one-line explanation.
+
+5) Based on what is missing, propose an ordered list of NEXT TASKS (Step 1, Step 2, Step 3, …) to fully complete the CUSTOMER app flows, starting from Ride, then Eats, then Parcel. Do NOT start implementing them yet – just list them clearly.
+
+Repeat: In this step you are ONLY analyzing and reporting. No code edits, no refactors, no new features until I confirm the next task.
