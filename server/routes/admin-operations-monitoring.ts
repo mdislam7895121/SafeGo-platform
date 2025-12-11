@@ -280,6 +280,297 @@ router.get("/drivers/status", checkPermission(Permission.VIEW_OPERATIONS), async
   }
 });
 
+// ====================================================
+// GET /api/admin/operations-monitoring/active-food-orders
+// List all active food orders (read-only admin view)
+// ====================================================
+const activeFoodOrdersFilterSchema = z.object({
+  countryCode: z.enum(["BD", "US"]).optional(),
+  status: z.string().optional(),
+  restaurantId: z.string().optional(),
+  driverId: z.string().optional(),
+  limit: z.string().optional(),
+  offset: z.string().optional(),
+});
+
+router.get("/active-food-orders", checkPermission(Permission.VIEW_OPERATIONS), async (req: AuthRequest, res) => {
+  try {
+    const filters = activeFoodOrdersFilterSchema.parse(req.query);
+    const limit = Math.min(parseInt(filters.limit || "50"), 100);
+    const offset = parseInt(filters.offset || "0");
+
+    const whereClause: any = {
+      status: {
+        notIn: ["delivered", "completed", "cancelled", "cancelled_restaurant", "cancelled_customer", "cancelled_driver"],
+      },
+    };
+
+    if (filters.countryCode) {
+      whereClause.restaurant = {
+        is: {
+          countryCode: filters.countryCode,
+        },
+      };
+    }
+
+    if (filters.status) {
+      whereClause.status = filters.status;
+    }
+
+    if (filters.restaurantId) {
+      whereClause.restaurantId = filters.restaurantId;
+    }
+
+    if (filters.driverId) {
+      whereClause.driverId = filters.driverId;
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.foodOrder.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+        select: {
+          id: true,
+          orderCode: true,
+          customerId: true,
+          restaurantId: true,
+          driverId: true,
+          status: true,
+          serviceFare: true,
+          driverPayout: true,
+          restaurantPayout: true,
+          safegoCommission: true,
+          paymentMethod: true,
+          paymentStatus: true,
+          isCommissionSettled: true,
+          createdAt: true,
+          acceptedAt: true,
+          preparingAt: true,
+          readyAt: true,
+          pickedUpAt: true,
+          deliveryAddress: true,
+          customer: {
+            select: {
+              id: true,
+              fullName: true,
+              phoneNumber: true,
+            },
+          },
+          restaurant: {
+            select: {
+              id: true,
+              restaurantName: true,
+              countryCode: true,
+            },
+          },
+          driver: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phoneNumber: true,
+            },
+          },
+        },
+      }),
+      prisma.foodOrder.count({ where: whereClause }),
+    ]);
+
+    const statusCounts = await prisma.foodOrder.groupBy({
+      by: ["status"],
+      where: {
+        status: {
+          notIn: ["delivered", "completed", "cancelled", "cancelled_restaurant", "cancelled_customer"],
+        },
+      },
+      _count: { id: true },
+    });
+
+    res.json({
+      orders: orders.map(o => ({
+        id: o.id,
+        orderCode: o.orderCode,
+        customerId: o.customerId,
+        restaurantId: o.restaurantId,
+        driverId: o.driverId,
+        status: o.status,
+        fare: serializeDecimal(o.serviceFare),
+        driverPayout: serializeDecimal(o.driverPayout),
+        restaurantPayout: serializeDecimal(o.restaurantPayout),
+        safegoCommission: serializeDecimal(o.safegoCommission),
+        paymentMethod: o.paymentMethod,
+        paymentStatus: o.paymentStatus,
+        isCommissionSettled: o.isCommissionSettled,
+        createdAt: o.createdAt,
+        acceptedAt: o.acceptedAt,
+        preparingAt: o.preparingAt,
+        readyAt: o.readyAt,
+        pickedUpAt: o.pickedUpAt,
+        deliveryAddress: o.deliveryAddress,
+        customerName: o.customer?.fullName || "Unknown",
+        customerPhone: o.customer?.phoneNumber || null,
+        restaurantName: o.restaurant?.restaurantName || "Unknown",
+        countryCode: o.restaurant?.countryCode || "US",
+        driverName: o.driver ? `${o.driver.firstName || ""} ${o.driver.lastName || ""}`.trim() : null,
+        driverPhone: o.driver?.phoneNumber || null,
+      })),
+      total,
+      statusCounts: statusCounts.reduce((acc, s) => ({ ...acc, [s.status]: s._count.id }), {}),
+      limit,
+      offset,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid filters", details: error.errors });
+    }
+    console.error("Get active food orders error:", error);
+    res.status(500).json({ error: "Failed to fetch active food orders" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/operations-monitoring/active-parcels
+// List all active parcel deliveries (read-only admin view)
+// ====================================================
+const activeParcelsFilterSchema = z.object({
+  countryCode: z.enum(["BD", "US"]).optional(),
+  status: z.string().optional(),
+  driverId: z.string().optional(),
+  limit: z.string().optional(),
+  offset: z.string().optional(),
+});
+
+router.get("/active-parcels", checkPermission(Permission.VIEW_OPERATIONS), async (req: AuthRequest, res) => {
+  try {
+    const filters = activeParcelsFilterSchema.parse(req.query);
+    const limit = Math.min(parseInt(filters.limit || "50"), 100);
+    const offset = parseInt(filters.offset || "0");
+
+    const whereClause: any = {
+      serviceType: "parcel",
+      status: {
+        notIn: ["delivered", "completed", "cancelled"],
+      },
+    };
+
+    if (filters.countryCode) {
+      whereClause.countryCode = filters.countryCode;
+    }
+
+    if (filters.status) {
+      whereClause.status = filters.status;
+    }
+
+    if (filters.driverId) {
+      whereClause.driverId = filters.driverId;
+    }
+
+    const [parcels, total] = await Promise.all([
+      prisma.delivery.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+        select: {
+          id: true,
+          customerId: true,
+          driverId: true,
+          countryCode: true,
+          status: true,
+          pickupAddress: true,
+          dropoffAddress: true,
+          serviceFare: true,
+          driverPayout: true,
+          safegoCommission: true,
+          paymentMethod: true,
+          paymentStatus: true,
+          isCommissionSettled: true,
+          parcelType: true,
+          chargeableWeightKg: true,
+          codEnabled: true,
+          codAmount: true,
+          codCollected: true,
+          createdAt: true,
+          acceptedAt: true,
+          pickedUpAt: true,
+          senderName: true,
+          receiverName: true,
+          customer: {
+            select: {
+              id: true,
+              fullName: true,
+              phoneNumber: true,
+            },
+          },
+          driver: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phoneNumber: true,
+            },
+          },
+        },
+      }),
+      prisma.delivery.count({ where: whereClause }),
+    ]);
+
+    const statusCounts = await prisma.delivery.groupBy({
+      by: ["status"],
+      where: {
+        serviceType: "parcel",
+        status: {
+          notIn: ["delivered", "completed", "cancelled"],
+        },
+      },
+      _count: { id: true },
+    });
+
+    res.json({
+      parcels: parcels.map(p => ({
+        id: p.id,
+        customerId: p.customerId,
+        driverId: p.driverId,
+        countryCode: p.countryCode || "US",
+        status: p.status,
+        pickupAddress: p.pickupAddress,
+        dropoffAddress: p.dropoffAddress,
+        fare: serializeDecimal(p.serviceFare),
+        driverPayout: serializeDecimal(p.driverPayout),
+        safegoCommission: serializeDecimal(p.safegoCommission),
+        paymentMethod: p.paymentMethod,
+        paymentStatus: p.paymentStatus,
+        isCommissionSettled: p.isCommissionSettled,
+        parcelType: p.parcelType,
+        chargeableWeightKg: p.chargeableWeightKg ? serializeDecimal(p.chargeableWeightKg) : null,
+        codEnabled: p.codEnabled,
+        codAmount: p.codAmount ? serializeDecimal(p.codAmount) : null,
+        codCollected: p.codCollected,
+        createdAt: p.createdAt,
+        acceptedAt: p.acceptedAt,
+        pickedUpAt: p.pickedUpAt,
+        senderName: p.senderName,
+        receiverName: p.receiverName,
+        customerName: p.customer?.fullName || "Unknown",
+        driverName: p.driver ? `${p.driver.firstName || ""} ${p.driver.lastName || ""}`.trim() : null,
+        driverPhone: p.driver?.phoneNumber || null,
+      })),
+      total,
+      statusCounts: statusCounts.reduce((acc, s) => ({ ...acc, [s.status]: s._count.id }), {}),
+      limit,
+      offset,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid filters", details: error.errors });
+    }
+    console.error("Get active parcels error:", error);
+    res.status(500).json({ error: "Failed to fetch active parcels" });
+  }
+});
+
 router.get("/drivers/:driverId/trips", checkPermission(Permission.VIEW_OPERATIONS), async (req: AuthRequest, res) => {
   try {
     const { driverId } = req.params;

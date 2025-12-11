@@ -78,6 +78,16 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Restaurant is not verified" });
     }
 
+    // Country-specific payment validation: US = online only, BD = cash + online
+    const orderCountryCode = restaurant.countryCode || 'US';
+    if (orderCountryCode === 'US' && paymentMethod === 'cash') {
+      return res.status(400).json({ 
+        error: "Cash payments are not available in the United States. Please use online payment.",
+        countryCode: orderCountryCode,
+        allowedPaymentMethods: ['online'],
+      });
+    }
+
     // Stock validation - check if all items have sufficient stock
     const orderItems = Array.isArray(items) ? items : JSON.parse(items);
     const menuItemIds = orderItems.map((item: { menuItemId: string }) => item.menuItemId);

@@ -945,6 +945,223 @@ router.post("/bd/request", requireRole(["customer"]), async (req: AuthRequest, r
   }
 });
 
+// ====================================================
+// POST /api/parcel/us/request - Create a US parcel delivery request
+// US = Online payment only, no cash
+// ====================================================
+const usParcelRequestSchema = z.object({
+  pickupAddress: z.string().min(1).max(500),
+  pickupLat: z.number().min(-90).max(90),
+  pickupLng: z.number().min(-180).max(180),
+  dropoffAddress: z.string().min(1).max(500),
+  dropoffLat: z.number().min(-90).max(90),
+  dropoffLng: z.number().min(-180).max(180),
+  senderName: z.string().min(1).max(100),
+  senderPhone: z.string().min(1).max(20),
+  receiverName: z.string().min(1).max(100),
+  receiverPhone: z.string().min(1).max(20),
+  parcelType: z.string().min(1).max(50),
+  parcelDescription: z.string().max(500).optional(),
+  specialInstructions: z.string().max(500).optional(),
+  sizeCategory: z.enum(["small", "medium", "large", "extra_large"]),
+  weightKg: z.number().min(0.01).max(100).optional(),
+  paymentMethod: z.enum(["online"]),
+});
+
+router.post("/us/request", requireRole(["customer"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = usParcelRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    if (data.paymentMethod !== "online") {
+      return res.status(400).json({
+        error: "Cash payments are not available in the United States. Online payment is required.",
+        allowedPaymentMethods: ["online"],
+      });
+    }
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    if (!customer.isVerified) {
+      return res.status(403).json({ error: "Customer must be verified to request parcel delivery" });
+    }
+
+    if (customer.user.countryCode !== "US") {
+      return res.status(403).json({ 
+        error: "This endpoint is for US customers only. Please use /api/parcel/bd/request for Bangladesh.",
+      });
+    }
+
+    const toRad = (deg: number) => deg * (Math.PI / 180);
+    const R = 6371;
+    const dLat = toRad(data.dropoffLat - data.pickupLat);
+    const dLng = toRad(data.dropoffLng - data.pickupLng);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(data.pickupLat)) * Math.cos(toRad(data.dropoffLat)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceKm = R * c;
+
+    const pricing = await prisma.parcelPricingConfig.findFirst({
+      where: {
+        countryCode: "US",
+        sizeCategory: data.sizeCategory,
+        isActive: true,
+      },
+    });
+
+    const defaultPricing: Record<string, { baseFare: number; perKmRate: number; perKgSurcharge: number }> = {
+      small: { baseFare: 5.00, perKmRate: 1.00, perKgSurcharge: 0.50 },
+      medium: { baseFare: 8.00, perKmRate: 1.25, perKgSurcharge: 0.75 },
+      large: { baseFare: 12.00, perKmRate: 1.50, perKgSurcharge: 1.00 },
+      extra_large: { baseFare: 18.00, perKmRate: 2.00, perKgSurcharge: 1.50 },
+    };
+
+    const pricingData = pricing ? {
+      baseFare: Number(pricing.baseFare),
+      perKmRate: Number(pricing.perKmRate),
+      perKgSurcharge: pricing.perKgSurcharge ? Number(pricing.perKgSurcharge) : 0,
+    } : defaultPricing[data.sizeCategory];
+
+    let fare = pricingData.baseFare + (distanceKm * pricingData.perKmRate);
+    if (data.weightKg) {
+      fare += data.weightKg * pricingData.perKgSurcharge;
+    }
+    fare = Math.round(fare * 100) / 100;
+
+    const commissionPercent = 0.10;
+    const safegoCommission = Math.round(fare * commissionPercent * 100) / 100;
+    const driverPayout = Math.round((fare - safegoCommission) * 100) / 100;
+
+    const deliveryId = `DEL-US-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    const delivery = await prisma.delivery.create({
+      data: {
+        id: deliveryId,
+        customerId: customer.id,
+        pickupAddress: data.pickupAddress,
+        pickupLat: data.pickupLat,
+        pickupLng: data.pickupLng,
+        dropoffAddress: data.dropoffAddress,
+        dropoffLat: data.dropoffLat,
+        dropoffLng: data.dropoffLng,
+        serviceFare: new Prisma.Decimal(fare),
+        safegoCommission: new Prisma.Decimal(safegoCommission),
+        driverPayout: new Prisma.Decimal(driverPayout),
+        paymentMethod: "online",
+        status: "requested",
+        serviceType: "parcel",
+        countryCode: "US",
+        parcelType: data.parcelType,
+        parcelDescription: data.parcelDescription,
+        specialInstructions: data.specialInstructions,
+        senderName: data.senderName,
+        senderPhone: data.senderPhone,
+        receiverName: data.receiverName,
+        receiverPhone: data.receiverPhone,
+        chargeableWeightKg: data.weightKg ? new Prisma.Decimal(data.weightKg) : null,
+        parcelSizeCategory: data.sizeCategory,
+        pricingBreakdown: {
+          baseFare: pricingData.baseFare,
+          distanceKm: Math.round(distanceKm * 100) / 100,
+          distanceFare: Math.round(distanceKm * pricingData.perKmRate * 100) / 100,
+          weightKg: data.weightKg || 0,
+          weightSurcharge: data.weightKg ? Math.round(data.weightKg * pricingData.perKgSurcharge * 100) / 100 : 0,
+          totalFare: fare,
+          currency: "USD",
+        },
+        statusHistory: [{ status: "requested", timestamp: new Date().toISOString(), actor: "customer" }],
+        updatedAt: new Date(),
+      },
+    });
+
+    res.status(201).json({
+      message: "Parcel delivery request created successfully",
+      delivery: {
+        id: delivery.id,
+        status: delivery.status,
+        pickupAddress: delivery.pickupAddress,
+        dropoffAddress: delivery.dropoffAddress,
+        totalCharge: fare,
+        currency: "USD",
+        breakdown: {
+          baseFare: pricingData.baseFare,
+          distanceKm: Math.round(distanceKm * 100) / 100,
+          distanceFare: Math.round(distanceKm * pricingData.perKmRate * 100) / 100,
+          weightSurcharge: data.weightKg ? Math.round(data.weightKg * pricingData.perKgSurcharge * 100) / 100 : 0,
+          commission: safegoCommission,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error("[Parcel US] Error creating delivery:", error);
+    res.status(500).json({ error: error.message || "Failed to create parcel delivery" });
+  }
+});
+
+// GET /api/parcel/us/my-parcels - Get US customer's parcels
+router.get("/us/my-parcels", requireRole(["customer"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const parcels = await prisma.delivery.findMany({
+      where: {
+        customerId: customer.id,
+        serviceType: "parcel",
+        countryCode: "US",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    res.json({
+      parcels: parcels.map((p) => ({
+        id: p.id,
+        status: p.status,
+        pickupAddress: p.pickupAddress,
+        dropoffAddress: p.dropoffAddress,
+        parcelType: p.parcelType,
+        sizeCategory: p.parcelSizeCategory,
+        fare: Number(p.serviceFare),
+        paymentMethod: p.paymentMethod,
+        createdAt: p.createdAt,
+        acceptedAt: p.acceptedAt,
+        deliveredAt: p.deliveredAt,
+        senderName: p.senderName,
+        receiverName: p.receiverName,
+      })),
+    });
+  } catch (error: any) {
+    console.error("[Parcel US] Error fetching parcels:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch parcels" });
+  }
+});
+
 // GET /api/parcel/bd/my-parcels - Get customer's parcels
 router.get("/bd/my-parcels", requireRole(["customer"]), async (req: AuthRequest, res) => {
   try {
