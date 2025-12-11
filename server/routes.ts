@@ -20,6 +20,7 @@ import driverFoodDeliveryRoutes from "./routes/driver-food-delivery"; // Step 46
 import customerRoutes from "./routes/customer";
 import customerFoodRoutes from "./routes/customer-food";
 import customerSupportRoutes from "./routes/customer-support"; // Phase 12
+import customerPaymentRoutes from "./routes/customer-payment"; // Customer Payment Methods
 import restaurantRoutes from "./routes/restaurant";
 import restaurantSupportRoutes from "./routes/restaurant-support"; // Phase 12
 import adminRoutes from "./routes/admin";
@@ -353,6 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/driver/food-delivery", driverFoodDeliveryRoutes); // Step 46: Driver Food Delivery Flow
   app.use("/api/customer", customerRoutes);
   app.use("/api/customer", customerSupportRoutes); // Phase 12
+  app.use("/api/customer/payment", customerPaymentRoutes); // Customer Payment Methods
   app.use("/api/customer/food", customerFoodRoutes);
   app.use("/api/customer/restaurants", customerRestaurantStatusRoutes); // Phase 10
   app.use("/api/customer/restaurants", customerRestaurantPricingRoutes); // Phase 11
