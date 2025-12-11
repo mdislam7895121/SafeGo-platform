@@ -3,21 +3,11 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { uploadOnboardingDocument, getFileUrl } from '../middleware/upload';
+import { calculateAge } from '@shared/dateUtils';
 
 const router = Router();
 
 const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
-
-function calculateAge(dateOfBirth: string): number {
-  const today = new Date();
-  const birthDate = new Date(dateOfBirth);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
@@ -55,8 +45,8 @@ const nestedDriverRegistrationSchema = z.object({
   }),
   vehicleInfo: z.object({
     vehicleType: z.string().min(1, 'Vehicle type required'),
-    vehicleModel: z.string().min(1, 'Vehicle model required'),
-    vehiclePlate: z.string().min(1, 'Vehicle plate required'),
+    vehicleModel: z.string().optional(), // Optional for walking/bicycle delivery
+    vehiclePlate: z.string().optional(), // Optional for walking/bicycle delivery
     vehicleYear: z.string().optional(),
     vehicleMake: z.string().optional(),
     vehicleColor: z.string().optional(),
@@ -151,11 +141,25 @@ function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSc
     if (data.driverType === 'ride' && !documents.driverLicenseExpiry) {
       errors.push('Driver license expiry is required for US ride drivers');
     }
-    if (!vehicleInfo.registrationDocumentUrl) {
-      errors.push('Vehicle registration document is required for US drivers');
-    }
-    if (!vehicleInfo.insuranceDocumentUrl) {
-      errors.push('Vehicle insurance document is required for US drivers');
+    
+    // Vehicle documents are only required for ride-hailing and car delivery drivers
+    // Walking and bicycle delivery drivers don't need vehicle documents
+    const requiresVehicleDocuments = data.driverType === 'ride' || 
+      (data.driverType === 'delivery' && vehicleInfo.vehicleType === 'car');
+    
+    if (requiresVehicleDocuments) {
+      if (!vehicleInfo.vehicleModel || vehicleInfo.vehicleModel.length < 1) {
+        errors.push('Vehicle model is required for US drivers with cars');
+      }
+      if (!vehicleInfo.vehiclePlate || vehicleInfo.vehiclePlate.length < 1) {
+        errors.push('Vehicle license plate is required for US drivers with cars');
+      }
+      if (!vehicleInfo.registrationDocumentUrl) {
+        errors.push('Vehicle registration document is required for US drivers with cars');
+      }
+      if (!vehicleInfo.insuranceDocumentUrl) {
+        errors.push('Vehicle insurance document is required for US drivers with cars');
+      }
     }
     
     if (requiresNycCompliance) {

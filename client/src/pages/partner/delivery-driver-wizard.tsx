@@ -46,6 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, uploadWithAuth } from "@/lib/queryClient";
+import { calculateAge } from "@shared/dateUtils";
 
 interface OnboardingDraft {
   id: string;
@@ -112,16 +113,6 @@ const WIZARD_STEPS = [
   { id: 7, title: "Review & Submit", icon: ClipboardCheck },
 ];
 
-function calculateAge(dateOfBirth: string): number {
-  const today = new Date();
-  const birthDate = new Date(dateOfBirth);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
 
 const personalInfoSchemaBD = z.object({
   fullName: z.string().min(2, "Full name is required"),
