@@ -1,0 +1,247 @@
+=== SAFEGO GLOBAL MASTER RULES (CONTEXT - DO NOT CHANGE) ===
+
+You are working on the SafeGo global super-app platform.
+
+A) ROLES (must always exist, never mixed)
+1. Customer
+2. Driver
+3. Restaurant (Merchant)
+4. Admin
+
+Each role has its own:
+- signup/onboarding flow
+- KYC/verification rules
+- dashboard
+- permissions
+- status flows
+
+No role can see or edit another role’s sensitive data. Never mix access.
+
+B) GLOBAL APP LOGIC
+SafeGo must always support 3 services:
+1. Ride-hailing
+2. Food delivery
+3. Parcel delivery
+
+The app is global but must have country-specific logic.
+
+C) COUNTRY-SPECIFIC KYC (MANDATORY)
+
+Bangladesh (BD) KYC must include:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front/back images)
+- emergency contact details
+- verification_status + is_verified
+
+United States (US) KYC must include:
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified
+
+D) ADMIN PANEL (ALWAYS REQUIRED)
+Admin must be able to:
+- verify customers, drivers, restaurants, shop partners, ticket operators
+- approve/reject KYC with rejection_reason
+- manage pricing, fees, commissions
+- block/unblock any user
+- manage payouts and settlement
+- view driver negative balance
+- view restaurant/shop/ticket negative balance
+
+E) CORE COLLECTIONS (MUST EXIST)
+These collections must exist and stay compatible:
+1. rides
+2. food_orders
+3. deliveries (parcels)
+
+Each must include:
+- identity fields (customer_id, driver_id, restaurant_id, etc.)
+- addresses + geolocation
+- fees + commission
+- payment details
+- timestamps
+- complete status flow
+- rating and feedback
+
+F) COMMISSION & PAYOUT RULES
+
+1. If customer pays CASH ride:
+   - Driver receives full cash
+   - SafeGo commission becomes negative balance in driver_wallet_balance
+   - Driver must settle weekly
+
+2. If food order is CASH:
+   - Restaurant gets all cash
+   - Commission becomes negative balance in restaurant_wallet
+
+3. If shop or ticket order is CASH (BD only):
+   - Partner gets all cash
+   - SafeGo commission becomes negative balance in their wallet
+
+4. If payment is ONLINE (any service):
+   - SafeGo keeps commission automatically
+
+5. Admin can settle balances and mark as paid.
+
+G) SECURITY RULES
+- Customers cannot view driver documents (NID, license, etc.)
+- Drivers cannot view customer NID or sensitive KYC
+- Restaurant/shop/ticket partners cannot view other merchants
+- Only admin can change pricing, commission, verification, blocking
+- Users can update only their own profile
+
+H) STATUS FLOWS
+
+Ride statuses:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+Food statuses:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+Parcel statuses:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+I) ONBOARDING
+Each user type must have multi-step onboarding:
+- Basic info
+- Address
+- ID/KYC upload (country-specific)
+- Emergency contact
+- verification_status = "pending"
+- Block access until approved by admin
+
+J) NOTIFICATIONS
+System must support:
+- New ride alert for driver
+- Food order updates
+- Parcel updates
+- Shop/ticket order updates
+- Verification approval/rejection
+- Important admin notifications
+
+K) NON-BREAKING CHANGE RULE
+- Do not rename or remove existing fields, APIs, or routes.
+- Only ADD new fields/endpoints/components when needed.
+- All changes must be backward-compatible with existing BD and US logic.
+- The shared SafeGo backend is the single source of truth for pricing, GPS, status, and country rules. Frontend must not duplicate business logic.
+
+Keep ALL of these rules in mind while auditing and fixing.
+
+========================================================
+=== TASK: FULL AUDIT AND FIX FOR LANDING PAGE + ROUTING ===
+========================================================
+
+The current issue:
+- /login shows the login screen correctly.
+- The root path "/" (public landing page) is showing a blank white screen.
+- This started after multiple router and lazy-loading optimizations.
+
+I want you to perform a careful, non-breaking audit of the client app and fix the root cause.
+
+Your goals:
+1) Find EXACTLY why "/" is blank.
+2) Restore the existing SafeGo landing page (with Ride / Food / Parcel cards).
+3) Ensure all public routes work WITHOUT breaking any ride/food/parcel/shop/ticket or payment logic.
+
+Do NOT redesign the landing page. Just restore the existing one.
+
+-----------------------------------
+STEP 1 — Create a safety checkpoint
+-----------------------------------
+- Create a checkpoint before making changes so we can roll back if needed.
+
+-----------------------------------
+STEP 2 — Inspect logs and console
+-----------------------------------
+1. Run the client and open the browser console for "/".
+2. Capture all runtime errors and warnings related to:
+   - Landing page component
+   - Router configuration
+   - Dynamic/static imports
+3. Also check the server logs for any build or bundling errors.
+
+Do NOT ignore errors. Write down clearly what the failing module or import is.
+
+-----------------------------------
+STEP 3 — Audit router configuration
+-----------------------------------
+Inspect the main router files, typically:
+- client/src/App.tsx
+- client/src/router/* (or equivalent)
+
+Verify that:
+
+1. Public routes are defined like this (structure-wise, names may differ):
+   - "/"          → LandingPage (existing SafeGo landing)
+   - "/login"    → LoginPage
+   - "/signup"   → SignupPage
+   - "/bd/ride"  → BD ride landing page
+   - "/bd/food"  → BD food landing page
+   - "/bd/parcel"→ BD parcel landing page
+
+2. There is NO redirect from "/" to "/login".
+
+3. The LandingPage component is imported with a STATIC import from the correct path, for example:
+   import LandingPage from "./pages/landing/LandingPage";
+
+4. Remove or disable any React.lazy / Suspense or role-based conditional logic around the root route ("/") that could prevent rendering.
+
+-----------------------------------
+STEP 4 — Audit the LandingPage component
+-----------------------------------
+Open the actual landing page component file.
+
+1. Confirm it does NOT:
+   - depend on authenticated user or user.role
+   - access browser APIs in module scope that might throw
+   - use undefined hooks, contexts, or variables
+
+2. If you see experimental logic (feature flags, AR ideas, voice commands, etc.), ignore/remove them for now. The landing page should be SIMPLE and STABLE:
+   - SafeGo logo + tagline
+   - Buttons: "Sign in", "Create account"
+   - Cards for Ride / Food / Parcel
+
+3. If necessary, temporarily reduce the LandingPage component to a minimal working JSX layout, then re-add existing content carefully.
+
+-----------------------------------
+STEP 5 — Ensure no other modules are broken
+-----------------------------------
+After fixing the landing page:
+
+1. Verify that these still work:
+   - /login
+   - /signup
+   - /bd/ride
+   - /bd/food
+   - /bd/parcel
+   - Admin, driver, restaurant, shop, ticket dashboards AFTER login
+
+2. Confirm that:
+   - No backend routes were changed.
+   - No SafeGo collections, status flows, or payment logic were modified.
+   - BD vs US behaviour remains exactly as before.
+
+-----------------------------------
+STEP 6 — Final verification and summary
+-----------------------------------
+1. Reload "/" and confirm:
+   - The landing page renders correctly.
+   - The console has NO uncaught errors.
+2. Reload "/login" and confirm login still works.
+3. Provide a concise summary:
+
+   - Root cause of the blank landing page.
+   - Files changed.
+   - Why the fix is non-breaking and safe for production.
+
+Do NOT add futuristic features (AR view, voice commands, etc.) as part of this task.
+Focus ONLY on auditing and fixing the routing/landing issue and ensuring stability.
+
