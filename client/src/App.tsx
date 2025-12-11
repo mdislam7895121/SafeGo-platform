@@ -335,6 +335,11 @@ import FraudPreventionCenter from "@/pages/admin/fraud-prevention-center";
 import FinanceCenter from "@/pages/admin/finance-center";
 import PayoutCenter from "@/pages/admin/payout-center";
 import FinanceLogs from "@/pages/admin/finance-logs";
+import FinanceOverview from "@/pages/admin/finance-overview";
+import FinanceGatewayReports from "@/pages/admin/finance-gateway-reports";
+import FinanceDriverBalances from "@/pages/admin/finance-driver-balances";
+import FinanceRestaurantBalances from "@/pages/admin/finance-restaurant-balances";
+import FinanceSettlementsHistory from "@/pages/admin/finance-settlements-history";
 import SecurityCenter from "@/pages/admin/SecurityCenter";
 import ReputationCenter from "@/pages/admin/ReputationCenter";
 import DataGovernanceCenter from "@/pages/admin/DataGovernanceCenter";
@@ -2595,6 +2600,41 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Finance Audit Logs">
             <FinanceLogs />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance/overview">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Finance Overview">
+            <FinanceOverview />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance/gateway-reports">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Gateway Reports">
+            <FinanceGatewayReports />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance/driver-balances">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Driver Balances">
+            <FinanceDriverBalances />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance/restaurant-balances">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Restaurant Balances">
+            <FinanceRestaurantBalances />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance/settlements">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Settlements History">
+            <FinanceSettlementsHistory />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

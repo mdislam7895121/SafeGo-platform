@@ -14846,3 +14846,84 @@ model EmailNotificationLog {
   @@index([statusTrigger])
   @@map("email_notification_logs")
 }
+
+// ========================================
+// ADMIN FINANCE DASHBOARD - SETTLEMENTS
+// ========================================
+
+enum SettlementUserType {
+  driver
+  restaurant
+}
+
+enum SettlementMethod {
+  bank_transfer
+  cash_deposit
+  bkash
+  nagad
+  stripe_payout_adjust
+  other
+}
+
+enum AdminSettlementStatus {
+  pending
+  completed
+  cancelled
+}
+
+model Settlement {
+  id                String            @id @default(uuid())
+  
+  userType          SettlementUserType
+  userId            String
+  userName          String?
+  countryCode       String
+  
+  totalAmount       Decimal           @db.Decimal(12, 2)
+  currency          String            @default("BDT")
+  method            SettlementMethod
+  reference         String?
+  notes             String?           @db.Text
+  
+  status            AdminSettlementStatus  @default(completed)
+  
+  createdByAdminId  String
+  createdByAdminName String?
+  
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  orders            SettlementOrder[]
+  
+  @@index([userType])
+  @@index([userId])
+  @@index([countryCode])
+  @@index([status])
+  @@index([createdByAdminId])
+  @@index([createdAt])
+  @@map("settlements")
+}
+
+enum SettlementOrderType {
+  ride
+  food
+  delivery
+}
+
+model SettlementOrder {
+  id                    String               @id @default(uuid())
+  
+  settlementId          String
+  settlement            Settlement           @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  
+  orderType             SettlementOrderType
+  orderId               String
+  commissionAmountApplied Decimal            @db.Decimal(10, 2)
+  
+  createdAt             DateTime             @default(now())
+  
+  @@index([settlementId])
+  @@index([orderId])
+  @@index([orderType])
+  @@map("settlement_orders")
+}

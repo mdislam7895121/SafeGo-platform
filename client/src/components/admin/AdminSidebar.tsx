@@ -39,6 +39,7 @@ import {
   MessageSquare,
   Store,
   Ticket,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { SafePilotSidebarIcon } from "@/components/safepilot/SafePilotLogo";
@@ -357,6 +358,39 @@ const phase3cNavItems: NavItem[] = [
   },
 ];
 
+const financeDashboardNavItems: NavItem[] = [
+  {
+    title: "Finance Overview",
+    href: "/admin/finance/overview",
+    icon: TrendingUp,
+    navKey: "payouts",
+  },
+  {
+    title: "Gateway Reports",
+    href: "/admin/finance/gateway-reports",
+    icon: CreditCard,
+    navKey: "payouts",
+  },
+  {
+    title: "Driver Balances",
+    href: "/admin/finance/driver-balances",
+    icon: Car,
+    navKey: "payouts",
+  },
+  {
+    title: "Restaurant Balances",
+    href: "/admin/finance/restaurant-balances",
+    icon: UtensilsCrossed,
+    navKey: "payouts",
+  },
+  {
+    title: "Settlements",
+    href: "/admin/finance/settlements",
+    icon: HandCoins,
+    navKey: "payouts",
+  },
+];
+
 const phase4NavItems: NavItem[] = [
   {
     title: "SafePilot",
@@ -565,6 +599,19 @@ export function AdminSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {renderNavGroup(configNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {renderNavGroup(financeDashboardNavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Finance Dashboard
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(financeDashboardNavItems)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

@@ -93,6 +93,7 @@ import settlementFinanceRoutes from "./routes/settlement-finance"; // SafeGo Mas
 import securityHardeningRoutes from "./routes/security"; // SafeGo Master Tasks 29-36: Security Hardening Layer
 import ratingRoutes from "./routes/rating"; // SafeGo Master Tasks 37-42: Ratings & Reputation Engine
 import adminReputationRoutes from "./routes/admin-reputation"; // SafeGo Master Tasks 37-42: Admin Reputation Center
+import adminFinanceRoutes from "./routes/admin-finance"; // Admin Finance Dashboard: Revenue, Balances, Settlements
 import dataRightsRoutes from "./routes/data-rights"; // SafeGo Master Tasks 43-47: Data Rights & Retention Layer
 import systemHealthRoutes from "./routes/system-health"; // SafeGo Master Tasks 48-51: Pre-Launch System Readiness
 import contactSubmissionsRoutes from "./routes/contact-submissions"; // Public Contact Form Submissions
@@ -384,6 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/security-hardening", securityHardeningRoutes); // SafeGo Master Tasks 29-36: Security Hardening Layer
   app.use("/api/rating", ratingRoutes); // SafeGo Master Tasks 37-42: Ratings & Reputation Engine
   app.use("/api/admin/reputation", adminReputationRoutes); // SafeGo Master Tasks 37-42: Admin Reputation Center
+  app.use("/api/admin/finance", adminFinanceRoutes); // Admin Finance Dashboard: Revenue, Balances, Settlements
   app.use(dataRightsRoutes); // SafeGo Master Tasks 43-47: Data Rights & Retention Layer
   app.use(systemHealthRoutes); // SafeGo Master Tasks 48-51: Pre-Launch System Readiness
   app.use("/api/food-orders", foodOrderRoutes);
