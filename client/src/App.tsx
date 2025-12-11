@@ -13,19 +13,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
 
-// Core auth pages (non-lazy for fast initial load)
+// Core pages (non-lazy for fast initial load)
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import NotFound from "@/pages/not-found";
-
-// Lazy-loaded public landing pages
-const LandingPage = lazy(() => import("@/pages/landing/LandingPage").then(m => ({ default: m.default })));
-const ContactPage = lazy(() => import("@/pages/landing/ContactPage").then(m => ({ default: m.default })));
-const HelpPage = lazy(() => import("@/pages/landing/HelpPage").then(m => ({ default: m.default })));
-const TermsPage = lazy(() => import("@/pages/landing/TermsPage").then(m => ({ default: m.default })));
-const PrivacyPage = lazy(() => import("@/pages/landing/PrivacyPage").then(m => ({ default: m.default })));
-const CookiesPage = lazy(() => import("@/pages/landing/CookiesPage").then(m => ({ default: m.default })));
-const PartnerOnboardingPage = lazy(() => import("@/pages/landing/PartnerOnboardingPage").then(m => ({ default: m.default })));
+import SimpleLanding from "@/pages/SimpleLanding";
 
 // Lazy-loaded route modules for major sections
 const AdminRoutes = lazy(() => import("@/routes/AdminRoutes").then(m => ({ default: m.AdminRoutes })));
@@ -134,11 +126,9 @@ function Router() {
 
   return (
     <Switch>
-      {/* Public Routes - no auth required */}
+      {/* Public Routes - no auth required, static imports for reliability */}
       <Route path="/">
-        <Suspense fallback={<LoadingSpinner />}>
-          <LandingPage />
-        </Suspense>
+        <SimpleLanding />
       </Route>
       <Route path="/login">
         <Login />
@@ -146,52 +136,16 @@ function Router() {
       <Route path="/signup">
         <Signup />
       </Route>
-      <Route path="/contact">
-        <Suspense fallback={<LoadingSpinner />}>
-          <ContactPage />
-        </Suspense>
-      </Route>
-      <Route path="/help">
-        <Suspense fallback={<LoadingSpinner />}>
-          <HelpPage />
-        </Suspense>
-      </Route>
-      <Route path="/terms">
-        <Suspense fallback={<LoadingSpinner />}>
-          <TermsPage />
-        </Suspense>
-      </Route>
-      <Route path="/privacy">
-        <Suspense fallback={<LoadingSpinner />}>
-          <PrivacyPage />
-        </Suspense>
-      </Route>
-      <Route path="/cookies">
-        <Suspense fallback={<LoadingSpinner />}>
-          <CookiesPage />
-        </Suspense>
-      </Route>
-      <Route path="/partner">
-        <Suspense fallback={<LoadingSpinner />}>
-          <PartnerOnboardingPage />
-        </Suspense>
-      </Route>
       
       {/* BD public service routes */}
       <Route path="/bd/ride">
-        <Suspense fallback={<LoadingSpinner />}>
-          <LandingPage />
-        </Suspense>
+        <SimpleLanding />
       </Route>
       <Route path="/bd/food">
-        <Suspense fallback={<LoadingSpinner />}>
-          <LandingPage />
-        </Suspense>
+        <SimpleLanding />
       </Route>
       <Route path="/bd/parcel">
-        <Suspense fallback={<LoadingSpinner />}>
-          <LandingPage />
-        </Suspense>
+        <SimpleLanding />
       </Route>
       
       {/* Admin Routes - lazy loaded, auth checked inside component */}
