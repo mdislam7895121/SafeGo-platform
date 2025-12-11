@@ -77,3 +77,10 @@ Key Features:
 - MD5 signature verification for webhook security
 - Proper status mapping to SafeGo payment states
 - Cash remains default and active during rollout
+- Feature flag gating requires both flag AND credentials
+- Order-level payment tracking fields (paymentCountryCode, paymentCurrency, paymentProvider, paymentReferenceId, paymentMetadata, isCommissionSettled)
+- Commission auto-settlement for online payments (no negative balance)
+
+Architecture Documentation:
+- `docs/bd_online_payments_architecture.md` - Technical flow and integration details
+- `docs/payment_providers_overview.md` - Provider comparison and extension guide
