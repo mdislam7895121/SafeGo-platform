@@ -293,6 +293,7 @@ import AdminSupportTickets from "@/pages/admin-portal/support-tickets";
 import AdminSupportTicketDetail2 from "@/pages/admin-portal/support-ticket-detail";
 import AdminDriverSupportCenter from "@/pages/admin/driver-support";
 import AdminMobileWalletConfig from "@/pages/admin/mobile-wallet-config";
+import AdminPaymentMethodsConfig from "@/pages/admin/payment-methods-config";
 import AdminRidePricingConfig from "@/pages/admin/ride-pricing-config";
 import AdminRideRequests from "@/pages/admin/ride-requests";
 import AdminBdTaxSettings from "@/pages/admin/bd-tax-settings";
@@ -2098,6 +2099,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Mobile Wallet Config">
             <AdminMobileWalletConfig />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payment-methods-config">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Payment Methods Config">
+            <AdminPaymentMethodsConfig />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
