@@ -80,12 +80,15 @@ router.post("/bkash", async (req: Request, res: Response) => {
 
 router.post("/sslcommerz/ipn", async (req: Request, res: Response) => {
   try {
+    console.log("[SSLCommerz IPN] Received callback:", JSON.stringify(req.body, null, 2));
     const payload = new URLSearchParams(req.body).toString();
     
     const result = await paymentService.handleWebhook(
       PaymentProvider.sslcommerz,
       payload
     );
+    
+    console.log("[SSLCommerz IPN] Processing result:", result);
     
     if (!result.success) {
       console.error("[PaymentWebhook] SSLCOMMERZ IPN error:", result.message);
@@ -101,12 +104,15 @@ router.post("/sslcommerz/ipn", async (req: Request, res: Response) => {
 
 router.post("/sslcommerz/success", async (req: Request, res: Response) => {
   try {
+    console.log("[SSLCommerz SUCCESS] Received callback:", JSON.stringify(req.body, null, 2));
     const payload = new URLSearchParams(req.body).toString();
     
     const result = await paymentService.handleWebhook(
       PaymentProvider.sslcommerz,
       payload
     );
+    
+    console.log("[SSLCommerz SUCCESS] Processing result:", result);
     
     const redirectUrl = result.success 
       ? "/payment/success"
@@ -121,12 +127,15 @@ router.post("/sslcommerz/success", async (req: Request, res: Response) => {
 
 router.post("/sslcommerz/fail", async (req: Request, res: Response) => {
   try {
+    console.log("[SSLCommerz FAIL] Received callback:", JSON.stringify(req.body, null, 2));
     const payload = new URLSearchParams(req.body).toString();
     
-    await paymentService.handleWebhook(
+    const result = await paymentService.handleWebhook(
       PaymentProvider.sslcommerz,
       payload
     );
+    
+    console.log("[SSLCommerz FAIL] Processing result:", result);
     
     res.redirect("/payment/failed");
   } catch (error: any) {
@@ -137,12 +146,15 @@ router.post("/sslcommerz/fail", async (req: Request, res: Response) => {
 
 router.post("/sslcommerz/cancel", async (req: Request, res: Response) => {
   try {
+    console.log("[SSLCommerz CANCEL] Received callback:", JSON.stringify(req.body, null, 2));
     const payload = new URLSearchParams(req.body).toString();
     
-    await paymentService.handleWebhook(
+    const result = await paymentService.handleWebhook(
       PaymentProvider.sslcommerz,
       payload
     );
+    
+    console.log("[SSLCommerz CANCEL] Processing result:", result);
     
     res.redirect("/payment/cancelled");
   } catch (error: any) {

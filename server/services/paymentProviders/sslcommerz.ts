@@ -74,18 +74,21 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
   private getConfig(): SSLCommerzConfig | null {
     const isSandbox = process.env.SSLCOMMERZ_SANDBOX_ENABLED_BD === "true";
     
+    // Use sandbox-specific credentials if available, otherwise fall back to main credentials
     const storeId = isSandbox
-      ? process.env.SSLCOMMERZ_SANDBOX_STORE_ID_BD
+      ? (process.env.SSLCOMMERZ_SANDBOX_STORE_ID_BD || process.env.SSLCOMMERZ_STORE_ID_BD)
       : process.env.SSLCOMMERZ_STORE_ID_BD;
     
     const storePassword = isSandbox
-      ? process.env.SSLCOMMERZ_SANDBOX_PASSWORD_BD
+      ? (process.env.SSLCOMMERZ_SANDBOX_PASSWORD_BD || process.env.SSLCOMMERZ_STORE_PASSWORD_BD)
       : process.env.SSLCOMMERZ_STORE_PASSWORD_BD;
 
     if (!storeId || !storePassword) {
+      console.log(`[SSLCommerz] Config check: sandbox=${isSandbox}, storeId=${!!storeId}, password=${!!storePassword}`);
       return null;
     }
 
+    console.log(`[SSLCommerz] Using ${isSandbox ? 'SANDBOX' : 'LIVE'} mode with store: ${storeId}`);
     return { storeId, storePassword, isSandbox };
   }
 
@@ -118,10 +121,17 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
       const tranId = this.generatePaymentId();
       const baseUrl = this.getBaseUrl();
       
-      const successUrl = `${process.env.APP_BASE_URL || ""}/api/payments/sslcommerz/success`;
-      const failUrl = `${process.env.APP_BASE_URL || ""}/api/payments/sslcommerz/fail`;
-      const cancelUrl = `${process.env.APP_BASE_URL || ""}/api/payments/sslcommerz/cancel`;
-      const ipnUrl = `${process.env.APP_BASE_URL || ""}/api/payments/sslcommerz/ipn`;
+      // SSLCOMMERZ requires absolute URLs for callbacks
+      const appBaseUrl = process.env.APP_BASE_URL 
+        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null) 
+        || "https://localhost:5000";
+      
+      const successUrl = `${appBaseUrl}/api/payments/sslcommerz/success`;
+      const failUrl = `${appBaseUrl}/api/payments/sslcommerz/fail`;
+      const cancelUrl = `${appBaseUrl}/api/payments/sslcommerz/cancel`;
+      const ipnUrl = `${appBaseUrl}/api/payments/sslcommerz/ipn`;
+      
+      console.log(`[SSLCommerz] Using callback base URL: ${appBaseUrl}`);
 
       const requestData = new URLSearchParams({
         store_id: config.storeId,
@@ -149,6 +159,9 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
         value_d: params.idempotencyKey || "",
       });
 
+      console.log(`[SSLCommerz] Sending request to: ${baseUrl}/gwprocess/v4/api.php`);
+      console.log(`[SSLCommerz] Request data:`, Object.fromEntries(requestData.entries()));
+
       const response = await fetch(`${baseUrl}/gwprocess/v4/api.php`, {
         method: "POST",
         headers: {
@@ -157,7 +170,23 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
         body: requestData.toString(),
       });
 
-      const result: SSLCommerzSessionResponse = await response.json();
+      const responseText = await response.text();
+      console.log(`[SSLCommerz] Raw API response:`, responseText);
+      
+      let result: SSLCommerzSessionResponse;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error(`[SSLCommerz] Failed to parse response as JSON:`, responseText);
+        return {
+          success: false,
+          status: PaymentStatus.failed,
+          error: `Invalid API response: ${responseText.substring(0, 200)}`,
+          errorCode: "invalid_response",
+        };
+      }
+
+      console.log(`[SSLCommerz] Parsed response:`, result);
 
       if (result.status === "SUCCESS" && result.GatewayPageURL) {
         console.log(`[SSLCommerz] Session created: ${tranId}`);
@@ -169,11 +198,14 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
         };
       }
 
-      console.error(`[SSLCommerz] Session creation failed:`, result.desc);
+      const errorMessage = (result as any).failedreason 
+        || result.desc?.join(", ") 
+        || "Failed to create payment session";
+      console.error(`[SSLCommerz] Session creation failed:`, errorMessage, result);
       return {
         success: false,
         status: PaymentStatus.failed,
-        error: result.desc?.join(", ") || "Failed to create payment session",
+        error: errorMessage,
         errorCode: "session_creation_failed",
       };
     } catch (error) {
