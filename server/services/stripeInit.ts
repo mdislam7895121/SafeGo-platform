@@ -45,14 +45,19 @@ export async function initStripe(): Promise<{ success: boolean; webhookUuid?: st
     webhookUuid = uuid;
     console.log(`[StripeInit] Webhook configured: ${webhook.url} (UUID: ${uuid})`);
 
-    console.log('[StripeInit] Starting Stripe data backfill...');
-    stripeSync.syncBackfill()
-      .then(() => {
-        console.log('[StripeInit] Stripe data synced successfully');
-      })
-      .catch((err: any) => {
-        console.error('[StripeInit] Error syncing Stripe data:', err);
-      });
+    // Skip heavy backfill in development to reduce memory usage
+    if (process.env.SKIP_STRIPE_SYNC === 'true' || (process.env.NODE_ENV === 'development' && process.env.FORCE_STRIPE_SYNC !== 'true')) {
+      console.log('[StripeInit] Skipping Stripe backfill in development mode (set FORCE_STRIPE_SYNC=true to enable)');
+    } else {
+      console.log('[StripeInit] Starting Stripe data backfill...');
+      stripeSync.syncBackfill()
+        .then(() => {
+          console.log('[StripeInit] Stripe data synced successfully');
+        })
+        .catch((err: any) => {
+          console.error('[StripeInit] Error syncing Stripe data:', err);
+        });
+    }
 
     stripeInitialized = true;
     return { success: true, webhookUuid: uuid };
