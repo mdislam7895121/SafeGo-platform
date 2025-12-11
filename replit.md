@@ -84,3 +84,28 @@ Key Features:
 Architecture Documentation:
 - `docs/bd_online_payments_architecture.md` - Technical flow and integration details
 - `docs/payment_providers_overview.md` - Provider comparison and extension guide
+
+## Admin Finance Dashboard (December 2024)
+
+**Comprehensive Finance Monitoring & Settlement System**
+
+A full-featured admin dashboard for revenue monitoring, gateway reporting, partner balance tracking, and settlement management:
+
+- **Routes**: `/admin/finance/*` (overview, gateway-reports, driver-balances, restaurant-balances, settlements)
+- **Backend**: `server/routes/admin-finance.ts`, `server/services/financeStatsService.ts`
+- **RBAC**: Uses existing `payouts` navigation key, accessible by FINANCE_ADMIN and super admins
+
+Key Features:
+- **Finance Overview**: Revenue by country/service, negative balance summaries, top 10 partners by owed commission
+- **Gateway Reports**: Transaction history with filters by country, provider, method, status, and date range
+- **Driver Balances**: List drivers with negative balances, view unsettled orders, record settlements
+- **Restaurant Balances**: Same capabilities for restaurant partners
+- **Settlements History**: Complete audit trail of all recorded settlements with order-level detail
+
+Settlement Workflow:
+1. Admin views partner with negative balance
+2. Opens detail sheet showing unsettled orders
+3. Records settlement with amount, method (bank transfer, bKash, Nagad, etc.), reference
+4. System updates partner balance and marks orders as settled
+
+Frontend Pages: `client/src/pages/admin/finance-*.tsx`
