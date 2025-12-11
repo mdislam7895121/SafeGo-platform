@@ -126,10 +126,10 @@ class SSLCommerzPaymentProvider extends BasePaymentProvider {
         || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null) 
         || "https://localhost:5000";
       
-      const successUrl = `${appBaseUrl}/api/payments/sslcommerz/success`;
-      const failUrl = `${appBaseUrl}/api/payments/sslcommerz/fail`;
-      const cancelUrl = `${appBaseUrl}/api/payments/sslcommerz/cancel`;
-      const ipnUrl = `${appBaseUrl}/api/payments/sslcommerz/ipn`;
+      const successUrl = `${appBaseUrl}/api/webhooks/payments/sslcommerz/success`;
+      const failUrl = `${appBaseUrl}/api/webhooks/payments/sslcommerz/fail`;
+      const cancelUrl = `${appBaseUrl}/api/webhooks/payments/sslcommerz/cancel`;
+      const ipnUrl = `${appBaseUrl}/api/webhooks/payments/sslcommerz/ipn`;
       
       console.log(`[SSLCommerz] Using callback base URL: ${appBaseUrl}`);
 
