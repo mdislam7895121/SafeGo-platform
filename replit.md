@@ -53,4 +53,27 @@ See `AUDIT_PHASE1_REPORT.md` and `AUDIT_FINAL_REPORT.md` for detailed audit docu
 *   **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.
 *   **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 *   **UI Components**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
-*   **Third-party Services**: Twilio (SMS OTP), AgentMail (Email OTP), Stripe (payment gateway), Google Maps Platform (Maps JavaScript API, Places API, Directions API, Geocoding API), bKash, Nagad, Checkr, AWS Rekognition, Persona/Onfido.
+*   **Third-party Services**: Twilio (SMS OTP), AgentMail (Email OTP), Stripe (payment gateway - US), SSLCOMMERZ (payment gateway - Bangladesh), Google Maps Platform (Maps JavaScript API, Places API, Directions API, Geocoding API), bKash, Nagad, Checkr, AWS Rekognition, Persona/Onfido.
+
+## Bangladesh Online Payments Integration (December 2024)
+
+**SSLCOMMERZ Gateway Integration - Phase 0-3 Complete**
+
+The platform now supports online payments in Bangladesh through SSLCOMMERZ:
+
+- **Gateway Provider**: SSLCOMMERZ (`server/services/paymentProviders/sslcommerz.ts`)
+- **Feature Flag**: `FEATURE_BD_ONLINE_PAYMENTS_ENABLED` (default: false, start in sandbox)
+- **Environment Variables Required**:
+  - `SSLCOMMERZ_STORE_ID_BD` / `SSLCOMMERZ_SANDBOX_STORE_ID_BD`
+  - `SSLCOMMERZ_STORE_PASSWORD_BD` / `SSLCOMMERZ_SANDBOX_PASSWORD_BD`
+  - `SSLCOMMERZ_SANDBOX_ENABLED_BD` (set to "true" for sandbox mode)
+- **Webhook Endpoints**: `/api/payments/sslcommerz/ipn`, `/success`, `/fail`, `/cancel`
+- **Supported Methods**: Cards (Visa, MC, AMEX), Mobile Wallets (bKash, Nagad, Rocket, Upay), Internet Banking
+- **Business Setup Guide**: `docs/bd_payments_business_setup.md`
+
+Key Features:
+- Session-based redirect flow with SSLCOMMERZ hosted checkout
+- Server-side transaction validation via SSLCOMMERZ API
+- MD5 signature verification for webhook security
+- Proper status mapping to SafeGo payment states
+- Cash remains default and active during rollout
