@@ -78,8 +78,9 @@ const DEFAULT_METHOD_DESCRIPTIONS: Record<string, string> = {
 };
 
 function isBdOnlinePaymentsEnabled(): boolean {
-  return process.env.FEATURE_BD_ONLINE_PAYMENTS_ENABLED === "true" &&
-    !!process.env.SSLCOMMERZ_STORE_ID_BD || !!process.env.SSLCOMMERZ_SANDBOX_STORE_ID_BD;
+  const featureEnabled = process.env.FEATURE_BD_ONLINE_PAYMENTS_ENABLED === "true";
+  const hasCredentials = !!process.env.SSLCOMMERZ_STORE_ID_BD || !!process.env.SSLCOMMERZ_SANDBOX_STORE_ID_BD;
+  return featureEnabled && hasCredentials;
 }
 
 export class PaymentOptionsService {

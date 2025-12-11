@@ -141,6 +141,7 @@ export class SettlementService {
           data: {
             settlementStatus: "settled",
             settledAt: new Date(),
+            isCommissionSettled: paymentMethod !== "cash",
           },
         });
 
@@ -336,6 +337,7 @@ export class SettlementService {
           data: {
             settlementStatus: "settled",
             settledAt: new Date(),
+            isCommissionSettled: paymentMethod !== "cash",
           },
         });
 
@@ -512,6 +514,7 @@ export class SettlementService {
           data: {
             settlementStatus: "settled",
             settledAt: new Date(),
+            isCommissionSettled: paymentMethod !== "cash",
           },
         });
 
