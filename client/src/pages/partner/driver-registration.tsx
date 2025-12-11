@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isPartnerAvailable, getPartnerConfig, type PartnerType } from "@shared/partnerAvailability";
+import { calculateAge } from "@shared/dateUtils";
 // V1 is kept in ./legacy/driver-registration-v1.tsx for backup/reference only
 // V2 is now the only version used for driver onboarding (feature flag bypass)
 
@@ -55,17 +56,6 @@ const EMERGENCY_RELATIONSHIPS = [
   { value: 'friend', label: 'Friend' },
   { value: 'other', label: 'Other' },
 ];
-
-function calculateAge(dateOfBirth: string): number {
-  const today = new Date();
-  const birthDate = new Date(dateOfBirth);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
 
 const personalInfoSchemaUS = z.object({
   usaFullLegalName: z.string().min(2, "Full legal name is required"),
