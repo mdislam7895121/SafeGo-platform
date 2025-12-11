@@ -67,7 +67,7 @@ The platform now supports online payments in Bangladesh through SSLCOMMERZ:
   - `SSLCOMMERZ_STORE_ID_BD` / `SSLCOMMERZ_SANDBOX_STORE_ID_BD`
   - `SSLCOMMERZ_STORE_PASSWORD_BD` / `SSLCOMMERZ_SANDBOX_PASSWORD_BD`
   - `SSLCOMMERZ_SANDBOX_ENABLED_BD` (set to "true" for sandbox mode)
-- **Webhook Endpoints**: `/api/payments/sslcommerz/ipn`, `/success`, `/fail`, `/cancel`
+- **Webhook Endpoints**: `/api/webhooks/payments/sslcommerz/ipn`, `/success`, `/fail`, `/cancel`
 - **Supported Methods**: Cards (Visa, MC, AMEX), Mobile Wallets (bKash, Nagad, Rocket, Upay), Internet Banking
 - **Business Setup Guide**: `docs/bd_payments_business_setup.md`
 

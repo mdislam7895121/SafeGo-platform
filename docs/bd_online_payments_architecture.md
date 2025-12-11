@@ -72,7 +72,7 @@ Validates and processes webhook callbacks from SSLCOMMERZ.
 
 ## Callback Endpoints
 
-**Base Path:** `/api/payments/sslcommerz/`
+**Base Path:** `/api/webhooks/payments/sslcommerz/`
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|

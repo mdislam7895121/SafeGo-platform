@@ -120,10 +120,10 @@ router.get("/payment/bd/status", async (req, res) => {
       storeIdPresent: !!(process.env.SSLCOMMERZ_STORE_ID_BD || process.env.SSLCOMMERZ_SANDBOX_STORE_ID_BD),
       passwordPresent: !!(process.env.SSLCOMMERZ_STORE_PASSWORD_BD || process.env.SSLCOMMERZ_SANDBOX_PASSWORD_BD),
       callbackUrls: {
-        success: "/api/payments/sslcommerz/success",
-        fail: "/api/payments/sslcommerz/fail",
-        cancel: "/api/payments/sslcommerz/cancel",
-        ipn: "/api/payments/sslcommerz/ipn",
+        success: "/api/webhooks/payments/sslcommerz/success",
+        fail: "/api/webhooks/payments/sslcommerz/fail",
+        cancel: "/api/webhooks/payments/sslcommerz/cancel",
+        ipn: "/api/webhooks/payments/sslcommerz/ipn",
       },
       status: isConfigured ? "READY" : "NOT_CONFIGURED",
     };

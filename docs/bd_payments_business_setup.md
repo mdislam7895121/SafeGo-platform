@@ -61,10 +61,10 @@ Configure the following URLs in SSLCOMMERZ dashboard:
 
 | URL Type | Path | Description |
 |----------|------|-------------|
-| Success URL | `https://yourdomain.com/api/payments/sslcommerz/success` | Redirect after successful payment |
-| Fail URL | `https://yourdomain.com/api/payments/sslcommerz/fail` | Redirect after failed payment |
-| Cancel URL | `https://yourdomain.com/api/payments/sslcommerz/cancel` | Redirect if user cancels |
-| IPN URL | `https://yourdomain.com/api/payments/sslcommerz/ipn` | Instant Payment Notification webhook |
+| Success URL | `https://yourdomain.com/api/webhooks/payments/sslcommerz/success` | Redirect after successful payment |
+| Fail URL | `https://yourdomain.com/api/webhooks/payments/sslcommerz/fail` | Redirect after failed payment |
+| Cancel URL | `https://yourdomain.com/api/webhooks/payments/sslcommerz/cancel` | Redirect if user cancels |
+| IPN URL | `https://yourdomain.com/api/webhooks/payments/sslcommerz/ipn` | Instant Payment Notification webhook |
 
 ### 5. IP Whitelist
 
