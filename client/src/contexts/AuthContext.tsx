@@ -6,7 +6,7 @@ import { getAuthToken, setAuthToken, clearAllLegacyTokens } from "@/lib/authToke
 interface User {
   id: string;
   email: string;
-  role: "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner" | "pending_ticket_operator" | "pending_shop_partner";
+  role: "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner" | "pending_ticket_operator" | "pending_shop_partner" | "pending_driver" | "pending_restaurant";
   countryCode: "BD" | "US";
   profile?: any;
 }

@@ -135,7 +135,7 @@ function Router() {
 
   // Redirect to role-appropriate page when logged in and accessing root
   if (user && location === "/") {
-    const redirectPath = getPostLoginPath(user.role);
+    const redirectPath = getPostLoginPath(user);
     return <Redirect to={redirectPath} />;
   }
 
