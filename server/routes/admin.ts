@@ -14583,4 +14583,177 @@ router.get("/operations/deliveries", checkPermission(Permission.VIEW_DASHBOARD),
   }
 });
 
+// GET /api/admin/shop-orders - Get all shop orders with filtering (BD only)
+router.get("/shop-orders", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { page = 1, limit = 20, status, search, dateFrom, dateTo, paymentMethod } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    // Build filter conditions with BD-only enforcement
+    const conditions: any[] = [
+      { shopPartner: { countryCode: "BD" } },
+    ];
+    if (paymentMethod && paymentMethod !== "all") conditions.push({ paymentMethod: paymentMethod as string });
+    if (status && status !== "all") conditions.push({ status: status as string });
+    if (dateFrom) {
+      const parsedFrom = new Date(dateFrom as string);
+      if (!isNaN(parsedFrom.getTime())) conditions.push({ placedAt: { gte: parsedFrom } });
+    }
+    if (dateTo) {
+      const parsedTo = new Date(dateTo as string);
+      if (!isNaN(parsedTo.getTime())) conditions.push({ placedAt: { lte: parsedTo } });
+    }
+    if (search) {
+      conditions.push({
+        OR: [
+          { orderNumber: { contains: search as string, mode: 'insensitive' } },
+          { shopPartner: { shopName: { contains: search as string, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    const where = { AND: conditions };
+
+    const [orders, total, stats] = await Promise.all([
+      prisma.productOrder.findMany({
+        where,
+        include: {
+          shopPartner: { select: { id: true, shopName: true, shopLogo: true, countryCode: true } },
+          customer: { select: { id: true, user: { select: { email: true, fullName: true } } } },
+          items: { select: { id: true, productName: true, quantity: true, subtotal: true } },
+        },
+        orderBy: { placedAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.productOrder.count({ where }),
+      prisma.productOrder.aggregate({
+        where,
+        _sum: { totalAmount: true, safegoCommission: true, shopPayout: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      orders: orders.map(o => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        totalAmount: Number(o.totalAmount),
+        safegoCommission: Number(o.safegoCommission),
+        shopPayout: Number(o.shopPayout),
+        paymentMethod: o.paymentMethod,
+        paymentStatus: o.paymentStatus,
+        placedAt: o.placedAt,
+        deliveredAt: o.deliveredAt,
+        shopName: o.shopPartner.shopName,
+        shopLogo: o.shopPartner.shopLogo,
+        countryCode: o.shopPartner.countryCode,
+        customerEmail: o.customer?.user?.email || 'N/A',
+        customerName: o.customer?.user?.fullName || 'N/A',
+        itemCount: o.items.length,
+      })),
+      stats: {
+        totalOrders: stats._count.id,
+        totalRevenue: Number(stats._sum.totalAmount) || 0,
+        totalCommission: Number(stats._sum.safegoCommission) || 0,
+        totalPayouts: Number(stats._sum.shopPayout) || 0,
+      },
+      pagination: { page: parseInt(page as string), limit: take, total, pages: Math.ceil(total / take) },
+    });
+  } catch (error: any) {
+    console.error("Admin shop orders error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch shop orders" });
+  }
+});
+
+// GET /api/admin/ticket-bookings - Get all ticket bookings with filtering (BD only)
+router.get("/ticket-bookings", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { page = 1, limit = 20, status, search, dateFrom, dateTo, paymentMethod } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    // Build filter conditions with BD-only enforcement
+    const conditions: any[] = [
+      { operator: { countryCode: "BD" } },
+    ];
+    if (paymentMethod && paymentMethod !== "all") conditions.push({ paymentMethod: paymentMethod as string });
+    if (status && status !== "all") conditions.push({ status: status as string });
+    if (dateFrom) {
+      const parsedFrom = new Date(dateFrom as string);
+      if (!isNaN(parsedFrom.getTime())) conditions.push({ bookedAt: { gte: parsedFrom } });
+    }
+    if (dateTo) {
+      const parsedTo = new Date(dateTo as string);
+      if (!isNaN(parsedTo.getTime())) conditions.push({ bookedAt: { lte: parsedTo } });
+    }
+    if (search) {
+      conditions.push({
+        OR: [
+          { bookingNumber: { contains: search as string, mode: 'insensitive' } },
+          { operator: { operatorName: { contains: search as string, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    const where = { AND: conditions };
+
+    const [bookings, total, stats] = await Promise.all([
+      prisma.ticketBooking.findMany({
+        where,
+        include: {
+          operator: { select: { id: true, operatorName: true, logo: true, countryCode: true } },
+          customer: { select: { id: true, user: { select: { email: true, fullName: true } } } },
+          listing: { select: { routeName: true, originCity: true, destinationCity: true, vehicleType: true } },
+        },
+        orderBy: { bookedAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.ticketBooking.count({ where }),
+      prisma.ticketBooking.aggregate({
+        where,
+        _sum: { totalAmount: true, safegoCommission: true, operatorPayout: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      bookings: bookings.map(b => ({
+        id: b.id,
+        bookingNumber: b.bookingNumber,
+        status: b.status,
+        totalAmount: Number(b.totalAmount),
+        safegoCommission: Number(b.safegoCommission),
+        operatorPayout: Number(b.operatorPayout),
+        paymentMethod: b.paymentMethod,
+        paymentStatus: b.paymentStatus,
+        journeyDate: b.journeyDate,
+        departureTime: b.departureTime,
+        numberOfSeats: b.numberOfSeats,
+        bookedAt: b.bookedAt,
+        operatorName: b.operator.operatorName,
+        operatorLogo: b.operator.logo,
+        countryCode: b.operator.countryCode,
+        customerEmail: b.customer?.user?.email || 'N/A',
+        customerName: b.customer?.user?.fullName || 'N/A',
+        route: b.listing ? `${b.listing.originCity} → ${b.listing.destinationCity}` : 'N/A',
+        vehicleType: b.listing?.vehicleType || 'N/A',
+      })),
+      stats: {
+        totalBookings: stats._count.id,
+        totalRevenue: Number(stats._sum.totalAmount) || 0,
+        totalCommission: Number(stats._sum.safegoCommission) || 0,
+        totalPayouts: Number(stats._sum.operatorPayout) || 0,
+      },
+      pagination: { page: parseInt(page as string), limit: take, total, pages: Math.ceil(total / take) },
+    });
+  } catch (error: any) {
+    console.error("Admin ticket bookings error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch ticket bookings" });
+  }
+});
+
 export default router;

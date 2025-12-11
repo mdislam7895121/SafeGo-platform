@@ -54,6 +54,12 @@ const CustomerSavedPlaces = lazy(() => import("@/pages/customer/saved-places"));
 const CustomerPrivacyPolicy = lazy(() => import("@/pages/customer/privacy-policy"));
 const CustomerDataPrivacy = lazy(() => import("@/pages/customer/data-privacy"));
 const CustomerSafetyCenter = lazy(() => import("@/pages/customer/safety-center"));
+const BDShops = lazy(() => import("@/pages/customer/bd-shops"));
+const BDShopDetails = lazy(() => import("@/pages/customer/bd-shop-details"));
+const BDProductDetails = lazy(() => import("@/pages/customer/bd-product-details"));
+const BDShopOrders = lazy(() => import("@/pages/customer/bd-shop-orders"));
+const BDTickets = lazy(() => import("@/pages/customer/bd-tickets"));
+const BDMyTickets = lazy(() => import("@/pages/customer/bd-my-tickets"));
 
 // Lazy-loaded shop partner pages
 const ShopPartnerLayout = lazy(() => import("@/layouts/ShopPartnerLayout").then(m => ({ default: m.ShopPartnerLayout })));
@@ -239,6 +245,24 @@ function Router() {
       </Route>
       <Route path="/customer/safety">
         <CustomerGuard><CustomerSafetyCenter /></CustomerGuard>
+      </Route>
+      <Route path="/customer/bd-shops">
+        <CustomerGuard><BDShops /></CustomerGuard>
+      </Route>
+      <Route path="/customer/bd-shop/:id">
+        <CustomerGuard><BDShopDetails /></CustomerGuard>
+      </Route>
+      <Route path="/customer/bd-product/:id">
+        <CustomerGuard><BDProductDetails /></CustomerGuard>
+      </Route>
+      <Route path="/customer/bd-shop-orders">
+        <CustomerGuard><BDShopOrders /></CustomerGuard>
+      </Route>
+      <Route path="/customer/bd-tickets">
+        <CustomerGuard><BDTickets /></CustomerGuard>
+      </Route>
+      <Route path="/customer/bd-my-tickets">
+        <CustomerGuard><BDMyTickets /></CustomerGuard>
       </Route>
 
       {/* Shop Partner Routes */}

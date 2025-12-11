@@ -27,6 +27,8 @@ const AdminUsers = lazy(() => import("@/pages/admin/users"));
 const AdminFeatureFlags = lazy(() => import("@/pages/admin/feature-flags"));
 const AdminFinanceOverview = lazy(() => import("@/pages/admin/finance-overview"));
 const AdminSecurityCenter = lazy(() => import("@/pages/admin/security-center"));
+const AdminShopOrders = lazy(() => import("@/pages/admin/shop-orders"));
+const AdminTicketBookings = lazy(() => import("@/pages/admin/ticket-bookings"));
 
 function LoadingFallback() {
   return (
@@ -215,6 +217,20 @@ export function AdminRoutes() {
         <AdminGuard>
           <AdminLayout>
             <AdminSecurityCenter />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/shop-orders">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminShopOrders />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/ticket-bookings">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminTicketBookings />
           </AdminLayout>
         </AdminGuard>
       </Route>
