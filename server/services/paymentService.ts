@@ -13,6 +13,7 @@ import { mockPaymentProvider } from "./paymentProviders/mock";
 import { stripePaymentProvider } from "./paymentProviders/stripe";
 import { bkashPaymentProvider } from "./paymentProviders/bkash";
 import { nagadPaymentProvider } from "./paymentProviders/nagad";
+import { sslcommerzPaymentProvider } from "./paymentProviders/sslcommerz";
 import { walletService } from "./walletService";
 import { settlementService } from "./settlementService";
 
@@ -55,6 +56,7 @@ const providerInstances: Record<PaymentProvider, IPaymentProvider> = {
   [PaymentProvider.stripe]: stripePaymentProvider,
   [PaymentProvider.bkash]: bkashPaymentProvider,
   [PaymentProvider.nagad]: nagadPaymentProvider,
+  [PaymentProvider.sslcommerz]: sslcommerzPaymentProvider,
   [PaymentProvider.paypal]: mockPaymentProvider,
   [PaymentProvider.braintree]: mockPaymentProvider,
 };

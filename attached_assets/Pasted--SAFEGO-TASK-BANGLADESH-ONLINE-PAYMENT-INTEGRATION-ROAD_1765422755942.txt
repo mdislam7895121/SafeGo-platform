@@ -1,0 +1,113 @@
+[SAFEGO TASK – BANGLADESH ONLINE PAYMENT INTEGRATION ROADMAP (SSLCOMMERZ-FIRST)]
+
+You are now designing and partially implementing the ONLINE PAYMENT INTEGRATION for Bangladesh ("BD") for SafeGo, focusing on SSLCOMMERZ as the first real gateway, while keeping everything ADDITIVE and NON-BREAKING.
+
+This is a ROADMAP + IMPLEMENTATION TASK:
+- Define clear phases.
+- Define data model changes.
+- Define backend gateway module.
+- Define customer flows and admin flows.
+- Keep US (Stripe) logic intact.
+- Keep BD Cash logic fully working during and after integration.
+
+====================================================
+PHASE 0 – PREREQUISITES & BOUNDARIES
+====================================================
+Objective:
+- Make sure BD online payments are introduced in a safe, controlled, and non-breaking way.
+
+Key constraints:
+- Do NOT break existing:
+  - rides, food_orders, deliveries schema.
+  - BD cash flows (commission → negative balance).
+  - US Stripe integration.
+- All secrets for SSLCOMMERZ must be environment variables, e.g.:
+  - SSLCOMMERZ_STORE_ID_BD
+  - SSLCOMMERZ_STORE_PASSWORD_BD
+  - SSLCOMMERZ_SANDBOX_ENABLED_BD (boolean)
+- Start with SANDBOX mode only.
+- Keep “cash” active in BD during all phases.
+
+Deliverables:
+- A design document (this task).
+- Basic environment variable placeholders prepared.
+- Feature flag:
+  - FEATURE_BD_ONLINE_PAYMENTS_ENABLED (boolean, default: false)
+
+====================================================
+PHASE 1 – MERCHANT & GATEWAY SETUP (BUSINESS SIDE, OUTSIDE CODE)
+====================================================
+This is conceptual but must be documented inside the repo.
+
+Steps (real-world, non-code):
+1. SafeGo BD company opens:
+   - SSLCOMMERZ merchant account (single entry point recommended)
+   - Optional: separate accounts for test vs production.
+
+2. Obtain:
+   - store_id
+   - store_password
+   - sandbox credentials
+   - allowed redirect URLs and IP rules from SSLCOMMERZ.
+
+3. Document:
+   - SSLCOMMERZ dashboard URLs
+   - settlement cycle (e.g. daily, weekly)
+   - which payment instruments are active (bKash, Nagad, cards, bank transfers).
+
+In-code deliverable:
+- Add a markdown file:
+  - docs/bd_payments_business_setup.md
+  - describing the above steps and where to find credentials (without storing them).
+
+====================================================
+PHASE 2 – DATA MODEL EXTENSIONS FOR BD ONLINE PAYMENTS
+====================================================
+Build on top of existing payment fields and payment_methods_catalog.
+
+2.1 payment_methods_catalog
+- Ensure BD entries exist with provider="sslcommerz":
+
+Examples:
+
+country_code = "BD", service_type = "global":
+- method_code      = "sslcommerz_online"
+- display_name     = "Online Payment (Cards & Wallets)"
+- description      = "Pay with cards, mobile wallets, and bank via SSLCOMMERZ."
+- provider         = "sslcommerz"
+- is_default_for_country = false (initially, cash remains default)
+- is_active        = false (until integration is stable)
+- sort_order       = e.g. 10
+
+Optional: keep bkash/nagad as method_code for future direct integration, but for now those can be conceptual, with provider="sslcommerz" behind the scenes.
+
+2.2 orders – rides / food_orders / deliveries
+Confirm the following fields exist (if not, ADD them, nullable):
+
+- payment_country_code
+- payment_currency
+- payment_method             (e.g. "cash", "sslcommerz_online")
+- payment_provider           (e.g. "cash", "sslcommerz")
+- payment_status             ("not_required", "pending", "requires_action", "authorized", "captured", "failed", "refunded", "cancelled")
+- payment_reference_id       (SSLCOMMERZ transaction id or session id)
+- payment_metadata           (JSON with gateway-specific details)
+- is_commission_settled      (boolean, default false)
+
+Existing records must default to:
+- payment_status = "not_required" or "pending" (if you already have a convention)
+- payment_method "cash" where applicable if previously used.
+
+====================================================
+PHASE 3 – BD GATEWAY MODULE (SSLCOMMERZ ADAPTER)
+====================================================
+Create a dedicated gateway adapter module for SSLCOMMERZ.  
+Example name: `BdSslCommerzGateway` or `PaymentProviderSslCommerzBD`.
+
+Responsibilities:
+- Create payment session/redirect URL.
+- Handle success/failure callbacks.
+- Verify signatures/hashes as per SSLCOMMERZ spec.
+- Map statuses to internal payment_status values.
+
+3.1 Interface
+Define a generic interface that is similar to existing Stripe

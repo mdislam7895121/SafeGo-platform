@@ -103,6 +103,7 @@ enum PaymentProvider {
   stripe // Stripe payment gateway
   bkash // bKash mobile payment (Bangladesh)
   nagad // Nagad mobile payment (Bangladesh)
+  sslcommerz // SSLCOMMERZ payment gateway (Bangladesh)
   paypal // PayPal
   braintree // Braintree
 }

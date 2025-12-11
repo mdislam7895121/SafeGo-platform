@@ -78,4 +78,77 @@ router.post("/bkash", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/sslcommerz/ipn", async (req: Request, res: Response) => {
+  try {
+    const payload = new URLSearchParams(req.body).toString();
+    
+    const result = await paymentService.handleWebhook(
+      PaymentProvider.sslcommerz,
+      payload
+    );
+    
+    if (!result.success) {
+      console.error("[PaymentWebhook] SSLCOMMERZ IPN error:", result.message);
+      return res.status(400).json({ error: result.message });
+    }
+    
+    res.json({ received: true });
+  } catch (error: any) {
+    console.error("[PaymentWebhook] Error processing SSLCOMMERZ IPN:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/sslcommerz/success", async (req: Request, res: Response) => {
+  try {
+    const payload = new URLSearchParams(req.body).toString();
+    
+    const result = await paymentService.handleWebhook(
+      PaymentProvider.sslcommerz,
+      payload
+    );
+    
+    const redirectUrl = result.success 
+      ? "/payment/success"
+      : "/payment/failed";
+    
+    res.redirect(redirectUrl);
+  } catch (error: any) {
+    console.error("[PaymentWebhook] Error processing SSLCOMMERZ success:", error);
+    res.redirect("/payment/failed");
+  }
+});
+
+router.post("/sslcommerz/fail", async (req: Request, res: Response) => {
+  try {
+    const payload = new URLSearchParams(req.body).toString();
+    
+    await paymentService.handleWebhook(
+      PaymentProvider.sslcommerz,
+      payload
+    );
+    
+    res.redirect("/payment/failed");
+  } catch (error: any) {
+    console.error("[PaymentWebhook] Error processing SSLCOMMERZ fail:", error);
+    res.redirect("/payment/failed");
+  }
+});
+
+router.post("/sslcommerz/cancel", async (req: Request, res: Response) => {
+  try {
+    const payload = new URLSearchParams(req.body).toString();
+    
+    await paymentService.handleWebhook(
+      PaymentProvider.sslcommerz,
+      payload
+    );
+    
+    res.redirect("/payment/cancelled");
+  } catch (error: any) {
+    console.error("[PaymentWebhook] Error processing SSLCOMMERZ cancel:", error);
+    res.redirect("/payment/cancelled");
+  }
+});
+
 export default router;
