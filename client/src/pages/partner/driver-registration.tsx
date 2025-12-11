@@ -56,10 +56,25 @@ const EMERGENCY_RELATIONSHIPS = [
   { value: 'other', label: 'Other' },
 ];
 
+function calculateAge(dateOfBirth: string): number {
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 const personalInfoSchemaUS = z.object({
   usaFullLegalName: z.string().min(2, "Full legal name is required"),
   phone: z.string().min(10, "Phone number is required"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
+    if (!dob) return false;
+    const age = calculateAge(dob);
+    return age >= 18;
+  }, { message: "You must be at least 18 years old to register as a driver" }),
   usaStreet: z.string().min(5, "Street address is required"),
   usaAptUnit: z.string().optional(),
   usaCity: z.string().min(2, "City is required"),
@@ -73,7 +88,11 @@ const personalInfoSchemaUS = z.object({
 
 const personalInfoSchemaBD = z.object({
   phone: z.string().min(10, "Phone number is required"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
+    if (!dob) return false;
+    const age = calculateAge(dob);
+    return age >= 18;
+  }, { message: "You must be at least 18 years old to register as a driver" }),
   emergencyContactName: z.string().min(2, "Emergency contact name is required"),
   emergencyContactPhone: z.string().min(10, "Emergency contact phone is required"),
   fatherName: z.string().min(2, "Father's name is required"),
@@ -99,8 +118,8 @@ const vehicleInfoSchema = z.object({
 });
 
 const nycComplianceSchema = z.object({
-  tlcLicenseNumber: z.string().min(5, "TLC license number is required"),
-  tlcLicenseExpiry: z.string().min(1, "TLC license expiry is required"),
+  tlcLicenseNumber: z.string().optional().or(z.literal("")),
+  tlcLicenseExpiry: z.string().optional().or(z.literal("")),
   fhvLicenseNumber: z.string().optional().or(z.literal("")),
   dmvInspectionDate: z.string().min(1, "DMV inspection date is required"),
   dmvInspectionExpiry: z.string().min(1, "DMV inspection expiry is required"),
@@ -396,6 +415,20 @@ function DriverRegistrationV2() {
         isValid = await personalFormUS.trigger();
         if (isValid) {
           const values = personalFormUS.getValues();
+          
+          // Additional age check for ride-hailing drivers (must be 21+)
+          if (driverType === 'ride' && values.dateOfBirth) {
+            const age = calculateAge(values.dateOfBirth);
+            if (age < 21) {
+              toast({
+                title: "Age Requirement Not Met",
+                description: "You must be at least 21 years old to register as a ride-hailing driver.",
+                variant: "destructive",
+              });
+              return;
+            }
+          }
+          
           setFormData(prev => ({ ...prev, personalInfo: values }));
           const needsNycCompliance = values.usaState === 'NY' && isNycBorough(values.usaCity);
           setIsNycDriver(needsNycCompliance);
@@ -434,10 +467,10 @@ function DriverRegistrationV2() {
       } else if (currentStep === 4 && isNycDriver) {
         isValid = await nycForm.trigger();
         if (isValid) {
-          if (!tlcFrontFile || !tlcBackFile || !fhvFile || !dmvInspectionFile) {
+          if (!dmvInspectionFile) {
             toast({
-              title: "Missing NYC Documents",
-              description: "Please upload all required NYC compliance documents (TLC front/back, FHV document, DMV inspection).",
+              title: "DMV Inspection Required",
+              description: "Please upload your DMV inspection document. TLC and FHV documents are optional.",
               variant: "destructive",
             });
             return;
@@ -1167,10 +1200,10 @@ function DriverRegistrationV2() {
             <div className="flex items-start gap-3">
               <Building2 className="h-5 w-5 text-blue-600 mt-0.5" />
               <div>
-                <p className="font-semibold text-blue-800 dark:text-blue-200">NYC TLC/FHV Compliance Required</p>
+                <p className="font-semibold text-blue-800 dark:text-blue-200">NYC DMV Inspection Required</p>
                 <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                   As a driver operating in one of New York City's five boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten Island), 
-                  you must provide TLC license, FHV permit, and DMV inspection documentation.
+                  you must provide DMV inspection documentation. TLC license and FHV permit are optional and can be added later.
                 </p>
               </div>
             </div>
@@ -1178,7 +1211,7 @@ function DriverRegistrationV2() {
         </Card>
 
         <div className="space-y-4">
-          <h4 className="font-semibold">TLC (Taxi & Limousine Commission) License *</h4>
+          <h4 className="font-semibold">TLC (Taxi & Limousine Commission) License <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h4>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
@@ -1186,9 +1219,9 @@ function DriverRegistrationV2() {
               name="tlcLicenseNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>TLC License Number *</FormLabel>
+                  <FormLabel>TLC License Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter TLC license number" {...field} data-testid="input-tlc-number" />
+                    <Input placeholder="Enter TLC license number (optional)" {...field} data-testid="input-tlc-number" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1199,7 +1232,7 @@ function DriverRegistrationV2() {
               name="tlcLicenseExpiry"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>TLC License Expiry *</FormLabel>
+                  <FormLabel>TLC License Expiry</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} data-testid="input-tlc-expiry" />
                   </FormControl>
@@ -1211,7 +1244,7 @@ function DriverRegistrationV2() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>TLC License Front *</Label>
+              <Label>TLC License Front <span className="text-muted-foreground">(Optional)</span></Label>
               <label htmlFor="tlc-front" className="block cursor-pointer">
                 <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${tlcFrontFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
                   <Upload className={`h-6 w-6 mx-auto mb-1 ${tlcFrontFile ? 'text-green-600' : 'text-muted-foreground'}`} />
@@ -1221,7 +1254,7 @@ function DriverRegistrationV2() {
               </label>
             </div>
             <div className="space-y-2">
-              <Label>TLC License Back *</Label>
+              <Label>TLC License Back <span className="text-muted-foreground">(Optional)</span></Label>
               <label htmlFor="tlc-back" className="block cursor-pointer">
                 <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${tlcBackFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
                   <Upload className={`h-6 w-6 mx-auto mb-1 ${tlcBackFile ? 'text-green-600' : 'text-muted-foreground'}`} />
@@ -1234,12 +1267,10 @@ function DriverRegistrationV2() {
         </div>
 
         <div className="border-t pt-6 space-y-4">
-          <h4 className="font-semibold">FHV (For-Hire Vehicle) Permit</h4>
-          
-          {/* FHV Number field hidden per NYC rule - admin will extract from uploaded document */}
+          <h4 className="font-semibold">FHV (For-Hire Vehicle) Permit <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h4>
           
           <div className="space-y-2">
-            <Label>FHV Document/Sticker Image *</Label>
+            <Label>FHV Document/Sticker Image <span className="text-muted-foreground">(Optional)</span></Label>
             <label htmlFor="fhv-doc" className="block cursor-pointer">
               <div className={`border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors ${fhvFile ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}`}>
                 <Upload className={`h-6 w-6 mx-auto mb-1 ${fhvFile ? 'text-green-600' : 'text-muted-foreground'}`} />

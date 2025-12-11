@@ -8,6 +8,17 @@ const router = Router();
 
 const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
 
+function calculateAge(dateOfBirth: string): number {
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
   'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
@@ -91,6 +102,17 @@ function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSc
     operatingState === 'NY' && 
     isNycBorough(operatingCity);
   
+  // Age validation
+  if (personalInfo.dateOfBirth) {
+    const age = calculateAge(personalInfo.dateOfBirth);
+    const minAge = data.driverType === 'ride' ? 21 : 18;
+    if (age < minAge) {
+      errors.push(`You must be at least ${minAge} years old to register as a ${data.driverType === 'ride' ? 'ride-hailing' : 'delivery'} driver`);
+    }
+  } else {
+    errors.push('Date of birth is required');
+  }
+  
   if (countryCode === 'BD') {
     if (!documents.nidNumber || documents.nidNumber.length < 10) {
       errors.push('NID number is required for Bangladesh drivers (minimum 10 digits)');
@@ -137,20 +159,8 @@ function validateNestedDriverKYC(data: z.infer<typeof nestedDriverRegistrationSc
     }
     
     if (requiresNycCompliance) {
-      if (!nycCompliance?.tlcLicenseNumber || nycCompliance.tlcLicenseNumber.length < 5) {
-        errors.push('TLC license number is required for NYC drivers');
-      }
-      if (!nycCompliance?.tlcLicenseFrontUrl) {
-        errors.push('TLC license front image is required for NYC drivers');
-      }
-      if (!nycCompliance?.tlcLicenseBackUrl) {
-        errors.push('TLC license back image is required for NYC drivers');
-      }
-      // FHV Number is OPTIONAL during driver submission - admin can fill it from document later
-      // However, FHV Document image IS REQUIRED for NYC drivers
-      if (!nycCompliance?.fhvDocumentUrl) {
-        errors.push('FHV document image is required for NYC drivers');
-      }
+      // TLC and FHV are OPTIONAL for NYC drivers - they can be added later or via admin
+      // Only DMV inspection is required for NYC drivers
       if (!nycCompliance?.dmvInspectionDate) {
         errors.push('DMV inspection date is required for NYC drivers');
       }

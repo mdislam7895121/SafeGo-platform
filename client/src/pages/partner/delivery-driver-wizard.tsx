@@ -112,13 +112,28 @@ const WIZARD_STEPS = [
   { id: 7, title: "Review & Submit", icon: ClipboardCheck },
 ];
 
+function calculateAge(dateOfBirth: string): number {
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 const personalInfoSchemaBD = z.object({
   fullName: z.string().min(2, "Full name is required"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   middleName: z.string().optional(),
   fatherName: z.string().min(2, "Father's name is required for Bangladesh"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
+    if (!dob) return false;
+    const age = calculateAge(dob);
+    return age >= 18;
+  }, { message: "You must be at least 18 years old to register as a delivery driver" }),
   phoneNumber: z.string().min(10, "Valid phone number required"),
 });
 
@@ -128,7 +143,11 @@ const personalInfoSchemaUS = z.object({
   lastName: z.string().optional(),
   middleName: z.string().optional(),
   fatherName: z.string().optional(),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
+    if (!dob) return false;
+    const age = calculateAge(dob);
+    return age >= 18;
+  }, { message: "You must be at least 18 years old to register as a delivery driver" }),
   phoneNumber: z.string().min(10, "Valid phone number required"),
 });
 
