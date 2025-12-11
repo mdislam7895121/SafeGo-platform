@@ -55,6 +55,7 @@ import loyaltyRoutes from "./routes/loyalty"; // SafeGo Loyalty Engine
 import tlcRoutes from "./routes/tlc"; // NYC TLC HVFHV Minimum Pay Enforcement
 import eatsRoutes from "./routes/eats"; // Public Eats endpoint for restaurant browsing
 import paymentWebhooksRoutes from "./routes/payment-webhooks"; // Phase 2B: Payment webhooks
+import stripeUSPaymentRoutes from "./routes/stripe-us-payment"; // US Online Payments with Stripe
 import devicesRoutes from "./routes/devices"; // Phase 2B: Device registration for FCM
 import kitchenRoutes from "./routes/kitchen"; // Phase 3: Kitchen Ticket System
 import parcelRoutes, { parcelPublicRoutes } from "./routes/parcel"; // Phase 3: Parcel Pricing, Scheduling & POD
@@ -357,6 +358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/customer", customerRoutes);
   app.use("/api/customer", customerSupportRoutes); // Phase 12
   app.use("/api/customer/payment", customerPaymentRoutes); // Customer Payment Methods
+  app.use("/api/payments/stripe/us", stripeUSPaymentRoutes); // US Online Payments with Stripe
   app.use("/api/customer/food", customerFoodRoutes);
   app.use("/api/customer/restaurants", customerRestaurantStatusRoutes); // Phase 10
   app.use("/api/customer/restaurants", customerRestaurantPricingRoutes); // Phase 11

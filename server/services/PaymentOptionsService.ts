@@ -83,6 +83,14 @@ function isBdOnlinePaymentsEnabled(): boolean {
   return featureEnabled && hasCredentials;
 }
 
+function isUsOnlinePaymentsEnabled(): boolean {
+  return process.env.FEATURE_US_ONLINE_PAYMENTS_ENABLED === "true";
+}
+
+function isCashDisabledForUS(): boolean {
+  return isUsOnlinePaymentsEnabled();
+}
+
 export class PaymentOptionsService {
   static async getAvailableMethodsForCustomer(
     customerId: string,
@@ -140,7 +148,9 @@ export class PaymentOptionsService {
     }));
 
     const hasCash = availableMethods.some((m) => m.methodCode === "cash");
-    if (!hasCash) {
+    const shouldHideCash = countryCode === "US" && isCashDisabledForUS();
+    
+    if (!hasCash && !shouldHideCash) {
       availableMethods.push({
         methodCode: "cash",
         displayName: "Cash",
@@ -153,6 +163,10 @@ export class PaymentOptionsService {
         sortOrder: 999,
       });
     }
+    
+    const filteredAvailableMethods = shouldHideCash 
+      ? availableMethods.filter(m => m.methodCode !== "cash")
+      : availableMethods;
 
     const savedMethods: CustomerSavedMethod[] = customer.paymentMethods.map((pm) => ({
       id: pm.id,
@@ -173,9 +187,11 @@ export class PaymentOptionsService {
     if (defaultSaved) {
       selectedDefaultMethodCode = defaultSaved.methodCode;
     } else {
-      const defaultConfig = availableMethods.find((m) => m.isDefaultCandidate);
+      const defaultConfig = filteredAvailableMethods.find((m) => m.isDefaultCandidate);
       if (defaultConfig) {
         selectedDefaultMethodCode = defaultConfig.methodCode;
+      } else if (shouldHideCash && filteredAvailableMethods.length > 0) {
+        selectedDefaultMethodCode = filteredAvailableMethods[0].methodCode;
       }
     }
 
@@ -183,7 +199,7 @@ export class PaymentOptionsService {
       countryCode,
       currencyCode,
       serviceType,
-      availableMethods,
+      availableMethods: filteredAvailableMethods,
       savedMethods,
       selectedDefaultMethodCode,
     };
@@ -227,7 +243,9 @@ export class PaymentOptionsService {
     }));
 
     const hasCash = methods.some((m) => m.methodCode === "cash");
-    if (!hasCash) {
+    const shouldHideCash = countryCode === "US" && isCashDisabledForUS();
+    
+    if (!hasCash && !shouldHideCash) {
       methods.push({
         methodCode: "cash",
         displayName: "Cash",
@@ -241,7 +259,7 @@ export class PaymentOptionsService {
       });
     }
 
-    return methods;
+    return shouldHideCash ? methods.filter(m => m.methodCode !== "cash") : methods;
   }
 
   static async validateMethodForCountry(
@@ -249,7 +267,12 @@ export class PaymentOptionsService {
     countryCode: string,
     serviceType: string = "GLOBAL"
   ): Promise<boolean> {
-    if (methodCode === "cash") return true;
+    if (methodCode === "cash") {
+      if (countryCode === "US" && isCashDisabledForUS()) {
+        return false;
+      }
+      return true;
+    }
 
     const config = await prisma.countryPaymentConfig.findFirst({
       where: {

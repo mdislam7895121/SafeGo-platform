@@ -1,0 +1,429 @@
+You are working on the SafeGo global super-app backend and admin platform.  
+Follow ALL existing SafeGo master rules and DO NOT break any existing features, APIs, or schemas.  
+All changes must be additive and backward-compatible.
+
+────────────────────────────────
+SAFEGO MASTER RULES (DO NOT SKIP)
+────────────────────────────────
+1) Roles – always 4 distinct roles with separate onboarding, KYC and dashboards:
+   - Customer
+   - Driver
+   - Restaurant/Merchant
+   - Admin
+
+   Each role must have:
+   - Its own signup/onboarding flow (multi-step)
+   - Its own dashboard
+   - Its own permissions / data visibility
+   - Its own status flags (active, blocked, pending_verification, etc.)
+   Never mix role access; do not let one role see another role’s private data except where explicitly allowed.
+
+2) Global services – the platform supports all 3, everywhere:
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+   Everything you implement must keep these three services in mind.
+
+3) Country logic – at minimum, Bangladesh (BD) and United States (US) must both be supported with branching KYC and business rules.
+
+4) Country-specific KYC (must keep existing flows; only extend if needed):
+   - BANGLADESH (BD) mandatory fields:
+     - father_name
+     - date_of_birth
+     - present_address
+     - permanent_address
+     - NID_number
+     - NID_image_front
+     - NID_image_back
+     - emergency_contact_name
+     - emergency_contact_phone
+     - verification_status ("pending" | "verified" | "rejected" | "need_more_info")
+     - is_verified (boolean)
+
+   - UNITED STATES (US) mandatory fields:
+     - date_of_birth
+     - home_address
+     - emergency_contact_name
+     - emergency_contact_phone
+     - government_id_type
+     - government_id_last4
+     - For drivers (US only):
+       - driver_license_number
+       - driver_license_image
+       - driver_license_expiry
+       - ssn_last4 (optional but supported)
+     - verification_status ("pending" | "verified" | "rejected" | "need_more_info")
+     - is_verified (boolean)
+
+   Do NOT remove or rename existing fields; only add new optional fields if necessary.
+
+5) Onboarding – All roles must use a multi-step onboarding:
+   Step 1: Basic info  
+   Step 2: Address (country–specific structure)  
+   Step 3: ID/KYC upload (according to BD/US rules)  
+   Step 4: Emergency contact  
+   - verification_status must start as "pending"
+   - User cannot operate rides/food/deliveries until Admin marks them verified
+   - Customers have simple signup; partners (drivers, restaurants, couriers) are created through separate onboarding after login (do NOT break this rule).
+
+6) Admin Panel – mandatory capabilities:
+   - Approve / reject KYC for:
+     - customers
+     - drivers
+     - restaurants
+   - Set and view:
+     - verification_status
+     - rejection_reason (if rejected)
+   - Block / unblock any user (customer, driver, restaurant)
+   - Configure and update:
+     - pricing rules
+     - fees
+     - commissions (for rides, food_orders, deliveries)
+   - Manage payouts:
+     - settle driver negative balances
+     - settle restaurant negative balances
+     - mark commission debt as paid
+   - See dashboards for:
+     - driver_wallet_balance (including negative balance)
+     - restaurant_wallet_balance (including negative)
+   - Admin is the ONLY role allowed to change pricing, commissions, verification, or blocking flags.
+
+7) Core collections (must already exist; only extend them):
+   - rides
+   - food_orders
+   - deliveries
+
+   Each collection must have or be extended to have:
+   - identity fields:
+     - customer_id
+     - driver_id (nullable until assigned)
+     - restaurant_id (for food_orders)
+   - address + geolocation:
+     - pickup_address, pickup_lat, pickup_lng
+     - dropoff_address, dropoff_lat, dropoff_lng
+   - fees + commission:
+     - base_fare
+     - distance_fare
+     - service_fee
+     - safego_commission_amount
+     - driver_earnings_amount / restaurant_earnings_amount
+   - payment details:
+     - payment_method ("cash" | "online_gateway")
+     - payment_gateway ("sslcommerz_bd" | "stripe_us" | null)
+     - payment_status ("unpaid" | "pending" | "paid" | "failed" | "refunded")
+     - payment_reference (gateway transaction id / charge id)
+     - currency ("BDT" | "USD")
+     - paid_at (timestamp nullable)
+   - timestamps:
+     - created_at
+     - updated_at
+     - completed_at (nullable)
+   - rating and feedback:
+     - customer_rating
+     - customer_feedback
+     - driver_rating
+     - driver_feedback
+
+   Do NOT remove or change existing fields – only add NEW fields in a backward-compatible way and migrate existing rows with safe defaults.
+
+8) Commission & payout rules (global; must remain intact):
+   1. If customer pays CASH (BD or US):
+      - Driver receives full cash in hand.
+      - SafeGo commission becomes a negative balance in driver_wallet_balance.
+      - Driver must settle weekly; admin can mark settlement as paid.
+   2. If food order is CASH:
+      - Restaurant gets all cash.
+      - Commission becomes negative balance in restaurant_wallet.
+   3. If payment is ONLINE:
+      - SafeGo keeps commission automatically.
+      - Driver/restaurant receive only their net earnings via wallet/payout.
+   4. Admin can view, settle, and mark these balances as paid.
+   Ensure the new US online payments integration respects these rules.
+
+9) Security & privacy rules:
+   - Customers CANNOT view driver documents (NID, license, etc.).
+   - Drivers CANNOT view customer NID or any sensitive KYC.
+   - Restaurants CANNOT view other restaurants.
+   - Only Admin may:
+     - change pricing/commissions
+     - approve/reject KYC
+     - block/unblock users
+   - Users can only update their own profile.
+   - Do not store full card numbers or CVV; use Stripe tokens only.
+   - Secrets (API keys, webhook secrets) must only live in environment variables.
+
+10) Status flows (must remain intact and be used in any new logic):
+
+   Ride statuses:
+   - requested → searching_driver → accepted → driver_arriving → in_progress → completed
+   - or any stage can go to cancelled_* (cancelled_by_customer, cancelled_by_driver, cancelled_by_system)
+
+   Food order statuses:
+   - placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+   - or cancelled_* variants
+
+   Parcel statuses:
+   - requested → searching_driver → accepted → picked_up → on_the_way → delivered
+   - or cancelled_* variants
+
+11) Notifications:
+   - New ride alert for driver
+   - Order status updates (food, parcel)
+   - Driver arrival & trip start
+   - Payment success/failure notifications
+   - Verification approval/rejection notifications
+   - Important admin announcements (policy changes, pricing updates)
+
+12) Architecture:
+   - There is ONE shared SafeGo backend for all countries.
+   - The /ride landing page and other frontends are thin clients that only call backend APIs.
+   - Do NOT add any pricing/status/commission logic into the landing page; use backend only.
+   - All country/currency decisions must come from backend responses.
+
+13) Security roadmap phase for this task:
+   - This task is in the “Payments & Financial Data Security” phase:
+     - Use gateway tokens (Stripe) instead of raw cards.
+     - Validate all webhook signatures.
+     - Log payment events securely (no sensitive card data).
+     - Ensure idempotent payment handling.
+
+────────────────────────────────
+TASK: IMPLEMENT USA ONLINE PAYMENTS WITH STRIPE (SANDBOX)
+────────────────────────────────
+Goal: Add a fully working USA online payment integration using Stripe (test mode) for SafeGo customers, covering rides, food_orders, and deliveries, while keeping Bangladesh SSLCommerz and cash logic intact.
+
+Key business rules for this task:
+- BD:
+  - Can use cash + SSLCommerz online (already implemented).
+- US:
+  - For now, NO cash option in any sector (rides, food, parcel) until the business explicitly enables it in a later prompt.
+  - Only online card-based payments via Stripe for US customers.
+- Online payments must automatically apply the commission logic:
+  - SafeGo keeps safego_commission_amount.
+  - Driver/restaurant wallets receive only net earnings.
+  - No negative balance accrual when payment_method = "online_gateway".
+
+────────────────────────────────
+A) ENVIRONMENT & CONFIG
+────────────────────────────────
+1. Add new environment variables (DO NOT hardcode secrets):
+   - STRIPE_SECRET_KEY_US            (test secret key)
+   - STRIPE_WEBHOOK_SECRET_US       (for payment_intent.succeeded, …)
+   - FEATURE_US_ONLINE_PAYMENTS_ENABLED = true
+
+2. Add a configuration module (or extend existing payment config) to resolve:
+   - getGatewayConfig("US", "stripe")
+   - Map currency = "USD" for US.
+   - Keep BD config for SSLCommerz intact.
+
+3. Ensure all new config reads are backward-compatible:
+   - If STRIPE_SECRET_KEY_US is missing, the US online payment feature should fail gracefully and be reported as disabled, not crash the app.
+
+────────────────────────────────
+B) DATA MODEL UPDATES (NON-BREAKING)
+────────────────────────────────
+Update (additive) the following collections/schemas:
+
+1. rides
+   - Ensure fields exist (add if missing, with safe defaults):
+     - payment_method (default "cash" for BD, "online_gateway" for US)
+     - payment_gateway ("sslcommerz_bd" | "stripe_us" | null)
+     - payment_status ("unpaid" | "pending" | "paid" | "failed" | "refunded")
+     - payment_reference (string | null)
+     - currency ("BDT" | "USD")
+     - paid_at (datetime | null)
+
+2. food_orders
+   - Same payment_* fields as rides with matching semantics.
+
+3. deliveries
+   - Same payment_* fields as rides with matching semantics.
+
+Migration rule:
+   - For existing rows:
+     - If country = "BD" and previously cash only:
+       - payment_method = "cash"
+       - payment_status = "unpaid" or "paid" according to existing flags.
+       - payment_gateway = null
+       - currency = "BDT"
+     - For US rows created before this feature:
+       - payment_method = "online_gateway" only when a Stripe transaction exists; otherwise default to "cash" but UI must not offer cash going forward.
+
+────────────────────────────────
+C) BACKEND PAYMENT APIs (STRIPE – US)
+────────────────────────────────
+Implement or extend the payment controller with Stripe endpoints.  
+Use REST endpoints; adjust routing names if there’s already a payment controller, but avoid breaking existing SSLCommerz routes.
+
+1. Create payment intent / session for US:
+   - POST /api/payments/stripe/us/create
+   - Input:
+     - order_type ("ride" | "food_order" | "delivery")
+     - order_id
+     - customer_id (derived from auth token)
+   - Logic:
+     - Validate that:
+       - order belongs to this customer
+       - order is in a payable status
+       - order country = "US"
+     - Compute total payable amount in USD from order fields.
+     - Create a Stripe Payment Intent (test mode) with:
+       - amount (in cents)
+       - currency = "usd"
+       - metadata:
+         - safego_order_type
+         - safego_order_id
+         - safego_customer_id
+     - Return:
+       - client_secret
+       - publishable_key (only frontend-safe key)
+       - any additional Stripe params required by the client.
+
+   - Update order record:
+     - payment_method = "online_gateway"
+     - payment_gateway = "stripe_us"
+     - payment_status = "pending"
+     - payment_reference = stripe_payment_intent_id
+
+2. Webhook endpoint (must verify signature):
+   - POST /api/webhooks/payments/stripe/us
+   - Validate Stripe signature using STRIPE_WEBHOOK_SECRET_US.
+   - Handle at least:
+     - payment_intent.succeeded
+     - payment_intent.payment_failed
+     - charge.refunded (optional for now but prepare hook)
+
+   - For payment_intent.succeeded:
+     - Read metadata: order_type, order_id, customer_id.
+     - Load the corresponding order (rides / food_orders / deliveries).
+     - Only proceed if payment_status is "pending".
+     - Apply commission logic:
+       - safego_commission_amount = computeCommission(order_total)
+       - For rides:
+         - driver_earnings_amount = order_total - safego_commission_amount
+         - Update driver_wallet_balance += driver_earnings_amount
+       - For food_orders:
+         - restaurant_earnings_amount = total - safego_commission_amount
+         - Update restaurant_wallet_balance += restaurant_earnings_amount
+     - Update order:
+       - payment_status = "paid"
+       - paid_at = now()
+       - payment_reference = stripe_charge_id or payment_intent_id
+     - Update status flow:
+       - For rides: keep existing ride status transitions (do NOT auto-complete the trip, just mark payment paid).
+       - For food_orders/deliveries: keep existing flow; payment just unlocks next step if required.
+     - Emit notifications:
+       - To customer: "Payment successful"
+       - To driver/restaurant: "Order paid; expected earnings X"
+
+   - For payment_intent.payment_failed:
+     - Update order payment_status = "failed"
+     - Keep order in unpaid state.
+     - Send failure notification to customer.
+
+3. Idempotency & safety:
+   - Webhook handlers must be idempotent:
+     - If the same Stripe event is delivered twice, do not double-credit wallets.
+     - Use Stripe event IDs or payment_reference to guard.
+
+4. Do NOT expose sensitive data:
+   - Never log full card numbers or CVV.
+   - You may log last4 from Stripe objects if needed.
+
+────────────────────────────────
+D) FRONTEND / CUSTOMER PAYMENT FLOWS (US)
+────────────────────────────────
+Do NOT build new landing-page pricing logic. Only integrate with backend APIs.
+
+1. Payment method selection:
+   - For US customers:
+     - Hide/disable "Cash" payment option for now.
+     - Show only "Pay with Card (Stripe)" or equivalent.
+   - For BD customers:
+     - Keep existing options (Cash, SSLCommerz/Bkash etc.).
+
+2. When US customer chooses to pay:
+   - Call POST /api/payments/stripe/us/create with order_type + order_id.
+   - Receive client_secret and publishable key.
+   - Use Stripe.js / mobile SDK to complete payment on client side.
+   - On success:
+     - Refresh order details from backend to see updated payment_status.
+   - Show clean success/failure UI.
+
+3. Security:
+   - All card entry must be handled via Stripe elements/SDK.
+   - Our frontend must never handle raw card numbers except through Stripe’s tokenized fields.
+
+────────────────────────────────
+E) ADMIN PANEL – US PAYMENT MONITORING & SETTLEMENT
+────────────────────────────────
+Extend the Admin panel in a non-breaking way:
+
+1. Add a “Payments – US Online (Stripe)” view:
+   - Filter by:
+     - date range
+     - order_type
+     - payment_status
+     - driver_id / restaurant_id
+   - Columns:
+     - order_type, order_id
+     - customer_id
+     - driver_id / restaurant_id
+     - amount, currency
+     - safego_commission_amount
+     - driver/restaurant earnings
+     - payment_status
+     - payment_gateway_reference (payment_intent/charge id)
+     - created_at, paid_at
+
+2. Wallet & settlement:
+   - Reuse existing wallet & commission rules:
+     - For online payments:
+       - No negative balance; SafeGo already keeps its commission.
+       - driver_wallet_balance / restaurant_wallet_balance only shows what is owed to them by SafeGo.
+   - Admin can:
+     - mark payouts as settled for a given driver/restaurant and date range.
+     - export a basic CSV (optional but prepare a function).
+
+3. Security:
+   - Only Admin can access this page.
+   - No card details shown.
+   - Only Stripe transaction IDs and high-level info.
+
+────────────────────────────────
+F) NOTIFICATIONS & LOGGING
+────────────────────────────────
+1. Notifications:
+   - On payment success:
+     - Push/in-app + optional email to customer (US).
+   - On payment failure:
+     - Notify customer with retry suggestion.
+   - Optional: driver/restaurant notification when an order becomes “paid”.
+
+2. Logging (internal, secure logs only):
+   - Log:
+     - order_type, order_id
+     - stripe_event_id
+     - payment_status transitions
+   - Never log full card data or secrets.
+   - Include correlation IDs for debugging.
+
+────────────────────────────────
+G) NON-BREAKING IMPLEMENTATION REQUIREMENTS
+────────────────────────────────
+- Do NOT rename or remove any existing fields, routes, or components.
+- Only ADD:
+  - new env vars
+  - new optional schema fields (with defaults)
+  - new endpoints under /api/payments/stripe/... and /api/webhooks/payments/stripe/...
+  - new Admin views/pages/components
+- Keep Bangladesh SSLCommerz integration exactly as it is.
+- Keep all existing SafeGo role logic unchanged.
+
+At the end, provide:
+1. A short summary of what you implemented.
+2. Instructions for how to run a US sandbox test payment for:
+   - a ride
+   - a food order
+   - a parcel delivery
+3. A list of files/modules you changed or created, and why those changes are guaranteed to be backward-compatible.

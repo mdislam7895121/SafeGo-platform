@@ -340,6 +340,7 @@ import FinanceGatewayReports from "@/pages/admin/finance-gateway-reports";
 import FinanceDriverBalances from "@/pages/admin/finance-driver-balances";
 import FinanceRestaurantBalances from "@/pages/admin/finance-restaurant-balances";
 import FinanceSettlementsHistory from "@/pages/admin/finance-settlements-history";
+import FinanceUSOnline from "@/pages/admin/finance-us-online";
 import SecurityCenter from "@/pages/admin/SecurityCenter";
 import ReputationCenter from "@/pages/admin/ReputationCenter";
 import DataGovernanceCenter from "@/pages/admin/DataGovernanceCenter";
@@ -2635,6 +2636,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Settlements History">
             <FinanceSettlementsHistory />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/finance/us-online">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="US Online Payments">
+            <FinanceUSOnline />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

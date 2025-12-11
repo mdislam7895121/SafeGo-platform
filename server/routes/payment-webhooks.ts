@@ -163,4 +163,43 @@ router.post("/sslcommerz/cancel", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/stripe/us", async (req: Request, res: Response) => {
+  try {
+    const featureEnabled = process.env.FEATURE_US_ONLINE_PAYMENTS_ENABLED === "true";
+    if (!featureEnabled) {
+      console.warn("[PaymentWebhook] US Stripe webhook received but feature is disabled");
+      return res.status(200).json({ received: true, message: "Feature disabled" });
+    }
+
+    const signature = req.headers["stripe-signature"] as string;
+    
+    const rawBody = (req as any).rawBody;
+    if (!rawBody) {
+      console.error("[PaymentWebhook] Missing raw body for Stripe US webhook");
+      return res.status(400).json({ error: "Missing webhook payload (raw body required for Stripe signature verification)" });
+    }
+    
+    const rawBodyString = Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : String(rawBody);
+    
+    console.log("[StripeUS Webhook] Received event, processing...");
+    
+    const result = await paymentService.handleWebhook(
+      PaymentProvider.stripe,
+      rawBodyString,
+      signature
+    );
+    
+    if (!result.success) {
+      console.error("[PaymentWebhook] Stripe US webhook error:", result.message);
+      return res.status(400).json({ error: result.message });
+    }
+    
+    console.log("[StripeUS Webhook] Processing complete:", result.message);
+    res.json({ received: true });
+  } catch (error: any) {
+    console.error("[PaymentWebhook] Error processing Stripe US webhook:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
