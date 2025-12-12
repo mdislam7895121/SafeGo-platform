@@ -53,6 +53,7 @@ waitForPort = 5000
 
 [agent]
 integrations = ["stripe:1.0.0"]
+expertMode = true
 
 [userenv]
 
