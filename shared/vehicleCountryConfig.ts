@@ -6,6 +6,7 @@
  */
 
 import { USA_VEHICLE_TYPES, USAVehicleKey, USAVehicleConfig, getUSAVehiclesByService, getAllUSAVehicles, EMPTY_STATE_MESSAGE_USA } from "./vehicleTypesUSA";
+import { BD_VEHICLE_TYPES, BDVehicleKey, BDVehicleConfig, getBDVehiclesByService, getAllBDVehicles, EMPTY_STATE_MESSAGE_BD_RIDE, EMPTY_STATE_MESSAGE_BD_FOOD, EMPTY_STATE_MESSAGE_BD_PARCEL } from "./vehicleTypesBD";
 import { VEHICLE_CATEGORIES, VehicleCategoryId, VehicleCategoryConfig, getActiveVehicleCategories } from "./vehicleCategories";
 
 export type SupportedCountry = "US" | "BD";
@@ -64,6 +65,22 @@ function mapBDVehicleCategoryToDisplay(v: VehicleCategoryConfig): VehicleDisplay
   };
 }
 
+function mapBDVehicleToDisplay(v: BDVehicleConfig): VehicleDisplayItem {
+  return {
+    vehicle_key: v.vehicle_key,
+    display_name: v.display_name,
+    short_description: v.short_description,
+    capacity: v.capacity,
+    is_premium: v.is_premium,
+    icon_type: v.icon_type,
+    eta_minutes_offset: v.eta_minutes_offset,
+    sort_order: v.sort_order,
+    country: "BD",
+    service_type: v.service_type,
+    minimum_fare: v.fare_config?.minimum_fare_bdt,
+  };
+}
+
 export function getVehiclesForCountry(
   countryCode: SupportedCountry,
   serviceType: ServiceType,
@@ -87,16 +104,25 @@ export function getVehiclesForCountry(
       .map(mapUSAVehicleToDisplay);
     emptyStateMessage = EMPTY_STATE_MESSAGE_USA;
   } else if (countryCode === "BD") {
+    const bdVehicles = getBDVehiclesByService(serviceType);
+    vehicles = bdVehicles
+      .filter(v => {
+        if (!v.is_enabled) return false;
+        if (pricingConfiguredKeys && !pricingConfiguredKeys.has(v.vehicle_key) && !v.fare_config) return false;
+        if (v.requirements?.requires_city_license && v.requirements?.city_codes) {
+          if (!userCityCode || !v.requirements.city_codes.includes(userCityCode)) return false;
+        }
+        return true;
+      })
+      .map(mapBDVehicleToDisplay);
+    
     if (serviceType === "ride") {
-      const bdCategories = getActiveVehicleCategories();
-      vehicles = bdCategories
-        .filter(v => {
-          if (pricingConfiguredKeys && !pricingConfiguredKeys.has(v.id)) return false;
-          return true;
-        })
-        .map(mapBDVehicleCategoryToDisplay);
+      emptyStateMessage = EMPTY_STATE_MESSAGE_BD_RIDE;
+    } else if (serviceType === "food") {
+      emptyStateMessage = EMPTY_STATE_MESSAGE_BD_FOOD;
+    } else {
+      emptyStateMessage = EMPTY_STATE_MESSAGE_BD_PARCEL;
     }
-    emptyStateMessage = "No vehicles available in your area right now.";
   }
 
   return {
@@ -111,7 +137,7 @@ export function getVehicleKeysByCountry(countryCode: SupportedCountry): string[]
   if (countryCode === "US") {
     return Object.keys(USA_VEHICLE_TYPES);
   } else if (countryCode === "BD") {
-    return Object.keys(VEHICLE_CATEGORIES);
+    return Object.keys(BD_VEHICLE_TYPES);
   }
   return [];
 }
@@ -120,7 +146,7 @@ export function isValidVehicleKeyForCountry(vehicleKey: string, countryCode: Sup
   if (countryCode === "US") {
     return vehicleKey in USA_VEHICLE_TYPES;
   } else if (countryCode === "BD") {
-    return vehicleKey in VEHICLE_CATEGORIES;
+    return vehicleKey in BD_VEHICLE_TYPES;
   }
   return false;
 }
@@ -129,10 +155,43 @@ export function getVehicleDisplayName(vehicleKey: string, countryCode: Supported
   if (countryCode === "US" && vehicleKey in USA_VEHICLE_TYPES) {
     return USA_VEHICLE_TYPES[vehicleKey as USAVehicleKey].display_name;
   }
-  if (countryCode === "BD" && vehicleKey in VEHICLE_CATEGORIES) {
-    return VEHICLE_CATEGORIES[vehicleKey as VehicleCategoryId].displayName;
+  if (countryCode === "BD" && vehicleKey in BD_VEHICLE_TYPES) {
+    return BD_VEHICLE_TYPES[vehicleKey as BDVehicleKey].display_name;
   }
   return null;
+}
+
+export function getAllVehiclesForCountry(countryCode: SupportedCountry): VehicleDisplayItem[] {
+  if (countryCode === "US") {
+    return getAllUSAVehicles().map(v => ({
+      vehicle_key: v.vehicle_key,
+      display_name: v.display_name,
+      short_description: v.short_description,
+      capacity: v.capacity,
+      is_premium: v.is_premium,
+      icon_type: v.icon_type,
+      eta_minutes_offset: v.eta_minutes_offset,
+      sort_order: v.sort_order,
+      country: "US" as SupportedCountry,
+      service_type: v.service_type as ServiceType,
+      minimum_fare: v.fare_multipliers?.minimum_fare,
+    }));
+  } else if (countryCode === "BD") {
+    return getAllBDVehicles().map(v => ({
+      vehicle_key: v.vehicle_key,
+      display_name: v.display_name,
+      short_description: v.short_description,
+      capacity: v.capacity,
+      is_premium: v.is_premium,
+      icon_type: v.icon_type,
+      eta_minutes_offset: v.eta_minutes_offset,
+      sort_order: v.sort_order,
+      country: "BD" as SupportedCountry,
+      service_type: v.service_type as ServiceType,
+      minimum_fare: v.fare_config?.minimum_fare_bdt,
+    }));
+  }
+  return [];
 }
 
 export const EXCLUDED_VEHICLE_TYPES_BY_COUNTRY: Record<SupportedCountry, string[]> = {

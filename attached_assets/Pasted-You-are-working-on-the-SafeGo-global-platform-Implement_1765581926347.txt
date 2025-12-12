@@ -1,0 +1,114 @@
+You are working on the SafeGo global platform. Implement this task end-to-end.
+
+SAFEGO MASTER RULES (MUST FOLLOW)
+1) Roles: customer, driver, restaurant, admin. Never mix access. Role-based permissions required.
+2) Services: ride-hailing, food delivery, parcel delivery must all be supported.
+3) Country rules: BD and US must have different onboarding & KYC rules:
+   - BD mandatory fields: father_name, date_of_birth, present_address, permanent_address, NID number + front/back images, emergency contact, verification_status, is_verified
+   - US mandatory fields: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, driver license + image + expiry, ssn_last4 optional, verification_status, is_verified
+4) Admin panel must support: verify customers/drivers/restaurants, approve/reject KYC with rejection_reason, update pricing/fees/commissions, block/unblock, manage payouts, view negative balances.
+5) Collections must exist and remain intact: rides, food_orders, deliveries with full status flows, payment details, timestamps, rating/feedback.
+6) Commission rules must remain:
+   - CASH ride: driver gets cash, SafeGo commission becomes negative driver_wallet_balance; weekly settlement by admin.
+   - CASH food: restaurant gets cash, commission becomes negative restaurant_wallet; admin can settle.
+   - Online: SafeGo keeps commission automatically.
+7) Security rules: customers cannot view driver docs; drivers cannot view customer sensitive info; restaurants isolated; only admin changes pricing/commission/verification/blocking.
+8) Status flows must remain complete:
+   - Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+   - Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x
+   - Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+9) Non-breaking: do NOT rename/remove existing fields/APIs/routes. Only ADD new configs/entries. Backward-compatible only.
+
+TASK
+We already defined a SafeGo-branded vehicle catalog for US. Now we must ADD the same set of vehicle types for Bangladesh (BD) too, without using Uber names anywhere.
+
+Vehicle types to ensure exist for Bangladesh (BD):
+
+Passenger Ride Vehicles (BD):
+1. SafeGo Standard
+2. SafeGo Comfort
+3. SafeGo Eco (Hybrid / Electric)
+4. SafeGo Family (6–7 seater)
+5. SafeGo Executive
+6. SafeGo Executive SUV
+7. SafeGo Schedule (Advance booking)
+8. SafeGo Hourly (Time-based)
+9. SafeGo City Taxi (city-regulated)
+
+Delivery / Parcel Vehicles (BD) — same list previously used for US delivery:
+10. SafeGo Car Delivery
+11. SafeGo Van Delivery
+12. SafeGo Connect (same-day parcel)
+
+IMPORTANT: In addition, do NOT break existing BD-only vehicles already present (e.g., Bike/CNG/Pickup/Mini Truck). Those must remain available according to BD config. This task is additive.
+
+IMPLEMENTATION REQUIREMENTS
+A) Global Vehicle Master (required)
+- Ensure the platform has (or add, if missing) a single global “vehicle master” definition source:
+  - db table OR config file OR seed list (use existing pattern)
+- For each vehicle entry (BD), include:
+  - vehicle_key (stable internal ID; no spaces; snake_case)
+  - display_name (SafeGo branded names exactly as listed)
+  - country: "BD"
+  - services_supported: [ride] or [food, parcel]
+  - vehicle_class: sedan/suv/xl/taxi/eco/van/car_delivery/etc.
+  - capacity: passenger_count OR parcel_capacity_level
+  - is_premium (true/false)
+  - is_time_based (true/false)
+  - is_scheduled (true/false)
+  - is_enabled (default false unless pricing exists)
+
+B) Country filtering (required)
+- Customer apps must show vehicle options ONLY for the selected country (BD vs US).
+- Vehicles must only appear if:
+  - country matches
+  - pricing exists (or a default price config exists)
+  - vehicle is enabled for that country
+
+C) Pricing & visibility rule (required)
+- If pricing is missing for a vehicle in BD, auto-hide it from customer UI (do not show empty cards).
+- Admin must be able to enable/disable a vehicle and set pricing per country.
+
+D) Driver eligibility (required)
+- Executive/Executive SUV: stricter eligibility flags (no driver doc exposure to customers).
+- City Taxi: allow city-level enable rules (BD cities).
+- Schedule/Hourly: ensure ride workflow supports scheduled/time-based flags without breaking normal rides.
+
+E) UI safety (required)
+- Absolutely NO white screens.
+- Add empty-state messages:
+  - Ride: “No ride options available right now.”
+  - Delivery: “Delivery is not available in your area right now.”
+- Add error boundary if not present and ensure route pages render at least a header + placeholder.
+
+F) Admin panel (required)
+- Add/extend admin UI for “Vehicle Types & Pricing” to manage:
+  - country selection (BD/US)
+  - enable/disable vehicles
+  - set base fare, per_km, per_min, minimum fare
+  - for delivery: base fee, per_km, weight/size multipliers if present
+- Keep permissions: only admin can change this.
+
+G) Data models / collections (required)
+- Ensure rides, food_orders, deliveries store:
+  - selected_vehicle_key
+  - selected_vehicle_display_name
+  - country
+  - pricing snapshot at time of order (so pricing changes don’t affect past records)
+
+H) Notifications (required)
+- When a vehicle is disabled or pricing missing, show clear admin warnings and avoid user-facing failures.
+
+DELIVERABLES
+1) Implement the BD additions and confirm no existing behavior is broken.
+2) Provide a short report:
+   - files/modules changed
+   - where the vehicle definitions live
+   - how country filtering & pricing-hide works
+3) Provide a quick manual test checklist:
+   - BD customer can see the new 12 vehicles (when pricing enabled) plus existing BD vehicles
+   - US customer still sees US list correctly
+   - No white screens on /ride /food /parcel /shops /tickets
+4) Confirm all changes are backward-compatible.
+
+Proceed now and finish in one pass.
