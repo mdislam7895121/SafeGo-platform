@@ -1,0 +1,58 @@
+You must perform a full end-to-end audit of the app because multiple routes are rendering a blank white screen
+(e.g., /customer, /ride, /food, /parcel, /tickets, /shops).
+
+Goal: eliminate white screen on every route and make published build stable.
+
+STRICT REQUIREMENTS:
+- Do not change product scope or remove features.
+- Add safe fallbacks, loading states, and error boundaries so the UI never goes fully blank.
+- Fix root causes (runtime errors, routing, API failures, env issues).
+- Keep changes incremental and non-breaking.
+
+STEP A — Reproduce and capture evidence
+1) For each route:
+   /, /customer, /ride, /food, /parcel, /tickets, /shops
+   open it in Preview and in Published/Republish environment.
+2) For each route, capture:
+   - Browser console errors (stack traces)
+   - Network tab: failed requests (status, URL, response body)
+   - Server logs during the request
+3) Summarize the root cause(s) for each route before applying fixes.
+
+STEP B — Implement “Never Blank UI” safety net
+4) Add a global React Error Boundary that catches render errors and shows a friendly error screen with:
+   - route path
+   - error message
+   - retry button (reload)
+5) Add Suspense/Loading fallback and route-level loading states.
+6) Ensure every page component returns visible UI even if data fails (placeholder cards + message).
+
+STEP C — Fix the actual root causes (most common)
+7) If router configuration/base path is wrong:
+   - confirm correct router setup for Replit publish
+   - ensure all routes resolve to the app shell
+8) If API calls fail:
+   - verify API base URL is correct for preview and for published env
+   - handle 401/403/500 gracefully
+   - fix CORS if needed
+9) If environment variables cause crashes:
+   - validate all required envs at startup with clear logs
+   - do not hard-crash the UI; show warning UI
+10) Ensure build/start config is correct for production:
+   - build: npm run build
+   - start: npm run start
+   - app must listen on process.env.PORT (not hardcoded)
+   - no crash loop
+
+STEP D — Verification checklist (must pass)
+11) For each route listed in Step A:
+   - page renders visible content (not blank)
+   - no uncaught console errors
+   - no infinite redirect loop
+   - if data missing, user sees a clear empty-state UI
+12) Provide me a short report:
+   - What was broken (per route)
+   - What you changed (files + key code)
+   - Proof: screenshots of working pages + logs summary
+
+Do not ask me questions. Do the audit, apply fixes, and deliver the working result.
