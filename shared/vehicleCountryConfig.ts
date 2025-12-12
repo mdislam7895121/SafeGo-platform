@@ -136,11 +136,16 @@ export function getVehicleDisplayName(vehicleKey: string, countryCode: Supported
 }
 
 export const EXCLUDED_VEHICLE_TYPES_BY_COUNTRY: Record<SupportedCountry, string[]> = {
-  US: ["BIKE", "SCOOTER", "BICYCLE", "MOTORCYCLE", "CNG", "RICKSHAW"],
+  US: ["CNG", "RICKSHAW"],
   BD: [],
 };
 
+const ALLOWED_DELIVERY_VEHICLES = ["SAFEGO_DELIVERY_BIKE", "SAFEGO_DELIVERY_MOTORBIKE"];
+
 export function isExcludedVehicleType(vehicleType: string, countryCode: SupportedCountry): boolean {
+  if (ALLOWED_DELIVERY_VEHICLES.includes(vehicleType.toUpperCase())) {
+    return false;
+  }
   const excluded = EXCLUDED_VEHICLE_TYPES_BY_COUNTRY[countryCode] || [];
   return excluded.some(e => vehicleType.toUpperCase().includes(e));
 }

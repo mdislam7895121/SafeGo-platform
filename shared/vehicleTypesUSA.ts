@@ -9,7 +9,7 @@
  * - Vehicles without pricing config are hidden from customers
  * - Premium vehicles (Executive, Executive SUV) require stricter driver eligibility
  * - City Taxi respects city/state-specific enable rules
- * - No Bike/Scooter/Bicycle vehicles in US market
+ * - Delivery Bike and Motorbike available for food/parcel delivery
  */
 
 export type USAServiceType = "ride" | "food" | "parcel";
@@ -24,6 +24,8 @@ export type USAVehicleKey =
   | "SAFEGO_SCHEDULE"
   | "SAFEGO_HOURLY"
   | "SAFEGO_CITY_TAXI"
+  | "SAFEGO_DELIVERY_BIKE"
+  | "SAFEGO_DELIVERY_MOTORBIKE"
   | "SAFEGO_CAR_DELIVERY"
   | "SAFEGO_VAN_DELIVERY"
   | "SAFEGO_CONNECT";
@@ -35,11 +37,12 @@ export interface USAVehicleConfig {
   short_description: string;
   country: "US";
   service_type: USAServiceType;
+  additional_services?: USAServiceType[];
   capacity: number;
   is_premium: boolean;
   is_time_based: boolean;
   is_enabled: boolean;
-  icon_type: "economy" | "comfort" | "eco" | "family" | "premium" | "suv" | "taxi" | "delivery" | "van" | "express";
+  icon_type: "economy" | "comfort" | "eco" | "family" | "premium" | "suv" | "taxi" | "delivery" | "van" | "express" | "bike" | "motorbike";
   eta_minutes_offset: number;
   sort_order: number;
   requirements?: {
@@ -299,6 +302,55 @@ export const USA_VEHICLE_TYPES: Record<USAVehicleKey, USAVehicleConfig> = {
     },
   },
 
+  SAFEGO_DELIVERY_BIKE: {
+    vehicle_key: "SAFEGO_DELIVERY_BIKE",
+    display_name: "SafeGo Delivery Bike",
+    description: "Eco-friendly bicycle delivery for small orders",
+    short_description: "Bicycle delivery",
+    country: "US",
+    service_type: "food",
+    additional_services: ["parcel"],
+    capacity: 1,
+    is_premium: false,
+    is_time_based: false,
+    is_enabled: true,
+    icon_type: "bike",
+    eta_minutes_offset: 0,
+    sort_order: 10,
+    fare_multipliers: {
+      base: 1.5,
+      per_mile: 0.8,
+      per_minute: 0.1,
+      minimum_fare: 3.0,
+    },
+  },
+
+  SAFEGO_DELIVERY_MOTORBIKE: {
+    vehicle_key: "SAFEGO_DELIVERY_MOTORBIKE",
+    display_name: "SafeGo Delivery Motorbike",
+    description: "Fast motorbike delivery for food and parcels",
+    short_description: "Motorbike delivery",
+    country: "US",
+    service_type: "food",
+    additional_services: ["parcel"],
+    capacity: 2,
+    is_premium: false,
+    is_time_based: false,
+    is_enabled: true,
+    icon_type: "motorbike",
+    eta_minutes_offset: 0,
+    sort_order: 11,
+    requirements: {
+      min_model_year: 2015,
+    },
+    fare_multipliers: {
+      base: 2.0,
+      per_mile: 1.0,
+      per_minute: 0.12,
+      minimum_fare: 4.0,
+    },
+  },
+
   SAFEGO_CAR_DELIVERY: {
     vehicle_key: "SAFEGO_CAR_DELIVERY",
     display_name: "SafeGo Car Delivery",
@@ -312,7 +364,7 @@ export const USA_VEHICLE_TYPES: Record<USAVehicleKey, USAVehicleConfig> = {
     is_enabled: true,
     icon_type: "delivery",
     eta_minutes_offset: 0,
-    sort_order: 10,
+    sort_order: 12,
     requirements: {
       min_model_year: 2010,
     },
@@ -337,7 +389,7 @@ export const USA_VEHICLE_TYPES: Record<USAVehicleKey, USAVehicleConfig> = {
     is_enabled: true,
     icon_type: "van",
     eta_minutes_offset: 5,
-    sort_order: 11,
+    sort_order: 13,
     requirements: {
       min_model_year: 2012,
     },
@@ -362,7 +414,7 @@ export const USA_VEHICLE_TYPES: Record<USAVehicleKey, USAVehicleConfig> = {
     is_enabled: true,
     icon_type: "express",
     eta_minutes_offset: 2,
-    sort_order: 12,
+    sort_order: 14,
     requirements: {
       min_model_year: 2012,
     },
@@ -385,6 +437,8 @@ export const USA_VEHICLE_TYPE_ORDER: USAVehicleKey[] = [
   "SAFEGO_SCHEDULE",
   "SAFEGO_HOURLY",
   "SAFEGO_CITY_TAXI",
+  "SAFEGO_DELIVERY_BIKE",
+  "SAFEGO_DELIVERY_MOTORBIKE",
   "SAFEGO_CAR_DELIVERY",
   "SAFEGO_VAN_DELIVERY",
   "SAFEGO_CONNECT",
@@ -397,7 +451,12 @@ export function getUSAVehicleType(key: USAVehicleKey): USAVehicleConfig {
 export function getUSAVehiclesByService(serviceType: USAServiceType): USAVehicleConfig[] {
   return USA_VEHICLE_TYPE_ORDER
     .map(key => USA_VEHICLE_TYPES[key])
-    .filter(v => v.service_type === serviceType && v.is_enabled);
+    .filter(v => {
+      if (!v.is_enabled) return false;
+      if (v.service_type === serviceType) return true;
+      if (v.additional_services?.includes(serviceType)) return true;
+      return false;
+    });
 }
 
 export function getEnabledUSARideVehicles(): USAVehicleConfig[] {

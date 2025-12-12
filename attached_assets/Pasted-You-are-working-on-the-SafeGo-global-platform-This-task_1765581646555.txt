@@ -1,0 +1,112 @@
+You are working on the SafeGo global platform.
+This task is to ADD delivery vehicle types (Bike & Motorbike)
+for BOTH United States (US) and Bangladesh (BD).
+
+You must follow all existing SafeGo rules.
+Do NOT remove, rename, or break any existing features.
+Only ADD configurations in a backward-compatible way.
+
+------------------------------------------------
+SCOPE
+------------------------------------------------
+Countries:
+- United States (US)
+- Bangladesh (BD)
+
+Services affected:
+- Food Delivery
+- Parcel Delivery
+
+------------------------------------------------
+DELIVERY VEHICLES TO ADD (BOTH US & BD)
+------------------------------------------------
+
+1. SafeGo Delivery Bike
+   - service_type: food, parcel
+   - vehicle_class: bike
+   - capacity: small parcels / food
+   - is_motorized: false
+
+2. SafeGo Delivery Motorbike
+   - service_type: food, parcel
+   - vehicle_class: motorbike
+   - capacity: medium parcels / food
+   - is_motorized: true
+
+These vehicles MUST be available in:
+- country = "US"
+- country = "BD"
+
+------------------------------------------------
+IMPLEMENTATION REQUIREMENTS
+------------------------------------------------
+
+1. GLOBAL VEHICLE MASTER
+- Add both vehicles to the global vehicle master list/config.
+- Each vehicle entry must include:
+  - vehicle_key (stable internal id)
+  - display_name
+  - country (US or BD)
+  - service_type (food | parcel)
+  - vehicle_class (bike | motorbike)
+  - capacity_level (small | medium)
+  - is_motorized (true/false)
+  - is_enabled (true/false)
+
+2. COUNTRY-BASED LOGIC
+- Vehicles must appear ONLY when:
+  - country matches (US or BD)
+  - pricing is configured
+  - driver is available
+- Do NOT hide these vehicles in US.
+  (Delivery bike & motorbike are intentionally enabled in both countries.)
+
+3. PRICING RULE
+- If pricing is missing:
+  - vehicle must NOT appear in customer UI
+- Pricing logic remains backend-driven.
+
+4. DRIVER ELIGIBILITY
+- Delivery Bike:
+  - minimal vehicle requirements
+- Delivery Motorbike:
+  - require valid driving license where applicable
+- Do NOT expose any driver documents to customers.
+
+5. UI & UX SAFETY
+- Never show blank/white screens.
+- If no delivery vehicles are available, show:
+  “Delivery is not available in your area right now.”
+
+6. SECURITY & PERMISSIONS
+- Only Admin can:
+  - enable/disable vehicles
+  - set pricing
+- Drivers can only select vehicles they are approved for.
+
+7. NON-BREAKING RULE
+- Do NOT modify existing APIs, routes, or database fields.
+- Only ADD new vehicle configurations.
+- Preserve all existing SafeGo functionality.
+
+------------------------------------------------
+VERIFICATION CHECKLIST
+------------------------------------------------
+
+Confirm the following:
+1. Delivery Bike appears in US & BD when pricing exists.
+2. Delivery Motorbike appears in US & BD when pricing exists.
+3. Vehicles do not appear without pricing.
+4. Food & parcel flows work without errors.
+5. No Uber naming appears anywhere.
+6. App loads without white screens.
+
+------------------------------------------------
+DELIVERABLE
+------------------------------------------------
+Provide a short report:
+- Where vehicle definitions were added
+- How country filtering works
+- Proof that US & BD both show delivery bike & motorbike
+
+Proceed carefully and complete the task end-to-end.
