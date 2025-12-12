@@ -1,0 +1,102 @@
+You are working on the SafeGo global platform.
+This task is about ADDING vehicle types for USA, inspired by Uber capabilities
+but using SafeGo’s own naming, branding, and country-based rules.
+
+You must follow all existing SafeGo rules. Do NOT remove or rename any existing
+fields, APIs, routes, or logic. Only ADD new configurations where needed.
+
+--------------------------------
+SCOPE
+--------------------------------
+Country: United States (US)
+Service types affected:
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+--------------------------------
+VEHICLE TYPES TO ADD (USA)
+--------------------------------
+
+Passenger Ride Vehicles (US):
+1. SafeGo Standard
+2. SafeGo Comfort
+3. SafeGo Eco (Hybrid / Electric)
+4. SafeGo Family (6–7 seater)
+5. SafeGo Executive
+6. SafeGo Executive SUV
+7. SafeGo Schedule (Advance booking)
+8. SafeGo Hourly (Time-based)
+9. SafeGo City Taxi (city-regulated)
+
+Delivery / Parcel Vehicles (US):
+10. SafeGo Car Delivery
+11. SafeGo Van Delivery
+12. SafeGo Connect (same-day parcel)
+
+--------------------------------
+IMPLEMENTATION REQUIREMENTS
+--------------------------------
+
+1. GLOBAL VEHICLE MASTER
+- Ensure all vehicle types exist in a global vehicle master list/table/config.
+- Each vehicle must have:
+  - vehicle_key (stable internal id)
+  - display_name
+  - country = "US"
+  - service_type (ride | food | parcel)
+  - capacity (passengers or parcel size)
+  - is_premium (true/false)
+  - is_time_based (true/false)
+  - is_enabled (true/false)
+
+2. COUNTRY-BASED VISIBILITY
+- Vehicles must only appear when country = US.
+- Do NOT show Bike, Scooter, or Bicycle vehicles in US.
+
+3. PRICING RULE
+- If pricing is NOT configured for a vehicle:
+  - It must NOT appear in customer apps.
+- Pricing logic must remain backend-driven.
+
+4. DRIVER ELIGIBILITY
+- Executive / Executive SUV:
+  - Require stricter driver eligibility flags (no document details exposed).
+- City Taxi:
+  - Must respect city/state-specific enable rules.
+
+5. UI SAFETY
+- Never render a blank page.
+- If no vehicles are available, show a clear empty-state message:
+  “No vehicles available in your area right now.”
+
+6. SECURITY & PERMISSIONS
+- Customers cannot see driver documents.
+- Drivers cannot see customer sensitive data.
+- Only Admin can enable/disable vehicle types or pricing.
+
+7. NON-BREAKING CHANGE RULE
+- Do NOT modify existing routes, collections, or APIs.
+- Only ADD new vehicle entries/configurations.
+- All changes must be backward-compatible.
+
+--------------------------------
+VERIFICATION CHECKLIST
+--------------------------------
+
+After implementation, confirm:
+1. USA customers see only the USA vehicle list above.
+2. No Uber naming appears anywhere in UI or code.
+3. Vehicles without pricing do not appear.
+4. App loads with no white screens.
+5. Admin can toggle vehicles on/off safely.
+
+--------------------------------
+DELIVERABLE
+--------------------------------
+Provide a short report including:
+- Where vehicle definitions were added (files/modules)
+- How country filtering is enforced
+- Proof that USA UI shows the correct list
+
+Proceed carefully and complete this end-to-end.
