@@ -67,8 +67,12 @@ export class ErrorBoundary extends Component<Props, State> {
               Something went wrong
             </h1>
             
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-2">
               We're sorry, but something unexpected happened. Please try reloading the page.
+            </p>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
+              Route: {typeof window !== 'undefined' ? window.location.pathname : 'unknown'}
             </p>
             
             <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 mb-6">
