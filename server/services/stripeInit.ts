@@ -26,8 +26,7 @@ export async function initStripe(): Promise<{ success: boolean; webhookUuid?: st
   try {
     console.log('[StripeInit] Initializing Stripe schema...');
     await runMigrations({ 
-      databaseUrl,
-      schema: 'stripe'
+      databaseUrl
     });
     console.log('[StripeInit] Stripe schema ready');
 

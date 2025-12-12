@@ -1,0 +1,65 @@
+You must act as a senior full-stack engineer and debugger.
+
+CURRENT PROBLEMS (CONFIRMED):
+1) Routes `/shops` and `/food` are loading blank white screens on Preview (mobile & desktop).
+2) Build & bundle succeed, but UI does not render content for these routes.
+3) Promotion failed due to missing required secret: ENCRYPTION_KEY.
+4) Stripe connector cannot be clicked/configured from UI (Configure button inactive).
+5) App exits during promotion because of environment validation failure.
+6) FCM is in mock mode (this is acceptable for now – do NOT block deploy for FCM).
+
+YOUR TASKS (DO ALL, IN ORDER):
+
+1. ROUTE DEBUGGING (CRITICAL)
+- Inspect `/shops` and `/food` routes.
+- Verify route registration (React Router / Next routing / Vite routing).
+- Check for:
+  - Missing default export
+  - Suspense without fallback
+  - API call blocking render
+  - Empty state rendering incorrectly
+- Ensure each route renders:
+  - Page title
+  - Placeholder content (card/list)
+  - Clear text like: "Shops loading…" / "Food services coming soon"
+- Do NOT leave routes blank even if backend data is missing.
+
+2. ENVIRONMENT FIX (BLOCKING DEPLOY)
+- Add safe, production-ready fallback handling for missing ENCRYPTION_KEY.
+- If ENCRYPTION_KEY is missing:
+  - Log a warning
+  - Generate a temporary runtime key ONLY for non-production
+  - Do NOT crash the app
+- Clearly mark this as temporary in logs.
+
+3. STRIPE CONFIGURATION (IMPORTANT)
+- Detect that Stripe connector is NOT configured via Replit UI.
+- Gracefully disable Stripe features in UI:
+  - Hide payment buttons
+  - Show message: "Payments will be enabled soon"
+- Do NOT attempt to initialize Stripe if credentials are unavailable.
+- Remove hard failure on Stripe init.
+
+4. PROMOTION / DEPLOYMENT
+- Ensure app does NOT exit due to:
+  - Missing Stripe
+  - Missing FCM
+- Promotion must succeed with:
+  - Core pages visible
+  - Routes rendering
+  - No fatal runtime errors
+
+5. FINAL CHECK
+- Rebuild
+- Run Preview
+- Confirm:
+  - `/`, `/shops`, `/food` render content
+  - No white screen
+  - No crash loop
+- Then report a clear status summary.
+
+RULES:
+- Do NOT ask me questions.
+- Do NOT suggest UI clicks.
+- Fix everything in code.
+- Be conservative, production-safe, and explicit.
