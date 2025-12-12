@@ -128,6 +128,25 @@ type DriverPublicProfile = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health endpoint - returns 200 with basic status
+  app.get('/health', (_req: Request, res: Response) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+    });
+  });
+
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+    });
+  });
+
   // Initialize Stripe integration (creates schema, webhooks, syncs data)
   const stripeInit = await initStripe();
   if (stripeInit.success && stripeInit.webhookUuid) {

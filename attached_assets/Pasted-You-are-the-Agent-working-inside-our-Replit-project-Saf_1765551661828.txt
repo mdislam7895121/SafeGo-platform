@@ -1,0 +1,77 @@
+You are the Agent working inside our Replit project “SafeGo-platform”. The user has already set ENCRYPTION_KEY in Replit Secrets.
+
+Goal: make the app fully work in Preview + Published domain (safegoglobal.com) with NO blank white pages on these routes:
+- /ride
+- /food
+- /parcel
+- /shops
+- /tickets
+
+Current problems to fix (must all be solved):
+1) Mobile/preview shows only white screen for the routes above.
+2) Publishing/Promote shows “socket closed / 4500 internal server error” or crashes.
+3) Stripe connector UI “Configure” click was not working earlier, but payments can remain in mock/test mode. Do NOT block app start if Stripe/FCM not configured.
+
+Hard rules:
+- Do NOT remove or weaken security.
+- Do NOT require Stripe or Firebase/FCM to boot. Keep them optional (mock mode) without crashes.
+- Add error boundaries + visible error UI so we never get a blank page.
+- Fix root cause (not just hiding errors).
+- Log important errors to server logs with clear tags.
+
+Step-by-step tasks (do in order):
+
+A) Find the white-screen root cause
+1) Run the app locally in Replit and open Preview for each route.
+2) Open browser console and capture errors (React errors, hydration errors, chunk load errors, 404 assets).
+3) Check server logs for runtime exceptions during route load.
+4) Identify if the issue is:
+   - Client-side crash (JS exception)
+   - Routing mismatch (React Router / Next / Vite)
+   - Missing build assets (wrong base path)
+   - API call crash (unhandled promise, auth redirect loop)
+   - Environment variable missing in production build
+
+B) Implement “No more white screens”
+1) Add a global React Error Boundary at the app root.
+2) Add route-level error boundaries (or a wrapper) for each route.
+3) Add a “FallbackErrorPage” that shows:
+   - Human readable message
+   - Error id
+   - Stack trace only in development
+   - A “Reload” button
+4) Add a global unhandledrejection and window.onerror handler in client to log and show fallback.
+
+C) Fix build + publish stability
+1) Ensure production build works: `npm run build` must complete.
+2) Ensure server start command for Replit Deploy is correct (no port conflicts).
+3) Confirm the app listens on the port Replit provides (process.env.PORT) and binds to 0.0.0.0.
+4) Remove any hardcoded localhost URLs in production.
+5) If there is an API base URL, make it relative or based on env.
+
+D) Fix routes rendering
+1) Verify the router config includes all routes and they import correct components.
+2) Ensure each route renders visible UI even if data loading fails.
+3) Add loading skeletons + empty states.
+
+E) Make integrations non-blocking
+1) Stripe: if keys/connector missing, log “[StripeInit] not configured” and continue.
+2) FCM: if not configured, keep mock mode and continue.
+3) Any other 3rd-party init must never throw at import-time; wrap in try/catch and lazy init.
+
+F) Deploy verification checklist (must pass)
+1) Preview: /ride /food /parcel /shops /tickets all render UI (not white).
+2) Published domain: same routes render.
+3) No crash loop in deploy logs.
+4) Console has no fatal errors; warnings acceptable.
+5) Add a /health endpoint returning 200 with basic status.
+
+Deliverables:
+- Commit changes with clear messages.
+- Provide a short report:
+  - root cause found
+  - files changed
+  - how it was fixed
+  - how to verify
+
+Start now. Do not ask me questions unless you are blocked by missing access. If blocked, state exactly what is missing and propose the smallest next action.

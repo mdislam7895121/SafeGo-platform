@@ -12,6 +12,7 @@ import { EatsCartProvider } from "@/contexts/EatsCartContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Core auth pages (non-lazy for fast initial load)
 import Login from "@/pages/login";
@@ -22,6 +23,9 @@ import NotFound from "@/pages/not-found";
 const LandingPage = lazy(() => import("@/pages/landing/LandingPage"));
 const ShopsPage = lazy(() => import("@/pages/landing/ShopsPage"));
 const FoodPage = lazy(() => import("@/pages/landing/FoodPage"));
+const RidePage = lazy(() => import("@/pages/landing/RidePage"));
+const ParcelPage = lazy(() => import("@/pages/landing/ParcelPage"));
+const TicketsPage = lazy(() => import("@/pages/landing/TicketsPage"));
 
 // Lazy-loaded route modules for major sections
 const AdminRoutes = lazy(() => import("@/routes/AdminRoutes").then(m => ({ default: m.AdminRoutes })));
@@ -163,6 +167,21 @@ function Router() {
       <Route path="/food">
         <Suspense fallback={<LoadingSpinner />}>
           <FoodPage />
+        </Suspense>
+      </Route>
+      <Route path="/ride">
+        <Suspense fallback={<LoadingSpinner />}>
+          <RidePage />
+        </Suspense>
+      </Route>
+      <Route path="/parcel">
+        <Suspense fallback={<LoadingSpinner />}>
+          <ParcelPage />
+        </Suspense>
+      </Route>
+      <Route path="/tickets">
+        <Suspense fallback={<LoadingSpinner />}>
+          <TicketsPage />
         </Suspense>
       </Route>
       
@@ -449,23 +468,27 @@ function AccountLockedHandler() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <NotificationSoundProvider>
-          <AuthProvider>
-            <EatsCartProvider>
-              <TooltipProvider>
-                <Toaster />
-                <AccountLockedHandler />
-                <Router />
-                <Suspense fallback={null}>
-                  <SafePilotButton />
-                </Suspense>
-              </TooltipProvider>
-            </EatsCartProvider>
-          </AuthProvider>
-        </NotificationSoundProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <NotificationSoundProvider>
+            <AuthProvider>
+              <EatsCartProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <AccountLockedHandler />
+                  <ErrorBoundary>
+                    <Router />
+                  </ErrorBoundary>
+                  <Suspense fallback={null}>
+                    <SafePilotButton />
+                  </Suspense>
+                </TooltipProvider>
+              </EatsCartProvider>
+            </AuthProvider>
+          </NotificationSoundProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
