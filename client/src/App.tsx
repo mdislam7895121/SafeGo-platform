@@ -18,8 +18,10 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import NotFound from "@/pages/not-found";
 
-// Lazy-loaded landing page
+// Lazy-loaded landing pages
 const LandingPage = lazy(() => import("@/pages/landing/LandingPage"));
+const ShopsPage = lazy(() => import("@/pages/landing/ShopsPage"));
+const FoodPage = lazy(() => import("@/pages/landing/FoodPage"));
 
 // Lazy-loaded route modules for major sections
 const AdminRoutes = lazy(() => import("@/routes/AdminRoutes").then(m => ({ default: m.AdminRoutes })));
@@ -152,6 +154,16 @@ function Router() {
       </Route>
       <Route path="/signup">
         <Signup />
+      </Route>
+      <Route path="/shops">
+        <Suspense fallback={<LoadingSpinner />}>
+          <ShopsPage />
+        </Suspense>
+      </Route>
+      <Route path="/food">
+        <Suspense fallback={<LoadingSpinner />}>
+          <FoodPage />
+        </Suspense>
       </Route>
       
       {/* Lazy-loaded major route modules */}

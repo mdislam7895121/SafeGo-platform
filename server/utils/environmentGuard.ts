@@ -55,30 +55,56 @@ function validateJwtSecret(): string | null {
  */
 function validateEncryptionKey(): string | null {
   const rawKey = process.env.ENCRYPTION_KEY;
+  const isNonProduction = 
+    process.env.NODE_ENV === "development" || 
+    process.env.NODE_ENV === "test" || 
+    !process.env.NODE_ENV;
   
   if (!rawKey || rawKey.trim() === "") {
+    if (isNonProduction) {
+      return null;
+    }
     return "ENCRYPTION_KEY is required for encrypting sensitive data (NID, SSN, bank accounts, 2FA secrets)";
   }
   
-  // Trim any accidental whitespace from the key (common copy-paste issue)
   const key = rawKey.trim();
   
-  // Check if it's hex format (crypto.ts requirement)
   const isHexFormat = /^[0-9a-fA-F]{64}$/.test(key);
-  
-  // Check if it's 32-byte UTF-8 format (encryption.ts requirement)
   const isUtf8Format = key.length === 32;
   
   if (!isHexFormat && !isUtf8Format) {
     return "ENCRYPTION_KEY must be either 32 bytes (UTF-8) or 64 hex characters (32 bytes hex). Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"";
   }
   
-  // CRITICAL: Reject default/insecure values - these are production security risks
   if (key.includes("default") || key.includes("safego-default") || key.includes("your-encryption-key")) {
     return "ENCRYPTION_KEY is using a default/placeholder value - THIS IS INSECURE! All encrypted data would be compromised. Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"";
   }
   
   return null;
+}
+
+let temporaryEncryptionKey: string | null = null;
+
+export function getTemporaryEncryptionKey(): string | null {
+  return temporaryEncryptionKey;
+}
+
+function generateTemporaryEncryptionKeyIfNeeded(): void {
+  const rawKey = process.env.ENCRYPTION_KEY;
+  const isNonProduction = 
+    process.env.NODE_ENV === "development" || 
+    process.env.NODE_ENV === "test" || 
+    !process.env.NODE_ENV;
+  
+  if ((!rawKey || rawKey.trim() === "") && isNonProduction) {
+    const crypto = require("crypto");
+    const generatedKey = crypto.randomBytes(32).toString("hex");
+    temporaryEncryptionKey = generatedKey;
+    process.env.ENCRYPTION_KEY = generatedKey;
+    console.warn("\n[!] TEMPORARY ENCRYPTION_KEY generated for non-production use.");
+    console.warn("[!] WARNING: This key is ephemeral - encrypted data will NOT be recoverable after restart!");
+    console.warn("[!] Set a permanent ENCRYPTION_KEY before deploying to production.\n");
+  }
 }
 
 /**
@@ -182,6 +208,8 @@ export function validateEnvironment(): ValidationResult {
  */
 export function guardEnvironment(): void {
   console.log("[Environment Guard] Validating security configuration...");
+  
+  generateTemporaryEncryptionKeyIfNeeded();
   
   const result = validateEnvironment();
   const isNonProduction = 
