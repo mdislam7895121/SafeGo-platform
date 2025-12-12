@@ -51,3 +51,6 @@ SSLCOMMERZ_SUCCESS_URL_BD = "/api/payments/sslcommerz/success"
 SSLCOMMERZ_FAIL_URL_BD = "/api/payments/sslcommerz/fail"
 SSLCOMMERZ_CANCEL_URL_BD = "/api/payments/sslcommerz/cancel"
 FEATURE_US_ONLINE_PAYMENTS_ENABLED = "true"
+
+[userenv.production]
+ENCRYPTION_KEY = "9f3b6d1a7c4e2a8d0b6f9e3c5a1d7b8e4f0a9c2e6d1b5f8a3e7c0d4b9a2"
