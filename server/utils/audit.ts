@@ -187,6 +187,8 @@ export const EntityType = {
   SAFETY_ALERT: "safety_alert",
   FEATURE_FLAG: "feature_flag",
   ADMIN_RBAC: "admin_rbac",
+  // Vehicle type management
+  VEHICLE_TYPE: "vehicle_type",
 } as const;
 
 interface AuditLogParams {
