@@ -101,8 +101,31 @@ const TicketOperatorStart = lazy(() => import("@/pages/partner/ticket-start"));
 
 function LoadingSpinner() {
   return (
-    <div className="flex items-center justify-center min-h-screen" data-testid="loading-spinner">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <div 
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#f8fafc'
+      }}
+      data-testid="loading-spinner"
+    >
+      <div style={{ textAlign: 'center' }}>
+        <div 
+          style={{
+            width: '48px',
+            height: '48px',
+            border: '3px solid #e2e8f0',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            margin: '0 auto 16px',
+            animation: 'spin 1s linear infinite'
+          }}
+        />
+        <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>Loading...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
     </div>
   );
 }
@@ -146,53 +169,54 @@ function Router() {
   }
 
   return (
-    <Switch>
-      {/* Public Routes */}
-      <Route path="/">
-        <Suspense fallback={<LoadingSpinner />}>
-          <LandingPage />
-        </Suspense>
-      </Route>
-      <Route path="/login">
-        <Login />
-      </Route>
-      <Route path="/signup">
-        <Signup />
-      </Route>
-      <Route path="/shops">
-        <Suspense fallback={<LoadingSpinner />}>
-          <ShopsPage />
-        </Suspense>
-      </Route>
-      <Route path="/food">
-        <Suspense fallback={<LoadingSpinner />}>
-          <FoodPage />
-        </Suspense>
-      </Route>
-      <Route path="/ride">
-        <Suspense fallback={<LoadingSpinner />}>
-          <RidePage />
-        </Suspense>
-      </Route>
-      <Route path="/parcel">
-        <Suspense fallback={<LoadingSpinner />}>
-          <ParcelPage />
-        </Suspense>
-      </Route>
-      <Route path="/tickets">
-        <Suspense fallback={<LoadingSpinner />}>
-          <TicketsPage />
-        </Suspense>
-      </Route>
-      
-      {/* Lazy-loaded major route modules */}
+    <>
+      {/* Lazy-loaded major route modules - rendered outside Switch for proper matching */}
       <Suspense fallback={<LoadingSpinner />}>
         <AdminRoutes />
         <DriverRoutes />
         <RestaurantRoutes />
       </Suspense>
 
-      {/* Customer Routes */}
+      <Switch>
+        {/* Public Routes */}
+        <Route path="/">
+          <Suspense fallback={<LoadingSpinner />}>
+            <LandingPage />
+          </Suspense>
+        </Route>
+        <Route path="/login">
+          <Login />
+        </Route>
+        <Route path="/signup">
+          <Signup />
+        </Route>
+        <Route path="/shops">
+          <Suspense fallback={<LoadingSpinner />}>
+            <ShopsPage />
+          </Suspense>
+        </Route>
+        <Route path="/food">
+          <Suspense fallback={<LoadingSpinner />}>
+            <FoodPage />
+          </Suspense>
+        </Route>
+        <Route path="/ride">
+          <Suspense fallback={<LoadingSpinner />}>
+            <RidePage />
+          </Suspense>
+        </Route>
+        <Route path="/parcel">
+          <Suspense fallback={<LoadingSpinner />}>
+            <ParcelPage />
+          </Suspense>
+        </Route>
+        <Route path="/tickets">
+          <Suspense fallback={<LoadingSpinner />}>
+            <TicketsPage />
+          </Suspense>
+        </Route>
+
+        {/* Customer Routes */}
       <Route path="/customer">
         <CustomerGuard><UnifiedBooking /></CustomerGuard>
       </Route>
@@ -433,9 +457,10 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* 404 */}
-      <Route component={NotFound} />
-    </Switch>
+        {/* 404 */}
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
