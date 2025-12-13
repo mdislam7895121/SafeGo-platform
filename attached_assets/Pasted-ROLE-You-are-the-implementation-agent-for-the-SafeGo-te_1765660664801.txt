@@ -1,0 +1,71 @@
+ROLE: You are the implementation agent for the SafeGo team Replit project. Goal: make the app publish-ready by auditing and fixing ALL missing/invalid secrets after migrating from Personal workspace to Team workspace. Do NOT print any secret values in logs, UI, or commits.
+
+TASK A — Audit secrets (Dev + Production)
+1) Open Replit → Tools/Deployments/Publishing → Configuration/Secrets.
+2) Compare secrets between:
+   - Team workspace project secrets
+   - (If available) linked Account Vault / previous Personal workspace secrets list
+3) Create a file: docs/SECRETS_CHECKLIST.md with:
+   - Required secret name
+   - Purpose
+   - Expected format/length
+   - Where used (server/client/deploy)
+   - Status: Present/ Missing/ Invalid (DO NOT include values)
+
+Minimum expected secrets (adjust if code shows more):
+- SESSION_SECRET (strong random string, 32+ chars)
+- JWT_SECRET (strong random string, 32+ chars)
+- ENCRYPTION_KEY (MUST be exactly 64 hex chars OR 32 bytes utf-8; validate strictly)
+- GOOGLE_MAPS_API_KEY (required for maps + places/autocomplete if used)
+- SSLCOMMERZ_STORE_ID_BD
+- SSLCOMMERZ_STORE_PASSWORD_BD
+Database (if Postgres used):
+- PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+Also check for any other keys referenced in code via process.env.* (search codebase for "process.env.")
+
+TASK B — Fix “Maps unavailable: Failed to fetch maps config”
+1) Identify where the frontend loads maps config:
+   - Search for “fetch maps config”, “maps config”, “/api/maps”, “/api/config”, “GOOGLE_MAPS_API_KEY”.
+2) Ensure there is a stable backend endpoint (example):
+   - GET /api/config/maps
+   - Returns ONLY non-sensitive config needed by client, e.g. { enabled: true/false } and (if required) a restricted public key strategy.
+   - If GOOGLE_MAPS_API_KEY is missing, return { enabled:false, reason:"missing_key" } and UI must show a friendly message, not a blank screen.
+3) Add robust error handling so the UI never goes white:
+   - If config fetch fails, show fallback UI + retry button.
+
+TASK C — Stop crash loops on missing secrets
+1) Add a startup environment validation layer:
+   - Validate required secrets for server features (auth, encryption, payments).
+   - If something is missing, do NOT exit the whole app unless it is truly critical.
+   - Instead: disable that feature and log a single redacted warning.
+2) ENCRYPTION_KEY validation must be strict:
+   - If not exactly 64 hex chars (or accepted 32-byte utf8), treat as invalid and disable encryption-dependent features gracefully.
+3) Ensure Protected routes still redirect correctly (no infinite loop).
+
+TASK D — Team secrets sync & request missing values from owner
+1) For each secret that is Missing/Invalid in the Team project:
+   - Create the secret key entry in Team workspace (no value in code).
+   - Then ask the owner (Md Tazizul Islam) to provide the value securely.
+2) Output a short “OWNER ACTION REQUIRED” list with ONLY secret names (no values), e.g.:
+   - Provide value for: GOOGLE_MAPS_API_KEY
+   - Provide value for: SSLCOMMERZ_STORE_ID_BD
+   - Provide value for: SSLCOMMERZ_STORE_PASSWORD_BD
+
+TASK E — Verify publish readiness
+1) Run locally and in Preview:
+   - /, /login, /customer, /ride, /food, /parcel, /shops, /tickets
+2) Confirm:
+   - No blank white screens
+   - Maps section either works OR shows graceful “maps disabled” UI
+   - No crash loops
+3) Republish and confirm production works.
+4) Add a final summary in docs/PUBLISH_READY_REPORT.md:
+   - What was fixed
+   - What secrets are required
+   - Any owner actions remaining
+   - Confirmation checklist (routes + deploy status)
+
+IMPORTANT SECURITY RULES
+- Never paste secret values into chat, commits, or logs.
+- Do not hardcode any secret in code.
+- All secrets must be in Replit Secrets/Deployments secrets.
