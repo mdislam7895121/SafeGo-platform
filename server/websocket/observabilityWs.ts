@@ -56,11 +56,23 @@ type ObservabilityEvent = MetricsUpdate | LogUpdate | AlertUpdate | { type: "con
 const observabilityConnections = new Map<string, AuthenticatedObservabilitySocket>();
 let wss: WebSocketServer | null = null;
 let metricsInterval: NodeJS.Timeout | null = null;
+const MAX_OBSERVABILITY_CONNECTIONS = 20;
 
 export function setupObservabilityWebSocket(server: HTTPServer) {
+  if (wss) {
+    console.log('[Observability WebSocket] Already initialized, skipping duplicate setup');
+    return;
+  }
+  
   wss = new WebSocketServer({ server, path: "/api/admin/observability/ws" });
 
   wss.on("connection", async (ws: AuthenticatedObservabilitySocket, req) => {
+    if (wss!.clients.size > MAX_OBSERVABILITY_CONNECTIONS) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "Server at capacity" } }));
+      ws.close();
+      return;
+    }
+    
     ws.isAlive = true;
     ws.subscriptions = new Set(["metrics", "logs", "alerts"]);
 

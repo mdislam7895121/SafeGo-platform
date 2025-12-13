@@ -41,10 +41,25 @@ const driverConnections = new Map<string, AuthenticatedWebSocket>();
 const sessionRooms = new Map<string, Set<AuthenticatedWebSocket>>();
 const offerTimers = new Map<string, NodeJS.Timeout>();
 
+let dispatchWssInstance: WebSocketServer | null = null;
+const MAX_CONNECTIONS = 500;
+
 export function setupDispatchWebSocket(server: HTTPServer) {
+  if (dispatchWssInstance) {
+    console.log('[Dispatch WebSocket] Already initialized, skipping duplicate setup');
+    return;
+  }
+  
   const wss = new WebSocketServer({ server, path: '/api/dispatch/ws' });
+  dispatchWssInstance = wss;
 
   wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
+    if (wss.clients.size > MAX_CONNECTIONS) {
+      ws.send(JSON.stringify({ type: 'error', payload: { message: 'Server at capacity, try again later' } }));
+      ws.close();
+      return;
+    }
+    
     ws.isAlive = true;
     ws.rooms = new Set();
 
@@ -537,8 +552,7 @@ async function sendOfferToDriver(sessionId: string): Promise<void> {
         },
         serviceType: session.serviceType,
         customer: {
-          firstName: session.customer.firstName,
-          lastName: session.customer.lastName,
+          name: session.customer.fullName || 'Customer',
         },
       },
     }));

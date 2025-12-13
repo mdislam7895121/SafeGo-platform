@@ -29,10 +29,25 @@ const messageRateLimit = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const MAX_MESSAGES_PER_MINUTE = 30;
 
+let wssInstance: WebSocketServer | null = null;
+const MAX_RIDE_CHAT_CONNECTIONS = 200;
+
 export function setupRideChatWebSocket(server: HTTPServer) {
+  if (wssInstance) {
+    console.log('[Ride Chat WebSocket] Already initialized, skipping duplicate setup');
+    return;
+  }
+  
   const wss = new WebSocketServer({ server, path: "/api/rides/chat/ws" });
+  wssInstance = wss;
 
   wss.on("connection", async (ws: AuthenticatedWebSocket, req) => {
+    if (wss.clients.size > MAX_RIDE_CHAT_CONNECTIONS) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "Server at capacity" } }));
+      ws.close();
+      return;
+    }
+    
     ws.isAlive = true;
 
     const url = new URL(req.url || "", `http://${req.headers.host}`);

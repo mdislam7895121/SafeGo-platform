@@ -1,0 +1,88 @@
+ROLE: You are the SafeGo Platform Reliability + Security engineer. Your job is to make the app production-stable, memory-safe, and secret-safe after moving from Personal to Team workspace on Replit.
+
+GOAL (non-negotiable):
+- App must run in production without crash loops.
+- Secrets must be complete and validated for BOTH development and production environments.
+- Memory must stay under Stability Guard thresholds (target < 70% steady, < 85% peak).
+- All routes /, /login, /customer, /ride, /food, /parcel, /tickets, /shops must render and function.
+- Maps must never show “Failed to fetch maps config” in production.
+- If optional integrations (Twilio, FCM, Checkr, Stripe) are missing, app must still run with safe degraded behavior (feature disabled + clear UI message).
+
+STEP 1: INVENTORY AND DOCUMENT ALL REQUIRED SECRETS
+1) Create/update docs/SECRETS_CHECKLIST.md listing:
+   - Required secrets (must exist in production):
+     - ENCRYPTION_KEY (64 hex chars)
+     - JWT_SECRET (strong random)
+     - SESSION_SECRET (strong random)
+     - GOOGLE_MAPS_API_KEY (required for maps + address autocomplete in production)
+     - Database: PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE (or DATABASE_URL if used)
+   - Country payment secrets (feature-gated):
+     - SSLCOMMERZ_STORE_ID_BD
+     - SSLCOMMERZ_STORE_PASSWORD_BD
+   - Optional (must not crash if missing):
+     - TWILIO_* (SMS)
+     - FCM_* (push)
+     - CHECKR_* (US background checks)
+     - STRIPE_* (payments)
+2) In docs/SECRETS_CHECKLIST.md include “Where used”, “Is required?”, “Production impact if missing”.
+
+STEP 2: TEAM WORKSPACE SECRET SYNC FIX
+1) Compare Dev secrets vs Production secrets in the Team workspace.
+2) Ensure the Production environment has ALL required secrets above.
+3) If any required secret is missing, STOP and ask the owner to provide it.
+   - Output a short list titled: “Secrets I need from you”
+   - Do NOT proceed with deployment until provided.
+
+STEP 3: HARD FAIL ONLY ON CRITICAL SECRETS
+1) Implement Environment Guard:
+   - Only hard-fail the app startup if CRITICAL secrets are missing:
+     ENCRYPTION_KEY, JWT_SECRET, SESSION_SECRET, DB connection, GOOGLE_MAPS_API_KEY (only if maps is enabled).
+2) For optional integrations (Twilio/FCM/Checkr/Stripe), never hard-fail. Log a warning and disable the feature.
+
+STEP 4: FIX “Failed to fetch maps config” FOR PRODUCTION
+1) Trace the endpoint or config loader used by the frontend to fetch maps config.
+2) Make sure it works in production base URL and with auth rules.
+3) Confirm GOOGLE_MAPS_API_KEY is read server-side and returned safely (never expose unrestricted keys; use restrictions in Google Cloud).
+4) Add a fallback UI: if maps config fetch fails, show “Maps temporarily unavailable” but keep the rest of booking functional.
+
+STEP 5: MEMORY STABILITY AUDIT (HIGHEST PRIORITY)
+Your logs show Stability Guard CRITICAL memory usage ~96–97% (threshold 85%). Fix this.
+1) Add lightweight memory instrumentation:
+   - Log process.memoryUsage() every 30–60s with route/activity tags.
+2) Identify top offenders:
+   - WebSocket servers (dispatch/observability/admin notifications)
+   - Any in-memory caches storing large data (requests, orders, rides, logs)
+   - Large JSON responses or repeated polling
+3) Apply fixes:
+   - Ensure WS server singletons (no duplicate instantiation on reload)
+   - Add limits + cleanup on WS connections (max connections, ping/pong, timeouts)
+   - Remove/limit any in-memory “store everything” structures; use DB for persistence
+   - Add pagination + query limits for admin endpoints
+   - Avoid loading huge datasets at startup
+4) After fixes, prove improvement:
+   - Provide before/after memory logs for 10 minutes of idle + 5 minutes of use.
+
+STEP 6: PRODUCTION-SAFE STARTUP
+1) Ensure app binds correctly to the port provided by the platform.
+2) Confirm “NODE_ENV=production node dist/index.js” starts cleanly.
+3) Ensure no infinite restart loop under load.
+
+STEP 7: ROUTE AND FEATURE VERIFICATION
+1) Run a full route smoke test:
+   - /, /login, /customer, /ride, /food, /parcel, /tickets, /shops
+2) Validate:
+   - No blank pages
+   - No console errors
+   - Key flows load (at least UI renders and API calls return)
+3) Provide a short checklist report of what passed/failed.
+
+DELIVERABLES:
+- docs/SECRETS_CHECKLIST.md completed
+- A “Secrets I need from you” list if anything is missing in Team Production
+- Memory audit notes + concrete code changes to keep memory < 85%
+- Final status: Ready for deployment (yes/no) with reasons
+
+RULES:
+- Do not change business logic or UI design beyond what is required for stability.
+- Keep changes incremental and non-breaking.
+- Never print secret values in logs; only print whether they are set/valid.

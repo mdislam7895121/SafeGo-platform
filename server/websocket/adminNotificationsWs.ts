@@ -26,6 +26,7 @@ interface AdminNotificationEvent {
 const adminConnections = new Map<string, AuthenticatedAdminSocket>();
 
 let wss: WebSocketServer | null = null;
+const MAX_ADMIN_CONNECTIONS = 100;
 
 function getScopedCountFilter(ws: AuthenticatedAdminSocket): { isRead: boolean; countryCode?: string } {
   const baseFilter: { isRead: boolean; countryCode?: string } = { isRead: false };
@@ -42,9 +43,20 @@ function getScopedCountFilter(ws: AuthenticatedAdminSocket): { isRead: boolean; 
 }
 
 export function setupAdminNotificationsWebSocket(server: HTTPServer) {
+  if (wss) {
+    console.log('[Admin Notifications WebSocket] Already initialized, skipping duplicate setup');
+    return;
+  }
+  
   wss = new WebSocketServer({ server, path: '/api/admin/notifications/ws' });
 
   wss.on('connection', async (ws: AuthenticatedAdminSocket, req) => {
+    if (wss!.clients.size > MAX_ADMIN_CONNECTIONS) {
+      ws.send(JSON.stringify({ type: 'error', payload: { message: 'Server at capacity' } }));
+      ws.close();
+      return;
+    }
+    
     ws.isAlive = true;
 
     const url = new URL(req.url || '', `http://${req.headers.host}`);

@@ -31,11 +31,26 @@ interface WsMessage {
 const orderRooms = new Map<string, Set<AuthenticatedWebSocket>>();
 const userConnections = new Map<string, Set<AuthenticatedWebSocket>>();
 
+let wssInstance: WebSocketServer | null = null;
+const MAX_FOOD_ORDER_CONNECTIONS = 300;
+
 export function setupFoodOrderNotificationsWebSocket(server: HTTPServer) {
+  if (wssInstance) {
+    console.log('[Food Order Notifications WebSocket] Already initialized, skipping duplicate setup');
+    return;
+  }
+  
   const secret = getJwtSecret();
   const wss = new WebSocketServer({ server, path: "/api/food-orders/notifications/ws" });
+  wssInstance = wss;
 
   wss.on("connection", async (ws: AuthenticatedWebSocket, req) => {
+    if (wss.clients.size > MAX_FOOD_ORDER_CONNECTIONS) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "Server at capacity" } }));
+      ws.close();
+      return;
+    }
+    
     ws.isAlive = true;
 
     const url = new URL(req.url || "", `http://${req.headers.host}`);
