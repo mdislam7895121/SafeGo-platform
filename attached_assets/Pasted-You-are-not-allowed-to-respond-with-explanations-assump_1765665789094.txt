@@ -1,0 +1,89 @@
+You are not allowed to respond with explanations, assumptions, or partial fixes.
+
+This is a FINAL, ONE-SHOT task.
+No follow-up, no iteration, no “already fixed” claims without proof.
+
+========================
+MANDATORY REQUIREMENTS
+========================
+
+1. ENVIRONMENT ENFORCEMENT (NON-NEGOTIABLE)
+------------------------------------------
+- In PRODUCTION:
+  - App MUST FAIL TO START if ANY of the following are missing:
+    JWT_SECRET
+    ENCRYPTION_KEY
+    SESSION_SECRET
+    DATABASE_URL
+    GOOGLE_MAPS_API_KEY
+- No temp keys.
+- No fallback.
+- No “optional” logic.
+- Exit code must be 1.
+- Console must clearly show which key is missing.
+
+- In DEVELOPMENT:
+  - App may start WITH WARNINGS ONLY.
+  - Warnings must be explicit and visible in logs.
+
+You must VERIFY this by showing actual startup logs for BOTH modes.
+
+2. GOOGLE MAPS – VISUAL STABILITY (CRITICAL)
+--------------------------------------------
+The map must meet ALL of the following or the task is FAILED:
+
+- No broken tiles
+- No half-rendered grid
+- No blank squares after:
+  - page load
+  - tab switch
+  - resize
+  - mobile/desktop toggle
+- ResizeObserver MUST trigger:
+  google.maps.event.trigger(map, 'resize')
+- Map instance must be singleton
+- All listeners, observers, markers MUST be cleaned on unmount
+- Retry logic must FULLY reload SDK if script load fails
+
+You must prove this with:
+- Browser console logs
+- A visible working map screenshot
+- Confirmation that tiles remain stable after resize
+
+3. SECRETS VISIBILITY & CONSISTENCY
+-----------------------------------
+- Secrets must be read from ONE source only
+- No duplicate naming
+- No mismatch between docs, code, and runtime
+- Provide a final list of REQUIRED secrets for production
+- Provide a final list of OPTIONAL secrets (if any)
+
+4. FINAL VERIFICATION CHECKLIST (MANDATORY)
+-------------------------------------------
+Before you mark the task complete, you MUST show:
+
+- [ ] Production start FAILS if any required secret is missing
+- [ ] Development start PASSES with warnings only
+- [ ] Google Map renders correctly on first load
+- [ ] Google Map survives resize without breaking
+- [ ] No duplicate Google Maps script tags
+- [ ] No memory leaks from observers or listeners
+
+If ANY item is unchecked, DO NOT mark complete.
+
+5. OUTPUT FORMAT (STRICT)
+-------------------------
+Your final response must contain ONLY:
+
+A) Files changed (exact paths)
+B) What was enforced (bullet list)
+C) Proof logs (code blocks)
+D) Final confirmation:
+   "READY FOR PRODUCTION – NO BLOCKERS"
+
+No storytelling.
+No task history.
+No assumptions.
+No “should be”.
+
+If this is not done perfectly, the task is considered FAILED.
