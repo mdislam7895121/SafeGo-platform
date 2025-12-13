@@ -29,12 +29,33 @@ function checkRateLimit(userId: string): boolean {
 }
 
 // ====================================================
+// GET /api/maps/health
+// Environment health check for maps service (no secrets exposed)
+// ====================================================
+router.get("/health", (req, res) => {
+  const health = {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+    googleMapsKeyPresent: !!GOOGLE_MAPS_API_KEY,
+    googleMapsKeyLength: GOOGLE_MAPS_API_KEY ? GOOGLE_MAPS_API_KEY.length : 0,
+    baseUrl: req.get("host") || "unknown",
+    origin: req.get("origin") || "none",
+    referer: req.get("referer") || "none",
+    protocol: req.protocol,
+  };
+  console.log("[Maps] Health check:", JSON.stringify(health));
+  res.json(health);
+});
+
+// ====================================================
 // GET /api/maps/config
 // Get Maps configuration for frontend JavaScript SDK
 // The API key has HTTP referrer restrictions for browser-only use
 // Returns graceful response when not configured (no error status)
 // ====================================================
 router.get("/config", (req, res) => {
+  console.log(`[Maps] Config request from origin: ${req.get("origin") || "none"}, referer: ${req.get("referer") || "none"}`);
+  console.log(`[Maps] API key present: ${!!GOOGLE_MAPS_API_KEY}, length: ${GOOGLE_MAPS_API_KEY?.length || 0}`);
   if (!GOOGLE_MAPS_API_KEY) {
     // Return 200 with disabled state - allows client to handle gracefully
     return res.json({
@@ -646,7 +667,8 @@ router.get("/traffic-eta", async (req: AuthRequest, res) => {
 // Clean up old rate limit entries periodically
 setInterval(() => {
   const now = Date.now();
-  for (const [rideId, timestamp] of trafficEtaRateLimits.entries()) {
+  const entries = Array.from(trafficEtaRateLimits.entries());
+  for (const [rideId, timestamp] of entries) {
     if (now - timestamp > TRAFFIC_ETA_COOLDOWN_MS * 10) {
       trafficEtaRateLimits.delete(rideId);
     }

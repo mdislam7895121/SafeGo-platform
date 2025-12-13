@@ -1,0 +1,86 @@
+You are working on SafeGo-platform (Replit team workspace). The Google Maps API key was updated, but the /customer map still renders as blank tiles/boxes. Your job: do a complete audit and make maps + pickup/dropoff suggestions + routes fully stable in production and preview.
+
+GOALS (must pass):
+1) /customer loads with a real interactive map (no blank tiles/boxes).
+2) Pickup/Dropoff address autocomplete works (Places suggestions show).
+3) Selecting pickup+dropoff draws route and computes distance/time/ETA.
+4) Works on BOTH:
+   - Preview domain (*.replit.dev / *.replit.app)
+   - Custom domain: safegoglobal.com
+5) No crash loops, no missing-secret failures. If maps are misconfigured, show a clean fallback UI + exact admin-friendly error.
+
+STEP-BY-STEP TASKS:
+
+A) Confirm environment & secrets (Team + Production)
+- Open Secrets and verify these exist and are linked for Team + Deploy/Production:
+  - GOOGLE_MAPS_API_KEY
+  - SESSION_SECRET
+  - ENCRYPTION_KEY (64 hex)
+  - JWT_SECRET
+  - Any DB secrets (PGHOST/PGPORT/PGUSER/PGPASSWORD) if used
+- Ensure the deploy environment is actually using the Team secrets (not personal).
+- Add a runtime “env health” endpoint or log line (safe, no secret values) showing:
+  - GOOGLE_MAPS_API_KEY present? true/false
+  - NODE_ENV, base URL
+- If any secret is missing in Team, STOP and request it from the owner.
+
+B) Identify why map tiles are blank (root cause)
+- Open browser devtools console on /customer and capture exact errors.
+- Check Network tab:
+  - Is https://maps.googleapis.com/maps/api/js being requested?
+  - Is it blocked (403, RefererNotAllowedMapError, ApiNotActivatedMapError, BillingNotEnabledMapError)?
+  - Are there CSP errors blocking maps scripts/images?
+- In server logs, confirm any /api/maps/config endpoint returns 200 and includes the expected config (never expose full key publicly if you can avoid it; if you must, do it only for client-side Maps JS key).
+- Verify frontend is using the correct library for the key:
+  - If using Google Maps JS, load via official loader and use google.maps.Map.
+  - If using MapLibre/Mapbox, a Google key will NOT load tiles; you must use a tile URL (OSM/MapTiler/Mapbox) with correct token. Fix mismatch.
+
+C) Fix Google key restrictions for BOTH domains
+- If the error indicates referrer restrictions:
+  - Update docs/SECRETS_CHECKLIST.md with required referrers:
+    - https://safegoglobal.com/*
+    - https://www.safegoglobal.com/*
+    - https://*.replit.app/*
+    - https://*.replit.dev/*
+  - Ensure billing enabled + required APIs enabled in Google Cloud:
+    - Maps JavaScript API
+    - Places API
+    - Directions API
+    - Geocoding API (if used)
+- Implement an in-app diagnostic banner (dev/admin only) to show common Google error types without exposing the key.
+
+D) Make map config fetching stable
+- If frontend calls /api/maps/config:
+  - Ensure it works on both domains (no CORS issues).
+  - If using cookies/auth, ensure /api/maps/config is public or uses correct auth.
+  - Add caching headers or in-memory cache to avoid repeated fetch.
+  - Add retry with backoff (max 2 retries) and a clear error state.
+
+E) Fallback behavior (must be production-safe)
+- If maps fail to load:
+  - Show “Maps unavailable” UI but keep the rest of the page usable.
+  - Allow manual pickup/dropoff text entry.
+  - Log a single structured error (no spam loop).
+- Add a feature flag:
+  - MAPS_PROVIDER=google|osm_fallback
+  - If google fails, optionally switch to OSM tiles (MapLibre) as a backup. Do not break existing UX.
+
+F) Verification checklist (must provide evidence)
+- Provide screenshots or short notes proving:
+  - Map renders on safegoglobal.com/customer
+  - Autocomplete suggestions appear
+  - Route draws with distance/time
+  - No console red errors related to maps
+- Provide a short “What was broken / what you changed / why it’s fixed” summary.
+- Ensure memory usage warnings are not caused by repeated map initialization:
+  - Map component must initialize once; cleanup on unmount; no interval leaks.
+
+OUTPUT REQUIREMENTS:
+- Commit changes with clear messages.
+- Update docs/SECRETS_CHECKLIST.md with:
+  - Required secrets list
+  - Required Google referrer allowlist patterns
+  - Required Google APIs checklist
+- If any missing keys are required, ask the owner for them by exact secret name.
+
+Do not mark as done until all GOALS pass.
