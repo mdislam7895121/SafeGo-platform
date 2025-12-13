@@ -337,6 +337,15 @@ router.get("/restaurants", async (req: Request, res: Response) => {
     const openNow = req.query.openNow === 'true';
     const search = req.query.search as string | undefined;
 
+    // Server-side validation logging for debugging restaurant queries
+    console.log("[Eats] Restaurant query:", {
+      cuisineType: cuisineType || 'all',
+      sortBy: sortBy || 'default',
+      openNow,
+      search: search || null,
+      timestamp: new Date().toISOString(),
+    });
+
     const whereConditions: any = {
       isVerified: true,
       isActive: true,
@@ -426,6 +435,13 @@ router.get("/restaurants", async (req: Request, res: Response) => {
     if (openNow) {
       formattedRestaurants = formattedRestaurants.filter(r => r.isOpen);
     }
+
+    // Log query results for debugging
+    console.log("[Eats] Restaurant query results:", {
+      totalFound: restaurants.length,
+      afterFilters: formattedRestaurants.length,
+      openNowFilter: openNow,
+    });
 
     res.json({
       restaurants: formattedRestaurants,
