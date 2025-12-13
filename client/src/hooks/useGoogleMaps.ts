@@ -13,8 +13,14 @@ let loadPromise: Promise<void> | null = null;
 let isLoaded = false;
 let mapsDisabled = false;
 
+// Reset state to allow retry (e.g., after network recovery or config change)
+function resetMapsState(): void {
+  loadPromise = null;
+  // Only reset mapsDisabled if it was a transient error, not a config-disabled state
+}
+
 async function loadGoogleMapsSDK(): Promise<void> {
-  // If maps is disabled, reject immediately with a clear message
+  // If maps is permanently disabled (config says no key), reject immediately
   if (mapsDisabled) {
     return Promise.reject(new Error("Maps service not configured"));
   }
@@ -31,17 +37,17 @@ async function loadGoogleMapsSDK(): Promise<void> {
     try {
       const response = await fetch("/api/maps/config");
       
-      // Handle non-200 responses gracefully
+      // Handle non-200 responses - transient error, allow retry
       if (!response.ok) {
-        mapsDisabled = true;
-        console.warn("[GoogleMaps] Maps config endpoint returned error, maps disabled");
+        loadPromise = null; // Reset to allow retry
+        console.warn("[GoogleMaps] Maps config endpoint returned error, will retry on next request");
         reject(new Error("Maps service unavailable"));
         return;
       }
       
       const config = await response.json();
       
-      // Check if maps is disabled via config response
+      // Check if maps is disabled via config response - permanent until reload
       if (config.enabled === false || !config.keyPresent) {
         mapsDisabled = true;
         console.info("[GoogleMaps] Maps service not configured - features disabled");
