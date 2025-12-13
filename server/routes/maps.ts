@@ -32,13 +32,21 @@ function checkRateLimit(userId: string): boolean {
 // GET /api/maps/config
 // Get Maps configuration for frontend JavaScript SDK
 // The API key has HTTP referrer restrictions for browser-only use
+// Returns graceful response when not configured (no error status)
 // ====================================================
 router.get("/config", (req, res) => {
   if (!GOOGLE_MAPS_API_KEY) {
-    return res.status(503).json({ error: "Maps service not configured" });
+    // Return 200 with disabled state - allows client to handle gracefully
+    return res.json({
+      enabled: false,
+      keyPresent: false,
+      message: "Maps service not configured - add GOOGLE_MAPS_API_KEY to enable",
+    });
   }
   
   res.json({
+    enabled: true,
+    keyPresent: true,
     apiKey: GOOGLE_MAPS_API_KEY,
     libraries: ["places"],
   });

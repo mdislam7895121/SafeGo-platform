@@ -11,8 +11,14 @@ declare global {
 
 let loadPromise: Promise<void> | null = null;
 let isLoaded = false;
+let mapsDisabled = false;
 
 async function loadGoogleMapsSDK(): Promise<void> {
+  // If maps is disabled, reject immediately with a clear message
+  if (mapsDisabled) {
+    return Promise.reject(new Error("Maps service not configured"));
+  }
+
   if (isLoaded && window.google?.maps?.places) {
     return Promise.resolve();
   }
@@ -24,14 +30,32 @@ async function loadGoogleMapsSDK(): Promise<void> {
   loadPromise = new Promise(async (resolve, reject) => {
     try {
       const response = await fetch("/api/maps/config");
+      
+      // Handle non-200 responses gracefully
       if (!response.ok) {
-        throw new Error("Failed to fetch maps config");
+        mapsDisabled = true;
+        console.warn("[GoogleMaps] Maps config endpoint returned error, maps disabled");
+        reject(new Error("Maps service unavailable"));
+        return;
       }
+      
       const config = await response.json();
+      
+      // Check if maps is disabled via config response
+      if (config.enabled === false || !config.keyPresent) {
+        mapsDisabled = true;
+        console.info("[GoogleMaps] Maps service not configured - features disabled");
+        reject(new Error("Maps service not configured"));
+        return;
+      }
+      
       const apiKey = config.apiKey;
 
       if (!apiKey) {
-        throw new Error("No API key available");
+        mapsDisabled = true;
+        console.warn("[GoogleMaps] No API key in config response");
+        reject(new Error("Maps API key not available"));
+        return;
       }
 
       const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
@@ -71,12 +95,25 @@ async function loadGoogleMapsSDK(): Promise<void> {
   return loadPromise;
 }
 
+// Check if maps is known to be disabled (without triggering load)
+export function isMapsServiceDisabled(): boolean {
+  return mapsDisabled;
+}
+
 export function useGoogleMaps() {
   const [isReady, setIsReady] = useState(isLoaded && !!window.google?.maps?.places);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDisabled, setIsDisabled] = useState(mapsDisabled);
 
   useEffect(() => {
+    // If already known to be disabled, don't try to load
+    if (mapsDisabled) {
+      setIsDisabled(true);
+      setError("Maps service not configured");
+      return;
+    }
+
     if (isLoaded && window.google?.maps?.places) {
       setIsReady(true);
       return;
@@ -91,10 +128,11 @@ export function useGoogleMaps() {
       .catch((err) => {
         setError(err.message);
         setIsLoading(false);
+        setIsDisabled(mapsDisabled);
       });
   }, []);
 
-  return { isReady, isLoading, error };
+  return { isReady, isLoading, error, isDisabled };
 }
 
 interface PlaceResult {
