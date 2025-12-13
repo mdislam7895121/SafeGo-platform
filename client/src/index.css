@@ -303,6 +303,39 @@
   }
 }
 
+/* Leaflet map tile gap/seam fixes */
+.leaflet-tile-container img,
+.leaflet-tile {
+  width: 256.5px !important;
+  height: 256.5px !important;
+}
+
+.leaflet-tile-pane {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.leaflet-container {
+  background: #f8f9fa;
+}
+
+.leaflet-tile-loaded {
+  opacity: 1 !important;
+}
+
+/* Ensure proper z-indexing for map elements */
+.leaflet-pane {
+  z-index: 400;
+}
+
+.leaflet-overlay-pane {
+  z-index: 450;
+}
+
+.leaflet-marker-pane {
+  z-index: 500;
+}
+
 /* Customer GPS location pulse animation */
 @keyframes customerPulse {
   0% {
