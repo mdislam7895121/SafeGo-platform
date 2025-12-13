@@ -24,22 +24,24 @@ function validateRequired(name: string, value: string | undefined): string | nul
  * Validates JWT_SECRET
  * Must be at least 32 characters for security
  * CRITICAL: Used for authentication tokens, document signing, and session security
+ * MANDATORY FOR PRODUCTION - App will fail to start without this
  */
 function validateJwtSecret(): string | null {
   const secret = process.env.JWT_SECRET;
+  const isProduction = process.env.NODE_ENV === "production";
   
   if (!secret || secret.trim() === "") {
-    return "JWT_SECRET is required for authentication, document signing, and session security";
+    return `JWT_SECRET is MANDATORY FOR PRODUCTION - required for authentication, document signing, and session security${isProduction ? " [FATAL]" : ""}`;
   }
   
   if (secret.length < 32) {
-    return `JWT_SECRET must be at least 32 characters for security (currently ${secret.length})`;
+    return `JWT_SECRET must be at least 32 characters for security (currently ${secret.length})${isProduction ? " [FATAL]" : ""}`;
   }
   
   // CRITICAL: Reject default/insecure values - these are production security risks
   if (secret.includes("default") || secret.includes("change-in-production") || 
       secret.includes("your-secret-key") || secret.includes("safego-secret")) {
-    return "JWT_SECRET is using a default/placeholder value - THIS IS INSECURE! Generate a secure random key with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"";
+    return `JWT_SECRET is using a default/placeholder value - THIS IS INSECURE! Generate a secure random key with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"${isProduction ? " [FATAL]" : ""}`;
   }
   
   return null;
@@ -49,12 +51,14 @@ function validateJwtSecret(): string | null {
  * Validates ENCRYPTION_KEY
  * Must be exactly 32 bytes
  * CRITICAL: Used for encrypting NID, SSN, bank accounts, 2FA secrets, recovery codes
+ * MANDATORY FOR PRODUCTION - App will fail to start without this
  * Note: Two encryption modules exist with different encoding expectations:
  * - encryption.ts: expects 32-byte UTF-8 string
  * - crypto.ts: expects 64 hex characters (32 bytes)
  */
 function validateEncryptionKey(): string | null {
   const rawKey = process.env.ENCRYPTION_KEY;
+  const isProduction = process.env.NODE_ENV === "production";
   const isNonProduction = 
     process.env.NODE_ENV === "development" || 
     process.env.NODE_ENV === "test" || 
@@ -64,7 +68,7 @@ function validateEncryptionKey(): string | null {
     if (isNonProduction) {
       return null;
     }
-    return "ENCRYPTION_KEY is required for encrypting sensitive data (NID, SSN, bank accounts, 2FA secrets)";
+    return "ENCRYPTION_KEY is MANDATORY FOR PRODUCTION - required for encrypting sensitive data (NID, SSN, bank accounts, 2FA secrets) [FATAL]";
   }
   
   const key = rawKey.trim();
@@ -73,11 +77,11 @@ function validateEncryptionKey(): string | null {
   const isUtf8Format = key.length === 32;
   
   if (!isHexFormat && !isUtf8Format) {
-    return "ENCRYPTION_KEY must be either 32 bytes (UTF-8) or 64 hex characters (32 bytes hex). Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"";
+    return `ENCRYPTION_KEY must be either 32 bytes (UTF-8) or 64 hex characters (32 bytes hex). Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"${isProduction ? " [FATAL]" : ""}`;
   }
   
   if (key.includes("default") || key.includes("safego-default") || key.includes("your-encryption-key")) {
-    return "ENCRYPTION_KEY is using a default/placeholder value - THIS IS INSECURE! All encrypted data would be compromised. Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"";
+    return `ENCRYPTION_KEY is using a default/placeholder value - THIS IS INSECURE! All encrypted data would be compromised. Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"${isProduction ? " [FATAL]" : ""}`;
   }
   
   return null;
@@ -91,19 +95,26 @@ export function getTemporaryEncryptionKey(): string | null {
 
 function generateTemporaryEncryptionKeyIfNeeded(): void {
   const rawKey = process.env.ENCRYPTION_KEY;
+  const isProduction = process.env.NODE_ENV === "production";
   const isNonProduction = 
     process.env.NODE_ENV === "development" || 
     process.env.NODE_ENV === "test" || 
     !process.env.NODE_ENV;
+  
+  if (isProduction) {
+    return;
+  }
   
   if ((!rawKey || rawKey.trim() === "") && isNonProduction) {
     const crypto = require("crypto");
     const generatedKey = crypto.randomBytes(32).toString("hex");
     temporaryEncryptionKey = generatedKey;
     process.env.ENCRYPTION_KEY = generatedKey;
-    console.warn("\n[!] TEMPORARY ENCRYPTION_KEY generated for non-production use.");
+    console.warn("\n" + "=".repeat(80));
+    console.warn("[!] TEMPORARY ENCRYPTION_KEY generated for DEVELOPMENT/TEST use ONLY.");
     console.warn("[!] WARNING: This key is ephemeral - encrypted data will NOT be recoverable after restart!");
-    console.warn("[!] Set a permanent ENCRYPTION_KEY before deploying to production.\n");
+    console.warn("[!] ENCRYPTION_KEY is MANDATORY FOR PRODUCTION - set a permanent key before deploying.");
+    console.warn("=".repeat(80) + "\n");
   }
 }
 
@@ -204,18 +215,26 @@ export function validateEnvironment(): ValidationResult {
 /**
  * Run environment validation and fail fast if errors are found
  * Called at application startup before any routes or database connections
- * In development/test mode, shows warnings instead of failing
+ * 
+ * PRODUCTION MODE: App will FAIL TO START if JWT_SECRET or ENCRYPTION_KEY is missing/invalid
+ * DEVELOPMENT MODE: Shows warnings but allows startup with temporary keys
  */
 export function guardEnvironment(): void {
-  console.log("[Environment Guard] Validating security configuration...");
-  
-  generateTemporaryEncryptionKeyIfNeeded();
-  
-  const result = validateEnvironment();
+  const isProduction = process.env.NODE_ENV === "production";
   const isNonProduction = 
     process.env.NODE_ENV === "development" || 
     process.env.NODE_ENV === "test" || 
     !process.env.NODE_ENV;
+  
+  console.log(`[Environment Guard] Validating security configuration (${isProduction ? "PRODUCTION" : "DEVELOPMENT"} mode)...`);
+  
+  if (isProduction) {
+    console.log("[Environment Guard] PRODUCTION MODE: JWT_SECRET and ENCRYPTION_KEY are MANDATORY");
+  }
+  
+  generateTemporaryEncryptionKeyIfNeeded();
+  
+  const result = validateEnvironment();
   
   // Log warnings (non-critical issues)
   if (result.warnings.length > 0) {
@@ -234,17 +253,22 @@ export function guardEnvironment(): void {
     });
     
     if (isNonProduction) {
-      // In development/test: show errors but allow startup with strong warning
       console.warn("\n[!] NON-PRODUCTION MODE: Application starting despite configuration issues.");
+      console.warn("[!] JWT_SECRET and ENCRYPTION_KEY are MANDATORY FOR PRODUCTION!");
       console.warn("[!] FIX THESE ISSUES BEFORE DEPLOYING TO PRODUCTION!\n");
     } else {
-      // In production: fail fast
-      console.error("\nApplication startup aborted.");
+      console.error("\n" + "=".repeat(80));
+      console.error("FATAL: PRODUCTION STARTUP ABORTED");
+      console.error("=".repeat(80));
+      console.error("\nJWT_SECRET and ENCRYPTION_KEY are MANDATORY FOR PRODUCTION.");
       console.error("Fix the above issues and restart the application.\n");
       process.exit(1);
     }
   } else {
     console.log("[Environment Guard] All critical security configuration valid");
+    if (isProduction) {
+      console.log("[Environment Guard] PRODUCTION: JWT_SECRET and ENCRYPTION_KEY verified");
+    }
   }
 }
 
