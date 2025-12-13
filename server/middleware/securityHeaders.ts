@@ -75,7 +75,7 @@ export function getSecurityStats(): {
 
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, data] of notFoundProbes.entries()) {
+  for (const [ip, data] of Array.from(notFoundProbes.entries())) {
     if (now - data.firstSeen > PROBE_WINDOW_MS * 2) {
       notFoundProbes.delete(ip);
     }
@@ -127,7 +127,7 @@ function isSuspiciousBot(userAgent: string): boolean {
 
 setInterval(() => {
   const now = Date.now();
-  for (const [key, window] of landingRateLimitStore.entries()) {
+  for (const [key, window] of Array.from(landingRateLimitStore.entries())) {
     if (window.blockedUntil && window.blockedUntil < now) {
       landingRateLimitStore.delete(key);
     } else if (now - window.windowStart > LANDING_WINDOW_MS * 2) {
