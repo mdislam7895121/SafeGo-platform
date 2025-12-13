@@ -305,20 +305,30 @@ export function guardEnvironment(): void {
     
     if (isNonProduction) {
       console.warn("\n[!] NON-PRODUCTION MODE: Application starting despite configuration issues.");
-      console.warn("[!] JWT_SECRET and ENCRYPTION_KEY are MANDATORY FOR PRODUCTION!");
+      console.warn("[!] The following secrets are MANDATORY FOR PRODUCTION:");
+      console.warn("    - JWT_SECRET");
+      console.warn("    - ENCRYPTION_KEY");
+      console.warn("    - SESSION_SECRET");
+      console.warn("    - DATABASE_URL");
+      console.warn("    - GOOGLE_MAPS_API_KEY");
       console.warn("[!] FIX THESE ISSUES BEFORE DEPLOYING TO PRODUCTION!\n");
     } else {
       console.error("\n" + "=".repeat(80));
       console.error("FATAL: PRODUCTION STARTUP ABORTED");
       console.error("=".repeat(80));
-      console.error("\nJWT_SECRET and ENCRYPTION_KEY are MANDATORY FOR PRODUCTION.");
-      console.error("Fix the above issues and restart the application.\n");
+      console.error("\nThe following secrets are MANDATORY FOR PRODUCTION:");
+      console.error("  - JWT_SECRET");
+      console.error("  - ENCRYPTION_KEY");
+      console.error("  - SESSION_SECRET");
+      console.error("  - DATABASE_URL");
+      console.error("  - GOOGLE_MAPS_API_KEY");
+      console.error("\nFix the above issues and restart the application.\n");
       process.exit(1);
     }
   } else {
     console.log("[Environment Guard] All critical security configuration valid");
     if (isProduction) {
-      console.log("[Environment Guard] PRODUCTION: JWT_SECRET and ENCRYPTION_KEY verified");
+      console.log("[Environment Guard] PRODUCTION: All mandatory secrets verified (JWT_SECRET, ENCRYPTION_KEY, SESSION_SECRET, DATABASE_URL, GOOGLE_MAPS_API_KEY)");
     }
   }
 }
