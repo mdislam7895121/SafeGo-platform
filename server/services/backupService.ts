@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-
-const prisma = new PrismaClient();
 
 export type BackupType = 'FULL_DB' | 'PARTIAL_ANALYTICS' | 'FILES_ONLY' | 'CONFIG_ONLY';
 export type BackupStatus = 'CREATED' | 'VERIFIED' | 'FAILED' | 'IN_PROGRESS';
