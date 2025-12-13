@@ -1,9 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db";
 import { z } from "zod";
 import crypto from "crypto";
-
-const prisma = new PrismaClient();
 const router = Router();
 
 interface AuthenticatedRequest extends Request {

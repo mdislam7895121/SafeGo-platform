@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db";
 import { authenticateToken, AuthRequest, checkPermission } from "../middleware/auth";
 import { requireAdmin } from "../middleware/authz";
 import { Permission } from "../utils/permissions";
@@ -7,7 +7,6 @@ import { z } from "zod";
 import crypto from "crypto";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.use(authenticateToken);
 router.use(requireAdmin);

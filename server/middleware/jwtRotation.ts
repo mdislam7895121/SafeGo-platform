@@ -1,9 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-
-const prisma = new PrismaClient();
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;

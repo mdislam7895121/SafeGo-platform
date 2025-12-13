@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db";
 import { createTokenPair, refreshTokenPair, revokeAllUserTokens, revokeTokenFamily } from "../middleware/jwtRotation";
 import { checkOTPRateLimit, recordOTPRequest, recordOTPVerification } from "../middleware/otpRateLimiter";
 import { checkLoginThrottle, recordLoginAttempt, clearLoginBlocks } from "../middleware/loginThrottling";
@@ -9,7 +9,6 @@ import { getWAFStats } from "../middleware/wafMiddleware";
 import { createAdminAuditLog, verifyAuditLogIntegrity } from "../middleware/adminAuditLog";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.post("/token/create", async (req: Request, res: Response) => {
   try {
