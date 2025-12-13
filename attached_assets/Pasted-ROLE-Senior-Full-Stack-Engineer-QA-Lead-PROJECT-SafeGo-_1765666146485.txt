@@ -1,0 +1,89 @@
+ROLE: Senior Full-Stack Engineer + QA Lead
+PROJECT: SafeGo platform (Replit) - Production readiness audit & fixes
+GOAL: Fix all broken customer flows end-to-end (Ride + Eats + Parcel + Shops + Tickets) without breaking desktop UI.
+
+NON-NEGOTIABLE RULES
+1) Do not change UI layout unless required to fix functionality. Desktop must not regress.
+2) Fix root causes, not “hide” errors with static messages.
+3) Every fix must have: (a) log proof, (b) reproduction steps, (c) verification steps.
+4) No new temporary keys. Production must fail if required secrets missing.
+5) After fixes, run a full smoke test across /customer main services.
+
+TASK A — SYSTEM HEALTH AUDIT (must complete first)
+A1) List all customer routes and verify each returns 200:
+- /customer
+- /customer/ride
+- /customer/eats
+- /customer/parcel
+- /customer/shops
+- /customer/tickets
+A2) For each route, verify:
+- API calls succeed (no 401/403/500)
+- data loads (not empty due to backend bug)
+- loading states and empty states are correct and not misleading
+A3) Add a single "HealthCheck" endpoint and log:
+- DB connected
+- required env present
+- service modules initialized
+Return 200 + JSON.
+
+TASK B — EATS PAGE NOT WORKING (your screenshot)
+CURRENT ISSUE: Eats shows "No restaurants available in your area yet" even when system should have data.
+B1) Identify if empty restaurants is caused by:
+- missing seed data in production DB
+- location-based query using wrong city/lat/lng
+- filtering logic accidentally excluding all
+- wrong status flags (approved/open hours)
+B2) Fix backend query:
+- If location missing, fall back to "nearby default city" and show a banner "Set location to see nearby restaurants" (NOT permanent empty state).
+- If restaurants exist globally but not locally, show “No restaurants near you” + CTA: “Browse all restaurants” that loads unfiltered list.
+B3) Ensure a minimum demo dataset exists:
+- Create at least 5 restaurants with cuisine tags, open/close flags, delivery radius, and sample menus.
+- Data must be editable later (admin panel or simple seed script).
+B4) Verify in UI:
+- Search works
+- Cuisine filter works
+- Open/Favorites toggles work
+- Restaurant cards open profile page correctly
+Provide proof screenshots + console logs.
+
+TASK C — AUTH / SESSION / PERMISSIONS
+C1) Confirm customer session works across all services:
+- login persists
+- refresh does not log out
+- cookies/session config correct for Replit domain + custom domain
+C2) If any page silently fails due to auth, show a clear CTA: “Sign in to continue”.
+
+TASK D — MAP + LOCATION + PLACES CONSISTENCY
+D1) Confirm Google Maps loads stable (no broken tiles) on:
+- Desktop Chrome
+- Mobile (Replit preview)
+D2) Fix location retrieval:
+- If geolocation denied, show non-blocking prompt and allow manual location entry.
+- Ensure pickup/dropoff autocomplete never breaks.
+D3) Verify route calculation + pricing request works end-to-end.
+
+TASK E — DATA INTEGRITY CHECKS (prevents future “empty” bugs)
+E1) Add server-side validation logs for:
+- restaurants query filters (print final query params)
+- returned count
+- reasons for exclusion (status, radius, city mismatch)
+E2) Add an admin “Data sanity” page:
+- Restaurants count by status (draft/pending/approved/open)
+- Last 10 created restaurants
+- Quick toggle open/close for testing
+
+TASK F — SMOKE TEST (must be last)
+Run and document a 15-minute smoke test checklist:
+1) /customer loads
+2) Ride: set pickup + dropoff → routes show → request button enabled
+3) Eats: restaurants list appears (either nearby or browse all) → open restaurant → menu loads
+4) Parcel: create draft order page loads + pricing works (or clear message if not configured)
+5) No console errors, no 500s in logs
+6) Mobile + Desktop both OK
+
+DELIVERABLES
+1) A short "Fix Summary" with file list changed.
+2) Proof: screenshots + console logs for Eats + Ride + API calls.
+3) A “Known limitations” list (only if truly non-blocking).
+Do not stop until all tasks A–F pass.
