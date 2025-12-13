@@ -12,11 +12,54 @@ declare global {
 let loadPromise: Promise<void> | null = null;
 let isLoaded = false;
 let mapsDisabled = false;
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 1000;
 
 // Reset state to allow retry (e.g., after network recovery or config change)
-function resetMapsState(): void {
+export function resetMapsState(): void {
   loadPromise = null;
-  // Only reset mapsDisabled if it was a transient error, not a config-disabled state
+  // Note: mapsDisabled is only reset for full page reload since it indicates permanent config issue
+}
+
+// Delay helper for exponential backoff
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchConfigWithRetry(): Promise<{ apiKey: string; enabled: boolean; keyPresent: boolean }> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delayMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+        console.log(`[GoogleMaps] Retry attempt ${attempt}/${MAX_RETRIES} after ${delayMs}ms delay...`);
+        await delay(delayMs);
+      }
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch("/api/maps/config", {
+        signal: controller.signal,
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Config endpoint returned ${response.status}`);
+      }
+      
+      const config = await response.json();
+      return config;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(`[GoogleMaps] Config fetch attempt ${attempt + 1} failed:`, lastError.message);
+    }
+  }
+  
+  throw lastError || new Error("Failed to fetch maps config after retries");
 }
 
 async function loadGoogleMapsSDK(): Promise<void> {
@@ -35,17 +78,7 @@ async function loadGoogleMapsSDK(): Promise<void> {
 
   loadPromise = new Promise(async (resolve, reject) => {
     try {
-      const response = await fetch("/api/maps/config");
-      
-      // Handle non-200 responses - transient error, allow retry
-      if (!response.ok) {
-        loadPromise = null; // Reset to allow retry
-        console.warn("[GoogleMaps] Maps config endpoint returned error, will retry on next request");
-        reject(new Error("Maps service unavailable"));
-        return;
-      }
-      
-      const config = await response.json();
+      const config = await fetchConfigWithRetry();
       
       // Check if maps is disabled via config response - permanent until reload
       if (config.enabled === false || !config.keyPresent) {
@@ -87,6 +120,7 @@ async function loadGoogleMapsSDK(): Promise<void> {
       script.defer = true;
       script.onerror = (e) => {
         console.error("[GoogleMaps] Failed to load SDK:", e);
+        loadPromise = null; // Clear to allow retry on next attempt
         reject(new Error("Failed to load Google Maps SDK"));
       };
 
@@ -94,6 +128,7 @@ async function loadGoogleMapsSDK(): Promise<void> {
       console.log("[GoogleMaps] Loading SDK with Places library...");
     } catch (error) {
       console.error("[GoogleMaps] Error loading SDK:", error);
+      loadPromise = null; // Clear to allow retry on next attempt
       reject(error);
     }
   });

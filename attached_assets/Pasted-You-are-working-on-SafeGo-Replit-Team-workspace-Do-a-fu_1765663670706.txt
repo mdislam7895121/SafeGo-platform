@@ -1,0 +1,71 @@
+You are working on SafeGo (Replit Team workspace). Do a full “Secrets + Maps + Production readiness” audit and fix everything without breaking existing flows.
+
+Goal:
+- App must be publish-ready and stable in Team workspace.
+- No crash loops.
+- Maps, pickup/dropoff autocomplete, and route rendering must work on both:
+  1) replit.app domain
+  2) safegoglobal.com domain
+
+Step 1 — Inventory secrets (must be explicit, not assumptions)
+1) In SafeGo-platform (frontend) open Secrets and list all keys currently present (names only).
+2) In ReplitBackend (backend) open Secrets and list all keys currently present (names only).
+3) Identify missing keys by comparing with docs/SECRETS_CHECKLIST.md (if present). If the checklist does not exist or is incomplete, create/refresh it.
+
+Step 2 — Enforce critical vs optional secrets
+1) Define “CRITICAL_SECRETS” for startup. App must refuse to start only if these are missing/invalid:
+   - ENCRYPTION_KEY (must be exactly 64 hex chars)
+   - JWT_SECRET
+   - SESSION_SECRET
+   - Database secrets for backend if backend needs DB at startup: PGHOST, PGPORT, PGUSER, PGPASSWORD
+   - GOOGLE_MAPS_API_KEY (required for maps-related endpoints; if missing, UI must show a clean fallback but not crash)
+2) Define “OPTIONAL_SECRETS” that can be missing without blocking publish:
+   - TWILIO_* (SMS)
+   - FCM_* (push)
+   - CHECKR_* (US background checks)
+   - STRIPE_* (payments US) if not used in current release
+   - Any other non-core integrations
+
+Step 3 — Fix Team workspace secret syncing (this is the main issue)
+1) Ensure Team project uses the correct secrets source:
+   - If keys exist in Personal/Account Vault, link them into Team workspace (Link Account Secrets / Choose from Account Vault), OR request the missing values from the owner.
+2) For each missing CRITICAL secret, prompt the owner to provide the value (do NOT generate payment provider keys; only generate safe random secrets where appropriate).
+3) Validate formats:
+   - ENCRYPTION_KEY: 64 hex chars.
+   - JWT_SECRET/SESSION_SECRET: long random strings (>= 32 bytes).
+
+Step 4 — Fix Google Maps end-to-end
+1) Confirm which library is used (Google Maps JS, Mapbox, Leaflet). Based on code, ensure the correct API key env var is used consistently.
+2) Backend:
+   - Ensure any /api/maps/config (or equivalent) returns the expected config in production.
+   - Ensure CORS allows the production origins (replit.app and safegoglobal.com).
+3) Frontend:
+   - Ensure requests to maps config are pointing to the correct backend base URL in production.
+   - If maps config fetch fails, show a clear inline message and keep the page usable (no blank white screens).
+4) Provide a checklist for the owner to configure Google Cloud:
+   - Enable: Maps JavaScript API, Places API, Geocoding API.
+   - Set HTTP referrer restrictions to include:
+     - https://*.replit.app/*
+     - https://safegoglobal.com/*
+   - If using server-side requests, also mention IP restriction vs referrer restriction clearly.
+
+Step 5 — Production stability hardening
+1) Investigate “Stability Guard: memory usage exceeds threshold” logs:
+   - Confirm real memory usage vs heap threshold.
+   - Ensure websocket servers are singleton and have connection limits + cleanup on close.
+2) Add lightweight health endpoints:
+   - GET /health (returns ok + version + uptime)
+   - GET /ready (checks DB connectivity if required)
+3) Ensure logging is not spamming high-frequency warnings.
+
+Step 6 — Verification (must be proven)
+Provide screenshots or logs showing:
+1) All critical secrets present in Team workspace for BOTH projects.
+2) /customer page loads, pickup/dropoff autocomplete works, and map tiles render.
+3) Publish succeeds and app stays stable for 10+ minutes without crash loops.
+
+Important constraints:
+- Do not remove existing roles or flows.
+- Do not break /ride landing page architecture: frontend must call shared backend APIs for pricing/status.
+- Any new config must be backward compatible.
+- Ask the owner for missing secret VALUES when needed; do not guess them.
