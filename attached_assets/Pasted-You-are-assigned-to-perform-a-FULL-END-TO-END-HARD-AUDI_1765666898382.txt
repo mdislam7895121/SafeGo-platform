@@ -1,0 +1,134 @@
+You are assigned to perform a FULL END-TO-END HARD AUDIT of the SafeGo platform.
+
+This is NOT a partial fix task.
+This is NOT an incremental task.
+You must fix, verify, and lock everything in ONE PASS.
+
+DO NOT ask questions.
+DO NOT mark tasks complete without proof.
+DO NOT defer work.
+
+========================
+SCOPE (MANDATORY)
+========================
+
+1) ENVIRONMENT & SECRETS (STRICT)
+
+Required secrets (must exist and be validated at runtime):
+- SESSION_SECRET
+- JWT_SECRET
+- ENCRYPTION_KEY
+- DATABASE_URL
+- GOOGLE_MAPS_API_KEY
+- Country-based payment keys (BD / USA)
+
+Rules:
+- In NODE_ENV=production → app MUST FAIL TO START if any required secret is missing.
+- In development → warnings allowed, NO silent fallback.
+- NO hardcoded secrets.
+- Single Environment Guard must run BEFORE server starts.
+
+Deliverables:
+- Verified Environment Guard
+- Fatal logs for missing secrets
+- Updated docs/SECRETS_CHECKLIST.md
+
+========================
+2) GOOGLE MAPS (NON-NEGOTIABLE)
+========================
+
+You must FIX ALL map issues permanently.
+
+Mandatory:
+- Singleton Google Maps loader (NO duplicate script tags)
+- ResizeObserver implemented correctly
+- google.maps.event.trigger(map, "resize") on container change
+- Proper cleanup on unmount (listeners, markers, observers)
+- Retry logic if SDK load fails
+- Fallback UI if Maps API is unavailable
+
+Result:
+- No broken tiles
+- No half-rendered maps
+- Works on desktop + mobile + refresh + route change
+
+========================
+3) CUSTOMER FLOWS (END-TO-END)
+========================
+
+Audit and FIX all customer-facing routes:
+
+Ride:
+- Pickup & dropoff
+- Route calculation
+- Pricing
+- Vehicle list
+- Request ride button
+
+Eats:
+- Restaurants load if data exists
+- Proper empty-state UI if none exist
+- Filters (Cuisine, Open, Favorites) WORK
+- Country-based filtering WORKS
+
+Parcel / Others:
+- No dead buttons
+- No blank screens
+- Routes load correctly
+
+========================
+4) DATABASE & DATA INTEGRITY
+========================
+
+- Verify DB connection
+- Verify queries return real data
+- Seed demo data if required (BD + USA)
+- NO “empty DB but marked working”
+
+========================
+5) SECURITY & AUTH
+========================
+
+- Sessions protect customer routes
+- JWT usage correct
+- ENCRYPTION_KEY actively used
+- No secrets exposed to frontend
+- No auth bypass on refresh
+
+========================
+6) MEMORY & WEBSOCKETS
+========================
+
+- Verify no memory leaks
+- WebSockets clean up properly
+- Dev-only warnings clearly labeled
+- No duplicate socket instances
+
+========================
+7) FINAL VERIFICATION (REQUIRED)
+========================
+
+Before saying DONE, you MUST provide:
+
+A) What was broken
+B) What was fixed
+C) Files changed
+D) Proof from logs / UI
+E) Remaining known issues (if any)
+
+Rules:
+- App starts cleanly in development
+- App FAILS correctly in production if secrets missing
+- Maps render correctly everywhere
+- Eats & Ride flows fully functional
+- No critical console errors
+
+========================
+ABSOLUTE RULE
+========================
+
+If the same issue appears again, you FAILED this task.
+
+Fix everything.
+Verify everything.
+Deliver once.
