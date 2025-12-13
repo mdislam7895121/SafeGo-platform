@@ -3,7 +3,19 @@ import crypto from 'crypto';
 import { getClientIp } from '../utils/ip';
 import { Request } from 'express';
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+function getEncryptionKey(): string {
+  const key = process.env.ENCRYPTION_KEY;
+  if (!key) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("[FATAL] ENCRYPTION_KEY is required in production");
+    }
+    console.warn("[kycSecurityService] WARNING: ENCRYPTION_KEY not set - using temporary key for development only");
+    return crypto.randomBytes(32).toString('hex');
+  }
+  return key;
+}
+
+const ENCRYPTION_KEY = getEncryptionKey();
 const IV_LENGTH = 16;
 const SIGNED_URL_EXPIRY_MS = 5 * 60 * 1000;
 

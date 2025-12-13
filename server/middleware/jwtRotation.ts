@@ -5,7 +5,19 @@ import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
-const JWT_SECRET = process.env.JWT_SECRET || "safego-jwt-secret-key";
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("[FATAL] JWT_SECRET is required in production");
+    }
+    console.warn("[jwtRotation] WARNING: JWT_SECRET not set - using temporary key for development only");
+    return "dev-only-temporary-jwt-secret-key-32chars";
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "7d";
 const ACCESS_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
