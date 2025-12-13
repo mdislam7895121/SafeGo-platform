@@ -31,10 +31,25 @@ const messageRateLimit = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 hour in ms
 const MAX_MESSAGES_PER_HOUR = 100;
 
+let wssInstance: WebSocketServer | null = null;
+const MAX_SUPPORT_CHAT_CONNECTIONS = 100;
+
 export function setupSupportChatWebSocket(server: HTTPServer) {
+  if (wssInstance) {
+    console.log('[Support Chat WebSocket] Already initialized, skipping duplicate setup');
+    return;
+  }
+  
   const wss = new WebSocketServer({ server, path: "/api/support/chat/ws" });
+  wssInstance = wss;
 
   wss.on("connection", (ws: AuthenticatedWebSocket, req) => {
+    if (wss.clients.size > MAX_SUPPORT_CHAT_CONNECTIONS) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "Server at capacity" } }));
+      ws.close();
+      return;
+    }
+    
     ws.isAlive = true;
 
     const url = new URL(req.url || "", `http://${req.headers.host}`);
