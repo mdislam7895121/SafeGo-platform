@@ -1,145 +1,135 @@
-# SafeGo Secrets & Environment Variables Checklist
+# SafeGo Secrets & API Configuration Checklist
 
-This document lists all required secrets and environment variables for SafeGo deployment.
+This document lists all required secrets, environment variables, and API key configurations for SafeGo to function properly in production.
 
-## Critical Security Secrets (REQUIRED)
+## Required Secrets
 
-### 1. ENCRYPTION_KEY
-- **Purpose**: Encrypts sensitive data including NID, SSN, bank account numbers, 2FA secrets, and recovery codes
-- **Format**: 64 hexadecimal characters (32 bytes as hex)
-- **Generate**: 
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  ```
-- **Impact if missing**: 
-  - Development: Temporary key generated (data not recoverable after restart)
-  - Production: Application will NOT start
-- **Storage**: Must be stored as a **Secret** (encrypted)
+### Core Security
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `JWT_SECRET` | JWT token signing for authentication | Yes |
+| `ENCRYPTION_KEY` | AES-256-GCM encryption for sensitive data | Yes |
+| `SESSION_SECRET` | Express session signing | Yes |
 
-### 2. JWT_SECRET
-- **Purpose**: Signs authentication tokens, document signatures, and session security
-- **Format**: At least 32 characters (64 hex characters recommended)
-- **Generate**:
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  ```
-- **Impact if missing**: Application will NOT start
-- **Storage**: Must be stored as a **Secret** (encrypted)
-
-### 3. SESSION_SECRET
-- **Purpose**: Express session security and cookie signing
-- **Format**: At least 32 characters
-- **Generate**:
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  ```
-- **Impact if missing**: Sessions may be insecure
-- **Storage**: Must be stored as a **Secret** (encrypted)
-
-### 4. DATABASE_URL
-- **Purpose**: PostgreSQL database connection
-- **Format**: `postgresql://user:password@host:port/database?sslmode=require`
-- **Impact if missing**: Application will NOT start
-- **Note**: Automatically provided by Replit's built-in PostgreSQL database
-
----
-
-## Third-Party API Keys
+### Database
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Individual DB credentials | Auto-set by Replit |
 
 ### Google Maps
-- **GOOGLE_MAPS_API_KEY**
-  - Purpose: Maps JavaScript SDK, Places API, Directions API, Geocoding API
-  - Impact if missing: Maps features disabled gracefully, app still functional
-  - Storage: Secret (encrypted)
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `GOOGLE_MAPS_API_KEY` | Google Maps JavaScript API, Places, Directions, Geocoding | Yes |
+
+#### Google Maps API Key Configuration
+
+The Google Maps API key must have:
+
+**Enabled APIs:**
+- Maps JavaScript API
+- Places API
+- Directions API
+- Geocoding API
+
+**HTTP Referrer Restrictions (Browser Keys):**
+```
+https://safegoglobal.com/*
+https://www.safegoglobal.com/*
+https://*.replit.app/*
+https://*.replit.dev/*
+https://*.kirk.replit.dev/*
+```
+
+**IP Restrictions (Server Keys - if using separate key):**
+- Add Replit's IP ranges or use no restrictions for development
 
 ### Payment Gateways
 
-#### Bangladesh (SSLCOMMERZ)
-- **SSLCOMMERZ_STORE_ID_BD** - Production store ID
-- **SSLCOMMERZ_STORE_PASSWORD_BD** - Production store password
-- **SSLCOMMERZ_SANDBOX_STORE_ID_BD** - Sandbox store ID (for testing)
-- **SSLCOMMERZ_SANDBOX_PASSWORD_BD** - Sandbox password (for testing)
-
 #### United States (Stripe)
-- Stripe integration is managed via Replit's built-in Stripe integration
-- See `use_integration` for Stripe setup
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `STRIPE_SECRET_KEY` | Stripe server-side API | For US payments |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe client-side API | For US payments |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook verification | For US payments |
 
----
+#### Bangladesh (SSLCOMMERZ)
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `SSLCOMMERZ_STORE_ID_BD` | Production store ID | For BD payments |
+| `SSLCOMMERZ_STORE_PASSWORD_BD` | Production store password | For BD payments |
+| `SSLCOMMERZ_SANDBOX_STORE_ID_BD` | Sandbox store ID | For BD testing |
+| `SSLCOMMERZ_SANDBOX_PASSWORD_BD` | Sandbox store password | For BD testing |
+| `SSLCOMMERZ_SANDBOX_ENABLED_BD` | Set to "true" for sandbox mode | Optional |
 
-## Feature Flags (Environment Variables)
+### Mobile Wallet Payouts (Bangladesh)
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `BKASH_API_KEY` | bKash payout integration | For BD payouts |
+| `BKASH_API_SECRET` | bKash secret | For BD payouts |
+| `NAGAD_API_KEY` | Nagad payout integration | For BD payouts |
+| `NAGAD_API_SECRET` | Nagad secret | For BD payouts |
 
-These are NOT secrets - store as environment variables:
+### Notifications
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `TWILIO_ACCOUNT_SID` | Twilio SMS OTP | For SMS |
+| `TWILIO_AUTH_TOKEN` | Twilio authentication | For SMS |
+| `TWILIO_PHONE_NUMBER` | Twilio sending number | For SMS |
+| `AGENTMAIL_API_KEY` | Email OTP service | For Email |
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FEATURE_BD_ONLINE_PAYMENTS_ENABLED` | `false` | Enable Bangladesh online payments |
-| `FEATURE_US_ONLINE_PAYMENTS_ENABLED` | `false` | Enable US online payments |
-| `SSLCOMMERZ_SANDBOX_ENABLED_BD` | `true` | Use SSLCOMMERZ sandbox mode |
-| `NODE_ENV` | `development` | Environment mode |
+### Identity Verification
+| Secret Name | Purpose | Required |
+|-------------|---------|----------|
+| `CHECKR_API_KEY` | Background check service | For US drivers |
+| `AWS_ACCESS_KEY_ID` | AWS Rekognition (facial recognition) | For KYC |
+| `AWS_SECRET_ACCESS_KEY` | AWS credentials | For KYC |
+| `AWS_REGION` | AWS region (default: us-east-1) | For KYC |
 
----
+## Environment Variables
 
-## SSLCOMMERZ Webhook URLs (Environment Variables)
+### Feature Flags
+| Variable Name | Purpose | Default |
+|---------------|---------|---------|
+| `FEATURE_BD_ONLINE_PAYMENTS_ENABLED` | Enable Bangladesh online payments | false |
+| `NODE_ENV` | Environment mode | development |
 
-| Variable | Value |
-|----------|-------|
-| `SSLCOMMERZ_SUCCESS_URL_BD` | `/api/payments/sslcommerz/success` |
-| `SSLCOMMERZ_FAIL_URL_BD` | `/api/payments/sslcommerz/fail` |
-| `SSLCOMMERZ_CANCEL_URL_BD` | `/api/payments/sslcommerz/cancel` |
+### URLs
+| Variable Name | Purpose | Default |
+|---------------|---------|---------|
+| `FRONTEND_URL` | Frontend URL for CORS | https://safego.replit.app |
 
----
+## Health Check Endpoints
 
-## Quick Setup for Team Workspace Migration
+Use these endpoints to verify configuration:
 
-When migrating from Personal to Team workspace, these secrets must be re-added:
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/maps/health` | Check Google Maps API key presence |
+| `GET /api/health` | General application health |
 
-### Step 1: Generate New Keys
-```bash
-# Generate ENCRYPTION_KEY (64 hex chars)
-node -e "console.log('ENCRYPTION_KEY:', require('crypto').randomBytes(32).toString('hex'))"
+## Verification Steps
 
-# Generate JWT_SECRET (64 hex chars)
-node -e "console.log('JWT_SECRET:', require('crypto').randomBytes(32).toString('hex'))"
+1. **Google Maps**: Visit `/customer` after login and verify:
+   - Map tiles render (uses Leaflet/OpenStreetMap)
+   - Pickup/Dropoff autocomplete shows suggestions
+   - Route calculation returns distance/duration
 
-# Generate SESSION_SECRET (64 hex chars)
-node -e "console.log('SESSION_SECRET:', require('crypto').randomBytes(32).toString('hex'))"
-```
+2. **Payments**: Check `/api/webhooks/payments/health` for gateway status
 
-### Step 2: Add to Replit Secrets
-1. Open the Secrets tab in Replit
-2. Add each key as a new secret
-3. Restart the application
-
-### Step 3: Verify
-Check the application logs for:
-- `[Environment Guard] All critical security configuration valid`
-
-If you see validation errors, double-check that:
-- ENCRYPTION_KEY is exactly 64 hex characters
-- JWT_SECRET is at least 32 characters
-- DATABASE_URL is a valid PostgreSQL connection string
-
----
+3. **Database**: Application startup logs show successful connection
 
 ## Troubleshooting
 
-### Blank White Pages
-If routes show blank white pages:
-1. Check browser console for JavaScript errors
-2. Verify ENCRYPTION_KEY and JWT_SECRET are set
-3. Check server logs for startup errors
+### Google Maps Not Working
+1. Check `/api/maps/health` - should show `keyPresent: true`
+2. Verify HTTP referrer restrictions include your domains
+3. Check browser console for CSP violations
+4. Ensure all required APIs are enabled in Google Cloud Console
 
-### "Failed to fetch maps config"
-This is expected if GOOGLE_MAPS_API_KEY is not set. The app will continue to work without map features.
-
-### Database Connection Errors
-Verify DATABASE_URL is set correctly. For Replit's built-in PostgreSQL, this is auto-configured.
-
----
-
-## Security Best Practices
-
-1. **Never commit secrets to git** - Use environment variables/secrets only
-2. **Rotate keys periodically** - Generate new keys every 90 days
-3. **Use different keys per environment** - Dev, staging, and prod should have unique keys
-4. **Audit access** - Track who has access to secrets in team workspaces
+### CSP Violations
+If you see CSP violations in logs, verify `server/middleware/securityHeaders.ts` includes:
+- `https://maps.googleapis.com` in script-src, style-src, img-src, connect-src
+- `https://maps.gstatic.com` in script-src, img-src
+- `https://fonts.googleapis.com` in style-src
+- `https://fonts.gstatic.com` in font-src
