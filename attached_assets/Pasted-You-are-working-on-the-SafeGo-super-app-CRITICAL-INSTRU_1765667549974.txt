@@ -1,0 +1,100 @@
+You are working on the SafeGo super app.
+
+CRITICAL INSTRUCTIONS (READ CAREFULLY):
+- This is a FINAL, ONE-SHOT task. No partial work.
+- Do NOT ask follow-up questions.
+- Do NOT mark anything complete unless it is actually verified working.
+- Audit the ENTIRE system end-to-end and fix ALL issues.
+- Treat this as a pre-production launch audit.
+
+====================================================
+SAFEGO GLOBAL RULES (MANDATORY)
+====================================================
+
+1. There is ONE shared SafeGo backend.
+   - Pricing, GPS, ride status, food, parcel, auth, country rules must all come from this backend.
+   - No frontend-only logic for pricing, maps, or status.
+
+2. Customer app (/customer) is a LANDING EXPERIENCE.
+   - Ride, Eats, Parcel must all work from this entry point.
+
+3. Signup Rule:
+   - ONLY customer signup exists.
+   - Drivers, restaurants, partners are created later via onboarding.
+   - Never break existing roles.
+
+4. Country Logic:
+   - USA and Bangladesh must both work.
+   - Currency, payment methods, vehicles, availability must come from backend.
+
+5. Production Security:
+   - In production (NODE_ENV=production), app MUST FAIL TO START if any required secret is missing.
+   - No temporary keys allowed in production.
+   - Required secrets:
+     JWT_SECRET
+     ENCRYPTION_KEY
+     SESSION_SECRET
+     DATABASE_URL
+     GOOGLE_MAPS_API_KEY
+
+6. Google Maps Rules:
+   - Singleton loader ONLY.
+   - No duplicate script tags.
+   - ResizeObserver must trigger map resize.
+   - Proper cleanup on unmount.
+   - Must work on mobile + desktop without broken tiles.
+
+====================================================
+YOUR TASKS (ALL REQUIRED)
+====================================================
+
+A. FULL SYSTEM AUDIT
+- Ride flow (pickup, dropoff, routes, pricing, vehicles)
+- Eats flow (restaurant list, filters, empty state, menus)
+- Parcel flow
+- Authentication + sessions
+- Database connections (NO duplicate pools)
+- WebSockets (no leaks, proper limits)
+- Memory usage (no unbounded growth)
+
+B. FIX EVERYTHING FOUND
+- Fix broken UI states
+- Fix missing data issues (seed demo data if required)
+- Fix map rendering issues
+- Fix backend bugs
+- Fix security gaps
+
+C. PRODUCTION HARDENING
+- Enforce strict environment validation
+- Remove ALL hardcoded or fallback secrets
+- Ensure production fails fast on misconfiguration
+
+D. VERIFY — NOT ASSUME
+You MUST provide proof for each:
+- Browser console logs
+- Server logs
+- Clear explanation of what was tested and how
+
+E. FINAL DELIVERABLE (MANDATORY)
+At the end, output a FINAL REPORT with these exact sections:
+
+1. AUDIT SUMMARY (PASS / FAIL)
+2. ISSUES FOUND (bullet list)
+3. FIXES APPLIED (file names + what changed)
+4. VERIFIED WORKING (Ride / Eats / Parcel / Maps / Auth)
+5. PRODUCTION READINESS STATUS
+6. KNOWN NON-BLOCKING ISSUES (if any)
+7. CLEAR NEXT STEPS (if any)
+
+If ANYTHING is not production-ready, mark the audit as FAIL.
+
+====================================================
+IMPORTANT
+====================================================
+
+- Do NOT say “ready” unless everything is truly working.
+- Do NOT skip any module.
+- Do NOT leave TODOs.
+- This output will be used as a final decision for production launch.
+
+Begin the audit now.
