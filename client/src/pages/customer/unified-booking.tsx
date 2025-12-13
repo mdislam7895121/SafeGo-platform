@@ -452,17 +452,64 @@ function MapFollowDriver({
   return null;
 }
 
-// Fix map tile rendering when modal opens - simple version that invalidates once
-function MapInvalidateOnMount() {
+// Enhanced map resize handler - invalidates on mount, window resize, and container size changes
+function MapResizeHandler() {
   const map = useMap();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
-    // Invalidate after a short delay to ensure container is sized
-    const timeoutId = setTimeout(() => {
+    // Initial invalidateSize after mount with delay for container sizing
+    const initialTimeout = setTimeout(() => {
       map.invalidateSize(true);
     }, 100);
     
-    return () => clearTimeout(timeoutId);
+    // Additional delayed invalidate to catch animations/transitions
+    const secondTimeout = setTimeout(() => {
+      map.invalidateSize(true);
+    }, 300);
+    
+    // ResizeObserver for container size changes (sidebar collapse, etc.)
+    const container = map.getContainer();
+    const parentContainer = container?.parentElement;
+    let resizeObserver: ResizeObserver | null = null;
+    
+    if (parentContainer && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        // Debounce resize events to avoid excessive calls during animations
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+        }
+        debounceRef.current = setTimeout(() => {
+          map.invalidateSize(true);
+        }, 50);
+      });
+      resizeObserver.observe(parentContainer);
+      // Also observe the map container itself
+      resizeObserver.observe(container);
+    }
+    
+    // Window resize handler as fallback
+    const handleWindowResize = () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      debounceRef.current = setTimeout(() => {
+        map.invalidateSize(true);
+      }, 100);
+    };
+    window.addEventListener('resize', handleWindowResize);
+    
+    return () => {
+      clearTimeout(initialTimeout);
+      clearTimeout(secondTimeout);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      window.removeEventListener('resize', handleWindowResize);
+    };
   }, [map]);
   
   return null;
@@ -2830,6 +2877,7 @@ export default function UnifiedBookingPage() {
                           doubleClickZoom={false}
                           touchZoom={false}
                         >
+                          <MapResizeHandler />
                           <TileLayer
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             attribution='&copy; OpenStreetMap'
@@ -3499,6 +3547,7 @@ export default function UnifiedBookingPage() {
               zoomControl={true}
               attributionControl={false}
             >
+              <MapResizeHandler />
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap'
@@ -3711,7 +3760,7 @@ export default function UnifiedBookingPage() {
                 zoomControl={true}
                 attributionControl={false}
               >
-                <MapInvalidateOnMount />
+                <MapResizeHandler />
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; OpenStreetMap'
