@@ -138,23 +138,45 @@ function validateDatabaseUrl(): string | null {
 }
 
 /**
- * Validates SESSION_SECRET (if session middleware is used)
+ * Validates SESSION_SECRET
+ * MANDATORY FOR PRODUCTION - required for session security
  * Should be at least 32 characters for security
  */
 function validateSessionSecret(): string | null {
   const secret = process.env.SESSION_SECRET;
+  const isProduction = process.env.NODE_ENV === "production";
   
-  // SESSION_SECRET is optional if sessions aren't used
   if (!secret || secret.trim() === "") {
-    return null; // Not critical - return null (no error)
+    if (isProduction) {
+      return "SESSION_SECRET is MANDATORY FOR PRODUCTION - required for session security [FATAL]";
+    }
+    return null;
   }
   
   if (secret.length < 32) {
-    return `SESSION_SECRET should be at least 32 characters (currently ${secret.length})`;
+    return `SESSION_SECRET must be at least 32 characters for security (currently ${secret.length})${isProduction ? " [FATAL]" : ""}`;
   }
   
   if (secret.includes("default") || secret.includes("change-in-production")) {
-    return "SESSION_SECRET appears to be a default/placeholder value - use a secure random key";
+    return `SESSION_SECRET is using a default/placeholder value - THIS IS INSECURE!${isProduction ? " [FATAL]" : ""}`;
+  }
+  
+  return null;
+}
+
+/**
+ * Validates GOOGLE_MAPS_API_KEY
+ * MANDATORY FOR PRODUCTION - required for maps, places, directions
+ */
+function validateGoogleMapsApiKey(): string | null {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  if (!apiKey || apiKey.trim() === "") {
+    if (isProduction) {
+      return "GOOGLE_MAPS_API_KEY is MANDATORY FOR PRODUCTION - required for maps, places, and directions [FATAL]";
+    }
+    return null;
   }
   
   return null;
@@ -183,10 +205,18 @@ function validateNodeEnv(): string | null {
  * Main environment validation function
  * Called at application startup
  * Throws error if critical validation fails
+ * 
+ * PRODUCTION MANDATORY SECRETS:
+ * - JWT_SECRET
+ * - ENCRYPTION_KEY
+ * - SESSION_SECRET
+ * - DATABASE_URL
+ * - GOOGLE_MAPS_API_KEY
  */
 export function validateEnvironment(): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const isProduction = process.env.NODE_ENV === "production";
   
   // Critical validations (will cause startup failure)
   const jwtError = validateJwtSecret();
@@ -198,10 +228,26 @@ export function validateEnvironment(): ValidationResult {
   const dbUrlError = validateDatabaseUrl();
   if (dbUrlError) errors.push(dbUrlError);
   
-  // Non-critical validations (will show warnings)
+  // Production-critical validations
   const sessionError = validateSessionSecret();
-  if (sessionError) warnings.push(sessionError);
+  if (sessionError) {
+    if (isProduction) {
+      errors.push(sessionError);
+    } else {
+      warnings.push(sessionError);
+    }
+  }
   
+  const mapsError = validateGoogleMapsApiKey();
+  if (mapsError) {
+    if (isProduction) {
+      errors.push(mapsError);
+    } else {
+      warnings.push(mapsError);
+    }
+  }
+  
+  // Non-critical validations (will show warnings)
   const nodeEnvError = validateNodeEnv();
   if (nodeEnvError) warnings.push(nodeEnvError);
   
@@ -229,7 +275,12 @@ export function guardEnvironment(): void {
   console.log(`[Environment Guard] Validating security configuration (${isProduction ? "PRODUCTION" : "DEVELOPMENT"} mode)...`);
   
   if (isProduction) {
-    console.log("[Environment Guard] PRODUCTION MODE: JWT_SECRET and ENCRYPTION_KEY are MANDATORY");
+    console.log("[Environment Guard] PRODUCTION MODE: The following secrets are MANDATORY:");
+    console.log("  - JWT_SECRET");
+    console.log("  - ENCRYPTION_KEY");
+    console.log("  - SESSION_SECRET");
+    console.log("  - DATABASE_URL");
+    console.log("  - GOOGLE_MAPS_API_KEY");
   }
   
   generateTemporaryEncryptionKeyIfNeeded();

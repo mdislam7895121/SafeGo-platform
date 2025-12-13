@@ -1,0 +1,93 @@
+You are the SafeGo lead engineer. Stop summarizing and start fixing. No partial fixes. No “it should work”. You must deliver a publish-ready system with hard checks and a fixed map UI.
+
+NON-NEGOTIABLE RULES
+1) Do not invent keys. Do not generate fake secrets in production.
+2) If any required production secret is missing, the app must FAIL FAST with a clear FATAL message.
+3) After fixes, you must provide proof: file paths + code snippets + the exact logs/console evidence showing it works.
+
+====================================================
+A) SECRETS + PRODUCTION ENFORCEMENT (HARD REQUIREMENT)
+====================================================
+
+Problem: After moving from personal -> team, some secrets are missing in the TEAM/PRODUCTION environment, which causes runtime breakage and unstable deploys.
+
+Tasks:
+1) Create a single source of truth for required secrets:
+   - Add/Update docs/SECRETS_CHECKLIST.md
+   - List every secret used by backend and frontend, with:
+     (name, required: dev/prod, where used, what breaks if missing)
+
+2) Implement an Environment Guard that enforces:
+   - In NODE_ENV=production:
+     REQUIRED: JWT_SECRET, ENCRYPTION_KEY, SESSION_SECRET, GOOGLE_MAPS_API_KEY, DATABASE_URL (or PGHOST/PGPORT/PGUSER/PGPASSWORD)
+     Also required if payments are enabled in prod: SSLCOMMERZ_STORE_ID_BD, SSLCOMMERZ_STORE_PASSWORD_BD
+     If any missing/invalid -> process exits immediately with [FATAL] and a readable list of missing keys.
+
+   - In development:
+     Warn clearly, but allow app to run ONLY where safe.
+     Never generate temporary keys in production.
+
+3) Replit Secrets audit:
+   - Compare current secrets in TEAM project against the checklist.
+   - For any missing secret: STOP and ask the owner to provide the value.
+   - Do not proceed to “Publish ready” until the owner confirms all required values are set.
+
+Acceptance criteria (must meet all):
+- In production without JWT_SECRET/ENCRYPTION_KEY -> app refuses to start with FATAL message.
+- In production with all secrets -> app starts cleanly (no secret-related warnings).
+- Checklist matches actual usage in code (no “extra” or “forgotten” secrets).
+
+====================================================
+B) GOOGLE MAPS “BROKEN TILES / WHITE BLOCKS” FIX (CRITICAL)
+====================================================
+
+Problem seen in screenshots:
+- Map loads with broken/partial tiles (white blocks, mis-rendered tiles).
+This is usually caused by container sizing, hidden parent layout, missing height, or no resize trigger after layout changes.
+
+Tasks:
+1) Ensure map container has stable sizing:
+   - The map wrapper MUST have explicit height/width.
+   - Avoid rendering map in a container that starts hidden or has height: 0.
+   - Ensure responsive rules for desktop + mobile.
+
+2) Force correct map resize behavior:
+   - Add a ResizeObserver on the map container.
+   - On size change, call:
+     google.maps.event.trigger(map, "resize")
+     and re-fit bounds if needed.
+
+3) Prevent duplicate map instances:
+   - Ensure the Google Maps script loads once.
+   - Ensure map instance is created once per page lifecycle and cleaned up on unmount.
+   - No memory leaks, no multiple overlays fighting each other.
+
+4) Verify API key + services:
+   - Confirm Maps JavaScript API + Places API are enabled.
+   - Add clear runtime logging for “Maps script loaded”, “Map instance created”, “Places ready”.
+   - If key restricted, ensure correct HTTP referrers for:
+     - replit.app domain
+     - custom domain (safegoglobal.com)
+     - any preview domain used
+
+5) Failure UX:
+   - If map fails to load, show a clean fallback panel (not blank space).
+   - Show a single banner: “Map unavailable. Check configuration.” with a retry button.
+
+Acceptance criteria (must meet all):
+- Desktop: map tiles render fully, no broken squares after refresh.
+- Mobile: map tiles render fully, no broken squares after scrolling/route selection.
+- After switching tabs/sections or resizing window: map still renders correctly.
+- No console errors related to map init or container size.
+
+====================================================
+C) DELIVERABLES (YOU MUST OUTPUT THESE)
+====================================================
+
+1) List of missing secrets (names only) that the owner must provide.
+2) Exact files changed (paths) + brief reason per file.
+3) Proof:
+   - A screenshot or copied logs showing Environment Guard behavior in production mode
+   - A screenshot or statement showing the map is fixed on both desktop and mobile.
+
+If you cannot complete a requirement, say exactly why and what input you need from the owner. Do not claim “fixed” without proof.
