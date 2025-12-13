@@ -1,0 +1,94 @@
+You are working on SafeGo. Follow these rules strictly before coding:
+(1) Roles: customer, driver, restaurant, admin must exist. Customer signup is the only public signup. Other roles are created via post-login onboarding flows and must not be broken.
+(2) Global logic: ride/food/parcel must share one backend for pricing, status flows, country rules. Frontend pages (including /ride landing) must call backend APIs; no duplicate engines in frontend.
+(3) Country rules: enforce BD + US country-specific KYC and payment rules. Currency/region must come from backend responses.
+(4) Mandatory admin panel: full admin controls, approvals, payouts/commission logic, security controls, audit logs.
+(5) Mandatory collections/models: rides, food_orders, deliveries (+ related tables) with full status flows.
+(6) Security: environment validation, secrets management, least privilege, no leaking secrets to client, proper CORS, rate limits where needed, secure session/JWT, encryption for sensitive fields.
+(7) For this task: produce a complete start-to-finish fix in one go. Audit first, then implement. Do not break existing working routes.
+
+TASK: We moved the project from Personal to Team. Many secrets/keys are missing in the Team project / deployment. Result:
+- Mobile preview shows blank white pages on /shops /food /parcel /tickets /ride (sometimes).
+- /customer shows “Maps unavailable: Failed to fetch maps config”.
+- Publishing previously failed due to ENCRYPTION_KEY invalid length and other missing secrets.
+We need you to audit EVERYTHING and make Team deployment stable and identical to Personal.
+
+GOALS (must all pass):
+A) App runs in Team workspace in dev AND in published deployment.
+B) /, /login, /customer, /ride, /food, /parcel, /shops, /tickets render correctly (no blank white page).
+C) Maps config loads correctly in /customer and map renders (or graceful fallback if key missing, but must not break pages).
+D) No secrets are referenced on the client directly. Client fetches config from backend endpoint safely.
+E) Deployment (Publish/Republish) succeeds without crash looping.
+
+STEP 1 — Inventory required secrets
+1. Search codebase for required environment variables:
+   - grep/ripgrep for process.env.* and any config schema (e.g., zod env guard).
+   - Produce a list: REQUIRED vs OPTIONAL, and which are BD-only vs US-only.
+2. Confirm which secrets exist in Team project:
+   - Replit “Secrets” tab (workspace)
+   - Replit “Publishing/Deployment” secrets (deployment config)
+   Note: Team deployments may not automatically inherit Personal secrets.
+
+STEP 2 — Fix secrets synchronization for Team
+Implement BOTH:
+1) A documented “Secrets checklist” inside repository at docs/SECRETS_CHECKLIST.md listing:
+   - Name, required?, scope (dev/deploy), country scope (BD/US), example format/length rules.
+2) Ensure deployment uses correct secrets:
+   - If Replit provides “Link Account Secrets” / “sync secrets”, use it; otherwise add missing secrets manually.
+   - ENCRYPTION_KEY must be exactly:
+     - 64 hex characters (32 bytes hex) OR 32 bytes UTF-8.
+   - Provide a safe generation command (do not print actual secrets to logs):
+     - node: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+3) Ensure GOOGLE_MAPS_API_KEY is present in deployment secrets if maps config is fetched server-side in production.
+4) Ensure JWT_SECRET and SESSION_SECRET exist and are long random strings.
+5) Ensure database env vars exist for deployment (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE or DATABASE_URL as used).
+6) For payment provider envs (e.g., SSLCOMMERZ_* and STRIPE_*):
+   - Mark them OPTIONAL for now if not enabling payments.
+   - App must not crash if they are missing; payments should be disabled gracefully.
+
+STEP 3 — Fix “Failed to fetch maps config”
+1) Locate the backend endpoint the client calls for maps config (e.g., /api/config/maps or similar).
+2) Ensure:
+   - Endpoint exists in deployment
+   - It returns a safe payload (no secret exposure) e.g. { enabled: true/false, provider: "google", keyPresent: boolean }
+   - If you must pass a key to client for Google Maps JS, ensure it is the intended public key and not mixed with server secrets.
+3) Add robust error handling:
+   - If config fetch fails, show a friendly banner but do NOT break page rendering.
+   - Ensure CORS and base URL are correct in production (use relative /api/... from same origin for deployed app).
+4) Verify in production build that API base URL is not pointing to localhost or a dev-only URL.
+
+STEP 4 — Fix blank white pages across routes
+1) Add a global error boundary at router root to catch render crashes and show a fallback UI with a “Reload” action and error id.
+2) Audit router/protected routes/lazy loading:
+   - Ensure Switch/Routes are correct and lazy modules are not mis-mounted.
+   - Ensure ProtectedRoute does not deadlock / infinite redirect.
+3) Confirm each route has a real component and exports correctly.
+4) Ensure bundling works for all lazy imports in production (vite build).
+5) Add per-route loading spinners for lazy pages.
+
+STEP 5 — Deployment stability
+1) Update build/run commands if required for Replit deployment:
+   - Build: npm run build
+   - Run: npm run start (or the correct start script)
+2) Ensure environment guard runs AFTER secrets are available and uses correct defaults for optional envs.
+3) Ensure database migrations/seed do not crash deployment:
+   - If “Failed to check for database diff: SERVER unexpectedly disconnected” happens, add retry and make it non-fatal for deploy UI checks.
+4) Run full publish/republish and confirm green.
+
+DELIVERABLES (must provide):
+1) A short report in the agent output:
+   - What was missing in Team vs Personal
+   - What you changed (files touched)
+   - A final list of required secrets for deployment
+2) docs/SECRETS_CHECKLIST.md added/updated
+3) Confirmed working list with screenshots/notes:
+   - /customer map works (or shows graceful fallback without blank page)
+   - /ride /food /parcel /shops /tickets render in mobile preview
+   - Publish succeeds
+
+CONSTRAINTS:
+- Do not hardcode secrets in code.
+- Do not log secrets.
+- Do not remove existing roles or break login/onboarding.
+- Keep one shared backend logic; frontend must call backend.
+Proceed now: audit first, then implement fixes end-to-end.
