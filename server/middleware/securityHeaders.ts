@@ -241,7 +241,9 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
     'https://maps.gstatic.com',
     'https://*.stripe.com',
     'https://*.replit.app',
-    'https://*.replit.dev'
+    'https://*.replit.dev',
+    'https://*.tile.openstreetmap.org',
+    'https://tile.openstreetmap.org'
   ];
 
   const trustedConnectDomains = [
