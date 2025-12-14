@@ -1,0 +1,56 @@
+Fix mobile zoom + input expansion issues across SafeGo customer routes.
+
+Observed problems (must fix):
+1) The page can be pinch-zoomed and users can accidentally zoom, breaking layout.
+2) On iOS Safari, when typing into address inputs (pickup/dropoff / GooglePlacesInput), the page zooms and the input/layout becomes “bigger”, causing overflow and horizontal scroll.
+
+Scope:
+- Apply fixes to /customer and all customer flows: /customer/ride, /customer/eats, /customer/parcel
+- Also verify public landing routes: /ride, /food, /parcel
+
+Requirements (do ALL):
+A) Viewport + scaling control
+1) Ensure the HTML <head> includes a correct viewport meta:
+   width=device-width, initial-scale=1, viewport-fit=cover
+2) DO NOT use user-scalable=no as the only “fix”.
+   If you choose to disable zoom, justify it and only do it if it doesn’t harm accessibility.
+   Preferred: fix the root cause (input font-size + overflow) so zoom is not triggered.
+
+B) Stop iOS input auto-zoom (root cause fix)
+1) Ensure ALL text inputs that users type into (including GooglePlacesInput and any address/pickup/dropoff fields) have font-size >= 16px on mobile.
+2) Ensure line-height and padding don’t create layout shift when focused.
+3) If any component uses transform: scale, remove it for inputs on mobile.
+4) Ensure input containers use min-w-0 and w-full to prevent flex overflow.
+
+C) Eliminate horizontal scroll and “layout widening”
+1) Add global guards:
+   - html, body { width: 100%; overflow-x: hidden; }
+   - main containers must not exceed 100vw
+2) Find and fix the actual overflowing element(s):
+   - Use browser devtools (or code search) to locate any element wider than viewport.
+   - Common culprits: fixed widths (px), min-width, long text, map containers, route cards.
+3) Ensure all major layout wrappers use:
+   - w-full, max-w-full
+   - min-w-0 on flex children
+   - break-words where needed for long strings
+
+D) Keyboard + safe-area behavior
+1) On iOS, when keyboard opens, inputs must remain visible and layout must not jump sideways.
+2) If there is any fixed/sticky footer/header, ensure it does not overlap inputs. Add safe-area padding where needed:
+   padding-bottom: env(safe-area-inset-bottom)
+
+E) Verification (must provide proof)
+1) Demonstrate on mobile widths 390x844 and 360x800:
+   - No auto-zoom when focusing or typing in address inputs
+   - No horizontal scrolling at any time
+   - No layout widening when address suggestions appear
+2) Confirm desktop behavior unchanged.
+3) Provide the exact files changed and a short explanation for each.
+4) Run npm run build and confirm it passes.
+
+Constraints:
+- Do not change backend/API logic.
+- UI/layout/CSS only.
+
+Deliverable:
+- Commit-ready changes with a clear summary of fixes for iOS zoom + overflow.
