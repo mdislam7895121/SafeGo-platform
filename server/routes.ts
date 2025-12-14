@@ -148,6 +148,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.get('/health/memory', (_req: Request, res: Response) => {
+    const mem = process.memoryUsage();
+    const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
+    const rssMB = Math.round(mem.rss / 1024 / 1024);
+    const percentUsed = Math.round((mem.heapUsed / mem.heapTotal) * 100);
+    
+    console.log(`[MEM] Health check: Heap ${heapUsedMB}/${heapTotalMB}MB (${percentUsed}%) | RSS: ${rssMB}MB`);
+    
+    res.status(200).json({
+      status: percentUsed >= 85 ? 'critical' : percentUsed >= 70 ? 'warning' : 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      uptimeFormatted: `${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s`,
+      memory: {
+        heapUsedMB,
+        heapTotalMB,
+        rssMB,
+        percentUsed,
+        external: Math.round(mem.external / 1024 / 1024),
+        arrayBuffers: Math.round(mem.arrayBuffers / 1024 / 1024),
+      },
+      environment: process.env.NODE_ENV || 'development',
+    });
+  });
+
   // Initialize Stripe integration (creates schema, webhooks, syncs data)
   const stripeInit = await initStripe();
   if (stripeInit.success && stripeInit.webhookUuid) {
