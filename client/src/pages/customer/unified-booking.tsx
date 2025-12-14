@@ -2363,14 +2363,14 @@ export default function UnifiedBookingPage() {
                           Choose your route
                         </p>
                         
-                        {/* MOBILE: Route pills - grid for ≤3, horizontal scroll for 4+ */}
+                        {/* MOBILE: Route pills - grid for ≤3, horizontal snap scroll for 4+ */}
                         <div className="md:hidden">
                           <div 
                             className={routes.length <= 3 
                               ? "grid gap-2" 
-                              : "flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
+                              : "flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 -mx-1 px-1"
                             }
-                            style={routes.length <= 3 ? { gridTemplateColumns: `repeat(${routes.length}, 1fr)` } : undefined}
+                            style={routes.length <= 3 ? { gridTemplateColumns: `repeat(${routes.length}, 1fr)` } : { scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                           >
                             {routes.map((route, index) => {
                               const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
@@ -2380,8 +2380,8 @@ export default function UnifiedBookingPage() {
                                 <button
                                   key={route.id}
                                   onClick={() => setActiveRouteId(route.id)}
-                                  className={`flex flex-col items-center justify-center h-14 px-2 rounded-xl transition-all text-center overflow-hidden ${
-                                    routes.length > 3 ? 'flex-shrink-0 min-w-[120px]' : ''
+                                  className={`flex flex-col items-center justify-center min-h-[44px] h-14 px-3 rounded-xl transition-all text-center overflow-hidden ${
+                                    routes.length > 3 ? 'flex-shrink-0 min-w-[120px] snap-start' : ''
                                   } ${
                                     isActive 
                                       ? "border-2 border-primary bg-blue-50 dark:bg-blue-900/30" 
@@ -2916,15 +2916,15 @@ export default function UnifiedBookingPage() {
                         <p className="text-xs text-muted-foreground">Select pickup & dropoff for prices</p>
                       </div>
                       
-                      {/* Horizontal scroll of car categories */}
-                      <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {/* MOBILE: Horizontal scroll with snap - DESKTOP: Responsive grid */}
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         {VEHICLE_CATEGORY_ORDER.slice(0, 4).map((categoryId: VehicleCategoryId) => {
                           const catConfig = VEHICLE_CATEGORIES[categoryId];
                           const vehicleImage = getVehicleCategoryImage(categoryId);
                           return (
                             <div
                               key={categoryId}
-                              className="flex-shrink-0 w-[120px] rounded-xl border border-border bg-background p-3 text-center"
+                              className="rounded-xl border border-border bg-background p-3 text-center min-h-[100px]"
                               data-testid={`preview-car-${categoryId}`}
                             >
                               <div 
@@ -3880,7 +3880,7 @@ export default function UnifiedBookingPage() {
             {rideStatus === "SELECTING" && routes.length > 1 && (
               <div className="mb-3">
                 <p className="text-sm font-semibold mb-2">Choose your route</p>
-                <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   {routes.map((route, index) => {
                     const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
                     const isActive = route.id === activeRouteId;
@@ -3889,7 +3889,7 @@ export default function UnifiedBookingPage() {
                       <button
                         key={route.id}
                         onClick={() => setActiveRouteId(route.id)}
-                        className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all whitespace-nowrap ${
+                        className={`flex-shrink-0 snap-start flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-full transition-all whitespace-nowrap ${
                           isActive 
                             ? "border-2 border-primary bg-blue-50 dark:bg-blue-900/30" 
                             : "border border-border bg-background"
