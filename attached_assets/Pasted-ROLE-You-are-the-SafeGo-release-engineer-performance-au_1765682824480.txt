@@ -1,0 +1,104 @@
+ROLE: You are the SafeGo release engineer + performance auditor. Goal: make the project “no-surprises” production-ready. No assumptions. No “dev-only” excuses without proof. You must produce evidence with logs and measurements. Any memory growth must be explained and fixed or isolated with a hard guardrail.
+
+CONTEXT:
+- App: SafeGo-platform (Replit)
+- Known prior work: Prisma duplicate connections fixed, Maps loader cleanup added, secrets guard added.
+- Current user requirement: “No issues allowed even small. Use best path always.”
+
+OBJECTIVES (MUST DO ALL):
+A) Prove whether the current memory issue is:
+   1) a real leak, or
+   2) dev-server footprint only.
+   Provide measurable evidence.
+
+B) If any leak exists, fix it. If not, implement guardrails so it can’t regress.
+
+C) Make production build run path the default for verification (dev is allowed only for UI work, not for production readiness checks).
+
+D) Verify EVERY customer-facing route works end-to-end (Ride/Eats/Parcel + auth protected routes) with a real test user session and seeded demo data. No missing states. No broken map tiles.
+
+HARD RULES:
+1) You must not mark READY unless you provide:
+   - Memory measurements over time (before/after)
+   - Heap snapshot or allocation trace evidence (if leak suspected)
+   - Route-by-route QA checklist results
+   - Console errors = 0 for tested routes
+2) Any claim like “dev only” must be backed with a production build comparison.
+
+STEP 1 — INSTRUMENTATION (DO FIRST)
+1. Add a lightweight memory logger (server + client) without external services:
+   - Server: log process.memoryUsage() every 30s with timestamp + route context (if possible).
+   - Client: log performance.memory (if available) and map instance counts.
+   - Add a /health/memory endpoint returning memoryUsage plus uptime.
+2. Ensure logs are easy to read: prefix lines with [MEM] and [LEAKCHECK].
+
+STEP 2 — REPRO TEST MATRIX
+Run these scenarios and record memory graphs (values at t=0, 5m, 10m, 15m):
+A) Idle on /customer (no interaction)
+B) Switch tabs Ride -> Eats -> Parcel -> back to Ride (repeat 5 times)
+C) Use GooglePlacesInput: set pickup and dropoff (5 times), request route, open/close panels
+D) Eats: load restaurants list, filter, open restaurant details, go back (repeat)
+E) Auth: logout/login, revisit protected routes
+For each scenario: record server memory + client observations.
+
+STEP 3 — PRODUCTION COMPARISON (NON-NEGOTIABLE)
+1. Run production build locally in Replit:
+   - npm run build
+   - run the built server (not dev)
+2. Repeat scenario A + B in production mode and capture the same metrics.
+3. Decision:
+   - If memory grows steadily in production: it’s a leak → FIX.
+   - If stable in production but high in dev: document it + add guardrails.
+
+STEP 4 — LEAK HUNT (IF ANY GROWTH)
+Investigate likely sources and fix with proofs:
+1) Unbounded intervals/timeouts not cleared
+2) Event listeners not removed (window, document, map listeners, ResizeObserver)
+3) Map instances or markers accumulating (count them; ensure cleanup)
+4) WebSocket/HMR only: ensure no custom sockets reconnect loops
+5) DB pool growth: verify single PrismaClient and no new client per request
+6) Large caches: LRU and max-size; never unbounded arrays/maps
+
+Deliverable: commit-level fixes with “before vs after” memory metrics.
+
+STEP 5 — QA: ALL ROUTES MUST WORK
+Create a QA checklist and execute it with screenshots/log proof:
+Public routes:
+- /ride, /food, /parcel load
+Customer routes (require auth):
+- /customer (Ride): Map loads on first render; tiles not broken; pickup/dropoff selectable; route draws; pricing shows; request button enabled when valid
+- /customer/eats: restaurants visible; filters work; restaurant details open; empty state only if truly empty
+- /customer/parcel: location selection works; form submit works; validation messages correct
+Auth:
+- signup/login works; protected routes redirect properly; session persists; logout clears session
+Console/Network:
+- No 404s on API calls
+- No uncaught exceptions
+- No infinite loading states
+
+If any route fails, fix it immediately and re-run the full checklist.
+
+STEP 6 — GUARDRails (PREVENT FUTURE REGRESSION)
+Implement:
+1) A CI-like script or “pre-publish check” command that:
+   - runs production build
+   - hits key routes/health endpoints
+   - fails if memory exceeds threshold or grows >X% in 10 minutes
+2) Add runtime assertions in production:
+   - Max one map instance per view
+   - No duplicate loader scripts
+   - Prisma singleton enforced
+3) Update docs/SECRETS_CHECKLIST.md with:
+   - required env vars
+   - production start commands
+   - verification checklist
+
+OUTPUT FORMAT (STRICT):
+1) Executive Decision: READY / NOT READY (with reasons)
+2) Memory Evidence Table:
+   - scenario, mode (dev/prod), t=0/5/10/15, delta, conclusion
+3) Fixes Applied (file list + summary)
+4) QA Checklist Results (pass/fail list)
+5) Next Actions (only if NOT READY)
+
+START NOW. Do not ask me questions unless you are blocked by missing credentials. If blocked, propose a safe temporary method (seed test user + seed data) and proceed.
