@@ -1,0 +1,72 @@
+You are the SafeGo release engineer. Task: transfer the current SafeGo Replit project from Personal to Team workspace, using GitHub as the source of truth, without breaking secrets, deployments, or URLs.
+
+GOAL:
+- The project must live under the TEAM workspace (not personal).
+- The TEAM repo + TEAM Replit project becomes the canonical production source.
+- After transfer, all routes must work and all required secrets must be present.
+
+NON-NEGOTIABLE RULES:
+1) No code copying manually between repls unless absolutely necessary. Prefer GitHub sync as the truth.
+2) Do not expose secrets in code or logs.
+3) After transfer, verify:
+   - secrets exist in TEAM repl
+   - build + run works
+   - /ride /food /parcel /customer routes load
+   - maps + places + eats data show as expected
+4) Provide proof: screenshots or logs for GitHub connection, Secrets list (names only), and successful startup logs.
+
+STEP-BY-STEP (DO EXACTLY):
+A) Confirm current state
+1. Identify current Repl owner scope: Personal vs Team
+2. Identify GitHub repo URL currently connected (if any)
+3. Check if Replit has “Transfer/Repl ownership” option available for this repl.
+   - If direct transfer is possible → do it.
+   - If not possible → create a new TEAM repl from GitHub and migrate by sync.
+
+B) Preferred Path: Create TEAM Repl from GitHub (cleanest)
+1. In TEAM workspace, create a new Repl:
+   - Import from GitHub repository (SafeGo repo)
+   - Ensure branch is correct (main)
+2. Run install:
+   - npm ci (or npm install if lock issues)
+3. Set TEAM Secrets (names must match code):
+   - DATABASE_URL
+   - SESSION_SECRET
+   - JWT_SECRET
+   - ENCRYPTION_KEY
+   - GOOGLE_MAPS_API_KEY
+   - plus any payment keys already used (SSLCOMMERZ_* etc.)
+4. Run production-style check:
+   - npm run build
+   - npm start (or the correct production start command used in this repo)
+5. Verify routes:
+   - /ride, /food, /parcel
+   - /customer (auth redirect works)
+   - login → /customer works with maps loading correctly
+
+C) Optional Path: Direct Transfer (only if supported)
+1. Transfer the repl to TEAM workspace via Replit UI.
+2. Re-check GitHub integration, secrets, and deploy settings.
+3. Run the same production check + route verification.
+
+D) GitHub Ownership & Team Access (must fix if blocked)
+1. Ensure GitHub repo is under an Organization (team-owned), not a personal repo:
+   - If currently personal repo: transfer repository to the GitHub Organization.
+2. Confirm team members have correct permissions (admin/maintain/write).
+3. Connect TEAM Repl to Org repo with proper auth.
+
+E) Post-Transfer Hardening
+1. Ensure secrets are stored only in Replit Secrets and GitHub Actions secrets (if used), never in .env committed.
+2. Ensure branch protection on main (optional but recommended).
+3. Ensure deployment config points to TEAM repl.
+
+DELIVERABLES (REQUIRED OUTPUT):
+1) Which method used: Direct Transfer OR New TEAM repl from GitHub
+2) Proof checklist:
+   - GitHub connected (repo + branch)
+   - Secrets present (list names only)
+   - Startup success log line
+   - Route verification results (pass/fail)
+3) Any issues encountered + exact fixes applied.
+
+Start now. Do not ask the user questions unless you hit a hard permission block; if blocked, describe exactly what access is missing and the minimal fix.
