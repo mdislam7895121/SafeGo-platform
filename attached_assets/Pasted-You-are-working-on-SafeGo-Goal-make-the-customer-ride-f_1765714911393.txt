@@ -1,0 +1,67 @@
+You are working on SafeGo. Goal: make the customer ride flow UI fully device-friendly (mobile-first) WITHOUT breaking desktop layout.
+
+Context:
+- This is the /customer ride booking experience (landing-page style).
+- Current issue: page is not responsive; content is clipped and layout breaks on mobile (see “Choose your route / Choose a ride” section).
+- We must keep core backend logic unchanged; only fix UI/layout/responsiveness.
+
+Task (do ALL):
+1) Audit the following routes on mobile + desktop:
+   - /customer
+   - /customer/ride
+   - /customer/eats
+   - /customer/parcel
+   - /ride (public landing)
+   - /food (public landing)
+   - /parcel (public landing)
+
+2) Implement a responsive layout system:
+   - Mobile-first defaults.
+   - Breakpoints: sm, md, lg.
+   - No horizontal scrolling at any breakpoint.
+   - All cards, lists, and map sections must wrap correctly and never overflow the viewport.
+
+3) Fix the “Choose your route” and “Choose a ride” sections:
+   - Route option cards must be horizontally scrollable ONLY on mobile if needed (clean snap scrolling), otherwise wrap into 2-column grid on md+.
+   - Ride option cards must be full-width on mobile, 2-column grid on md, and desktop layout unchanged on lg+.
+   - Ensure images inside cards are responsive (no fixed widths that cause overflow).
+   - Ensure text wraps (no truncation that hides critical info). Use line-clamp only if necessary and never on titles.
+
+4) Fix container sizing and spacing:
+   - Add consistent page container: max width + responsive padding (px-4 on mobile, px-6/8 on larger).
+   - Ensure headers and toolbars don’t push content off-screen.
+   - Ensure all main sections use flex-col on mobile and only switch to flex-row on md+ when safe.
+   - Remove any hardcoded heights that cause clipping. Use min-h, auto, and proper overflow-y handling.
+
+5) Fix scrolling and sticky elements:
+   - If there is a map panel: on mobile it should be collapsible or below the form, not forced side-by-side.
+   - If any element is sticky/fixed: confirm it does not overlap content on small screens.
+   - Prevent double-scroll containers (only one main scroll on mobile).
+
+6) Accessibility and touch:
+   - Tap targets >= 44px.
+   - Buttons and selects must not be cramped.
+   - Ensure focus styles remain visible.
+
+7) Add a “Responsive QA checklist” doc:
+   - docs/RESPONSIVE_QA.md
+   - Include manual steps + the exact screen widths to test: 360x800, 390x844, 414x896, 768x1024, 1024x768, 1440x900.
+   - Include pass/fail criteria: no overflow, no clipped sections, no overlapping fixed elements, correct stacking behavior.
+
+Verification (must show proof):
+- Provide before/after screenshots (or describe exact visual changes) for:
+  - Mobile (390x844) on /customer/ride
+  - Desktop (1440x900) on /customer/ride
+- Run and paste outputs:
+  - npm run build (must pass)
+  - A quick console check that there are no layout-related runtime errors.
+
+Constraints:
+- Do NOT change business logic, pricing logic, or backend API behaviors.
+- Only adjust UI components, layout, CSS/Tailwind, and responsive structure.
+- Keep existing desktop design as close as possible; only improve where needed.
+
+Deliverables:
+- Code changes committed (locally) and ready to push.
+- docs/RESPONSIVE_QA.md added.
+- A short summary of what was changed and which files were touched.
