@@ -1,0 +1,117 @@
+ROLE: You are acting as a Senior Release Engineer + Security Gatekeeper.
+This is the FINAL production readiness and deployment task for the SafeGo platform.
+
+ABSOLUTE RULES (NON-NEGOTIABLE):
+- Do NOT ask questions
+- Do NOT add new features
+- Do NOT refactor unrelated code
+- Do NOT change any already verified logic
+- Do NOT assume anything — verify everything
+- If something is broken, FIX it and SHOW PROOF
+
+CURRENT VERIFIED STATE (MUST REMAIN INTACT):
+- Environment Guard enforces production secrets
+- App exits with code 1 if any required secret is missing
+- JWT authentication active
+- Session security active
+- Single shared database connection only
+- Google Maps uses singleton loader, retry logic, cleanup
+- Parcel request prop mismatch already fixed
+- Rate limiting enabled
+- Security headers enabled
+- WAF layer enabled
+
+TASK OBJECTIVES:
+
+1) FINAL SYSTEM AUDIT
+Perform a full end-to-end audit of:
+- Customer Ride flow
+- Customer Eats flow
+- Customer Parcel flow
+- Admin health endpoints
+- Database connectivity
+- Session persistence
+- API error handling
+- UI empty-state handling
+
+Check BOTH frontend and backend.
+Nothing is allowed to silently fail.
+
+2) PRODUCTION SECRET VALIDATION
+Confirm ALL of the following exist and meet requirements:
+- JWT_SECRET (minimum 32 characters)
+- ENCRYPTION_KEY (64 hex characters)
+- SESSION_SECRET (minimum 32 characters)
+- DATABASE_URL (valid PostgreSQL connection string)
+- GOOGLE_MAPS_API_KEY (valid and enabled)
+
+Rules:
+- No hardcoded secrets
+- No fallback values
+- No logging secret values
+- Production MUST fail fast if any secret is missing
+
+Show startup log proof that validation is enforced.
+
+3) DEPLOYMENT CONFIGURATION
+Ensure production uses:
+- NODE_ENV=production
+- npm run build (production build)
+- npm run start (no dev server, no hot reload)
+
+Confirm:
+- No Vite dev server in production
+- No debug logs exposed
+- No stack traces leaked to client
+- CORS restricted
+- Rate limit thresholds sane
+
+4) SMOKE TESTS (MANDATORY)
+Run and verify:
+
+Frontend:
+- /customer/ride loads correctly
+- /customer/eats loads correctly
+- /customer/parcel loads correctly
+- No blank screens
+- Proper empty-state UI where data is missing
+
+Backend:
+- Health endpoint returns OK
+- Database queries succeed
+- Sessions persist correctly
+- JWT auth works as expected
+
+5) ROLLBACK SAFETY
+Verify:
+- Last checkpoint is valid
+- Rollback restores a working state
+- No schema drift without migration
+
+6) FINAL RESPONSE FORMAT (STRICT)
+Your FINAL reply must be EXACTLY in this format:
+
+🚀 DEPLOYMENT STATUS
+READY FOR PRODUCTION ✅
+or
+BLOCKED ❌ (with exact blocking reason)
+
+🔐 SECRETS CHECK
+All required secrets validated
+
+🧪 SMOKE TEST RESULTS
+Ride: PASS / FAIL
+Eats: PASS / FAIL
+Parcel: PASS / FAIL
+
+🛡️ SECURITY STATUS
+All protections active
+
+📌 FINAL NOTE
+One short sentence only.
+
+NO EXTRA TEXT.
+NO EXPLANATIONS.
+NO QUESTIONS.
+
+This is a production release, not a sandbox.
