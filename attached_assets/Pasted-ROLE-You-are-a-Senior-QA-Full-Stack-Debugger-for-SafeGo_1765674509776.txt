@@ -1,0 +1,77 @@
+ROLE: You are a Senior QA + Full-Stack Debugger for SafeGo.
+Goal: Make EVERY customer page work correctly before ANY deployment work.
+
+NON-NEGOTIABLE RULES:
+- Do NOT talk about deployment, production, or publish until ALL pages pass.
+- Do NOT add new features.
+- Do NOT refactor unrelated code.
+- Fix only what is broken, then prove it with repeatable checks.
+- If data is missing, create SAFE demo seed data (country-aware BD/US) so UI is not empty.
+
+SCOPE: CUSTOMER APP ROUTES + CORE APIs
+You MUST verify on BOTH Desktop and Mobile viewport.
+
+PAGES THAT MUST WORK (NO EXCEPTIONS):
+1) /customer (home)
+2) /customer/ride
+3) /customer/eats
+4) /customer/parcel
+5) Any “Explore services” navigation that links from /customer
+6) Login/session protected routes must behave correctly (redirect, not blank)
+
+ACCEPTANCE CRITERIA (PASS/FAIL):
+A) No blank screens
+B) No broken layout (overlap, cut map tiles, scroll lock issues)
+C) No console errors that affect functionality
+D) All CTAs work (Request ride, open eats list, open parcel request)
+E) Empty states must be intentional and friendly (not broken UI)
+
+MANDATORY DEBUG + FIX PLAN (DO IN ORDER):
+
+STEP 1: ROUTE INVENTORY + NAV CHECK
+- List every customer-facing route in the app (from router config).
+- Click through from /customer to every service card.
+- Fix any broken link, wrong route, or missing route handler.
+
+STEP 2: RIDE PAGE (MAP + PLACES) HARD VERIFICATION
+- Confirm Google Maps renders correctly on first load and after resize.
+- Confirm tiles are not broken on Desktop and Mobile.
+- Confirm pickup autocomplete works and selecting pickup updates state.
+- Confirm dropoff input works (autocomplete + selection).
+- If map breaks: fix container sizing, resize trigger, and ensure map reinitializes safely.
+- Provide proof: browser console logs + screenshot description of correct map state.
+
+STEP 3: EATS PAGE (DATA + FILTERS)
+- If “No restaurants available” appears due to empty DB, seed demo restaurants and menus for BD and US.
+- Confirm cuisines filter works, search works, and restaurant cards open.
+- Confirm API returns data and UI shows it.
+- Provide proof: API response sample + UI evidence.
+
+STEP 4: PARCEL PAGE
+- Verify location selection works (pickup/dropoff), no prop mismatch, no TypeScript runtime issues.
+- Verify form submission path does not error and shows next state properly.
+- Provide proof: console clean + UI flow steps.
+
+STEP 5: SESSION + AUTH SANITY
+- Verify session persists across refresh.
+- Verify protected routes redirect correctly when unauthenticated.
+- No infinite loops.
+
+STEP 6: FINAL SMOKE TEST SCRIPT (REPEATABLE)
+Create a simple manual test checklist inside docs/QA_SMOKE_CHECKLIST.md that includes:
+- Steps to reproduce each pass condition for Ride/Eats/Parcel on Desktop and Mobile
+- Expected results
+This checklist must be usable by a non-developer.
+
+FINAL RESPONSE FORMAT (STRICT):
+1) Routes tested: (list)
+2) FIXES MADE: (bullet list with file paths)
+3) SMOKE TEST RESULTS:
+   - /customer: PASS/FAIL
+   - /customer/ride: PASS/FAIL
+   - /customer/eats: PASS/FAIL
+   - /customer/parcel: PASS/FAIL
+4) Remaining issues (if any): must be only blockers; otherwise write “None”
+5) Next action: “Ready for deployment prompt” ONLY if all are PASS
+
+START NOW. Do not mention deployment until all PASS.
