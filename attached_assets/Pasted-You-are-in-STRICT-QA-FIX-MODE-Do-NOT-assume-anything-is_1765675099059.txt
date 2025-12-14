@@ -1,0 +1,96 @@
+You are in STRICT QA + FIX MODE. 
+Do NOT assume anything is working. Do NOT rely on previous audit claims.
+You must VERIFY everything by actually testing flows.
+
+GOAL:
+Before any deployment or secret configuration, ALL customer-facing pages must be fully functional under an authenticated session.
+
+════════════════════════════════
+STEP 1: AUTHENTICATION BASELINE
+════════════════════════════════
+1. Create or use a TEST USER account.
+2. Login as that user.
+3. Confirm:
+   - Session cookie is set
+   - JWT is issued
+   - Protected routes do NOT redirect to login after auth
+
+If login/auth is broken → FIX FIRST and STOP.
+
+════════════════════════════════
+STEP 2: PAGE-BY-PAGE VERIFICATION (MANDATORY)
+════════════════════════════════
+Test EACH page below while LOGGED IN.
+You must VISUALLY confirm behavior and check browser console.
+
+A) /customer (Home)
+- Page loads without errors
+- No infinite loaders
+- No console errors
+
+B) /customer/ride
+- Google Map loads on FIRST render
+- Map tiles are NOT broken
+- Pickup location selectable (Places autocomplete works)
+- Dropoff location selectable
+- Ride options visible
+- No resize / blank map issues
+
+C) /customer/eats
+- Restaurants list visible
+- Demo/seed data appears
+- Filters (cuisine, open, favorites) work
+- Clicking a restaurant opens details
+- No empty state unless data truly missing
+
+D) /customer/parcel
+- Pickup location selectable
+- Dropoff location selectable
+- Form submits without errors
+- No TypeScript runtime warnings
+
+For EACH page:
+✔ Console clean (no blocking errors)
+✔ No stuck loading states
+✔ Data visible where expected
+
+If ANY page fails → FIX IMMEDIATELY and RETEST.
+
+════════════════════════════════
+STEP 3: GOOGLE MAPS HARD VERIFICATION
+════════════════════════════════
+- Confirm Google Maps SDK loads once (singleton)
+- Confirm Places library available
+- Confirm map renders without resize hacks
+- Confirm map survives tab switch / rerender
+- Confirm no duplicate script tags
+
+If map breaks EVEN ONCE → NOT READY.
+
+════════════════════════════════
+STEP 4: DATA & API CHECK
+════════════════════════════════
+- Verify restaurant API returns data for logged-in user
+- Verify ride-related endpoints respond correctly
+- Verify parcel submission endpoint works
+- Log API responses if empty
+
+If data missing → seed or fix queries.
+
+════════════════════════════════
+STEP 5: FINAL DECISION (NO ASSUMPTIONS)
+════════════════════════════════
+Return ONE of the following only:
+
+✅ READY FOR PRODUCTION
+OR
+❌ NOT READY
+
+Include:
+- Exact pages tested
+- What was fixed (if anything)
+- Remaining blockers (if NOT READY)
+
+Do NOT ask questions.
+Do NOT say "should work".
+Verify, fix, then declare status.
