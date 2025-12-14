@@ -383,9 +383,8 @@ export default function ParcelRequest() {
                 <GooglePlacesInput
                   value={pickupAddress}
                   onChange={setPickupAddress}
-                  onSelect={handlePickupSelect}
+                  onLocationSelect={handlePickupSelect}
                   placeholder="Enter pickup address"
-                  data-testid="input-pickup-address"
                 />
               </div>
               
@@ -459,9 +458,8 @@ export default function ParcelRequest() {
                     <GooglePlacesInput
                       value={dropoffAddress}
                       onChange={setDropoffAddress}
-                      onSelect={handleDropoffSelect}
+                      onLocationSelect={handleDropoffSelect}
                       placeholder="Enter dropoff address"
-                      data-testid="input-dropoff-address"
                     />
                   </div>
                 </>

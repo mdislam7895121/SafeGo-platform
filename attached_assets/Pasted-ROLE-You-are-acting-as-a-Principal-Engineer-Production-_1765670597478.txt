@@ -1,0 +1,164 @@
+ROLE
+You are acting as a Principal Engineer + Production Auditor.
+This is the final pass before real production.
+Your job is to verify, fix, and prove — not to explain or suggest.
+
+⸻
+
+🎯 GOAL (NO NEGOTIATION)
+
+SafeGo must be production-grade, country-aware, secure, and stable.
+
+If anything is:
+	•	broken
+	•	half-implemented
+	•	assumed
+	•	mocked
+	•	silently failing
+
+→ FIX IT COMPLETELY.
+
+No TODOs. No “should work”. No partial fixes.
+
+⸻
+
+1️⃣ SECURITY & SECRETS (ABSOLUTE RULE)
+
+REQUIRED IN PRODUCTION (APP MUST NOT START WITHOUT THESE):
+	•	JWT_SECRET (≥ 32 chars)
+	•	ENCRYPTION_KEY (64 hex chars)
+	•	SESSION_SECRET (≥ 32 chars)
+	•	DATABASE_URL (PostgreSQL)
+	•	GOOGLE_MAPS_API_KEY
+	•	Payment keys (BD + USA if enabled)
+	•	OTP / SMS keys (Twilio or equivalent)
+	•	Push notification keys (FCM)
+
+ENFORCEMENT RULES:
+	•	❌ No hardcoded secrets anywhere
+	•	❌ No fallback keys in production
+	•	❌ No silent startup
+
+If any required secret is missing:
+	•	App must EXIT WITH CODE 1
+	•	Log must clearly show:
+FATAL – PRODUCTION STARTUP ABORTED
+
+Development mode may warn only.
+
+👉 Show proof from logs.
+
+⸻
+
+2️⃣ DATABASE & MEMORY (CRITICAL)
+	•	Verify single shared DB connection
+	•	Remove duplicate pools / repeated initializations
+	•	Confirm memory usage does not increase over time
+	•	Fix any leak or repeated connection logic
+
+👉 Output:
+	•	Exact files changed
+	•	What caused the issue
+	•	Why it cannot happen again
+
+⸻
+
+3️⃣ GOOGLE MAPS (ZERO TOLERANCE)
+
+You must ensure:
+	•	Singleton Google Maps loader
+	•	No duplicate script tags
+	•	Proper cleanup on unmount
+	•	ResizeObserver correctly triggers map resize
+	•	Retry logic if SDK fails
+	•	Fallback UI if map fails
+	•	Works on:
+	•	Desktop
+	•	Mobile
+	•	Resize
+	•	Route change
+
+👉 Show browser console proof.
+
+⸻
+
+4️⃣ CUSTOMER FLOWS (END-TO-END)
+
+🚗 Ride
+	•	Pickup works
+	•	Dropoff works
+	•	Country-based vehicle list
+	•	Price appears only after both locations
+	•	No blank states
+
+🍔 Eats
+	•	Restaurants load correctly
+	•	No empty screen unless database is truly empty
+	•	Filters work
+	•	Search works
+	•	Demo data exists if marketplace is empty
+
+📦 Parcel
+	•	Google Places input stable
+	•	No TypeScript prop mismatch
+	•	Location selection works end-to-end
+
+⸻
+
+5️⃣ COUNTRY RULES (MANDATORY)
+	•	USA & Bangladesh logic must be strictly config-driven
+	•	Vehicles, payments, rules load dynamically
+	•	❌ No hardcoded country assumptions
+
+⸻
+
+6️⃣ UI / UX SAFETY
+	•	No blank screens
+	•	Friendly error UI
+	•	Retry buttons where APIs or SDKs may fail
+	•	No infinite loaders
+
+⸻
+
+7️⃣ FINAL OUTPUT FORMAT (MANDATORY)
+
+Your final response MUST include:
+
+✅ AUDIT SUMMARY
+	•	What was broken
+	•	What was fixed
+	•	What was verified
+
+📁 FILES CHANGED
+
+List exact files
+
+🧪 PROOF
+	•	Logs
+	•	Browser console output
+	•	Clear confirmation messages
+
+⚠️ KNOWN ISSUES
+
+Only if NOT blocking production
+
+🚀 PRODUCTION STATUS
+
+Choose ONE:
+	•	READY FOR PRODUCTION
+	•	BLOCKED – DO NOT DEPLOY
+
+No soft language. No assumptions.
+
+⸻
+
+❗ STRICT RULES
+	•	Do NOT ask questions
+	•	Do NOT leave TODOs
+	•	Do NOT say “should be fine”
+	•	Do NOT skip anything
+
+If something is unclear → INVESTIGATE
+If something is missing → FIX IT
+
+This is the final audit before launch.
