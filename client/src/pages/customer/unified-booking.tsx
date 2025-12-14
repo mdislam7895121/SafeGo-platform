@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { decodePolyline } from "@/lib/formatters";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
