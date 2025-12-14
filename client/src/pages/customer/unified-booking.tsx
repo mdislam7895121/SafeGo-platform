@@ -1988,7 +1988,7 @@ export default function UnifiedBookingPage() {
   }, [effectiveDriverPosition, driverPositionIndex, phaseRoutePoints, trackingPhase]);
 
   return (
-    <div className="h-screen flex flex-col bg-muted/30" data-testid="unified-booking-page">
+    <div className="h-screen flex flex-col bg-muted/30 overflow-x-hidden max-w-[100vw]" data-testid="unified-booking-page">
       {/* Uber-style Sticky Header */}
       <header 
         className="sticky top-0 z-50 w-full bg-background border-b shadow-sm"
