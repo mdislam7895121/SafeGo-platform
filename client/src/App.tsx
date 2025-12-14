@@ -265,6 +265,9 @@ function Router() {
       <Route path="/customer/support">
         <CustomerGuard><CustomerSupport /></CustomerGuard>
       </Route>
+      <Route path="/customer/ride">
+        <CustomerGuard><UnifiedBooking /></CustomerGuard>
+      </Route>
       <Route path="/customer/ride-request">
         <CustomerGuard><RideRequestPage /></CustomerGuard>
       </Route>

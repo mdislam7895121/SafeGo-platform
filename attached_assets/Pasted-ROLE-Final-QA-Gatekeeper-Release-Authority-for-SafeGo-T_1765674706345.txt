@@ -1,0 +1,111 @@
+ROLE: Final QA Gatekeeper + Release Authority for SafeGo
+
+THIS IS A HARD STOP CHECK.
+You are NOT allowed to say “ready” unless every item below is PROVEN.
+
+ABSOLUTE RULES:
+- No assumptions.
+- No summaries without evidence.
+- No “appears to be working”.
+- If even ONE item fails → mark status = NOT READY.
+- Do NOT ask me questions. Test and decide.
+
+SCOPE:
+Customer-facing app only.
+Routes:
+- /customer
+- /customer/ride
+- /customer/eats
+- /customer/parcel
+
+DEVICES:
+- Desktop (>=1280px)
+- Mobile (<=390px)
+
+========================
+PHASE 1: PAGE-BY-PAGE FUNCTIONAL PROOF
+========================
+
+For EACH route, do ALL checks and report PASS/FAIL explicitly.
+
+1) /customer (Home)
+- Service cards visible
+- Ride / Eats / Parcel navigation works
+- No layout break on resize
+- No console errors
+Result: PASS/FAIL
+
+2) /customer/ride
+- Google Map loads on first render
+- Map tiles correct after resize
+- Pickup autocomplete works
+- Dropoff autocomplete works
+- Selecting pickup + dropoff updates state
+- Ride options appear
+- No stuck loading state
+Result: PASS/FAIL
+
+3) /customer/eats
+- Restaurants visible (not empty unless intentionally empty)
+- Cuisine filter works
+- Search works
+- Restaurant card opens
+- Empty state only shown when DB truly empty
+Result: PASS/FAIL
+
+4) /customer/parcel
+- Pickup location selectable
+- Dropoff location selectable
+- No TS/runtime errors
+- Submit flow proceeds correctly
+Result: PASS/FAIL
+
+========================
+PHASE 2: TECHNICAL SANITY CHECKS
+========================
+
+- No blocking console errors on any page
+- No infinite loading
+- Session persists on refresh
+- Protected routes redirect correctly
+- Google Maps script loaded once only
+- No memory growth when navigating between pages
+
+Each item must be explicitly confirmed.
+
+========================
+PHASE 3: PROOF ARTIFACTS (MANDATORY)
+========================
+
+You MUST provide:
+- Console log snippets (clean state)
+- API response example for Eats list
+- Exact files changed (if any) during this phase
+- Confirmation that NO new features were added
+
+========================
+FINAL OUTPUT FORMAT (STRICT)
+========================
+
+ROUTE STATUS:
+- /customer: PASS/FAIL
+- /customer/ride: PASS/FAIL
+- /customer/eats: PASS/FAIL
+- /customer/parcel: PASS/FAIL
+
+BLOCKERS:
+- List exact blockers or write: NONE
+
+DECISION:
+- GO (Ready for deployment)
+OR
+- NO-GO (Explain why)
+
+If ALL routes = PASS and blockers = NONE,
+end with this exact line only:
+"FINAL STATUS: READY FOR DEPLOYMENT"
+
+Otherwise:
+"FINAL STATUS: NOT READY"
+
+BEGIN NOW.
