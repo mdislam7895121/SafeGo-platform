@@ -3674,9 +3674,9 @@ export default function UnifiedBookingPage() {
                   key={id}
                   positions={points}
                   pathOptions={{
-                    color: id === activeRouteId ? "#3B82F6" : "#94A3B8",
-                    weight: id === activeRouteId ? 5 : 3,
-                    opacity: id === activeRouteId ? 0.9 : 0.4,
+                    color: id === activeRouteId ? "#4DA8DA" : "#64748B",
+                    weight: id === activeRouteId ? 4 : 2,
+                    opacity: id === activeRouteId ? 0.85 : 0.35,
                   }}
                   eventHandlers={{
                     click: () => setActiveRouteId(id),
@@ -3689,9 +3689,9 @@ export default function UnifiedBookingPage() {
                 <Polyline
                   positions={remainingRoutePoints}
                   pathOptions={{
-                    color: "#10B981",
-                    weight: 6,
-                    opacity: 0.9,
+                    color: "#4DA8DA",
+                    weight: 4,
+                    opacity: 0.85,
                   }}
                 />
               )}
@@ -3888,9 +3888,9 @@ export default function UnifiedBookingPage() {
                     key={id}
                     positions={points}
                     pathOptions={{
-                      color: id === activeRouteId ? "#3B82F6" : "#94A3B8",
-                      weight: id === activeRouteId ? 5 : 3,
-                      opacity: id === activeRouteId ? 0.9 : 0.4,
+                      color: id === activeRouteId ? "#4DA8DA" : "#64748B",
+                      weight: id === activeRouteId ? 4 : 2,
+                      opacity: id === activeRouteId ? 0.85 : 0.35,
                     }}
                     eventHandlers={{
                       click: () => setActiveRouteId(id),
@@ -3903,9 +3903,9 @@ export default function UnifiedBookingPage() {
                   <Polyline
                     positions={remainingRoutePoints}
                     pathOptions={{
-                      color: "#10B981",
-                      weight: 6,
-                      opacity: 0.9,
+                      color: "#4DA8DA",
+                      weight: 4,
+                      opacity: 0.85,
                     }}
                   />
                 )}
