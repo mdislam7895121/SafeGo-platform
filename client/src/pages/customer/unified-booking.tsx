@@ -3669,31 +3669,55 @@ export default function UnifiedBookingPage() {
                 />
               )}
               
+              {/* Route polylines with dual-stroke for visibility */}
               {routePolylines.map(({ id, points }) => (
-                <Polyline
-                  key={id}
-                  positions={points}
-                  pathOptions={{
-                    color: id === activeRouteId ? "#4DA8DA" : "#64748B",
-                    weight: id === activeRouteId ? 4 : 2,
-                    opacity: id === activeRouteId ? 0.85 : 0.35,
-                  }}
-                  eventHandlers={{
-                    click: () => setActiveRouteId(id),
-                  }}
-                />
+                <>
+                  {/* White outline stroke (bottom layer) */}
+                  <Polyline
+                    key={`${id}-outline`}
+                    positions={points}
+                    pathOptions={{
+                      color: "#FFFFFF",
+                      weight: id === activeRouteId ? 7 : 4,
+                      opacity: id === activeRouteId ? 1 : 0.5,
+                    }}
+                  />
+                  {/* Blue route stroke (top layer) */}
+                  <Polyline
+                    key={id}
+                    positions={points}
+                    pathOptions={{
+                      color: id === activeRouteId ? "#1DA1F2" : "#64748B",
+                      weight: id === activeRouteId ? 4 : 2,
+                      opacity: 1,
+                    }}
+                    eventHandlers={{
+                      click: () => setActiveRouteId(id),
+                    }}
+                  />
+                </>
               ))}
               
-              {/* Remaining route polyline - shows driver's path to destination */}
+              {/* Remaining route polyline with dual-stroke */}
               {remainingRoutePoints && remainingRoutePoints.length > 1 && (
-                <Polyline
-                  positions={remainingRoutePoints}
-                  pathOptions={{
-                    color: "#4DA8DA",
-                    weight: 4,
-                    opacity: 0.85,
-                  }}
-                />
+                <>
+                  <Polyline
+                    positions={remainingRoutePoints}
+                    pathOptions={{
+                      color: "#FFFFFF",
+                      weight: 7,
+                      opacity: 1,
+                    }}
+                  />
+                  <Polyline
+                    positions={remainingRoutePoints}
+                    pathOptions={{
+                      color: "#1DA1F2",
+                      weight: 4,
+                      opacity: 1,
+                    }}
+                  />
+                </>
               )}
             </MapContainer>
           )}
@@ -3883,31 +3907,55 @@ export default function UnifiedBookingPage() {
                   />
                 )}
                 
+                {/* Route polylines with dual-stroke for visibility */}
                 {routePolylines.map(({ id, points }) => (
-                  <Polyline
-                    key={id}
-                    positions={points}
-                    pathOptions={{
-                      color: id === activeRouteId ? "#4DA8DA" : "#64748B",
-                      weight: id === activeRouteId ? 4 : 2,
-                      opacity: id === activeRouteId ? 0.85 : 0.35,
-                    }}
-                    eventHandlers={{
-                      click: () => setActiveRouteId(id),
-                    }}
-                  />
+                  <>
+                    {/* White outline stroke (bottom layer) */}
+                    <Polyline
+                      key={`${id}-outline`}
+                      positions={points}
+                      pathOptions={{
+                        color: "#FFFFFF",
+                        weight: id === activeRouteId ? 7 : 4,
+                        opacity: id === activeRouteId ? 1 : 0.5,
+                      }}
+                    />
+                    {/* Blue route stroke (top layer) */}
+                    <Polyline
+                      key={id}
+                      positions={points}
+                      pathOptions={{
+                        color: id === activeRouteId ? "#1DA1F2" : "#64748B",
+                        weight: id === activeRouteId ? 4 : 2,
+                        opacity: 1,
+                      }}
+                      eventHandlers={{
+                        click: () => setActiveRouteId(id),
+                      }}
+                    />
+                  </>
                 ))}
                 
-                {/* Remaining route polyline - shows driver's path to destination */}
+                {/* Remaining route polyline with dual-stroke */}
                 {remainingRoutePoints && remainingRoutePoints.length > 1 && (
-                  <Polyline
-                    positions={remainingRoutePoints}
-                    pathOptions={{
-                      color: "#4DA8DA",
-                      weight: 4,
-                      opacity: 0.85,
-                    }}
-                  />
+                  <>
+                    <Polyline
+                      positions={remainingRoutePoints}
+                      pathOptions={{
+                        color: "#FFFFFF",
+                        weight: 7,
+                        opacity: 1,
+                      }}
+                    />
+                    <Polyline
+                      positions={remainingRoutePoints}
+                      pathOptions={{
+                        color: "#1DA1F2",
+                        weight: 4,
+                        opacity: 1,
+                      }}
+                    />
+                  </>
                 )}
               </MapContainer>
             )}
