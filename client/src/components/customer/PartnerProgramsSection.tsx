@@ -158,50 +158,68 @@ export function PartnerProgramsSection() {
   }
 
   return (
-    <div className="mt-6" data-testid="partner-programs-section">
-      <h3 className="text-lg font-bold text-foreground">{texts.sectionTitle}</h3>
-      <p className="text-sm text-muted-foreground mt-1">
+    <div className="mt-8" data-testid="partner-programs-section">
+      <h3 className="text-xl font-bold text-gray-900 dark:text-foreground">{texts.sectionTitle}</h3>
+      <p className="text-sm text-gray-500 dark:text-muted-foreground mt-1">
         {texts.masterTagline}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
-        {partnerCards.map((item) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
+        {partnerCards.map((item, index) => {
           const Icon = item.icon;
           const summary = partnerSummary?.[item.kind];
           const status: PartnerStatus = summary?.status || "not_started";
           const isItemLoading = loadingKind === item.kind && startMutation.isPending;
+          const isFeatured = index === 0;
 
           return (
             <div
               key={item.kind}
-              className="relative bg-white dark:bg-card rounded-xl border border-gray-100 dark:border-border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              className={`relative flex flex-col rounded-2xl p-6 transition-all duration-200 hover:shadow-lg ${
+                isFeatured 
+                  ? "bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50" 
+                  : "bg-white dark:bg-card border border-gray-100 dark:border-border shadow-sm"
+              }`}
               data-testid={`partner-card-${item.kind}`}
             >
               {isBD && status !== "not_started" && (
                 <span 
-                  className={`absolute top-3 right-3 px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadgeClass(status)}`}
+                  className={`absolute top-4 right-4 px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadgeClass(status)}`}
                   data-testid={`partner-status-${item.kind}`}
                 >
                   {getStatusLabel(status)}
                 </span>
               )}
 
-              <div className="mb-3">
-                <Icon className="h-8 w-8 text-blue-600 dark:text-blue-500" strokeWidth={1.5} />
+              <div className="mb-4">
+                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${
+                  isFeatured 
+                    ? "bg-blue-100 dark:bg-blue-900/50" 
+                    : "bg-gray-50 dark:bg-muted"
+                }`}>
+                  <Icon 
+                    className={`h-5 w-5 ${isFeatured ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"}`} 
+                    strokeWidth={1.75} 
+                  />
+                </div>
               </div>
 
-              <h4 className="text-base font-semibold text-gray-900 dark:text-foreground">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-foreground">
                 {item.title}
               </h4>
 
-              <p className="text-sm text-gray-500 dark:text-muted-foreground mt-1 leading-snug">
+              <p className="text-sm text-gray-500 dark:text-muted-foreground mt-1.5 flex-1">
                 {item.description}
               </p>
 
               <button
                 onClick={() => handlePartnerClick(item.kind)}
                 disabled={isItemLoading}
-                className="w-full mt-4 py-2.5 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className={`w-full mt-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 ${
+                  isFeatured
+                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                    : "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900"
+                }`}
                 data-testid={`partner-button-${item.kind}`}
               >
                 {isItemLoading ? (
