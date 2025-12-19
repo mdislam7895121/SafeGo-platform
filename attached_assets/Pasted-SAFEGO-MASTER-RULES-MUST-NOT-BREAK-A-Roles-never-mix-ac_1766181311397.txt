@@ -1,0 +1,155 @@
+SAFEGO — MASTER RULES (MUST NOT BREAK)
+
+A) Roles (never mix access)
+1) Customer
+   - Signup requirements
+   - BD/US KYC rules
+   - Dashboard
+   - Permissions
+   - Status flows
+2) Driver
+   - Signup requirements
+   - BD/US KYC rules
+   - Dashboard
+   - Permissions
+   - Status flows
+3) Restaurant (Merchant)
+   - Signup requirements
+   - BD/US KYC rules
+   - Dashboard
+   - Permissions
+   - Status flows
+4) Admin
+   - Admin dashboard + controls (verification, pricing, payouts, blocking)
+
+B) Global app logic (always support all 3 services)
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+Worldwide + country-specific rules
+
+C) Country-specific KYC (branching mandatory)
+BD mandatory:
+- father_name, date_of_birth, present_address, permanent_address
+- NID number + front/back images
+- emergency contact details
+- verification_status + is_verified
+US mandatory:
+- date_of_birth, home_address, emergency contact details
+- government_id_type, government_id_last4
+- drivers: driver_license + image + expiry
+- drivers: ssn_last4 (optional)
+- verification_status + is_verified
+
+D) Admin panel mandatory abilities
+- verify customers/drivers/restaurants
+- approve/reject KYC + rejection_reason
+- update pricing/fees/commissions
+- block/unblock any user
+- manage payouts
+- view driver negative balance
+- view restaurant negative balance
+
+E) Mandatory collections (do not rename/remove)
+1) rides
+2) food_orders
+3) deliveries
+Each includes: identity fields, addresses+geolocation, fees+commission, payment details,
+timestamps, full status flow, rating+feedback
+
+F) Commission + payout rules (must remain)
+1) CASH ride: driver gets full cash; SafeGo commission becomes negative driver_wallet_balance; weekly settlement
+2) CASH food: restaurant gets cash; commission becomes negative restaurant_wallet; weekly settlement
+3) Online: SafeGo keeps commission automatically
+4) Admin can settle balances + mark paid
+
+G) Security rules (must remain)
+- Customers cannot view driver docs
+- Drivers cannot view customer NID/sensitive info
+- Restaurant cannot view other restaurants
+- Only admin can change pricing/commission/verification/blocking
+- Users only update their own profile
+
+H) Status flows (must remain)
+Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x
+Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+
+I) Onboarding (must remain)
+Basic info → Address → KYC upload (BD/US) → Emergency contact → verification_status=pending
+Block access until admin approved
+
+J) Notifications (must remain)
+- New ride alert for driver
+- Order updates
+- Parcel updates
+- Verification approval/rejection
+- Important admin notifications
+
+Non-breaking rule:
+- Preserve existing routes/APIs/schemas. Only ADD if needed. No refactors that risk breakage.
+
+
+SAFEGO — REPLIT AGENT TASK PROMPT
+Goal: Make the Ride map look “Uber-like” professional (clean, minimal, no red traffic-style lines, no noisy labels), and remove the ugly “white patchy” look. Frontend-only.
+
+Observed problems from screenshot:
+1) Map styling looks like default OSM with harsh red road markings and dense labels.
+2) White/washed patches and uneven tile rendering (looks low quality / inconsistent).
+
+Hard constraints:
+- Do NOT touch backend logic, pricing, KYC, wallets, commissions, status flows, or collections.
+- Do NOT rename routes or existing components.
+- Only change map tiles/style configuration and map UI polish (frontend).
+- Must be backward-compatible and work in Replit preview.
+
+What to do (exact):
+1) Find the map implementation used on the Ride screen.
+   - Search for: Leaflet, react-leaflet, L.tileLayer, TileLayer, OpenStreetMap, OSM, MapContainer, mapbox, tiles.
+2) Remove any “traffic” layer if present (anything that draws red/orange traffic overlays).
+3) Switch the basemap to a clean “Uber-like” light style.
+
+   Implement ONE of these options (prefer free/no-key first):
+   Option A (recommended, no key): Carto Positron tiles
+     - URL: https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png
+     - Attribution per provider requirements
+   Option B (no key but depends on availability): Stadia Maps “alidade_smooth” or “osm_bright”
+     - Use the provider’s correct tile URL and attribution
+
+   If the project already uses Mapbox and has a token in Replit Secrets:
+   Option C (best Uber-like): Mapbox “light-v11” style
+     - Keep token in Secrets only, do not hardcode
+     - Use a clean style and reduce labels
+
+4) Fix the “white patchy / inconsistent tiles” issue:
+   - Ensure the map container has a stable size (full-height flex chain).
+   - On map mount and on container resize, call the equivalent of invalidateSize (Leaflet) so tiles reflow correctly.
+   - Use retina-friendly tiles:
+     - Use {r} in tile URL for 2x tiles, or detect devicePixelRatio.
+   - Ensure CSS sets:
+     - .leaflet-container { width: 100%; height: 100%; background: #fff; }
+   - If there is any CSS filter/opacity layer causing washout, remove it.
+
+5) Polishing rules (Uber-like feel):
+   - Keep controls minimal (zoom buttons ok).
+   - Reduce clutter: avoid extra labels/overlays unless needed.
+   - Route line should remain visible, but map base should be calm and neutral.
+
+Deliverables:
+- List exact file paths changed.
+- Provide the final code changes (diff or full blocks).
+- Explain in 2–3 lines:
+  - what caused red/noisy look (basemap/traffic layer),
+  - what caused white patches (container sizing + tile invalidation/retina).
+- Confirm:
+  - Map looks clean and professional,
+  - No red traffic-style visuals,
+  - No regressions in Ride flow.
+
+Stop conditions:
+- If you cannot find the map code, output:
+  - search terms used
+  - top 3 candidate files with paths
+  - and stop (do not guess).
+
+END PROMPT
