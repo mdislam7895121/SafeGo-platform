@@ -1,0 +1,77 @@
+SAFEGO — FINAL MAP DESIGN DECISION (LIGHT CLEAN MAP)
+
+Final decision:
+Use a LIGHT, CLEAN, Google-Maps-style map.
+Dark or earth/muddy maps are NOT acceptable.
+
+Hard rules (must not break):
+- Frontend only.
+- Do NOT touch backend, APIs, pricing, KYC, wallets, schemas, or status flows.
+- Preserve all routes and existing logic.
+- Minimal, safe changes.
+
+TARGET MAP STYLE (MANDATORY):
+
+1) Base map:
+- Light background (white / very light grey).
+- Clear separation between land, roads, water, and parks.
+- No dark mode.
+- No brown or earth tones.
+- High readability at a glance.
+
+2) Roads:
+- Highways: yellow/orange, clearly visible.
+- Primary roads: light orange.
+- Secondary roads: light grey.
+- Roads must be clearly distinguishable from land.
+
+3) Labels:
+- Clean, readable city/area names.
+- Not cluttered.
+- Similar density to Google Maps.
+
+4) Route line:
+- Single clean blue or cyan color.
+- Medium thickness (not thin, not neon).
+- Route must be the most visually prominent element.
+- No glow effects.
+
+5) Markers:
+- Pickup: simple blue dot.
+- Dropoff: simple red dot.
+- No large icons, no arrows, no cartoon graphics.
+
+6) Cancel behavior (critical):
+- On cancel:
+  - Route line disappears immediately.
+  - Dropoff marker disappears.
+  - No ghost or stale route redraw.
+- Async/stale protection MUST remain.
+
+7) What to REMOVE:
+- Any dark map tiles.
+- Any earth/brown tone tiles.
+- Any opacity/fog overlays.
+- Any “muddy” or low-contrast styling.
+
+Implementation notes:
+- If Leaflet: switch to a clean light tile provider (Google-like look).
+- If Mapbox: use a light style (not dark).
+- Ensure contrast and readability are the top priority.
+
+Verification checklist (must pass):
+- Roads are instantly understandable.
+- No “muddy” or confusing areas.
+- Route is obvious and clean.
+- Cancel leaves map perfectly clean.
+- Customers can understand the map without thinking.
+
+Deliverables:
+- List files changed.
+- Show final code diff.
+- Confirm: “Light clean map applied as default.”
+
+STOP if unsure:
+- List candidate files and stop. Do not guess.
+
+END.
