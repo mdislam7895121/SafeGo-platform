@@ -332,7 +332,7 @@ export default function BDRideDetail() {
                 zoomControl={false}
               >
                 <TileLayer
-                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://carto.com/">CARTO</a>'
                 />
                 <MapBoundsHandler
