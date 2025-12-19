@@ -611,7 +611,16 @@ export default function UnifiedBookingPage() {
   const [pickupDistanceMiles, setPickupDistanceMiles] = useState<number>(0);
   
   // Customer live GPS location tracking (Uber-style blue dot)
-  const { location: customerLocation, isLoading: isCustomerLocationLoading, isPermissionDenied: isLocationPermissionDenied } = useCustomerLocation();
+  const { location: customerLocation, isLoading: isCustomerLocationLoading, isPermissionDenied: isLocationPermissionDenied, retry: retryLocation } = useCustomerLocation();
+  
+  // Detect if running inside an iframe (Replit preview)
+  const isInIframe = useMemo(() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  }, []);
   const [hasInitialCentered, setHasInitialCentered] = useState(false);
   
   // Memoized customer location icon (blue dot with pulse)
@@ -2836,9 +2845,59 @@ export default function UnifiedBookingPage() {
                               <div className="h-8 w-8" />
                             </div>
 
-                            {locationError && (
-                              <div className="px-3 py-2 bg-red-50 rounded-lg text-xs text-red-600">
-                                {locationError}
+                            {(locationError || isLocationPermissionDenied) && (
+                              <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                                <div className="flex items-start gap-3">
+                                  <div className="shrink-0 mt-0.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600 dark:text-blue-400">
+                                      <circle cx="12" cy="12" r="10"/>
+                                      <path d="M12 16v-4"/>
+                                      <path d="M12 8h.01"/>
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                                      Location access needed
+                                    </p>
+                                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                                      {isInIframe 
+                                        ? "Open in a new tab for location access, or enter your pickup address manually."
+                                        : "Allow location in your browser settings, then tap 'Enable Location'. Or enter your pickup address manually."
+                                      }
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {isInIframe ? (
+                                        <a 
+                                          href={window.location.href}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                            <polyline points="15 3 21 3 21 9"/>
+                                            <line x1="10" x2="21" y1="14" y2="3"/>
+                                          </svg>
+                                          Open in new tab
+                                        </a>
+                                      ) : (
+                                        <button 
+                                          onClick={() => {
+                                            setLocationError(null);
+                                            retryLocation();
+                                          }}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                                            <circle cx="12" cy="10" r="3"/>
+                                          </svg>
+                                          Enable Location
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>

@@ -1,0 +1,67 @@
+SAFEGO — MASTER RULES (MUST NOT BREAK)
+
+A) Roles: Customer, Driver, Restaurant, Admin (separate permissions, dashboards, KYC, status flows)
+B) Services: Ride-hailing + Food delivery + Parcel delivery (worldwide + country rules)
+C) BD vs US KYC branching (mandatory fields) + verification_status/is_verified
+D) Admin panel: verify/approve/reject KYC, rejection_reason, pricing/fees/commissions, block/unblock, payouts, negative balances
+E) Collections: rides, food_orders, deliveries (identity, geo, fees, payment, timestamps, status, rating)
+F) Commission rules: cash creates negative wallet balances; online auto commission; admin settlement
+G) Security: no doc leaks; admin-only sensitive actions; users only edit own profile
+H) Full status flows for ride/food/parcel (no missing stages)
+I) Onboarding: multi-step, pending until admin approval
+J) Notifications: ride/order/parcel updates + verification notices
+Non-breaking: preserve routes/APIs/schemas; only ADD if needed.
+
+REPLIT AGENT TASK — FIX LOCATION DENIED + RESTORE PROFESSIONAL MAP LOOK (FRONTEND ONLY)
+
+Observed:
+- UI shows “Location access denied”.
+- Map looks washed/dull (possible overlay/opacity/filter or wrong tile style).
+
+Hard constraints:
+- Do NOT touch backend logic, pricing, KYC, wallets, status flows, collections, or routes.
+- Frontend-only changes: geolocation handling + map styling + CSS only.
+- Backward-compatible. Minimal diff.
+
+Tasks:
+1) Find the geolocation request code on the Ride screen:
+   - Search: navigator.geolocation, getCurrentPosition, watchPosition, "Location access denied".
+2) Implement proper permission + error handling:
+   - If permission denied:
+     a) show a compact inline banner (not red error only)
+     b) show a button: “Enable location”
+     c) show instructions text: “Allow location in browser settings, then refresh”
+   - Add a “Use map default location” fallback (NYC or last-known) so map still looks correct.
+   - Do NOT block the whole flow if location denied.
+
+3) Replit preview fix:
+   - Detect if running inside an iframe preview; if so, show a hint:
+     “Open in new tab for location access” with a link to the public preview URL.
+   - Keep UI clean.
+
+4) Fix washed/dull map appearance:
+   - Search CSS for opacity/filter on map container and remove it.
+   - Ensure map container and leaflet container are full-size and not under a disabled overlay.
+   - Add/confirm:
+     .leaflet-container { width: 100%; height: 100%; background: #fff; }
+
+5) Make map Uber-like professional:
+   - Switch the basemap tiles to a clean light style (no traffic overlay):
+     Use Carto Positron:
+     https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png
+   - Ensure attribution is included.
+   - Remove any traffic/extra overlay layer if present.
+
+Verification:
+- If location is allowed: blue dot centers near user.
+- If denied: no ugly red error; user sees clear CTA + fallback; map still looks normal.
+- Map looks clean/minimal (no noisy red road styling / no washed overlay).
+- No regressions in ride UI.
+
+Deliverables:
+- File paths changed.
+- Code diff (before/after blocks).
+- 2–3 lines explaining root causes (permission denied + overlay/style).
+STOP if map/geolocation code not found: list top 3 candidate files and search terms.
+
+END.
