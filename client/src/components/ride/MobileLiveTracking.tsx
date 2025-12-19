@@ -465,9 +465,9 @@ export function MobileLiveTracking({
               <Polyline
                 positions={routePoints}
                 pathOptions={{
-                  color: "#3B82F6",
-                  weight: 5,
-                  opacity: 0.6,
+                  color: "#4DA8DA",
+                  weight: 4,
+                  opacity: 0.5,
                 }}
               />
             )}
@@ -477,9 +477,9 @@ export function MobileLiveTracking({
               <Polyline
                 positions={remainingRoutePoints}
                 pathOptions={{
-                  color: "#10B981",
-                  weight: 6,
-                  opacity: 0.9,
+                  color: "#4DA8DA",
+                  weight: 4,
+                  opacity: 0.85,
                 }}
               />
             )}
