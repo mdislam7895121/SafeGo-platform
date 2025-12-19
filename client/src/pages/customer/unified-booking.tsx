@@ -3539,12 +3539,13 @@ export default function UnifiedBookingPage() {
         </div>
 
         {/* Map Section - Hidden on mobile, shown on desktop */}
-        <div ref={desktopMapRef} className="hidden md:block flex-1 min-h-0 relative overflow-hidden">
+        <div ref={desktopMapRef} className="hidden md:flex md:flex-col flex-1 min-h-0 h-full relative overflow-hidden">
           {isClient && (
             <MapContainer
               center={[mapCenter.lat, mapCenter.lng]}
               zoom={14}
-              className="h-full w-full"
+              className="flex-1 w-full"
+              style={{ height: "100%", minHeight: "100%" }}
               zoomControl={true}
               attributionControl={false}
             >
@@ -3752,12 +3753,13 @@ export default function UnifiedBookingPage() {
           </div>
           
           {/* Map area - fills remaining space */}
-          <div className="flex-1 min-h-0 relative">
+          <div className="flex-1 min-h-0 h-full relative flex flex-col">
             {isClient && (
               <MapContainer
                 center={[mapCenter.lat, mapCenter.lng]}
                 zoom={14}
-                className="h-full w-full"
+                className="flex-1 w-full"
+                style={{ height: "100%", minHeight: "100%" }}
                 zoomControl={true}
                 attributionControl={false}
               >
