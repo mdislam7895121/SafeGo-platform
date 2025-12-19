@@ -3634,8 +3634,8 @@ export default function UnifiedBookingPage() {
             >
               <MapResizeHandler />
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               />
               <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} routePoints={activeRoutePoints} />
               
