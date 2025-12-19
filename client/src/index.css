@@ -316,7 +316,7 @@
 }
 
 .leaflet-container {
-  background: #0b0f14;
+  background: #f8f9fa;
 }
 
 .leaflet-tile-loaded {
@@ -1157,7 +1157,7 @@ html, body {
   overflow-x: hidden;
 }
 
-/* ---- LEAFLET MAP FULL-HEIGHT FIX + UBER-LIKE DARK POLISH ---- */
+/* ---- LEAFLET MAP FULL-HEIGHT FIX + LIGHT GOOGLE-LIKE STYLE ---- */
 /* Leaflet requires explicit height. This forces map containers to fill their parent using absolute positioning */
 .leaflet-container {
   position: absolute !important;
@@ -1167,7 +1167,7 @@ html, body {
   bottom: 0;
   width: 100% !important;
   height: 100% !important;
-  background: #0b0f14;
+  background: #f8f9fa;
   font-family: inherit;
 }
 
@@ -1178,10 +1178,10 @@ html, body {
   backface-visibility: hidden;
 }
 
-/* Minimal, professional dark control styling */
+/* Minimal, professional light control styling */
 .leaflet-control-zoom {
   border: none !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
   border-radius: 8px !important;
   overflow: hidden;
 }
@@ -1191,22 +1191,22 @@ html, body {
   height: 32px !important;
   line-height: 32px !important;
   font-size: 16px !important;
-  color: #ffffff !important;
-  background: #1c1c28 !important;
+  color: #333333 !important;
+  background: #ffffff !important;
   border: none !important;
   transition: background 0.15s ease;
 }
 
 .leaflet-control-zoom a:hover {
-  background: #2a2a3c !important;
+  background: #f0f0f0 !important;
 }
 
 /* Semi-transparent attribution for cleaner look (still in code for compliance) */
 .leaflet-control-attribution {
   font-size: 9px;
-  opacity: 0.5;
-  background: rgba(0, 0, 0, 0.4) !important;
-  color: #888 !important;
+  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.8) !important;
+  color: #666 !important;
 }
 
 /* ---- RESPONSIVE CARD GRID ---- */
