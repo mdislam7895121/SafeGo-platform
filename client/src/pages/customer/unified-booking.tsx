@@ -601,6 +601,9 @@ export default function UnifiedBookingPage() {
   const prevDriverPositionRef = useRef<{ lat: number; lng: number } | null>(null);
   const prevTimestampRef = useRef<number>(Date.now());
   
+  // Stale async protection - incremented on cancel to ignore outdated route responses
+  const routeRequestIdRef = useRef<number>(0);
+  
   // Phase-based tracking state for Uber-style live tracking
   // Separates "going to pickup" from "going to dropoff" with distinct routes
   const [trackingPhase, setTrackingPhase] = useState<TrackingPhase>(null);
@@ -977,6 +980,9 @@ export default function UnifiedBookingPage() {
   useEffect(() => {
     if (!pickup || !dropoff || !isGoogleMapsReady) return;
 
+    // Capture current request ID for stale response detection
+    const currentRequestId = ++routeRequestIdRef.current;
+
     const directionsService = new google.maps.DirectionsService();
     directionsService.route(
       {
@@ -990,6 +996,12 @@ export default function UnifiedBookingPage() {
         },
       },
       (result, status) => {
+        // Ignore stale responses (e.g., if ride was cancelled before response arrived)
+        if (currentRequestId !== routeRequestIdRef.current) {
+          console.log("[Route] Ignoring stale route response");
+          return;
+        }
+        
         if (status === google.maps.DirectionsStatus.OK && result) {
           const parsedRoutes: RouteData[] = result.routes.map((route, index) => {
             const leg = route.legs[0];
@@ -1340,11 +1352,23 @@ export default function UnifiedBookingPage() {
 
   // Handle ride cancellation
   const handleCancelRide = useCallback(() => {
+    // Increment route request ID to invalidate any pending async route responses
+    routeRequestIdRef.current += 1;
+    
     // Clear any pending timeouts
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
       searchTimeoutRef.current = null;
     }
+    
+    // Clear all route state immediately to remove polyline from map
+    setRoutes([]);
+    setActiveRouteId(null);
+    setDriverToPickupRoute([]);
+    setPickupToDropoffRoute([]);
+    setDriverPosition(null);
+    setInterpolatedPosition(null);
+    setDriverPositionIndex(0);
     
     if (rideStatus === "SEARCHING_DRIVER") {
       // Cancel before driver assigned - go back to selecting
