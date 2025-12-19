@@ -1,0 +1,112 @@
+SAFEGO — MASTER RULES (MUST NOT BREAK)
+
+A) Roles (never mix access)
+1) Customer: signup + BD/US KYC + dashboard + permissions + status flows
+2) Driver: signup + BD/US KYC + dashboard + permissions + status flows
+3) Restaurant (Merchant): signup + BD/US KYC + dashboard + permissions + status flows
+4) Admin: verify/approve/reject KYC, rejection_reason, pricing/fees/commissions, block/unblock, payouts, negative balances
+
+B) Global services (ALWAYS support all 3)
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+Worldwide + country-specific rules
+
+C) Country KYC branching (mandatory)
+BD: father_name, date_of_birth, present_address, permanent_address, NID number + front/back images, emergency contact, verification_status, is_verified
+US: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4,
+    drivers: driver_license + image + expiry, ssn_last4 (optional), verification_status, is_verified
+
+D) Mandatory collections (do not rename/remove)
+rides, food_orders, deliveries
+Each: identities, geo, fees+commission, payment, timestamps, full status flow, rating/feedback
+
+E) Commission rules (must remain)
+Cash ride: driver keeps cash; SafeGo commission -> negative driver_wallet_balance; weekly settlement
+Cash food: restaurant keeps cash; commission -> negative restaurant_wallet; weekly settlement
+Online: SafeGo keeps commission automatically
+Admin settles balances + marks paid
+
+F) Security rules (must remain)
+No doc leaks; admin-only pricing/commission/verification/blocking; users edit only own profile
+
+G) Status flows (must remain)
+Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x
+Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+
+H) Onboarding + notifications (must remain)
+Multi-step onboarding, pending until admin approved; service + verification notifications
+
+Non-breaking rule:
+Preserve existing routes/APIs/schemas. Only ADD if needed. No risky refactors.
+
+
+REPLIT AGENT — MAKE THE MAP 100% UBER-LIKE (STRICT)
+
+Goal
+The Ride map must look like Uber’s professional dark map (clean, minimal, high-contrast roads, no ugly red road markings, no washed-out tiles). Match the second screenshot’s vibe as closely as possible.
+
+Hard constraints
+- FRONTEND ONLY: map rendering + style/tiles + CSS + small UI controls polish.
+- Do NOT change backend, pricing, KYC, wallets, status flows, collections, or routes.
+- Do NOT rename files/components.
+- Keep it backward-compatible and stable.
+
+What you MUST do
+1) Identify current map stack:
+   - Search for: Leaflet, react-leaflet, MapContainer, TileLayer, L.tileLayer, mapbox-gl, Mapbox, Google Maps, tiles.
+   - Report which one is used.
+
+2) Replace the basemap with an Uber-like DARK style:
+   Priority order (do the first that is feasible in this project):
+   A) If Mapbox GL is already used OR easy to enable without refactor:
+      - Use Mapbox dark style: "mapbox://styles/mapbox/dark-v11"
+      - Token MUST come from Replit Secrets (e.g., MAPBOX_TOKEN). Do NOT hardcode.
+      - Reduce label clutter if possible (use a clean dark style, avoid extra layers).
+   B) If the project uses Leaflet/raster tiles:
+      - Use Carto dark tiles (no traffic overlay):
+        https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png
+      - Ensure attribution is present.
+      - Remove any traffic/extra overlay layers if found.
+
+3) Fix “washed / foggy / grey overlay” problem:
+   - Search CSS and components for any overlay, opacity, filter, or disabled-state layer covering the map.
+   - Remove/adjust only what affects the map.
+   - Ensure these are true:
+     - Map wrapper fills its panel: width: 100%; height: 100%; (or flex: 1 chain)
+     - .leaflet-container (or map canvas) is also 100% width/height
+     - No parent container collapses height
+   - Leaflet only: call map.invalidateSize() after mount and when panel layout changes (e.g., left panel expands/collapses) to prevent partial tile rendering.
+
+4) Route line and markers polish (must look premium):
+   - Route polyline must be clearly visible on dark map.
+   - Use a single clean route color (no neon, no harsh red traffic look).
+   - Pickup/Dropoff markers should be simple and consistent (no random icons).
+
+5) Controls polish (Uber-like):
+   - Keep zoom controls subtle.
+   - No extra debug UI.
+   - No visible tile seams/white patches.
+
+Deliverables (mandatory)
+- List exact file paths changed.
+- Provide code blocks for final changes (diff-style).
+- Explain root cause in 2–3 lines:
+  - why map looked bad (tile style/overlay/size)
+  - why fix is safe and non-breaking
+
+Verification checklist (must pass)
+- Map looks dark, clean, professional like Uber.
+- No red traffic-style road markings or noisy clutter.
+- No washed overlay or white patchy tile artifacts.
+- Works in Replit preview and responsive view.
+- Ride flow still works the same.
+
+Stop conditions
+If you cannot find the map implementation:
+- Output the search terms used
+- Output the top 3 candidate file paths
+- STOP (do not guess).
+
+END PROMPT
