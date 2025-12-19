@@ -1,0 +1,62 @@
+SAFEGO — REPLIT AGENT PROMPT (LAYOUT FIX ONLY)
+
+Context
+- Project: SafeGo customer app (web/landing ride flow)
+- Environment: Replit workspace
+- Issue: The map renders as a tiny square in the center instead of filling the screen.
+- Backend/APIs are OK. This is a pure frontend layout sizing bug.
+
+Hard rules (non-breaking)
+1) Do NOT change any backend code, endpoints, pricing logic, status logic, or schemas.
+2) Do NOT rename routes or files.
+3) Only edit layout/CSS/containers related to the map screen.
+4) Keep all existing UI behaviors (button, bottom panel, header).
+5) Fix must be backward-compatible.
+
+What you must do (step-by-step)
+1) Find the exact file(s) that render the Ride screen map (search for keywords: "Map", "map", "leaflet", "mapbox", "google", "MapView", "Request SafeGo", "ride").
+2) Identify the map container element (the parent div/view wrapping the Map component).
+3) Audit the entire parent chain: screen root → layout wrapper → content area → map wrapper → map component.
+4) Fix the sizing using a strict “full-height chain” approach:
+
+   A) Ensure the page root has height:
+      - html, body, and the app root container must be height: 100% (or min-height: 100vh)
+      - eliminate any parent wrappers that have no height
+
+   B) Ensure the map wrapper fills available space:
+      - map wrapper must be width: 100%
+      - map wrapper must have flex: 1 (or height: 100% if parent has explicit height)
+      - map canvas element must also be set to width/height 100%
+
+   C) If there is a bottom panel / request button overlay:
+      - keep it positioned (fixed/absolute) above the map
+      - do NOT let it reduce map height or collapse the map container
+      - add padding-bottom to the map wrapper only if needed to prevent overlay hiding map controls
+
+5) Remove/replace common breakage patterns:
+   - height: "100%" on elements whose parents don’t have height
+   - fixed pixel heights that cause center square map
+   - map wrapper inside a container without display:flex or without height
+
+Debug requirement (must do)
+- Temporarily add a visible background to the map wrapper to confirm it fills the screen.
+- Confirm in preview that the wrapper expands full height, then remove debug background.
+
+Deliverables
+1) Provide the exact files changed (with paths).
+2) Provide a minimal diff-style patch (before/after or code blocks).
+3) Explain the root cause in 2–3 lines (container height/flex chain).
+4) Confirm the verification checklist below.
+
+Verification checklist (must pass)
+- Map fills the available screen area (no tiny center square).
+- Header stays at top, request button stays visible.
+- No horizontal/vertical unexpected scroll added.
+- Layout works in Replit preview window and mobile-sized responsive view.
+- No backend or route changes.
+
+STOP conditions
+- If you can’t find the map file, list the 3 most likely candidate files with paths and the search terms used, then stop.
+- Do NOT refactor the project structure.
+
+END PROMPT
