@@ -1,0 +1,62 @@
+SAFEGO — MASTER RULES (MUST NOT BREAK)
+
+A) Roles: Customer, Driver, Restaurant, Admin (separate permissions, dashboards, KYC, status flows)
+B) Services: Ride + Food + Parcel (worldwide + country rules)
+C) BD vs US KYC branching + verification_status/is_verified (mandatory)
+D) Admin panel: verify/approve/reject KYC, rejection_reason, pricing/fees/commissions, block/unblock, payouts, negative balances
+E) Collections: rides, food_orders, deliveries (identity, geo, fees, payment, timestamps, full status, rating)
+F) Commission rules (cash negative wallet; online auto; admin settlement)
+G) Security rules (no doc leaks; admin-only sensitive actions)
+H) Status flows: Ride/Food/Parcel (complete)
+I) Onboarding + notifications (must remain)
+Non-breaking: preserve routes/APIs/schemas; only ADD if needed.
+
+REPLIT AGENT — MAKE THE MAP LOOK EXACTLY “UBER-LIKE” (NOT MUDDY)
+
+Problem:
+Current map is dark but looks muddy/washed (brown/grey), not premium like Uber. We need a crisp, high-contrast dark map style.
+
+Hard constraints:
+- FRONTEND ONLY (map style/tiles + CSS + route/marker styling).
+- Do NOT touch backend, pricing, KYC, wallets, status flows, collections, or routes.
+- Do NOT rename files. Minimal diff only.
+
+Tasks:
+1) Identify map tech (Leaflet/react-leaflet OR Mapbox GL). Report which one.
+2) Replace the basemap with a true Uber-like dark style:
+   - If Mapbox is available OR can be enabled without refactor:
+     Use style: mapbox://styles/mapbox/dark-v11
+     Token MUST be from Replit Secrets (MAPBOX_TOKEN). Never hardcode.
+   - If Leaflet/raster only:
+     Use Carto dark tiles:
+     https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png
+     Add correct attribution.
+
+3) Remove the “muddy/washed” look:
+   - Search for any overlay/opacity/filter on map container and delete/disable it.
+   - Ensure map container sizing is correct and tiles render crisp:
+     - Leaflet: .leaflet-container { width: 100%; height: 100%; background: #0b0f14; }
+     - Leaflet: call map.invalidateSize() after mount and after layout changes.
+     - Ensure retina tiles via {r}.
+
+4) Make route & markers premium:
+   - Route polyline should be clean and readable on dark map.
+   - Avoid neon green/harsh colors. Use a single professional route color.
+   - Pickup/Dropoff markers should be minimal and consistent (small dots/rings).
+   - Remove any big “play” marker or cartoonish icon unless required; keep it Uber-like.
+
+5) Verification:
+   - Map is crisp, high-contrast dark (not brown/muddy).
+   - Route is clearly visible and elegant.
+   - No tile seams/white patches.
+   - UI behavior unchanged.
+
+Deliverables:
+- File paths changed
+- Final code blocks (diff-style)
+- 2–3 line explanation of what caused muddy look and how you fixed it
+
+STOP if you cannot locate map code:
+- list search terms + top 3 candidate files, then stop.
+
+END.
