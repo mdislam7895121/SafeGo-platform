@@ -316,7 +316,7 @@
 }
 
 .leaflet-container {
-  background: #f8f9fa;
+  background: #1a1a2e;
 }
 
 .leaflet-tile-loaded {
@@ -1157,7 +1157,7 @@ html, body {
   overflow-x: hidden;
 }
 
-/* ---- LEAFLET MAP FULL-HEIGHT FIX + UBER-LIKE POLISH ---- */
+/* ---- LEAFLET MAP FULL-HEIGHT FIX + UBER-LIKE DARK POLISH ---- */
 /* Leaflet requires explicit height. This forces map containers to fill their parent using absolute positioning */
 .leaflet-container {
   position: absolute !important;
@@ -1167,7 +1167,7 @@ html, body {
   bottom: 0;
   width: 100% !important;
   height: 100% !important;
-  background: #f8f9fa;
+  background: #1a1a2e;
   font-family: inherit;
 }
 
@@ -1176,10 +1176,10 @@ html, body {
   image-rendering: auto;
 }
 
-/* Minimal, professional control styling */
+/* Minimal, professional dark control styling */
 .leaflet-control-zoom {
   border: none !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
   border-radius: 8px !important;
   overflow: hidden;
 }
@@ -1189,13 +1189,13 @@ html, body {
   height: 36px !important;
   line-height: 36px !important;
   font-size: 18px !important;
-  color: #1a1a1a !important;
-  background: white !important;
+  color: #ffffff !important;
+  background: #2d2d44 !important;
   border: none !important;
 }
 
 .leaflet-control-zoom a:hover {
-  background: #f5f5f5 !important;
+  background: #3d3d5c !important;
 }
 
 /* Hide attribution for cleaner look (still in code for compliance) */
