@@ -286,7 +286,7 @@ export default function RideDropoffPage() {
           zoomControl={false}
           attributionControl={false}
         >
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; CARTO' />
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
           <MapBoundsHandler 
             pickupLocation={state.pickup} 
             dropoffLocation={markerPosition} 
