@@ -85,7 +85,7 @@ function RouteMap({ pickup, dropoff }: {
     const map = L.map(mapRef.current).setView([center.lat, center.lng], 13);
     mapInstanceRef.current = map;
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
     }).addTo(map);
 
