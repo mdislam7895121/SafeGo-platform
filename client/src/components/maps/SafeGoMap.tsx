@@ -456,9 +456,9 @@ export function SafeGoMap({
             <Polyline
               positions={computedRoute}
               pathOptions={{
-                color: "#374151",
-                weight: 8,
-                opacity: 0.3,
+                color: "#FFFFFF",
+                weight: 7,
+                opacity: 1,
                 lineCap: "round",
                 lineJoin: "round",
               }}
@@ -466,9 +466,9 @@ export function SafeGoMap({
             <Polyline
               positions={computedRoute}
               pathOptions={{
-                color: getRouteColor(),
-                weight: 5,
-                opacity: 0.9,
+                color: "#1DA1F2",
+                weight: 4,
+                opacity: 1,
                 lineCap: "round",
                 lineJoin: "round",
               }}

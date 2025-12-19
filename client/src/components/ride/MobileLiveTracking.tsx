@@ -460,28 +460,48 @@ export function MobileLiveTracking({
               />
             )}
             
-            {/* Full route polyline */}
+            {/* Full route polyline with dual-stroke */}
             {routePoints.length > 1 && (
-              <Polyline
-                positions={routePoints}
-                pathOptions={{
-                  color: "#4DA8DA",
-                  weight: 4,
-                  opacity: 0.5,
-                }}
-              />
+              <>
+                <Polyline
+                  positions={routePoints}
+                  pathOptions={{
+                    color: "#FFFFFF",
+                    weight: 7,
+                    opacity: 0.6,
+                  }}
+                />
+                <Polyline
+                  positions={routePoints}
+                  pathOptions={{
+                    color: "#1DA1F2",
+                    weight: 4,
+                    opacity: 0.6,
+                  }}
+                />
+              </>
             )}
             
-            {/* Remaining route polyline */}
+            {/* Remaining route polyline with dual-stroke */}
             {remainingRoutePoints && remainingRoutePoints.length > 1 && (
-              <Polyline
-                positions={remainingRoutePoints}
-                pathOptions={{
-                  color: "#4DA8DA",
-                  weight: 4,
-                  opacity: 0.85,
-                }}
-              />
+              <>
+                <Polyline
+                  positions={remainingRoutePoints}
+                  pathOptions={{
+                    color: "#FFFFFF",
+                    weight: 7,
+                    opacity: 1,
+                  }}
+                />
+                <Polyline
+                  positions={remainingRoutePoints}
+                  pathOptions={{
+                    color: "#1DA1F2",
+                    weight: 4,
+                    opacity: 1,
+                  }}
+                />
+              </>
             )}
           </MapContainer>
         )}
