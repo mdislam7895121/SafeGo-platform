@@ -1157,6 +1157,18 @@ html, body {
   overflow-x: hidden;
 }
 
+/* ---- LEAFLET MAP FULL-HEIGHT FIX ---- */
+/* Leaflet requires explicit height. This forces map containers to fill their parent using absolute positioning */
+.leaflet-container {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 /* ---- RESPONSIVE CARD GRID ---- */
 .admin-responsive-grid {
   display: grid;
