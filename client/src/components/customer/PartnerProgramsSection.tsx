@@ -49,10 +49,10 @@ export function PartnerProgramsSection() {
     return texts.statusLabels[status] || "";
   };
 
-  const getButtonLabel = (status: PartnerStatus): string => {
+  const getButtonLabel = (status: PartnerStatus, buttonText: string): string => {
     switch (status) {
       case "not_started":
-        return texts.statusLabels.not_started;
+        return buttonText;
       case "live":
         return countryCode === "BD" ? "ড্যাশবোর্ড দেখুন" : "View Dashboard";
       default:
@@ -164,7 +164,7 @@ export function PartnerProgramsSection() {
         {texts.masterTagline}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
         {partnerCards.map((item) => {
           const Icon = item.icon;
           const summary = partnerSummary?.[item.kind];
@@ -174,28 +174,12 @@ export function PartnerProgramsSection() {
           return (
             <div
               key={item.kind}
-              className="relative bg-white dark:bg-card rounded-xl p-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
+              className="relative bg-white dark:bg-card rounded-xl border border-gray-100 dark:border-border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
               data-testid={`partner-card-${item.kind}`}
             >
-              <div 
-                className="absolute left-0 top-0 h-full w-[2px] rounded-l-xl"
-                style={{
-                  background: "linear-gradient(to bottom, rgba(58, 139, 255, 0.4), rgba(58, 139, 255, 0.13))",
-                  filter: "blur(2px)",
-                }}
-              />
-              
-              <div 
-                className="absolute right-0 top-0 h-full w-[2px] rounded-r-xl"
-                style={{
-                  background: "linear-gradient(to bottom, rgba(58, 139, 255, 0.4), rgba(58, 139, 255, 0.13))",
-                  filter: "blur(2px)",
-                }}
-              />
-
               {isBD && status !== "not_started" && (
                 <span 
-                  className={`absolute top-3 right-3 px-2 py-[2px] text-[12px] font-semibold rounded-full ${getStatusBadgeClass(status)}`}
+                  className={`absolute top-3 right-3 px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadgeClass(status)}`}
                   data-testid={`partner-status-${item.kind}`}
                 >
                   {getStatusLabel(status)}
@@ -203,24 +187,21 @@ export function PartnerProgramsSection() {
               )}
 
               <div className="mb-3">
-                <Icon className="h-10 w-10 text-[#007BFF]" />
+                <Icon className="h-8 w-8 text-blue-600 dark:text-blue-500" strokeWidth={1.5} />
               </div>
 
-              <h4 className="text-[17px] font-bold text-gray-900 dark:text-foreground">
+              <h4 className="text-base font-semibold text-gray-900 dark:text-foreground">
                 {item.title}
               </h4>
 
-              <p className="text-[14px] text-gray-500 dark:text-muted-foreground mt-1">
+              <p className="text-sm text-gray-500 dark:text-muted-foreground mt-1 leading-snug">
                 {item.description}
               </p>
 
               <button
                 onClick={() => handlePartnerClick(item.kind)}
                 disabled={isItemLoading}
-                className="w-full mt-4 py-2 rounded-lg font-bold text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: "#007BFF" }}
-                onMouseEnter={(e) => !isItemLoading && (e.currentTarget.style.backgroundColor = "#0069d9")}
-                onMouseLeave={(e) => !isItemLoading && (e.currentTarget.style.backgroundColor = "#007BFF")}
+                className="w-full mt-4 py-2.5 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50"
                 data-testid={`partner-button-${item.kind}`}
               >
                 {isItemLoading ? (
@@ -228,7 +209,7 @@ export function PartnerProgramsSection() {
                 ) : needsLogin ? (
                   texts.loginButtonText
                 ) : (
-                  getButtonLabel(status)
+                  getButtonLabel(status, item.buttonText)
                 )}
               </button>
             </div>

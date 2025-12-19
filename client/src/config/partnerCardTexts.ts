@@ -82,33 +82,33 @@ const BD_TEXTS: PartnerTexts = {
 };
 
 const US_TEXTS: PartnerTexts = {
-  masterTagline: "Turn your free time into income. Flexible opportunities that fit your schedule.",
+  masterTagline: "Flexible opportunities that work around your schedule.",
   sectionTitle: "Earn with SafeGo",
   cards: [
     {
       kind: "driver_ride",
-      title: "Ride Share Driver",
-      description: "Drive your way. Earn every day.",
-      buttonText: "Become a Ride Driver",
+      title: "Ride Driver",
+      description: "Drive passengers and earn on your schedule.",
+      buttonText: "Apply as Driver",
       icon: Car,
     },
     {
       kind: "driver_delivery_bike",
-      title: "Delivery Driver (Bike & Bicycle)",
-      description: "Start earning with SafeGo using a bike or bicycle. Fast approval. Simple requirements.",
-      buttonText: "Become a Delivery Driver",
+      title: "Delivery Driver",
+      description: "Deliver food and packages in your area.",
+      buttonText: "Start Delivering",
       icon: Bike,
     },
     {
       kind: "restaurant",
       title: "Restaurant Partner",
-      description: "Reach more customers. Grow your orders.",
-      buttonText: "Become a Restaurant Partner",
+      description: "Reach more customers through our platform.",
+      buttonText: "Partner with Us",
       icon: UtensilsCrossed,
     },
   ],
   statusLabels: {
-    not_started: "Start Now",
+    not_started: "Get Started",
     draft: "Draft",
     kyc_pending: "KYC Pending",
     setup_incomplete: "Setup Incomplete",
