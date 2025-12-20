@@ -1,0 +1,203 @@
+You are performing a ZERO-OMISSION full system inventory audit of the SafeGo platform.
+
+This is NOT a summary.
+This is NOT a high-level overview.
+
+Your task is to list EVERYTHING that exists in the codebase,
+from the first file to the last file,
+with exact names.
+No assumptions.
+No grouping without listing items.
+No skipping.
+
+If something exists in code, config, database, UI, or automation,
+it MUST appear in this report.
+
+========================
+RULES (STRICT)
+========================
+- Do NOT refactor code
+- Do NOT delete anything
+- Do NOT rename anything
+- Only READ, SCAN, and REPORT
+- If unsure, include it anyway
+- Zero omissions allowed
+
+========================
+OUTPUT FORMAT
+========================
+Use clear numbered sections.
+Every section must list items by exact name.
+
+========================
+SECTION 1: PROJECT STRUCTURE
+========================
+List:
+- Root folders
+- Subfolders
+- Important config files
+Example:
+- /src
+- /src/routes/ride/createRide.ts
+- /src/services/pricingEngine.ts
+
+========================
+SECTION 2: BACKEND API ROUTES (NAME BY NAME)
+========================
+List EVERY API endpoint with:
+- HTTP method
+- Full route path
+- Purpose
+
+Example:
+- POST /api/ride/create
+- GET /api/ride/estimate
+- POST /api/driver/accept
+
+DO NOT GROUP. LIST ALL.
+
+========================
+SECTION 3: DATABASE MODELS / TABLES
+========================
+List EVERY model/table by exact name.
+Include:
+- Core tables
+- Join tables
+- Logs
+- Audit tables
+- AI-related tables
+- Temporary or helper tables
+
+========================
+SECTION 4: SERVICES & ENGINES
+========================
+List every service class or module:
+- Pricing engine
+- Matching engine
+- ETA engine
+- Commission logic
+- Payout logic
+- Fraud detection
+- Notification service
+- Any helper services
+
+Exact file/module names only.
+
+========================
+SECTION 5: MAP SYSTEM (DETAILED)
+========================
+List:
+- Map provider
+- Tile source
+- Style files
+- Route rendering logic
+- Marker logic
+- Cancel cleanup logic
+- Traffic logic (what exists, what does not)
+
+Include exact filenames and functions.
+
+========================
+SECTION 6: FRONTEND – CUSTOMER
+========================
+List EVERY screen/page/component:
+- Home
+- Ride booking
+- Pickup search
+- Dropoff search
+- Vehicle selection
+- Payment
+- Trip status
+- History
+- Profile
+- Settings
+- Support
+
+Each as individual items.
+
+========================
+SECTION 7: FRONTEND – DRIVER
+========================
+List:
+- Driver onboarding screens
+- Verification steps
+- Online/offline logic
+- Trip accept/reject
+- Navigation
+- Earnings
+- Wallet
+- History
+
+Name every component.
+
+========================
+SECTION 8: FRONTEND – PARTNERS
+========================
+List separately:
+- Restaurant partner screens
+- Shop partner screens
+- Ticket operator screens
+
+Menu management, orders, payouts, dashboards — all listed individually.
+
+========================
+SECTION 9: ADMIN PANEL (CRITICAL)
+========================
+List:
+- Every admin role
+- Every permission
+- Every admin screen
+- Monitoring tools
+- Manual controls
+- Support tools
+- Override features
+
+Exact names required.
+
+========================
+SECTION 10: PAYMENTS
+========================
+List:
+- Payment providers
+- Payment flows
+- Cash logic
+- Refund logic
+- Payout logic
+- Ledger tables
+
+========================
+SECTION 11: SECURITY
+========================
+List:
+- Auth flows
+- JWT handling
+- 2FA
+- Encryption
+- Rate limiting
+- Fraud detection
+- Audit logs
+
+========================
+SECTION 12: AI & AUTOMATION
+========================
+List:
+- All AI modules (SafePilot)
+- Automation jobs
+- Scheduled tasks
+- Background workers
+
+========================
+SECTION 13: WHAT IS PARTIAL
+========================
+List items that exist in code but are not fully active.
+
+========================
+SECTION 14: WHAT DOES NOT EXIST AT ALL
+========================
+List features that are completely missing (confirmed).
+
+========================
+FINAL CONFIRMATION
+========================
+End with a signed confirmation stating:
+“This report lists every existing component in the SafeGo platform with zero omissions.”
