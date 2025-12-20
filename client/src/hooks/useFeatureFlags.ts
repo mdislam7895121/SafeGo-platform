@@ -38,4 +38,6 @@ export function useFeatureFlags() {
 
 export const FEATURE_FLAGS = {
   DRIVER_ONBOARDING_V2: "driver_onboarding_v2",
+  OFFLINE_MODE_ENABLED: "offline_mode_enabled",
+  VOICE_NAVIGATION_ENABLED: "voice_navigation_enabled",
 } as const;
