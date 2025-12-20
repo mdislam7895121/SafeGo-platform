@@ -1,0 +1,136 @@
+You are auditing the SafeGo platform.
+
+TASK:
+Generate a COMPLETE A-to-Z report of everything that has been built so far for our company.
+
+This is NOT a proposal.
+This is NOT a plan.
+This is a CURRENT STATE AUDIT.
+
+INSTRUCTIONS:
+Scan the entire codebase, UI, backend, configs, routes, APIs, database models, environment files, and deployment setup.
+
+Produce a structured report with CLEAR STATUS.
+
+REPORT FORMAT (MANDATORY):
+
+1. Company Overview
+- Project name
+- Platforms (Web / Mobile / Backend)
+- Tech stack used
+
+2. Customer App (User Side)
+For each item mark one:
+[✔ Implemented] | [⚠ Partial] | [✖ Not Started]
+
+- Authentication (signup, login, logout)
+- Location permission handling
+- Map loading
+- Pickup selection
+- Dropoff selection
+- Route drawing
+- Route clearing on cancel
+- Real-time location tracking
+- Ride request flow
+- Choose ride / vehicle list
+- Fare calculation display
+- ETA display
+- Ride cancel flow
+- Payment UI
+- Activity / history screen
+- Notifications (if any)
+
+3. Driver App / Driver Flow
+- Driver signup
+- Driver verification
+- Driver online/offline
+- Ride request receive
+- Accept / reject ride
+- Navigation
+- Ride status updates
+- Earnings view
+
+4. Delivery / Parcel Flow
+- Delivery driver flow
+- Parcel request
+- Tracking
+- Status updates
+
+5. Restaurant / Shop / Ticket (BD-specific)
+- Restaurant partner flow
+- Shop partner flow
+- Ticket system
+- Admin linkage
+
+6. Map & Navigation System
+- Map provider used
+- Base map style
+- Route rendering
+- Traffic system (real-time vs static)
+- Known issues (e.g. red roads, leftover routes)
+- Current fixes applied
+
+7. Backend & APIs
+- Backend framework
+- API endpoints list
+- Ride lifecycle APIs
+- Location APIs
+- Pricing logic
+- Traffic data source
+- Authentication logic
+
+8. Database
+- Database used
+- Collections / tables
+- Ride records
+- Users
+- Drivers
+- Orders / deliveries
+
+9. Admin / Operations
+- Admin panel exists? yes/no
+- Admin features implemented
+- Monitoring tools
+
+10. Deployment & Environment
+- Hosting platform
+- Environment variables
+- Secrets handling
+- Build status
+
+11. Security & Compliance
+- Auth security
+- API protection
+- Data exposure risks
+- What is missing
+
+12. UI / UX Quality Review
+- Professional level? yes/no
+- Uber-like consistency? yes/no
+- Major UX problems list
+
+13. Known Bugs & Technical Debt
+- Map issues
+- State issues
+- Performance issues
+
+14. Final Summary
+- What is FULLY DONE
+- What is PARTIALLY DONE
+- What is NOT STARTED
+- Overall readiness level (Prototype / MVP / Production)
+
+STRICT RULES:
+- Do NOT guess
+- Do NOT assume
+- Only report what exists in code
+- Be honest and direct
+- Use bullet points
+- Clear status tags
+
+OUTPUT:
+One single structured report.
+No extra explanation.
+No marketing language.
+
+END.
