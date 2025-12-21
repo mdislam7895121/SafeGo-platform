@@ -193,15 +193,40 @@ function Router() {
   }
 
   return (
-    <>
-      {/* Lazy-loaded major route modules - rendered outside Switch for proper matching */}
-      <Suspense fallback={<LoadingSpinner />}>
-        <AdminRoutes />
-        <DriverRoutes />
-        <RestaurantRoutes />
-      </Suspense>
-
       <Switch>
+        {/* Major route modules - must be inside Switch to prevent 404 overlay */}
+        {/* Note: Need both exact /admin and /admin/:rest* patterns for wouter */}
+        <Route path="/admin">
+          <Suspense fallback={<LoadingSpinner />}>
+            <AdminRoutes />
+          </Suspense>
+        </Route>
+        <Route path="/admin/:rest*">
+          <Suspense fallback={<LoadingSpinner />}>
+            <AdminRoutes />
+          </Suspense>
+        </Route>
+        <Route path="/driver">
+          <Suspense fallback={<LoadingSpinner />}>
+            <DriverRoutes />
+          </Suspense>
+        </Route>
+        <Route path="/driver/:rest*">
+          <Suspense fallback={<LoadingSpinner />}>
+            <DriverRoutes />
+          </Suspense>
+        </Route>
+        <Route path="/restaurant">
+          <Suspense fallback={<LoadingSpinner />}>
+            <RestaurantRoutes />
+          </Suspense>
+        </Route>
+        <Route path="/restaurant/:rest*">
+          <Suspense fallback={<LoadingSpinner />}>
+            <RestaurantRoutes />
+          </Suspense>
+        </Route>
+
         {/* Public Routes */}
         <Route path="/">
           <Suspense fallback={<LoadingSpinner />}>
@@ -599,16 +624,9 @@ function Router() {
         <Redirect to="/partner/ticket/start" />
       </Route>
 
-        {/* Route handlers for major sections (handled by external route modules) */}
-        {/* These prevent the 404 from matching - actual content rendered by AdminRoutes/DriverRoutes/RestaurantRoutes */}
-        <Route path="/admin/:rest*">{null}</Route>
-        <Route path="/driver/:rest*">{null}</Route>
-        <Route path="/restaurant/:rest*">{null}</Route>
-
         {/* 404 */}
         <Route component={NotFound} />
       </Switch>
-    </>
   );
 }
 
