@@ -1,0 +1,133 @@
+ROLE: You are the senior engineer owning SafeGo Admin Console stability.
+
+========================
+SAFEGO GLOBAL RULES (MUST FOLLOW)
+========================
+1) Roles & Surfaces
+- Customer app, Driver app, Restaurant/Shop partner portal, Admin panel must be treated as separate UX surfaces.
+- There are 4 roles you must always respect: customer, driver, restaurant/shop partner, admin.
+- Never break existing role flows. No deletions of working features unless explicitly required.
+
+2) Single Shared Backend Rule
+- Pricing, commission, payout, ride status, country rules must come from the shared SafeGo backend via APIs.
+- Do not create a second pricing/status engine inside any frontend.
+- Frontend shows currency/region strictly from backend responses.
+
+3) Country Logic
+- USA: Ride, Food, Parcel.
+- Bangladesh: Ride, Food, Parcel, Shop, Tickets.
+- Country-specific features must be guarded by backend-driven config and role permissions.
+
+4) Admin Panel Must-Haves
+- Admin panel must include stable routing, sidebar navigation, page shells, proper auth guard, and zero “phantom routes.”
+- All admin pages must render inside ONE admin layout and ONE router context.
+- Every sidebar item and dashboard card must navigate to a real route (no 404, no duplicate dashboard).
+- Add a clean AdminNotFound only as a last resort, never as the normal navigation outcome.
+
+5) Security & Stability
+- Protect admin routes behind admin auth (401/403 handled cleanly).
+- No refactors that risk breaking stable work. Make incremental, non-breaking changes.
+- Add a git checkpoint commit before and after the fix.
+
+========================
+TASK: INVESTIGATE + FIX ADMIN “DUPLICATE DASHBOARD / PAGE NOT FOUND”
+========================
+Context (from screenshots):
+- Original Admin Dashboard renders fine.
+- When clicking ANY dashboard card (or some sidebar items), a SECOND/duplicate admin area appears “below” and shows “Page Not Found” for routes like:
+  /admin/cms-pages, /admin/onboarding-overview, /admin/activity-log, /admin/security-center, /admin/parcels...
+- This indicates the admin UI is being mounted twice OR two route outlets exist, OR links trigger both navigation + a second render tree.
+
+Goal:
+- Remove the duplicate admin dashboard rendering entirely.
+- Ensure all admin navigations resolve to the correct pages (no Page Not Found after clicking cards).
+- Ensure sidebar scroll behavior is stable (menu should not jump/float strangely).
+
+Deliverables (must do all):
+A) Root-cause analysis (write it as a short bullet list in the PR description):
+- Identify exactly where the second admin mount comes from.
+- Identify whether it’s caused by:
+  1) duplicate <AdminLayout>/<AdminApp> rendered twice,
+  2) duplicate router providers (two Router contexts),
+  3) nested routes/outlets that render a second “dashboard” section,
+  4) wrong Link usage (anchor + router.push causing double navigation),
+  5) conflicting frameworks (e.g., Next/Remix/App Router vs React Router) mixing patterns.
+
+B) Code Fix (do the real fix, not a workaround):
+1) ROUTING SINGLE SOURCE OF TRUTH
+- Ensure there is exactly ONE admin entry file that mounts the admin router/layout.
+- Ensure admin pages are defined under one route tree: /admin/*.
+- Remove/merge any duplicate admin route definitions or second admin “app shell.”
+- Confirm there is only one <Outlet> (or equivalent) that renders admin page content.
+
+2) FIX NAVIGATION COMPONENTS
+- Dashboard cards: ensure they use ONE navigation method:
+  - Use <Link to="..."> (React Router) OR router.push("...") (Next), not both.
+  - If there is an <a href> plus onClick push, remove one and prevent default correctly.
+- Sidebar items: ensure they navigate to existing routes.
+- Confirm routes match exact paths (no mismatch like /admin/parcels?status=delivered mapped to /admin/parcels/status-delivered without route).
+
+3) ADMIN NOT FOUND
+- Keep AdminNotFound as fallback only.
+- It must never appear for routes that exist.
+- If routes were “invented” previously, either:
+  - implement the missing pages as minimal shells (PageHeader + empty state), OR
+  - remove the nav items/cards that point to non-existent routes.
+  Choose the approach that preserves the product roadmap (prefer minimal shells so UI is complete).
+
+4) SIDEBAR SCROLL / LAYOUT
+- Sidebar should be fixed/sticky within the viewport and scroll independently if content exceeds height.
+- Main content scroll should not drag sidebar off position.
+- Implement CSS fixes:
+  - stable height: 100vh / 100dvh
+  - overflow-y: auto for sidebar area
+  - prevent layout shifts on route change
+
+C) Verification Checklist (must execute and report results)
+- From /admin (dashboard):
+  1) Click every dashboard card → navigates to the correct page, no duplicate dashboard appears.
+  2) Click every sidebar item → correct page, no Page Not Found.
+  3) Hard refresh on a deep route (example /admin/cms-pages) → still loads (auth permitting).
+  4) Confirm only one admin shell is in the DOM (no second header/sidebar rendered).
+- If 401/403 occurs due to not logged in, show a clean “Authentication required” state without breaking layout.
+
+D) Git Hygiene
+- Create a “before” checkpoint commit.
+- Create an “after” commit with message:
+  fix(admin): remove duplicate admin mount and stabilize routing
+- If tags are used, add:
+  admin-routing-stable
+
+========================
+HOW TO EXECUTE (MANDATORY WORKFLOW)
+========================
+1) Locate admin entry + routing:
+- Search for: "AdminDashboard", "AdminLayout", "AdminApp", "admin routes", "<Outlet", "createBrowserRouter", "Routes", "Route", "router.push", "<Link", "href='/admin"
+- Identify ALL files that define /admin routes. There must be only one final source.
+
+2) Locate duplicate render:
+- Search for AdminLayout/AdminShell being rendered in:
+  - a layout file AND a page file at the same time
+  - a top-level App shell and also inside a route component
+- Remove the extra mount.
+
+3) Fix nav elements:
+- Dashboard cards: replace any mixed navigation with a single approach.
+- Sidebar: ensure to paths match route definitions.
+
+4) Add minimal page shells if needed:
+- For any route in sidebar/cards that does not exist, create a minimal page component:
+  - Title + description + “Coming soon” empty state
+  - Do not crash, do not 404
+
+========================
+OUTPUT FORMAT
+========================
+Return:
+1) Root cause summary (bullets)
+2) List of files changed (paths)
+3) Key code snippets (only the critical ones)
+4) Verification results checklist (pass/fail)
+5) The two git commands to commit/tag
+
+Do not ask me questions. Investigate in the codebase and fix it end-to-end.
