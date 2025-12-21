@@ -27,6 +27,21 @@ const RidePage = lazy(() => import("@/pages/landing/RidePage"));
 const ParcelPage = lazy(() => import("@/pages/landing/ParcelPage"));
 const TicketsPage = lazy(() => import("@/pages/landing/TicketsPage"));
 
+// Lazy-loaded legal pages
+const TermsPage = lazy(() => import("@/pages/landing/TermsPage"));
+const PrivacyPage = lazy(() => import("@/pages/landing/PrivacyPage"));
+const CookiesPage = lazy(() => import("@/pages/landing/CookiesPage"));
+const SafetyPolicyPage = lazy(() => import("@/pages/landing/SafetyPolicyPage"));
+const DataDeletionPage = lazy(() => import("@/pages/landing/DataDeletionPage"));
+const PartnerTermsPage = lazy(() => import("@/pages/landing/PartnerTermsPage"));
+const SafetyPage = lazy(() => import("@/pages/landing/SafetyPage"));
+const ContactPage = lazy(() => import("@/pages/landing/ContactPage"));
+const HelpPage = lazy(() => import("@/pages/landing/HelpPage"));
+const HelpCenterPage = lazy(() => import("@/pages/landing/HelpCenterPage"));
+const SupportPage = lazy(() => import("@/pages/landing/SupportPage"));
+const AccessibilityPage = lazy(() => import("@/pages/landing/AccessibilityPage"));
+const CommunityGuidelinesPage = lazy(() => import("@/pages/landing/CommunityGuidelinesPage"));
+
 // Lazy-loaded route modules for major sections
 const AdminRoutes = lazy(() => import("@/routes/AdminRoutes").then(m => ({ default: m.AdminRoutes })));
 const DriverRoutes = lazy(() => import("@/routes/DriverRoutes").then(m => ({ default: m.DriverRoutes })));
@@ -213,6 +228,73 @@ function Router() {
         <Route path="/tickets">
           <Suspense fallback={<LoadingSpinner />}>
             <TicketsPage />
+          </Suspense>
+        </Route>
+
+        {/* Legal & Support Pages */}
+        <Route path="/terms">
+          <Suspense fallback={<LoadingSpinner />}>
+            <TermsPage />
+          </Suspense>
+        </Route>
+        <Route path="/privacy">
+          <Suspense fallback={<LoadingSpinner />}>
+            <PrivacyPage />
+          </Suspense>
+        </Route>
+        <Route path="/cookies">
+          <Suspense fallback={<LoadingSpinner />}>
+            <CookiesPage />
+          </Suspense>
+        </Route>
+        <Route path="/safety-policy">
+          <Suspense fallback={<LoadingSpinner />}>
+            <SafetyPolicyPage />
+          </Suspense>
+        </Route>
+        <Route path="/data-deletion">
+          <Suspense fallback={<LoadingSpinner />}>
+            <DataDeletionPage />
+          </Suspense>
+        </Route>
+        <Route path="/partner-terms">
+          <Suspense fallback={<LoadingSpinner />}>
+            <PartnerTermsPage />
+          </Suspense>
+        </Route>
+        <Route path="/safety">
+          <Suspense fallback={<LoadingSpinner />}>
+            <SafetyPage />
+          </Suspense>
+        </Route>
+        <Route path="/contact">
+          <Suspense fallback={<LoadingSpinner />}>
+            <ContactPage />
+          </Suspense>
+        </Route>
+        <Route path="/help">
+          <Suspense fallback={<LoadingSpinner />}>
+            <HelpPage />
+          </Suspense>
+        </Route>
+        <Route path="/help-center">
+          <Suspense fallback={<LoadingSpinner />}>
+            <HelpCenterPage />
+          </Suspense>
+        </Route>
+        <Route path="/support">
+          <Suspense fallback={<LoadingSpinner />}>
+            <SupportPage />
+          </Suspense>
+        </Route>
+        <Route path="/accessibility">
+          <Suspense fallback={<LoadingSpinner />}>
+            <AccessibilityPage />
+          </Suspense>
+        </Route>
+        <Route path="/community-guidelines">
+          <Suspense fallback={<LoadingSpinner />}>
+            <CommunityGuidelinesPage />
           </Suspense>
         </Route>
 
