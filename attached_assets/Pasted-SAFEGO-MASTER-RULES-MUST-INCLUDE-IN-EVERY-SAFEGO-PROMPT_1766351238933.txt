@@ -1,0 +1,79 @@
+SAFEGO MASTER RULES (MUST INCLUDE IN EVERY SAFEGO PROMPT)
+
+A) ROLES — Customer, Driver, Restaurant, Admin (never mix access)
+B) SERVICES — Ride, Food, Parcel (worldwide + country rules)
+C) KYC — BD vs US branching mandatory
+D) ADMIN — verification, pricing, commissions, block/unblock, payouts, negative balances
+E) COLLECTIONS — rides, food_orders, deliveries with status flows, fees, geo, payment, timestamps, rating
+F) COMMISSION — cash creates negative balance + weekly settlement; online auto-commission
+G) SECURITY — role isolation, no doc leakage, admin-only sensitive actions
+H) STATUS FLOWS — full ride/food/parcel
+I) ONBOARDING — multi-step + pending until approved
+J) NOTIFICATIONS — driver alerts + status updates
+
+NON-BREAKING RULE
+- Do not rename/remove routes. Only ADD or fix. Keep existing map integration stable.
+
+==================================================
+TASK: FIX GOOGLE MAP COLORS (RESTORE ORIGINAL DEFAULT LOOK)
+==================================================
+
+PROBLEM
+Google map is rendering grey/washed-out/desaturated.
+Founder wants the ORIGINAL Google Maps default colors (normal mode),
+not dimmed, not grey, not “disabled” looking.
+
+ROOT CAUSES TO CHECK (MUST)
+1) Map styles array causing desaturation
+   - Any `styles: [...]` option in map config
+   - Any `color`, `saturation: -100`, `lightness` overrides
+2) CSS filters on map container or parent layout
+   - `filter: grayscale(1)` or `filter: saturate(...)`
+   - `opacity < 1`
+   - `mix-blend-mode`
+3) Overlay layers above map
+   - A semi-transparent div sitting on top of the map
+   - “disabled state” overlay, or loading skeleton overlay left active
+4) Theme mismatch
+   - App global dark mode applying CSS to map wrapper
+5) Replit/Preview zoom scaling (less likely)
+   - check CSS transforms on the map parent
+
+REQUIRED FIX (STRICT)
+A) Restore default Google map look:
+   - Remove any custom map `styles` unless explicitly requested.
+   - Ensure map options do NOT contain desaturation settings.
+   - Ensure mapTypeId = "roadmap"
+B) Fix CSS:
+   - Map container must have:
+     - opacity: 1
+     - filter: none
+     - background: transparent
+   - Remove any overlay that reduces brightness.
+C) Keep UX unchanged:
+   - Do not break markers, route polyline, fitBounds, or pickup/dropoff logic.
+   - No refactor beyond what’s needed.
+
+DELIVERABLES
+1) Identify the exact cause:
+   - “Map styles caused it” OR “CSS overlay caused it” OR “Both”
+2) Provide the specific file(s) and lines changed:
+   - Map component file (GoogleMap options)
+   - Any CSS/Tailwind/styled-components affecting map wrapper
+3) Confirm with a before/after screenshot (or describe visual result):
+   - “Map now shows normal Google colors with clear roads/parks labels.”
+
+ACCEPTANCE TEST
+- Map is full-color (normal Google roadmap)
+- No grey overlay
+- Markers + route polyline still work
+- No console errors
+
+FILES TO INSPECT (LIKELY)
+- Google Maps component (options: styles, disableDefaultUI, mapTypeId)
+- ride-request-page.tsx
+- bd-ride-booking.tsx
+- Any global layout CSS that wraps the map section
+==================================================
+END
+==================================================

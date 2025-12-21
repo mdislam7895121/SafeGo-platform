@@ -125,24 +125,13 @@ export const GoogleMapsRideBooking = memo(function GoogleMapsRideBooking({
     const mapOptions: google.maps.MapOptions = {
       center: defaultCenter,
       zoom: defaultZoom,
+      mapTypeId: 'roadmap',
       disableDefaultUI: false,
       zoomControl: true,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
       gestureHandling: 'greedy',
-      styles: [
-        {
-          featureType: 'poi',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }],
-        },
-        {
-          featureType: 'transit',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }],
-        },
-      ],
     };
 
     const map = new google.maps.Map(mapContainerRef.current, mapOptions);
