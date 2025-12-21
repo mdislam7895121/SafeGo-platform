@@ -135,7 +135,7 @@ router.get('/admin/:id', ...adminAuth, async (req: AuthRequest, res: Response) =
 router.post('/admin', ...adminAuth, async (req: AuthRequest, res: Response) => {
   try {
     const validated = createPageSchema.parse(req.body);
-    const adminId = req.user?.id;
+    const adminId = (req.user as any)?.id;
 
     const existingPage = await (prisma as any).cmsPage.findUnique({
       where: { slug: validated.slug }
@@ -167,7 +167,7 @@ router.put('/admin/:id', ...adminAuth, async (req: AuthRequest, res: Response) =
   try {
     const { id } = req.params;
     const validated = updatePageSchema.parse(req.body);
-    const adminId = req.user?.id;
+    const adminId = (req.user as any)?.id;
 
     const existingPage = await (prisma as any).cmsPage.findUnique({
       where: { id }
