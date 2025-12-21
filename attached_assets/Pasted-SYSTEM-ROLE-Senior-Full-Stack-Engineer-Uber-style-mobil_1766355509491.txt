@@ -1,0 +1,163 @@
+SYSTEM ROLE: Senior Full-Stack Engineer (Uber-style mobility platform)
+
+PROJECT: SafeGo Global
+
+GOAL:
+Make SafeGo production-ready by fixing all broken pages, moving legal + landing control into Admin, cleaning Google Maps UI, restoring “You Saved” pricing transparency, fixing partner onboarding errors, and preparing the site for Google Search Console.
+
+STRICT RULES:
+- Do NOT break any existing working flow
+- Do NOT hardcode policy text
+- All content must be admin-editable
+- Web-first (no native apps)
+- Follow steps in order
+- Every step must be verifiable in UI
+
+========================
+STEP 1 — FIX ALL 404 PAGES (CRITICAL)
+========================
+Problem:
+The following routes return 404:
+/terms
+/privacy
+/cookies
+/safety
+/data-deletion
+/partner-terms
+/careers
+/restaurant/onboarding
+
+Tasks:
+1. Register all routes in the frontend router.
+2. Each route must render a real page component (not placeholder).
+3. Footer links must correctly open these pages.
+4. No route should ever show “Did you forget to add the page to the router?”
+
+Acceptance:
+- Clicking any footer or company link never shows 404.
+
+========================
+STEP 2 — ADMIN-CONTROLLED LEGAL PAGES
+========================
+Goal:
+All legal/policy pages must be editable from Admin Panel.
+
+Tasks:
+1. Create Admin module: “Legal & Policies”.
+2. Store each policy in DB with:
+   - slug
+   - title
+   - content (rich text)
+   - country (US | BD | GLOBAL)
+   - status (draft | published)
+3. Frontend legal pages must fetch content via API.
+4. Admin changes must reflect instantly on the website.
+
+Acceptance:
+- Editing policy in Admin updates live site without code changes.
+
+========================
+STEP 3 — GOOGLE SEARCH CONSOLE READY
+========================
+Tasks:
+1. Add robots.txt
+2. Add auto-generated sitemap.xml
+3. Include all landing + legal pages in sitemap
+4. Add SEO meta tags (title, description, canonical)
+
+Acceptance:
+- Site is ready for Google Search Console submission.
+
+========================
+STEP 4 — GOOGLE MAPS UI CLEANUP (UBER-STYLE)
+========================
+Problems:
+- Red roads are visually noisy
+- Map looks cluttered
+
+Tasks:
+1. Apply Google Maps custom style:
+   - Hide transit labels
+   - Desaturate roads
+   - No traffic layer
+   - Neutral grey roads
+2. Preserve:
+   - Green pickup marker (custom pin)
+   - Red dropoff marker (custom pin)
+   - Blue route polyline with white outline
+3. Apply only to ride booking map components.
+
+Acceptance:
+- Calm, professional, Uber-like map appearance.
+
+========================
+STEP 5 — RESTORE “YOU SAVED” VISIBILITY
+========================
+Problem:
+Customer no longer sees savings (e.g. “You saved 10”).
+
+Tasks:
+1. Update fare breakdown UI:
+   - Base fare
+   - Distance fare
+   - Time fare
+   - Discount
+   - YOU SAVED
+2. Show “You saved X” on:
+   - Vehicle card
+   - Fare details modal
+3. Do NOT expose internal commission percentages.
+
+Acceptance:
+- Customer clearly sees savings like Uber.
+
+========================
+STEP 6 — FIX PARTNER / DRIVER ONBOARDING ERRORS
+========================
+Problem:
+Invalid enum errors during onboarding.
+
+Tasks:
+1. Sync backend enums:
+   - ride_driver
+   - delivery_driver
+   - shop_partner
+   - restaurant
+   - ticket_operator
+2. Fix frontend payloads to match enums.
+3. Ensure flows work:
+   - Apply as Driver
+   - Start Delivering
+   - Restaurant Partner
+
+Acceptance:
+- No red error box.
+- Onboarding always starts correctly.
+
+========================
+STEP 7 — FULLY ADMIN-CONTROLLED LANDING PAGE
+========================
+Tasks:
+1. Admin module: “Landing Page Manager”.
+2. Admin can control:
+   - Hero text
+   - CTA buttons
+   - Section visibility
+   - “Coming Soon” labels
+3. Frontend landing page must render from API only.
+
+Acceptance:
+- Owner can edit landing page without developer.
+
+========================
+FINAL CHECKLIST (MUST CONFIRM ALL)
+========================
+- No 404 pages
+- Admin controls all policies
+- Google Search ready
+- Clean Google Maps UI
+- “You Saved” visible
+- Partner onboarding fixed
+- Landing page fully admin-driven
+
+END OF TASK.
