@@ -174,6 +174,12 @@ const configNavItems: NavItem[] = [
     navKey: "featureFlags",
   },
   {
+    title: "CMS Pages",
+    href: "/admin/cms-pages",
+    icon: FileText,
+    navKey: "settings",
+  },
+  {
     title: "Global Settings",
     href: "/admin/global-settings",
     icon: Shield,
