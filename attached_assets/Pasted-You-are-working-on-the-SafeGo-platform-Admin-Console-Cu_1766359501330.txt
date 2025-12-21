@@ -1,0 +1,87 @@
+You are working on the SafeGo-platform Admin Console. Current problem: Admin sidebar items and many admin “cards” navigate to routes that show “404 Page Not Found” (examples seen: /admin/security-center, /admin/parcels, /admin/parcels?status=delivered, /admin/cms-pages sometimes, /admin/bd-expansion, and other admin pages). Also there is a “duplicate admin”/duplicate layout behavior (a second admin view appears), and the left sidebar scroll jumps upward / feels broken. The previous agent claimed “45+ routes added” and “AdminNotFound fallback,” but in reality navigation still lands on 404 for many items. I need you to audit the entire Admin area end-to-end and fix routing + layout so every visible admin navigation target resolves to a real page.
+
+Hard requirements
+1) Do NOT add any new “second admin” or duplicate admin layout. There must be exactly one admin shell/layout.
+2) Every admin navigation item and every admin dashboard card click must route to a valid page (no 404). If a feature is not implemented yet, the route must still exist and show a clean “Coming soon” page inside the admin layout.
+3) Fix sidebar scroll behavior: sidebar must be independently scrollable and not jump; header stays stable; content scrolls properly.
+4) Fix navigation to always use absolute /admin/... paths (no relative path bugs).
+5) Keep changes incremental and non-breaking. Do not refactor unrelated areas.
+6) Add a verification method: a lightweight script/test or an internal “Routes Health” page that lists admin routes and highlights missing ones.
+
+What to do (step-by-step)
+A) Inventory routes
+- Locate the Admin sidebar configuration and Admin dashboard cards configuration (where the click targets are defined).
+- Extract every route path currently used (strings like /admin/xyz, /admin/parcels, /admin/cms-pages, etc.). Include hidden/secondary routes (filters like parcels?status=delivered).
+- Create a single source of truth file for admin routes (e.g., src/admin/adminRoutes.ts) exporting:
+  - route constants (path strings)
+  - sidebar items (label, icon, path)
+  - dashboard cards (label, path)
+  - a flat array ALL_ADMIN_ROUTES for validation
+
+B) Fix routing so all routes exist
+- Find how routing is implemented (Next.js pages router, Next.js app router, React Router, or custom).
+- Ensure there is exactly ONE admin layout/shell component used by all /admin routes (no duplicate wrapper).
+- For each route in ALL_ADMIN_ROUTES:
+  - If a real page already exists, confirm it is connected and reachable.
+  - If missing, create a page component/file for that route that renders:
+    - AdminLayout (the single shell)
+    - A standardized placeholder view: title, short description, “Coming soon”, and optional link back to /admin
+- Ensure /admin/cms-pages resolves to the intended CMS Pages screen (not AdminNotFound).
+- Ensure query routes like /admin/parcels?status=delivered still load the /admin/parcels page and interpret query safely.
+
+C) Fix the “duplicate admin” issue
+- Identify why a second admin page/layout appears:
+  - duplicated route registration
+  - nested router mounting admin inside admin
+  - wrong layout nesting
+  - rendering AdminLayout twice (one in route wrapper + one in page)
+- Remove the duplication so each admin route renders AdminLayout exactly once.
+- Confirm the main /admin dashboard renders normally and other pages keep the same shell.
+
+D) Fix sidebar scroll + layout stability
+- Admin shell layout rules:
+  - Left sidebar: fixed width, height: 100vh (or full container), overflow-y: auto
+  - Header/top bar: sticky within main content area (or fixed) without causing scroll reset
+  - Main content: overflow-y: auto with stable scroll container
+- Ensure clicking sidebar items does not reset sidebar scroll position unexpectedly.
+- Ensure the sidebar doesn’t “jump up” after navigation. Use stable keys and avoid re-mounting the sidebar on route change.
+
+E) Fix navigation calls
+- Replace any router.push("cms-pages") relative navigation with router.push("/admin/cms-pages") absolute.
+- If there’s a helper navigateToAdminRoute(), use it everywhere.
+- Ensure dashboard cards use the same route constants (no inline strings).
+
+F) CMS Pages “Failed to load pages” robustness
+- After route exists, if CMS Pages loads but shows “Failed to load pages”:
+  - Confirm API endpoint is correct
+  - Confirm auth/role is required; if not logged in, show a clean “Authentication required” state inside the page, not a crash.
+  - Add error boundary / graceful empty state so it never breaks the entire admin UI.
+
+G) Add verification
+Option 1 (preferred): Add /admin/routes-health page:
+- Lists ALL_ADMIN_ROUTES
+- For each route, a “Check” button that fetches it (client-side HEAD/GET) and shows OK/Not Found.
+Option 2: Add a small dev script that logs missing route files/registrations.
+
+Deliverables
+1) All admin sidebar items and admin dashboard cards navigate to real pages (no 404).
+2) No duplicate admin layout. Only one admin shell.
+3) Sidebar scroll is stable and independently scrollable; does not jump.
+4) A centralized adminRoutes.ts (or similar) used across sidebar + cards + route health.
+5) A brief written checklist showing:
+   - total routes found
+   - which were missing and added as placeholders
+   - which were mapped to real pages
+   - how to verify using /admin/routes-health
+
+How to validate (you must do this)
+- Click every sidebar item one by one and confirm:
+  - URL changes to /admin/...
+  - Page renders inside AdminLayout
+  - No 404 screen appears
+- Click every admin dashboard card (and any “quick action” card) and confirm the same.
+- Scroll sidebar down, click an item, confirm sidebar scroll stays where it was (no jump to top).
+- Refresh on a deep link like /admin/security-center and confirm it loads (no 404).
+
+Important
+Do not “solve” by showing AdminNotFound for real routes. Real routes must exist. If a route is not ready, show ComingSoonPage but still render within AdminLayout. The goal is a fully navigable admin panel with zero dead links.
