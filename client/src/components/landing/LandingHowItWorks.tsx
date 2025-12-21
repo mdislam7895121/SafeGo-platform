@@ -2,11 +2,20 @@ import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Region, HOW_IT_WORKS_DATA, HOW_IT_WORKS_SERVICES } from "./LandingConfig";
 
-export const HowItWorksSection = memo(function HowItWorksSection({ selectedRegion }: { selectedRegion: Region }) {
+interface HowItWorksSectionProps {
+  selectedRegion: Region;
+  cmsTitle?: string;
+  cmsSubtitle?: string;
+}
+
+export const HowItWorksSection = memo(function HowItWorksSection({ selectedRegion, cmsTitle, cmsSubtitle }: HowItWorksSectionProps) {
   const availableServices = HOW_IT_WORKS_SERVICES[selectedRegion];
   const flows = availableServices
     .map(id => HOW_IT_WORKS_DATA[id as keyof typeof HOW_IT_WORKS_DATA])
     .filter(Boolean);
+
+  const title = cmsTitle || "Simple steps to get started";
+  const subtitle = cmsSubtitle || "Getting a ride, ordering food, or sending a parcel takes just minutes";
   
   return (
     <section id="how-it-works" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
@@ -16,10 +25,10 @@ export const HowItWorksSection = memo(function HowItWorksSection({ selectedRegio
             How It Works
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
-            Simple steps to get started
+            {title}
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Getting a ride, ordering food, or sending a parcel takes just minutes
+            {subtitle}
           </p>
         </div>
         

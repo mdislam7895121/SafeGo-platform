@@ -45,15 +45,24 @@ const RegionToggle = memo(function RegionToggle({
   );
 });
 
-export const HeroSection = memo(function HeroSection({ 
-  selectedRegion, 
-  onRegionChange 
-}: { 
+interface HeroSectionProps {
   selectedRegion: Region;
   onRegionChange: (region: Region) => void;
-}) {
+  cmsTitle?: string;
+  cmsSubtitle?: string;
+}
+
+export const HeroSection = memo(function HeroSection({ 
+  selectedRegion, 
+  onRegionChange,
+  cmsTitle,
+  cmsSubtitle
+}: HeroSectionProps) {
   const services = REGION_SERVICES[selectedRegion];
   const heroConfig = HERO_CONFIG[selectedRegion];
+  
+  const description = cmsSubtitle || heroConfig.description;
+  const defaultHeadline = <>Move, eat, and<br />deliver with <span className="text-blue-600">SafeGo</span></>;
   
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-blue-50/50 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950/30 py-16 lg:py-24">
@@ -70,15 +79,16 @@ export const HeroSection = memo(function HeroSection({
             </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-[1.1] tracking-tight">
-              Move, eat, and<br />
-              deliver with <span className="text-blue-600">SafeGo</span>
+              {cmsTitle ? (
+                <>{cmsTitle} <span className="text-blue-600">SafeGo</span></>
+              ) : defaultHeadline}
             </h1>
             
             <p 
               className="mt-6 text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-lg mx-auto lg:mx-0 leading-relaxed transition-opacity duration-300"
               id={`region-content-${selectedRegion}`}
             >
-              {heroConfig.description}
+              {description}
             </p>
             
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">

@@ -91,7 +91,7 @@ router.get('/public/landing', async (req, res: Response) => {
         useFallback: true,
         country: validCountry,
         settings: settings || null,
-        sections: []
+        sections: {}
       });
     }
 

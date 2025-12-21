@@ -7,9 +7,18 @@ import {
 } from "@/components/ui/accordion";
 import { Region, FAQ_CONFIG, REGION_TO_FAQ_KEY } from "./LandingConfig";
 
-export const FAQSection = memo(function FAQSection({ selectedRegion }: { selectedRegion: Region }) {
+interface FAQSectionProps {
+  selectedRegion: Region;
+  cmsTitle?: string;
+  cmsSubtitle?: string;
+}
+
+export const FAQSection = memo(function FAQSection({ selectedRegion, cmsTitle, cmsSubtitle }: FAQSectionProps) {
   const regionKey = REGION_TO_FAQ_KEY[selectedRegion];
   const faqs = FAQ_CONFIG[regionKey];
+
+  const title = cmsTitle || "Frequently Asked Questions";
+  const subtitle = cmsSubtitle || "Got questions? We've got answers.";
 
   return (
     <section id="faq" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
@@ -19,10 +28,10 @@ export const FAQSection = memo(function FAQSection({ selectedRegion }: { selecte
             Support
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
-            Frequently Asked Questions
+            {title}
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Got questions? We've got answers.
+            {subtitle}
           </p>
         </div>
         

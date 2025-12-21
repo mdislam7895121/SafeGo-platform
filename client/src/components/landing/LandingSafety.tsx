@@ -2,7 +2,15 @@ import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SAFETY_SECTIONS } from "./LandingConfig";
 
-export const SafetySection = memo(function SafetySection() {
+interface SafetySectionProps {
+  cmsTitle?: string;
+  cmsSubtitle?: string;
+}
+
+export const SafetySection = memo(function SafetySection({ cmsTitle, cmsSubtitle }: SafetySectionProps) {
+  const title = cmsTitle || "Safety & Security";
+  const subtitle = cmsSubtitle || "Your safety and privacy are our top priority at every step";
+
   return (
     <section id="safety" className="py-20 lg:py-24 bg-gradient-to-br from-gray-50 via-gray-50 to-blue-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-blue-950/30 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -16,10 +24,10 @@ export const SafetySection = memo(function SafetySection() {
             Trust & Safety
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
-            Safety & Security
+            {title}
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Your safety and privacy are our top priority at every step
+            {subtitle}
           </p>
         </div>
         
