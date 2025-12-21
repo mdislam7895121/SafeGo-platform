@@ -95,6 +95,8 @@ const AdminComplaintDetails = lazy(() => import("@/pages/admin/complaint-details
 const AdminSupportTicketDetail = lazy(() => import("@/pages/admin/support-ticket-detail"));
 const AdminSupportChat = lazy(() => import("@/pages/admin/support-chat"));
 const AdminSmsTemplates = lazy(() => import("@/pages/admin/sms-templates"));
+const AdminPromotions = lazy(() => import("@/pages/admin/promotions"));
+const AdminRoutesHealth = lazy(() => import("@/pages/admin/routes-health"));
 
 function LoadingFallback() {
   return (
@@ -799,6 +801,20 @@ export function AdminRoutes() {
         <AdminGuard>
           <AdminLayout>
             <AdminOnboardingOverview />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/promotions">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminPromotions />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/routes-health">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminRoutesHealth />
           </AdminLayout>
         </AdminGuard>
       </Route>
