@@ -1,0 +1,104 @@
+SAFEGO MASTER RULES (MUST INCLUDE IN EVERY SAFEGO PROMPT)
+
+A) ROLES — ALWAYS include all 4 roles: Customer, Driver, Restaurant (Merchant), Admin.
+Each role must have signup requirements, KYC/verification rules (BD/US branching), dashboard, permissions, status flows. NEVER mix role access.
+
+B) GLOBAL APP LOGIC — ALWAYS required:
+SafeGo supports 3 services: Ride-hailing, Food delivery, Parcel delivery.
+Worldwide support with country-specific rules.
+
+C) COUNTRY-SPECIFIC KYC (Always Include):
+BD: father_name, date_of_birth, present_address, permanent_address, NID number + front/back images, emergency contact, verification_status + is_verified
+US: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, drivers: license + image + expiry, ssn_last4 optional, verification_status + is_verified
+
+D) ADMIN PANEL — ALWAYS REQUIRED:
+Admin can verify users, approve/reject KYC + reason, update pricing/fees/commissions, block/unblock, payouts, negative balances.
+
+E) COLLECTIONS — rides, food_orders, deliveries must exist with identity, geo, fees/commission, payment, timestamps, status flows, rating+feedback.
+
+F) COMMISSION RULES — cash → driver/restaurant gets cash, commission becomes negative balance, weekly settlement; online → SafeGo keeps commission.
+
+G) SECURITY — customers cannot view driver docs; drivers cannot view customer NID; only admin changes pricing/commission/verification/blocking; users edit only their own profile.
+
+H) STATUS FLOWS — full ride/food/parcel flows must remain unchanged.
+
+I) ONBOARDING — multi-step; verification_status="pending"; blocked until admin approval.
+
+J) NOTIFICATIONS — driver alerts, order updates, parcel updates, verification updates, admin notifications.
+
+IMPLEMENTATION RULES (NON-BREAKING)
+- Preserve existing routes/APIs/schemas.
+- Only ADD new fields/endpoints/components.
+- No separate pricing/status engine in frontend; must use existing backend.
+- Keep completed working steps stable; no refactors unless necessary.
+
+============================================================
+SERIAL TASK: REPLACE PLACEHOLDER MAP WITH ORIGINAL GOOGLE MAPS (WEB)
+============================================================
+
+GOAL
+Use ORIGINAL Google Maps (crisp tiles, smooth pan/zoom) in the customer web ride flow map.
+Remove/replace any fallback/placeholder/webview map implementation that causes pixelated tiles or instability.
+
+SCOPE
+- Customer ride booking screen map
+- Must support BD/US region selection
+- Must not break existing ride flow UI, bottom sheet, vehicle list, or backend calls
+
+REQUIREMENTS (STRICT)
+1) Google Maps JS integration
+- Implement Google Maps using a proper integration (preferred: @react-google-maps/api).
+- Map loads once and does NOT remount/flicker when UI state changes.
+
+2) Features
+- Show current user location (browser geolocation permission handling).
+- Pickup marker and Dropoff marker.
+- When both points exist: draw route polyline using Directions API.
+- Fit bounds to include both points.
+- Smooth zoom/pan; clean controls; mobile-friendly.
+
+3) Keys + Security
+- Add env var: GOOGLE_MAPS_API_KEY (no hardcoding).
+- Document required Google APIs:
+  - Maps JavaScript API
+  - Places API (only if autocomplete is used)
+  - Directions API (for route polyline)
+  - Geocoding API (only if reverse geocode is used)
+- Add safe UX fallback if key missing or blocked: show friendly “Map unavailable” panel.
+
+4) Performance & stability
+- Memoize map component, markers, and polyline.
+- Debounce route requests.
+- Avoid re-creating map options on every render.
+
+5) Country behavior
+- Default map center based on selected region (BD vs US).
+- Do not guess pricing/currency; keep using backend responses.
+
+DELIVERABLES
+- Working Google Map in ride screen
+- Routes + markers + fit bounds
+- No 404 changes, no unrelated UI refactor
+- Short README note: where to put API key and which Google APIs to enable
+
+ACCEPTANCE CHECKLIST
+- Crisp Google tiles (no pixelated/placeholder look)
+- Smooth pan/zoom
+- Pickup/dropoff markers render correctly
+- Route polyline renders and fits bounds
+- No console errors
+- Works on mobile web
+- Does not break ride flow and bottom sheet
+
+FILES/MODULES TO CHANGE (NON-BREAKING)
+- Ride map component(s) only
+- Env/config reader for GOOGLE_MAPS_API_KEY
+- Minimal docs note
+
+WHY NON-BREAKING
+- Adds Google provider integration + env var only
+- Keeps backend logic unchanged
+- Keeps current routes/UI intact
+============================================================
+END
+============================================================

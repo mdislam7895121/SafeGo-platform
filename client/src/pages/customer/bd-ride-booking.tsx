@@ -16,9 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { decodePolyline } from "@/lib/formatters";
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { GoogleMapsRideBooking } from "@/components/maps/GoogleMapsRideBooking";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -103,60 +101,6 @@ interface FareEstimateResponse {
 interface CityOption {
   code: string;
   name: string;
-}
-
-const pickupIcon = L.divIcon({
-  className: "custom-marker",
-  html: `<div style="
-    width: 28px; height: 28px; background: #22C55E; 
-    border: 3px solid white; border-radius: 50%; 
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    display: flex; align-items: center; justify-content: center;
-  ">
-    <span style="color: white; font-weight: bold; font-size: 12px;">A</span>
-  </div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-});
-
-const dropoffIcon = L.divIcon({
-  className: "custom-marker",
-  html: `<div style="
-    width: 28px; height: 28px; background: #EF4444; 
-    border: 3px solid white; border-radius: 50%; 
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    display: flex; align-items: center; justify-content: center;
-  ">
-    <span style="color: white; font-weight: bold; font-size: 12px;">B</span>
-  </div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-});
-
-function MapBoundsHandler({
-  pickupLocation,
-  dropoffLocation,
-}: {
-  pickupLocation: LocationData | null;
-  dropoffLocation: LocationData | null;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (pickupLocation && dropoffLocation) {
-      const bounds = L.latLngBounds(
-        [pickupLocation.lat, pickupLocation.lng],
-        [dropoffLocation.lat, dropoffLocation.lng]
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    } else if (pickupLocation) {
-      map.setView([pickupLocation.lat, pickupLocation.lng], 15);
-    } else if (dropoffLocation) {
-      map.setView([dropoffLocation.lat, dropoffLocation.lng], 15);
-    }
-  }, [map, pickupLocation, dropoffLocation]);
-
-  return null;
 }
 
 function getVehicleIcon(iconType: string) {
@@ -439,33 +383,14 @@ export default function BDRideBooking() {
       </header>
 
       <div className="flex-1 relative">
-        <MapContainer
-          center={pickupLocation ? [pickupLocation.lat, pickupLocation.lng] : defaultCenter}
-          zoom={13}
-          style={{ height: "100%", width: "100%" }}
-          zoomControl={false}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapBoundsHandler
-            pickupLocation={pickupLocation}
-            dropoffLocation={dropoffLocation}
-          />
-          {pickupLocation && (
-            <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={pickupIcon} />
-          )}
-          {dropoffLocation && (
-            <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={dropoffIcon} />
-          )}
-          {routePolyline && routePolyline.length > 0 && (
-            <Polyline
-              positions={routePolyline}
-              pathOptions={{ color: "#3B82F6", weight: 4, opacity: 0.8 }}
-            />
-          )}
-        </MapContainer>
+        <GoogleMapsRideBooking
+          pickupLocation={pickupLocation}
+          dropoffLocation={dropoffLocation}
+          routePolyline={routePolyline}
+          defaultCenter={{ lat: defaultCenter[0], lng: defaultCenter[1] }}
+          defaultZoom={13}
+          className="h-full w-full"
+        />
 
         <div className="absolute top-4 left-4 right-4 z-[1000]">
           <Card className="shadow-lg">

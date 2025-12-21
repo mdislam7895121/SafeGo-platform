@@ -39,3 +39,23 @@ The system employs a full-stack TypeScript approach. The frontend is built with 
 *   **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 *   **UI Components**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 *   **Third-party Services**: Twilio (SMS OTP), AgentMail (Email OTP), Stripe (payment gateway - US), SSLCOMMERZ (payment gateway - Bangladesh), Google Maps Platform (Maps JavaScript API, Places API, Directions API, Geocoding API), bKash, Nagad, Checkr, AWS Rekognition, Persona/Onfido.
+
+## Google Maps Configuration
+
+The customer ride booking flow uses Google Maps for crisp map tiles and route visualization.
+
+**Required Google APIs** (enable in Google Cloud Console):
+- Maps JavaScript API
+- Places API (for address autocomplete)
+- Directions API (for route polyline)
+- Geocoding API (for reverse geocoding)
+
+**Environment Setup**:
+- Set `GOOGLE_MAPS_API_KEY` secret in Replit Secrets panel
+- The API key is served via `/api/maps/config` endpoint
+- Fallback UI displays when API key is missing or unavailable
+
+**Map Component**: `client/src/components/maps/GoogleMapsRideBooking.tsx`
+- Dual-stroke route polyline (7px white outline, 4px #1DA1F2 blue)
+- Green pickup marker, red dropoff marker
+- Auto-fits bounds to include markers and route
