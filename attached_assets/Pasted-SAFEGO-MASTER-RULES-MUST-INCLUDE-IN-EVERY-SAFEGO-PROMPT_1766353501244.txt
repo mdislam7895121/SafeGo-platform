@@ -1,0 +1,63 @@
+SAFEGO MASTER RULES (MUST INCLUDE IN EVERY SAFEGO PROMPT)
+[KEEP EXACTLY THE SAME SAFEGO RULES AS PREVIOUS PROMPT — DO NOT REMOVE ANYTHING.]
+
+TASK: RESTORE “YOU SAVED $X” DISPLAY ON CHOOSE RIDE CARDS (UBER-LIKE)
+
+CURRENT ISSUE
+Previously customer could always see savings like “You saved $10”.
+Now the vehicle cards show price/ETA/seats but NO savings/discount.
+
+GOAL
+On each vehicle option card:
+- If savings exists (>0): show a small badge “Save $X” (or “You saved $X”) near the vehicle image/title.
+- Under price, show “Was $Y” crossed out + “Now $Z” (optional but preferred).
+- Must work for BOTH countries (US/BD) and all services (Ride/Food/Parcel) without breaking existing flows.
+
+DATA RULES (BACKEND + FRONTEND)
+1) Quote API must return:
+   - final_fare (number)
+   - currency (string, from backend)
+   - original_fare (number, nullable)
+   - savings_amount (number, nullable)
+   - discount_reason (string, nullable; e.g. promo/intro/rounding)
+2) Frontend must compute savings if missing:
+   - if original_fare exists and final_fare exists: savings_amount = max(0, original_fare - final_fare)
+3) If savings_amount <= 0: hide savings UI (no empty badge).
+
+UI SPEC (WEB)
+- Badge style: small pill, high contrast, clean
+- Example:
+  - Top-right of vehicle image: “Save $10”
+- Price line:
+  - If savings: show “$Y” (strikethrough, muted) then “$Z” (bold)
+  - Else show only “$Z”
+- Keep layout stable (no jumping).
+
+WHERE TO CHANGE
+- Identify the component that renders each vehicle card in the “Choose a ride” list.
+- Add savings UI there.
+- Ensure it works on both ride-request-page.tsx and bd-ride-booking.tsx (or shared component they use).
+
+ADMIN CONFIG (NON-BREAKING)
+- Add optional admin setting for default promo:
+  - enabled (boolean)
+  - savings_type: fixed_amount | percent
+  - value
+  - applies_to: ride | food | parcel
+  - country: US | BD
+- Must be additive, nullable fields only. No breaking migrations.
+
+SECURITY / PERMISSIONS
+- Customers see only their own quote + savings.
+- Drivers do NOT see admin promo config.
+- Only admin can change promo/discount settings.
+
+ACCEPTANCE TEST
+1) Open Choose a ride → at least one vehicle shows “Save $X”.
+2) If savings is 0, badge hidden.
+3) Currency matches backend (US=$, BD=৳ or backend currency code).
+4) No regression in booking flow.
+
+END
+- List exact files/modules changed
+- Explain why changes are non-breaking
