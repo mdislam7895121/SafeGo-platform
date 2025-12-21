@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLandingSeo } from "@/components/landing/LandingSeo";
 import GlobalFooter from "@/components/landing/GlobalFooter";
+import DOMPurify from "dompurify";
 
 const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -190,19 +191,77 @@ export default function DynamicPage() {
   );
 }
 
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m] || m);
+}
+
+function processMarkdownLine(rawLine: string): string {
+  let line = escapeHtml(rawLine);
+  line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  line = line.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  return line;
+}
+
 function formatContent(content: string): string {
   if (!content) return '';
   
-  let formatted = content
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br />')
-    .replace(/^(.+)$/, '<p>$1</p>');
+  let lines = content.split('\n');
+  let result: string[] = [];
+  let inList = false;
   
-  formatted = formatted.replace(/^##\s+(.+)$/gm, '<h2 class="text-xl font-semibold mt-6 mb-3">$1</h2>');
-  formatted = formatted.replace(/^###\s+(.+)$/gm, '<h3 class="text-lg font-medium mt-4 mb-2">$1</h3>');
+  for (let i = 0; i < lines.length; i++) {
+    let rawLine = lines[i].trim();
+    
+    if (!rawLine) {
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
+      continue;
+    }
+    
+    if (rawLine.startsWith('## ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      const text = processMarkdownLine(rawLine.slice(3));
+      result.push(`<h2 class="text-2xl font-bold mt-8 mb-4 text-gray-900">${text}</h2>`);
+    } else if (rawLine.startsWith('### ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      const text = processMarkdownLine(rawLine.slice(4));
+      result.push(`<h3 class="text-xl font-semibold mt-6 mb-3 text-gray-800">${text}</h3>`);
+    } else if (rawLine.startsWith('- ')) {
+      if (!inList) {
+        result.push('<ul class="list-disc pl-6 space-y-1 text-gray-700">');
+        inList = true;
+      }
+      const text = processMarkdownLine(rawLine.slice(2));
+      result.push(`<li>${text}</li>`);
+    } else if (/^\d+\.\s/.test(rawLine)) {
+      const text = processMarkdownLine(rawLine.replace(/^\d+\.\s/, ''));
+      if (!inList) {
+        result.push('<ol class="list-decimal pl-6 space-y-1 text-gray-700">');
+        inList = true;
+      }
+      result.push(`<li>${text}</li>`);
+    } else {
+      if (inList) { result.push('</ul>'); inList = false; }
+      const text = processMarkdownLine(rawLine);
+      result.push(`<p class="text-gray-700 mb-4">${text}</p>`);
+    }
+  }
   
-  formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  if (inList) result.push('</ul>');
   
-  return formatted;
+  const html = result.join('\n');
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'br', 'a'],
+    ALLOWED_ATTR: ['href', 'class', 'target', 'rel'],
+    ALLOW_DATA_ATTR: false
+  });
 }
