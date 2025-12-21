@@ -152,6 +152,26 @@ interface VoiceNavigationConfig {
 }
 ```
 
+#### Supported Languages
+| Code | Language | Native Name |
+|------|----------|-------------|
+| en-US | English (US) | English |
+| en-GB | English (UK) | English |
+| es-ES | Spanish | Español |
+| fr-FR | French | Français |
+| de-DE | German | Deutsch |
+| it-IT | Italian | Italiano |
+| pt-BR | Portuguese (Brazil) | Português |
+| zh-CN | Chinese (Simplified) | 中文 |
+| ja-JP | Japanese | 日本語 |
+| ko-KR | Korean | 한국어 |
+| ar-SA | Arabic | العربية |
+| hi-IN | Hindi | हिन्दी |
+| bn-BD | Bengali | বাংলা |
+| ru-RU | Russian | Русский |
+
+*Note: Available languages depend on device TTS support.*
+
 ### UI Components
 
 #### VoiceNavigationControls

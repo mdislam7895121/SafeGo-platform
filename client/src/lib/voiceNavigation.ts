@@ -28,6 +28,29 @@ const DISTANCE_THRESHOLDS = {
   IMMINENT: 30,
 };
 
+export interface VoiceOption {
+  code: string;
+  name: string;
+  nativeName: string;
+}
+
+export const SUPPORTED_LANGUAGES: VoiceOption[] = [
+  { code: 'en-US', name: 'English (US)', nativeName: 'English' },
+  { code: 'en-GB', name: 'English (UK)', nativeName: 'English' },
+  { code: 'es-ES', name: 'Spanish', nativeName: 'Español' },
+  { code: 'fr-FR', name: 'French', nativeName: 'Français' },
+  { code: 'de-DE', name: 'German', nativeName: 'Deutsch' },
+  { code: 'it-IT', name: 'Italian', nativeName: 'Italiano' },
+  { code: 'pt-BR', name: 'Portuguese (Brazil)', nativeName: 'Português' },
+  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '中文' },
+  { code: 'ja-JP', name: 'Japanese', nativeName: '日本語' },
+  { code: 'ko-KR', name: 'Korean', nativeName: '한국어' },
+  { code: 'ar-SA', name: 'Arabic', nativeName: 'العربية' },
+  { code: 'hi-IN', name: 'Hindi', nativeName: 'हिन्दी' },
+  { code: 'bn-BD', name: 'Bengali', nativeName: 'বাংলা' },
+  { code: 'ru-RU', name: 'Russian', nativeName: 'Русский' },
+];
+
 class VoiceNavigationService {
   private config: VoiceNavigationConfig;
   private synth: SpeechSynthesis | null = null;
@@ -35,6 +58,7 @@ class VoiceNavigationService {
   private lastSpokenTime: number = 0;
   private isSpeaking: boolean = false;
   private voicesLoaded: boolean = false;
+  private availableVoices: SpeechSynthesisVoice[] = [];
 
   constructor() {
     this.config = { ...DEFAULT_CONFIG };
@@ -45,12 +69,14 @@ class VoiceNavigationService {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       this.synth = window.speechSynthesis;
       
-      if (this.synth.getVoices().length > 0) {
-        this.voicesLoaded = true;
-      } else {
-        this.synth.addEventListener('voiceschanged', () => {
-          this.voicesLoaded = true;
-        });
+      const loadVoices = () => {
+        this.availableVoices = this.synth?.getVoices() || [];
+        this.voicesLoaded = this.availableVoices.length > 0;
+      };
+
+      loadVoices();
+      if (!this.voicesLoaded) {
+        this.synth.addEventListener('voiceschanged', loadVoices);
       }
     }
   }
@@ -67,11 +93,29 @@ class VoiceNavigationService {
     return { ...this.config };
   }
 
+  getAvailableLanguages(): VoiceOption[] {
+    if (!this.voicesLoaded || this.availableVoices.length === 0) {
+      return SUPPORTED_LANGUAGES;
+    }
+    
+    const availableCodes = new Set(
+      this.availableVoices.map(v => v.lang.substring(0, 2))
+    );
+    
+    return SUPPORTED_LANGUAGES.filter(lang => 
+      availableCodes.has(lang.code.substring(0, 2))
+    );
+  }
+
   private getVoice(): SpeechSynthesisVoice | null {
     if (!this.synth || !this.voicesLoaded) return null;
     
-    const voices = this.synth.getVoices();
-    const langVoice = voices.find(v => v.lang.startsWith(this.config.language.split('-')[0]));
+    const voices = this.availableVoices;
+    const exactMatch = voices.find(v => v.lang === this.config.language);
+    if (exactMatch) return exactMatch;
+    
+    const langPrefix = this.config.language.split('-')[0];
+    const langVoice = voices.find(v => v.lang.startsWith(langPrefix));
     return langVoice || voices[0] || null;
   }
 

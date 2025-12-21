@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { voiceNavigation, NavigationInstruction, VoiceNavigationConfig } from '@/lib/voiceNavigation';
+import { voiceNavigation, NavigationInstruction, VoiceNavigationConfig, VoiceOption } from '@/lib/voiceNavigation';
 import { useFeatureFlags } from './useFeatureFlags';
 
 export interface VoiceNavigationState {
@@ -69,6 +69,10 @@ export function useVoiceNavigation() {
       ...prev,
       config: voiceNavigation.getConfig(),
     }));
+  }, []);
+
+  const getAvailableLanguages = useCallback((): VoiceOption[] => {
+    return voiceNavigation.getAvailableLanguages();
   }, []);
 
   const announceInstruction = useCallback(async (
@@ -150,10 +154,12 @@ export function useVoiceNavigation() {
 
   return {
     ...state,
+    featureEnabled,
     toggleEnabled,
     setVolume,
     setRate,
     setLanguage,
+    getAvailableLanguages,
     announceInstruction,
     announceReroute,
     announceArrival,
