@@ -122,6 +122,68 @@ export const GoogleMapsRideBooking = memo(function GoogleMapsRideBooking({
   const initializeMap = useCallback(() => {
     if (!mapContainerRef.current || !window.google?.maps || mapRef.current) return;
 
+    // Uber-like clean map style: soft roads, no traffic colors, readable labels
+    const cleanMapStyles: google.maps.MapTypeStyle[] = [
+      // Reduce overall saturation for cleaner look
+      {
+        featureType: 'all',
+        elementType: 'geometry',
+        stylers: [{ saturation: -20 }],
+      },
+      // Soften road colors - no aggressive red/orange
+      {
+        featureType: 'road',
+        elementType: 'geometry',
+        stylers: [{ saturation: -40 }, { lightness: 10 }],
+      },
+      {
+        featureType: 'road.highway',
+        elementType: 'geometry',
+        stylers: [{ saturation: -50 }, { lightness: 20 }],
+      },
+      {
+        featureType: 'road.arterial',
+        elementType: 'geometry',
+        stylers: [{ saturation: -40 }, { lightness: 15 }],
+      },
+      // Keep road labels readable
+      {
+        featureType: 'road',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#666666' }],
+      },
+      // Keep parks green (slightly muted)
+      {
+        featureType: 'poi.park',
+        elementType: 'geometry',
+        stylers: [{ saturation: -20 }, { lightness: 20 }],
+      },
+      // Keep water blue (slightly muted)
+      {
+        featureType: 'water',
+        elementType: 'geometry',
+        stylers: [{ saturation: -10 }, { lightness: 10 }],
+      },
+      // Mute transit lines
+      {
+        featureType: 'transit',
+        elementType: 'geometry',
+        stylers: [{ saturation: -60 }, { lightness: 30 }],
+      },
+      // Hide POI labels for cleaner look
+      {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      // Hide transit labels
+      {
+        featureType: 'transit',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+    ];
+
     const mapOptions: google.maps.MapOptions = {
       center: defaultCenter,
       zoom: defaultZoom,
@@ -132,6 +194,7 @@ export const GoogleMapsRideBooking = memo(function GoogleMapsRideBooking({
       streetViewControl: false,
       fullscreenControl: false,
       gestureHandling: 'greedy',
+      styles: cleanMapStyles,
     };
 
     const map = new google.maps.Map(mapContainerRef.current, mapOptions);
