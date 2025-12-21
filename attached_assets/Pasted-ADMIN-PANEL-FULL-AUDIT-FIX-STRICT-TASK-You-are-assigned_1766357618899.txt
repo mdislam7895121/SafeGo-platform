@@ -1,0 +1,118 @@
+ADMIN PANEL FULL AUDIT & FIX — STRICT TASK
+
+You are assigned to perform a COMPLETE ADMIN PANEL AUDIT AND FIX for the SafeGo platform.
+This is NOT a feature request. This is a mandatory bug-fix and stability task.
+
+==============================
+1. SCOPE (ALL ADMIN PAGES)
+==============================
+You must audit and fix EVERY admin page, including but not limited to:
+
+/admin
+/admin/dashboard
+/admin/bd-expansion
+/admin/onboarding-overview
+/admin/cms-pages
+/admin/partners
+/admin/drivers
+/admin/settings
+/admin/promotions
+/admin/pricing
+/admin/analytics
+ALL routes linked from the admin sidebar
+
+==============================
+2. CRITICAL ISSUES TO FIX
+==============================
+
+A) ROUTING & 404 ERRORS
+- Multiple admin pages return 404 Page Not Found
+- Sidebar links exist but routes are missing or broken
+
+REQUIREMENTS:
+- Every admin menu item MUST have a valid route
+- No /admin/* route may return 404
+- Either properly implement missing routes or remove dead links cleanly
+- Router configuration must match sidebar exactly
+
+------------------------------
+
+B) SIDEBAR & LAYOUT BUG
+- Sidebar scrolls upward and loses position
+- Admin layout breaks while scrolling
+- Content and sidebar scroll together incorrectly
+
+REQUIREMENTS:
+- Sidebar must be fixed or sticky
+- Main content must scroll independently
+- No layout jump, overflow bug, or scroll reset
+
+------------------------------
+
+C) CMS PAGE CRASH
+Current error on /admin/cms-pages:
+<SelectItem /> must have a value prop that is not an empty string
+
+REQUIREMENTS:
+- CMS page must load without crashing
+- All Select components must have valid default values
+- Empty string values must be handled safely
+- No runtime error in admin UI
+
+------------------------------
+
+D) ONBOARDING ADMIN PAGES
+- /admin/onboarding-overview returns 404
+- Partner onboarding admin pages are broken or missing
+
+REQUIREMENTS:
+- All onboarding-related admin pages must open correctly
+- No dead routes
+- No placeholder or fake pages
+
+==============================
+3. QUALITY RULES (STRICT)
+==============================
+- No placeholders
+- No “working later”
+- No partial fixes
+- No console errors
+- Everything must ACTUALLY load and function
+
+==============================
+4. VERIFICATION (MANDATORY)
+==============================
+After fixing:
+- Manually visit EVERY admin route
+- Confirm:
+  - No 404
+  - No crashes
+  - Sidebar stable
+  - CMS usable
+- Provide a final checklist confirming each admin page works
+
+==============================
+5. PAYMENT & REFUND CLAUSE
+==============================
+If ANY admin page still:
+- Shows 404
+- Crashes
+- Has broken routing
+- Has unstable sidebar/layout
+
+Then this task is considered FAILED,
+and ALL previous admin-related payments must be REFUNDED.
+
+==============================
+6. DELIVERY
+==============================
+You must deliver:
+1) Fully working admin panel
+2) Stable routing
+3) Fixed sidebar behavior
+4) Error-free CMS pages
+5) Final confirmation report
+
+IMPORTANT:
+Do NOT touch customer app, ride flow, maps, pricing logic, or UI features.
+FOCUS ONLY on ADMIN PANEL stability and correctness.
