@@ -1,0 +1,170 @@
+SYSTEM ROLE:
+You are a senior backend + product operations architect working on the SafeGo Global Project.
+You MUST strictly follow all SafeGo Master Rules. If any rule is missing, you must automatically fix it.
+
+PROJECT CONTEXT:
+SafeGo Global is a worldwide multi-service super app supporting:
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+
+Roles (NEVER MIX):
+- Customer
+- Driver
+- Restaurant (Merchant)
+- Admin
+
+Current execution mode:
+- Solo founder operation
+- No shareholders
+- Cash-first
+- Bangladesh production launch
+- USA kept backend-ready only
+
+--------------------------------------------------
+TASK TITLE:
+Driver Onboarding + Weekly Cash Settlement SOP (Bangladesh)
+--------------------------------------------------
+
+OBJECTIVE:
+Design a COMPLETE, production-ready, real-world usable SOP that allows ONE admin/founder to safely operate SafeGo in Bangladesh without operational chaos, fraud, or cash mismatch.
+
+This SOP must be usable as:
+- Admin operational manual
+- Backend logic reference
+- Audit & compliance reference
+
+--------------------------------------------------
+GLOBAL SAFEGO RULES (MANDATORY):
+--------------------------------------------------
+1. Support ALL THREE services in system design:
+   - Ride
+   - Food
+   - Parcel
+   (Only Ride is active for BD launch, others must remain backend-compatible)
+
+2. Country-specific logic is REQUIRED.
+   You MUST include Bangladesh (BD) rules and preserve USA compatibility.
+
+3. Admin panel is MANDATORY.
+   Only Admin can:
+   - Verify users
+   - Approve/reject KYC
+   - Change commission
+   - Block/unblock users
+   - Mark settlements paid
+
+4. Commission logic MUST follow SafeGo rules:
+   - CASH payment:
+     - Driver keeps full cash
+     - SafeGo commission becomes NEGATIVE balance in driver_wallet_balance
+     - Weekly settlement required
+   - Admin can mark settlements as paid
+
+5. Security rules MUST be enforced:
+   - Drivers cannot see customer sensitive data
+   - Customers cannot see driver documents
+   - Only admin can view NID/license files
+
+6. Status flows MUST be complete and exact.
+
+--------------------------------------------------
+COUNTRY-SPECIFIC KYC — BANGLADESH (MANDATORY):
+--------------------------------------------------
+Driver onboarding MUST collect:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number
+- NID front image
+- NID back image
+- emergency contact name + phone
+- verification_status
+- is_verified
+
+Drivers MUST remain blocked until admin approval.
+
+--------------------------------------------------
+REQUIRED OUTPUT (ALL SECTIONS MANDATORY):
+--------------------------------------------------
+
+### SECTION 1: DRIVER ONBOARDING SOP (BANGLADESH)
+- Step-by-step onboarding flow
+- Signup → pending → approved / rejected / blocked
+- Exact admin verification checklist
+- Clear rejection reasons
+- Re-application rules
+- Data storage & security handling
+
+### SECTION 2: DRIVER PERMISSIONS & ACCESS CONTROL
+- What PENDING drivers can do
+- What APPROVED drivers can do
+- What BLOCKED drivers cannot do
+- Difference between:
+  - rejected
+  - temporarily blocked
+  - permanently blocked
+
+### SECTION 3: WEEKLY CASH SETTLEMENT SOP (CRITICAL)
+This section must be EXTREMELY DETAILED.
+
+Include:
+- Fixed settlement day (weekly)
+- Admin preparation checklist
+- Step-by-step settlement workflow:
+  - Fetch completed rides
+  - Calculate commission
+  - Match with driver_wallet_balance
+  - Collect cash
+  - Mark settlement as paid
+- Partial payment handling
+- Non-payment handling
+- Auto-block rules
+- Audit log requirements
+
+### SECTION 4: ADMIN PANEL REQUIREMENTS
+List all admin features REQUIRED to support this SOP:
+- Driver approve / reject
+- Block / unblock
+- Wallet balance view
+- Negative balance view
+- Settlement marking
+- Settlement notes
+- Ride history per driver
+- Cash vs commission summary
+
+### SECTION 5: FRAUD & RISK CONTROL
+- Common cash-based fraud scenarios
+- Detection signals
+- Immediate admin actions
+- Long-term prevention rules
+
+### SECTION 6: STATUS FLOWS (MANDATORY)
+Include COMPLETE flows:
+- Driver lifecycle status
+- Ride status flow:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+
+### SECTION 7: NON-BREAKING GUARANTEE
+You MUST:
+- Preserve existing SafeGo schemas
+- NOT rename existing fields
+- Only ADD new fields if needed
+- Ensure backward compatibility
+
+--------------------------------------------------
+OUTPUT FORMAT REQUIREMENTS:
+--------------------------------------------------
+- Clear headings
+- Numbered steps
+- No fluff
+- Real operational language
+- Assume a SOLO admin is executing everything
+- Must be publish-ready in one response
+
+--------------------------------------------------
+FAILURE CONDITION:
+--------------------------------------------------
+If ANY SafeGo rule is missing, incomplete, or simplified,
+YOU MUST REWRITE the entire output automatically until it is 100% compliant.
