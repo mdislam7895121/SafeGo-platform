@@ -257,15 +257,6 @@ router.get("/stats/risk", checkPermission(Permission.VIEW_DASHBOARD), async (req
       where: {
         ownerType: "driver",
         negativeBalance: { gt: 0 }
-      },
-      include: {
-        driverProfile: {
-          select: {
-            id: true,
-            userId: true,
-            countryCode: true,
-          }
-        }
       }
     });
 
@@ -283,18 +274,26 @@ router.get("/stats/risk", checkPermission(Permission.VIEW_DASHBOARD), async (req
       totalNegativeBalance += negBal;
 
       // Check if high negative balance (>5000 for BD, >100 for US)
-      const threshold = wallet.driverProfile?.countryCode === "BD" ? 5000 : 100;
+      // Use wallet's countryCode directly
+      const threshold = wallet.countryCode === "BD" ? 5000 : 100;
       if (negBal > threshold) {
         highNegativeBalance++;
       }
 
+      // Get last transaction date from wallet transactions
+      const lastTx = await prisma.walletTransaction.findFirst({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true }
+      });
+
       // Check if overdue (last transaction > 14 days ago)
-      if (wallet.lastTransactionDate && new Date(wallet.lastTransactionDate) < fourteenDaysAgo) {
+      if (lastTx && new Date(lastTx.createdAt) < fourteenDaysAgo) {
         overdueSettlements++;
       }
 
       // At-risk = high balance OR overdue
-      if (negBal > threshold || (wallet.lastTransactionDate && new Date(wallet.lastTransactionDate) < fourteenDaysAgo)) {
+      if (negBal > threshold || (lastTx && new Date(lastTx.createdAt) < fourteenDaysAgo)) {
         driversAtRisk++;
       }
     }
