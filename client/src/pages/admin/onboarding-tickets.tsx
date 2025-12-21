@@ -137,7 +137,7 @@ export default function AdminOnboardingTickets() {
       <PageHeader
         title="Tickets Onboarding"
         description="Manage ticket partner applications (Bangladesh only)"
-        icon={<Ticket className="h-6 w-6" />}
+        icon={Ticket}
       />
 
       {data?.stats && <StatsCards stats={data.stats} />}

@@ -141,7 +141,7 @@ export default function AdminOnboardingDrivers() {
       <PageHeader
         title="Drivers Onboarding"
         description="Manage driver and courier applications"
-        icon={<Car className="h-6 w-6" />}
+        icon={Car}
       />
 
       {data?.stats && <StatsCards stats={data.stats} />}
