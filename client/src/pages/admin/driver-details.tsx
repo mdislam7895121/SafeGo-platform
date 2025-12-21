@@ -273,6 +273,8 @@ export default function AdminDriverDetails() {
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState("");
+  // FIX 3: Block Enforcement - Require reason for blocking
+  const [blockReason, setBlockReason] = useState("");
   const [showNid, setShowNid] = useState(false);
   const [nid, setNid] = useState<string>("");
   const [showSSN, setShowSSN] = useState(false);
@@ -470,12 +472,14 @@ export default function AdminDriverDetails() {
     },
   });
 
-  // Block driver mutation
+  // FIX 3: Block driver mutation - with required reason
   const blockMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(`/api/admin/drivers/${driverId}/block`, {
         method: "PATCH",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: blockReason }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -484,11 +488,13 @@ export default function AdminDriverDetails() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Driver blocked successfully" });
+      toast({ title: "Driver blocked successfully", description: "Block takes effect immediately." });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/drivers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats/risk"] });
       setShowBlockDialog(false);
+      setBlockReason("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -2653,24 +2659,48 @@ export default function AdminDriverDetails() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Block Dialog */}
-      <AlertDialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+      {/* FIX 3: Block Dialog - with required reason */}
+      <AlertDialog open={showBlockDialog} onOpenChange={(open) => {
+        setShowBlockDialog(open);
+        if (!open) setBlockReason("");
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Block Driver</AlertDialogTitle>
+            <AlertDialogTitle className="text-destructive">Block Driver</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently block the driver from logging in. This action can be undone later.
+              This will block the driver immediately. They will not be able to:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Receive new ride assignments</li>
+                <li>Go online or accept requests</li>
+                <li>Access driver features (login still allowed)</li>
+              </ul>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="py-2">
+            <Label htmlFor="block-reason" className="text-sm font-medium">
+              Block Reason (Required)
+            </Label>
+            <Textarea
+              id="block-reason"
+              placeholder="Enter the reason for blocking this driver..."
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              className="mt-2"
+              data-testid="textarea-block-reason"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              This reason will be logged for audit purposes.
+            </p>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-block">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => blockMutation.mutate()}
-              disabled={blockMutation.isPending}
+              disabled={!blockReason.trim() || blockMutation.isPending}
               className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-block"
             >
-              Block Driver
+              {blockMutation.isPending ? "Blocking..." : "Block Driver"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

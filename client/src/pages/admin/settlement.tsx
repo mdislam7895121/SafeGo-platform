@@ -16,7 +16,9 @@ import {
   Download,
   Play,
   Clock,
-  XCircle
+  XCircle,
+  ShieldAlert,
+  Calendar
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -68,11 +80,19 @@ interface OverviewStats {
     totalBalance: number;
     walletsNeedingSettlement: number;
   };
+  parcel?: {
+    totalDeliveries: number;
+    pendingCommission: number;
+  };
   overall: {
     totalPendingSettlement: number;
     totalWalletsNeedingSettlement: number;
     totalBalance: number;
   };
+}
+
+interface PendingSettlementsResponse {
+  pending: PendingWallet[];
 }
 
 interface PendingWallet {
@@ -151,6 +171,12 @@ export default function AdminSettlement() {
   const [settleDialogOpen, setSettleDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   
+  // FIX 1: Settlement Click Safety - Confirmation modal state
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [receiptNumber, setReceiptNumber] = useState("");
+  const [settlementNotes, setSettlementNotes] = useState("");
+  
   // Analytics filters
   const [analyticsCountry, setAnalyticsCountry] = useState<string>("all");
   const [analyticsDateRange, setAnalyticsDateRange] = useState<string>("all");
@@ -160,6 +186,24 @@ export default function AdminSettlement() {
   const [batchOwnerType, setBatchOwnerType] = useState("all");
   const [batchCountry, setBatchCountry] = useState("all");
   const [minPayoutAmount, setMinPayoutAmount] = useState("10");
+  
+  // Calculate week range for settlement
+  const getWeekRange = () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    return {
+      start: startOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      end: endOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    };
+  };
+  
+  const weekRange = getWeekRange();
 
   // Fetch overview stats
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewStats>({
@@ -168,7 +212,7 @@ export default function AdminSettlement() {
   });
 
   // Fetch pending settlements
-  const { data: pendingData, isLoading: pendingLoading } = useQuery({
+  const { data: pendingData, isLoading: pendingLoading } = useQuery<PendingSettlementsResponse>({
     queryKey: filterType === "all" 
       ? ["/api/admin/settlement/pending"]
       : ["/api/admin/settlement/pending", { walletType: filterType }],
@@ -203,23 +247,47 @@ export default function AdminSettlement() {
     refetchInterval: 30000,
   });
 
-  // Settlement mutation
+  // Settlement mutation with FIX 1: Week range & double settlement prevention
   const settleMutation = useMutation({
     mutationFn: async (data: any) => {
       return await apiRequest("/api/admin/settle-wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          weekStart: new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0],
+          weekEnd: new Date(new Date().setDate(new Date().getDate() - new Date().getDay() + 6)).toISOString().split('T')[0],
+          paymentMethod: paymentMethod,
+          receiptNumber: receiptNumber || undefined,
+          notes: settlementNotes || undefined,
+        }),
       });
     },
     onSuccess: (data) => {
-      toast({
-        title: "Settlement successful",
-        description: data.message,
-      });
+      const amount = parseFloat(settlementAmount);
+      const remaining = selectedWallet ? selectedWallet.negativeBalance - amount : 0;
+      
+      // FIX 4: Partial Payment Clarity - Show carry-forward info
+      if (remaining > 0) {
+        toast({
+          title: "Partial Settlement Recorded",
+          description: `Received ${selectedWallet?.countryCode === 'BD' ? '৳' : '$'}${amount.toFixed(2)}. Remaining balance of ${selectedWallet?.countryCode === 'BD' ? '৳' : '$'}${remaining.toFixed(2)} carries forward to next week.`,
+        });
+      } else {
+        toast({
+          title: "Settlement Successful",
+          description: data.message || "Full payment received and recorded.",
+        });
+      }
+      
       setSettleDialogOpen(false);
+      setConfirmDialogOpen(false);
       setSelectedWallet(null);
       setSettlementAmount("");
+      setPaymentMethod("cash");
+      setReceiptNumber("");
+      setSettlementNotes("");
+      
       // Invalidate all settlement-related queries to refresh dashboard immediately
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/overview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/pending"] });
@@ -230,9 +298,10 @@ export default function AdminSettlement() {
       });
     },
     onError: (error: any) => {
+      setConfirmDialogOpen(false);
       toast({
-        title: "Settlement failed",
-        description: error.message,
+        title: "Settlement Failed",
+        description: error.message || "Could not process settlement. Please try again.",
         variant: "destructive",
       });
     },
@@ -303,6 +372,7 @@ export default function AdminSettlement() {
     createBatchMutation.mutate(payload);
   };
 
+  // FIX 1: Settlement Click Safety - Show confirmation before final submission
   const handleSubmitSettlement = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -318,11 +388,39 @@ export default function AdminSettlement() {
       return;
     }
 
+    // Open confirmation dialog instead of submitting directly
+    setConfirmDialogOpen(true);
+  };
+  
+  // FIX 1: Actual settlement after confirmation
+  const handleConfirmSettlement = () => {
+    if (!selectedWallet) return;
+    
+    const amount = parseFloat(settlementAmount);
     settleMutation.mutate({
       walletType: selectedWallet.walletType,
       walletId: selectedWallet.walletId,
       settlementAmount: amount,
     });
+  };
+  
+  // FIX 4: Calculate remaining balance for partial payments
+  const getRemainingBalance = () => {
+    if (!selectedWallet) return 0;
+    const amount = parseFloat(settlementAmount) || 0;
+    return Math.max(0, selectedWallet.negativeBalance - amount);
+  };
+  
+  const isPartialPayment = () => {
+    if (!selectedWallet) return false;
+    const amount = parseFloat(settlementAmount) || 0;
+    return amount > 0 && amount < selectedWallet.negativeBalance;
+  };
+  
+  // Format currency based on country
+  const formatAmount = (amount: number, countryCode?: string) => {
+    const symbol = countryCode === 'BD' ? '৳' : '$';
+    return `${symbol}${amount.toFixed(2)}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -1155,45 +1253,54 @@ export default function AdminSettlement() {
         </DialogContent>
       </Dialog>
 
-      {/* Settlement Dialog */}
+      {/* Enhanced Settlement Dialog with FIX 1 & FIX 4 */}
       <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Process Settlement</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Process Cash Settlement
+            </DialogTitle>
             <DialogDescription>
-              Reduce negative balance after receiving payment
+              Record payment received from driver for weekly commission
             </DialogDescription>
           </DialogHeader>
 
           {selectedWallet && (
             <div className="space-y-4">
-              <Card>
-                <CardContent className="pt-6">
+              {/* Driver/Restaurant Info Card */}
+              <Card className="border-2">
+                <CardContent className="pt-4 pb-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
                         {selectedWallet.walletType === "driver" ? "Driver" : "Restaurant"}
                       </p>
-                      <p className="font-medium">
+                      <p className="font-semibold text-lg">
                         {selectedWallet.walletType === "driver" 
                           ? selectedWallet.fullName 
                           : selectedWallet.restaurantName}
                       </p>
                       <p className="text-xs text-muted-foreground">{selectedWallet.email}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Current Pending</p>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Due</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        ${selectedWallet.negativeBalance.toFixed(2)}
+                        {formatAmount(selectedWallet.negativeBalance, selectedWallet.countryCode)}
                       </p>
+                      <Badge variant="outline" className="mt-1">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {weekRange.start} - {weekRange.end}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <form onSubmit={handleSubmitSettlement} className="space-y-4">
+                {/* Settlement Amount */}
                 <div>
-                  <Label htmlFor="settlementAmount">Settlement Amount ($)</Label>
+                  <Label htmlFor="settlementAmount">Amount Received</Label>
                   <Input
                     id="settlementAmount"
                     type="number"
@@ -1202,14 +1309,75 @@ export default function AdminSettlement() {
                     value={settlementAmount}
                     onChange={(e) => setSettlementAmount(e.target.value)}
                     required
+                    className="text-lg font-medium"
                     data-testid="input-settlement-amount"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Amount received from {selectedWallet.walletType} (max: ${selectedWallet.negativeBalance.toFixed(2)})
+                    Max: {formatAmount(selectedWallet.negativeBalance, selectedWallet.countryCode)}
                   </p>
                 </div>
+                
+                {/* FIX 4: Partial Payment Clarity - Show remaining balance */}
+                {isPartialPayment() && (
+                  <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
+                    <CardContent className="pt-3 pb-3">
+                      <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Partial Payment</span>
+                      </div>
+                      <p className="text-sm mt-1">
+                        Remaining <span className="font-bold">{formatAmount(getRemainingBalance(), selectedWallet.countryCode)}</span> will carry forward to next week.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Driver will be flagged as at-risk for partial payment.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Payment Method */}
+                <div>
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger id="paymentMethod" data-testid="select-payment-method">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="bkash">bKash</SelectItem>
+                      <SelectItem value="nagad">Nagad</SelectItem>
+                      <SelectItem value="bank">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Receipt Number (Optional) */}
+                <div>
+                  <Label htmlFor="receiptNumber">Receipt/Reference # (Optional)</Label>
+                  <Input
+                    id="receiptNumber"
+                    type="text"
+                    placeholder="e.g., RCV-2024-001"
+                    value={receiptNumber}
+                    onChange={(e) => setReceiptNumber(e.target.value)}
+                    data-testid="input-receipt-number"
+                  />
+                </div>
+                
+                {/* Notes (Optional) */}
+                <div>
+                  <Label htmlFor="settlementNotes">Notes (Optional)</Label>
+                  <Input
+                    id="settlementNotes"
+                    type="text"
+                    placeholder="Any additional notes..."
+                    value={settlementNotes}
+                    onChange={(e) => setSettlementNotes(e.target.value)}
+                    data-testid="input-settlement-notes"
+                  />
+                </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -1222,10 +1390,10 @@ export default function AdminSettlement() {
                   <Button
                     type="submit"
                     className="flex-1"
-                    disabled={settleMutation.isPending}
-                    data-testid="button-confirm-settle"
+                    disabled={!settlementAmount || parseFloat(settlementAmount) <= 0}
+                    data-testid="button-proceed-settle"
                   >
-                    {settleMutation.isPending ? "Processing..." : "Confirm Settlement"}
+                    Review & Confirm
                   </Button>
                 </div>
               </form>
@@ -1233,6 +1401,83 @@ export default function AdminSettlement() {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* FIX 1: Settlement Confirmation Dialog - Prevents Accidental Double Settlement */}
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="h-5 w-5" />
+              Confirm Settlement
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>You are about to record the following settlement:</p>
+                
+                {selectedWallet && (
+                  <Card className="border-2 border-green-200 dark:border-green-800">
+                    <CardContent className="pt-4 pb-4 space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Name:</span>
+                        <span className="font-semibold">
+                          {selectedWallet.walletType === "driver" 
+                            ? selectedWallet.fullName 
+                            : selectedWallet.restaurantName}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Week:</span>
+                        <span className="font-semibold">{weekRange.start} - {weekRange.end}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Amount Due:</span>
+                        <span className="font-semibold text-orange-600">
+                          {formatAmount(selectedWallet.negativeBalance, selectedWallet.countryCode)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="text-muted-foreground">Amount Received:</span>
+                        <span className="font-bold text-green-600 text-lg">
+                          {formatAmount(parseFloat(settlementAmount) || 0, selectedWallet.countryCode)}
+                        </span>
+                      </div>
+                      {isPartialPayment() && (
+                        <div className="flex justify-between text-yellow-600">
+                          <span>Remaining (Carry Forward):</span>
+                          <span className="font-semibold">
+                            {formatAmount(getRemainingBalance(), selectedWallet.countryCode)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Payment Method:</span>
+                        <span className="uppercase">{paymentMethod}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <p className="text-sm text-muted-foreground">
+                  This action will be logged and cannot be duplicated for the same driver in the same week.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-confirm">
+              Go Back
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSettlement}
+              disabled={settleMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-final-confirm"
+            >
+              {settleMutation.isPending ? "Processing..." : "Confirm Settlement"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -36,6 +36,14 @@ interface ParcelStats {
   cancelledParcels: number;
 }
 
+// FIX 2: Risk stats interface for negative balance visibility
+interface RiskStats {
+  driversAtRisk: number;
+  highNegativeBalance: number;
+  overdueSettlements: number;
+  totalNegativeBalance: number;
+}
+
 export default function AdminHome() {
   const { user, token, logout } = useAuth();
 
@@ -49,6 +57,12 @@ export default function AdminHome() {
   const { data: parcelStats, isLoading: isLoadingParcels } = useQuery<ParcelStats>({
     queryKey: ["/api/admin/stats/parcels"],
     refetchInterval: 30000, // Auto-refresh every 30 seconds
+  });
+  
+  // FIX 2: Fetch risk statistics for negative balance visibility
+  const { data: riskStats, isLoading: isLoadingRisk } = useQuery<RiskStats>({
+    queryKey: ["/api/admin/stats/risk"],
+    refetchInterval: 15000, // Faster refresh for critical data
   });
 
   // Fetch unread notification count
@@ -590,6 +604,65 @@ export default function AdminHome() {
                 label="Open Complaints"
                 isLoading={isLoading}
                 testId="card-open-complaints"
+              />
+            </Link>
+          </div>
+        </div>
+
+        {/* FIX 2: Risk & Settlement Statistics - Negative Balance Visibility */}
+        <div>
+          <SectionHeader 
+            title="Risk & Settlement Center" 
+            icon={ShieldAlert}
+            iconColor="text-red-600"
+            testId="section-risk-center"
+          />
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
+            <Link href="/admin/finance-driver-balances?filter=at-risk">
+              <StatCard
+                icon={AlertTriangle}
+                iconColor="text-red-600"
+                iconBgColor="bg-red-50 dark:bg-red-950/50"
+                value={riskStats?.driversAtRisk ?? 0}
+                label="Drivers At Risk"
+                isLoading={isLoadingRisk}
+                testId="card-drivers-at-risk"
+              />
+            </Link>
+
+            <Link href="/admin/finance-driver-balances?filter=high-negative">
+              <StatCard
+                icon={DollarSign}
+                iconColor="text-orange-600"
+                iconBgColor="bg-orange-50 dark:bg-orange-950/50"
+                value={riskStats?.highNegativeBalance ?? 0}
+                label="Debt > ৳5000"
+                isLoading={isLoadingRisk}
+                testId="card-high-negative"
+              />
+            </Link>
+
+            <Link href="/admin/finance-driver-balances?filter=overdue">
+              <StatCard
+                icon={Clock}
+                iconColor="text-yellow-600"
+                iconBgColor="bg-yellow-50 dark:bg-yellow-950/50"
+                value={riskStats?.overdueSettlements ?? 0}
+                label="Overdue > 14 Days"
+                isLoading={isLoadingRisk}
+                testId="card-overdue-settlements"
+              />
+            </Link>
+
+            <Link href="/admin/settlement">
+              <StatCard
+                icon={Wallet}
+                iconColor="text-purple-600"
+                iconBgColor="bg-purple-50 dark:bg-purple-950/50"
+                value={`৳${((riskStats?.totalNegativeBalance ?? 0) / 1000).toFixed(1)}k`}
+                label="Total Outstanding"
+                isLoading={isLoadingRisk}
+                testId="card-total-outstanding"
               />
             </Link>
           </div>

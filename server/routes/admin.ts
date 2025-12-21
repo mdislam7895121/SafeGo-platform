@@ -246,6 +246,72 @@ router.get("/stats", checkPermission(Permission.VIEW_DASHBOARD), async (req: Aut
 });
 
 // ====================================================
+// GET /api/admin/stats/risk
+// FIX 2: Risk statistics for negative balance visibility
+// Returns drivers at risk, high negative balance (>5000 BDT), overdue (>14 days)
+// ====================================================
+router.get("/stats/risk", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    // Get all driver wallets with negative balance
+    const walletsWithDebt = await prisma.wallet.findMany({
+      where: {
+        ownerType: "driver",
+        negativeBalance: { gt: 0 }
+      },
+      include: {
+        driverProfile: {
+          select: {
+            id: true,
+            userId: true,
+            countryCode: true,
+          }
+        }
+      }
+    });
+
+    // Calculate risk metrics
+    let driversAtRisk = 0;
+    let highNegativeBalance = 0;
+    let overdueSettlements = 0;
+    let totalNegativeBalance = 0;
+
+    const now = new Date();
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    for (const wallet of walletsWithDebt) {
+      const negBal = parseFloat(wallet.negativeBalance?.toString() || "0");
+      totalNegativeBalance += negBal;
+
+      // Check if high negative balance (>5000 for BD, >100 for US)
+      const threshold = wallet.driverProfile?.countryCode === "BD" ? 5000 : 100;
+      if (negBal > threshold) {
+        highNegativeBalance++;
+      }
+
+      // Check if overdue (last transaction > 14 days ago)
+      if (wallet.lastTransactionDate && new Date(wallet.lastTransactionDate) < fourteenDaysAgo) {
+        overdueSettlements++;
+      }
+
+      // At-risk = high balance OR overdue
+      if (negBal > threshold || (wallet.lastTransactionDate && new Date(wallet.lastTransactionDate) < fourteenDaysAgo)) {
+        driversAtRisk++;
+      }
+    }
+
+    res.json({
+      driversAtRisk,
+      highNegativeBalance,
+      overdueSettlements,
+      totalNegativeBalance,
+    });
+  } catch (error) {
+    console.error("Admin risk stats error:", error);
+    res.status(500).json({ error: "Failed to fetch risk stats" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/pending-kyc
 // List all users with pending verification
 // ====================================================
