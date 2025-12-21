@@ -1,0 +1,95 @@
+ROLE: Senior Full-Stack Engineer & Admin Panel Auditor
+
+PROJECT: SafeGo Admin Panel (Web)
+
+OBJECTIVE (STRICT):
+Audit the ENTIRE Admin Panel end-to-end and FIX ALL ISSUES.
+If ANY admin page is broken, missing, crashing, or partially working — it is considered FAILURE.
+
+SCOPE (ADMIN ONLY — DO NOT TOUCH CUSTOMER / DRIVER / MAP / RIDE UI):
+
+1) ROUTING & 404 ISSUES (CRITICAL)
+- Scan every admin sidebar menu item.
+- Ensure EVERY route exists and loads:
+  /admin
+  /admin/dashboard
+  /admin/users
+  /admin/drivers
+  /admin/restaurants
+  /admin/parcels
+  /admin/wallets
+  /admin/payouts
+  /admin/kyc
+  /admin/onboarding
+  /admin/onboarding-overview
+  /admin/bd-expansion
+  /admin/cms-pages
+  /admin/settings
+- ZERO admin route may show:
+  - 404 Page Not Found
+  - Blank screen
+  - “Did you forget to add the page to the router?”
+
+2) SIDEBAR & LAYOUT (CRITICAL)
+- Sidebar must NOT jump, auto-scroll, or reset position.
+- Sidebar scroll must be independent of page content.
+- Layout must be stable on refresh and navigation.
+- No layout shift on route change.
+
+3) CMS / CONTENT PAGES (CRITICAL)
+- Fix “Failed to load pages”
+- Fix Select / SelectItem empty value crash.
+- CMS Pages must:
+  - Load list
+  - Create new page
+  - Edit page
+  - Save page
+  - Delete page
+- No red error banners.
+- No console errors.
+
+4) ADMIN AUTH & API HANDLING
+- If not logged in → clean “Authentication required” state.
+- If logged in → data must load.
+- No silent failures.
+- All API errors must show readable admin-friendly messages.
+
+5) TYPESCRIPT & RUNTIME ERRORS
+- Remove all runtime crashes.
+- Fix all TypeScript errors in admin pages.
+- No `any` hacks unless unavoidable (explain why if used).
+
+6) ERROR HANDLING STANDARD
+- Replace raw error dumps with:
+  - Friendly UI message
+  - Retry option
+  - Proper fallback component
+
+7) FINAL VERIFICATION (MANDATORY)
+You MUST:
+- Manually open every admin menu item
+- Confirm NO 404
+- Confirm NO crash
+- Confirm NO blank page
+- Confirm sidebar stability
+
+8) DELIVERY REQUIREMENTS
+- Provide a clear checklist:
+  ✅ Page name → Working
+- Mention any page that was missing and added.
+- Mention any route that was fixed.
+- If ANY admin page still fails → state clearly “ADMIN NOT READY”.
+
+IMPORTANT RULES:
+- Do NOT touch customer, driver, ride, map, pricing, or UI polish.
+- Do NOT add new features.
+- ONLY fix what is broken.
+- Quality > speed.
+- This is a PAID audit — partial fixes are NOT acceptable.
+
+FINAL OUTPUT FORMAT:
+1. Summary of issues found
+2. Exact fixes applied
+3. Confirmation: “Admin panel fully stable” OR “Admin panel still broken (list reasons)”
+
+START ONLY AFTER FULL ADMIN AUDIT.
