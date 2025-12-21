@@ -12316,6 +12316,7 @@ router.post(
         discountType,
         value,
         maxDiscountAmount,
+        countryCode,
         appliesTo,
         targetCities,
         targetCategories,
@@ -12342,6 +12343,7 @@ router.post(
           discountType,
           value,
           maxDiscountAmount: maxDiscountAmount || null,
+          countryCode: countryCode || null,
           appliesTo,
           targetCities: targetCities || [],
           targetCategories: targetCategories || [],
@@ -12444,6 +12446,7 @@ router.patch(
       if (updates.discountType !== undefined) data.discountType = updates.discountType;
       if (updates.value !== undefined) data.value = updates.value;
       if (updates.maxDiscountAmount !== undefined) data.maxDiscountAmount = updates.maxDiscountAmount;
+      if (updates.countryCode !== undefined) data.countryCode = updates.countryCode;
       if (updates.appliesTo !== undefined) data.appliesTo = updates.appliesTo;
       if (updates.targetCities !== undefined) data.targetCities = updates.targetCities;
       if (updates.targetCategories !== undefined) data.targetCategories = updates.targetCategories;
