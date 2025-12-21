@@ -69,12 +69,17 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
 
   return (
     <SidebarProvider style={sidebarStyle}>
-      <div className="flex min-h-screen w-full">
-        <AdminSidebar />
+      {/* Admin Layout Container - Fixed height, no body scroll */}
+      <div className="flex h-screen w-full overflow-hidden">
+        {/* Sidebar - Sticky, never scrolls with page */}
+        <aside className="h-screen sticky top-0 flex-shrink-0 overflow-y-auto">
+          <AdminSidebar />
+        </aside>
         
-        <SidebarInset className="flex flex-col flex-1">
-          {/* Header - Mobile optimized with larger tap targets */}
-          <header className="sticky top-0 z-[100] flex h-14 sm:h-16 items-center gap-2 sm:gap-4 border-b bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 shadow-sm px-3 sm:px-4 md:px-6">
+        {/* Content Area - Only this scrolls */}
+        <SidebarInset className="flex flex-col flex-1 h-screen overflow-hidden">
+          {/* Header - Fixed at top of content area */}
+          <header className="sticky top-0 z-[100] flex h-14 sm:h-16 items-center gap-2 sm:gap-4 border-b bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 shadow-sm px-3 sm:px-4 md:px-6 flex-shrink-0">
             {/* Sidebar Toggle - 44px minimum tap target */}
             <SidebarTrigger className="-ml-1 min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9" data-testid="button-sidebar-toggle">
               <PanelLeft className="h-5 w-5" />
@@ -194,8 +199,8 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
             </div>
           </header>
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-auto">
+          {/* Main Content - This is the only scrolling area */}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
             {children}
           </main>
         </SidebarInset>
