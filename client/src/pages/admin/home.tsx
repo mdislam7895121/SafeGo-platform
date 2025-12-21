@@ -420,20 +420,8 @@ export default function AdminHome() {
         }
       />
 
-      {/* Welcome Message for New Admins */}
-      <div className="px-4 sm:px-6 md:px-8 pt-4">
-        <WelcomeMessage
-          title="Welcome to SafeGo Admin!"
-          message="You have full access to manage drivers, restaurants, customers, and platform settings. Use the quick actions below to get started or explore the management sections."
-          ctaText="View Getting Started Guide"
-          ctaHref="/admin/settings"
-          variant="gradient"
-          storageKey="admin_dashboard"
-        />
-      </div>
-
       {/* Real-Time Analytics Dashboard */}
-      <div className="px-4 sm:px-6 md:px-8 pt-5">
+      <div className="px-4 sm:px-6 md:px-8 pt-4">
         <RealTimeAnalytics />
       </div>
 
