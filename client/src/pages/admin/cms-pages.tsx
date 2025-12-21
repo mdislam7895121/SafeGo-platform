@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CmsPage {
   id: string;
@@ -52,56 +53,33 @@ async function fetchPages(category?: string, status?: string, search?: string) {
   if (status) params.append('status', status);
   if (search) params.append('search', search);
   
-  const res = await fetch(`/api/cms/admin?${params.toString()}`, {
-    credentials: 'include'
-  });
-  if (!res.ok) throw new Error('Failed to fetch pages');
-  return res.json();
+  return apiRequest(`/api/cms/admin?${params.toString()}`);
 }
 
 async function fetchPage(id: string) {
-  const res = await fetch(`/api/cms/admin/${id}`, {
-    credentials: 'include'
-  });
-  if (!res.ok) throw new Error('Failed to fetch page');
-  return res.json();
+  return apiRequest(`/api/cms/admin/${id}`);
 }
 
 async function createPage(data: Partial<CmsPage>) {
-  const res = await fetch('/api/cms/admin', {
+  return apiRequest('/api/cms/admin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(data)
   });
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || 'Failed to create page');
-  }
-  return res.json();
 }
 
 async function updatePage(id: string, data: Partial<CmsPage>) {
-  const res = await fetch(`/api/cms/admin/${id}`, {
+  return apiRequest(`/api/cms/admin/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(data)
   });
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || 'Failed to update page');
-  }
-  return res.json();
 }
 
 async function deletePage(id: string) {
-  const res = await fetch(`/api/cms/admin/${id}`, {
-    method: 'DELETE',
-    credentials: 'include'
+  return apiRequest(`/api/cms/admin/${id}`, {
+    method: 'DELETE'
   });
-  if (!res.ok) throw new Error('Failed to delete page');
-  return res.json();
 }
 
 export default function AdminCmsPages() {
