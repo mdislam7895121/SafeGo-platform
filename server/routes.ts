@@ -103,6 +103,7 @@ import systemHealthRoutes from "./routes/system-health"; // SafeGo Master Tasks 
 import contactSubmissionsRoutes from "./routes/contact-submissions"; // Public Contact Form Submissions
 import partnerOnboardingRoutes from "./routes/partner-onboarding"; // Partner Onboarding Applications
 import cmsRoutes from "./routes/cms"; // CMS Pages for Company/Legal/Support content
+import landingCmsRoutes from "./routes/landing-cms"; // Landing Page CMS
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -465,6 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/contact", contactSubmissionsRoutes); // Public Contact Form Submissions (rate limited for POST, auth required for admin GET)
   app.use("/api/partner-onboarding", partnerOnboardingRoutes); // Partner Onboarding Applications (rate limited for POST, auth required for admin GET)
   app.use("/api/cms", cmsRoutes); // CMS Pages - public and admin endpoints
+  app.use("/api", landingCmsRoutes); // Landing Page CMS - public and admin endpoints
   app.use("/api/phase5", phase5Routes); // Phase 5: Experience Intelligence & Real-Time Optimization
   app.use("/api", phase6Routes); // Phase 6: Security Hardening & Deployment Readiness (includes /health)
   app.use("/api/security", securityRoutes); // Phase 6B: Customer Security Features (SOS, device trust, privacy)
