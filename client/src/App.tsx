@@ -48,6 +48,9 @@ const CareersPage = lazy(() => import("@/pages/landing/CareersPage"));
 const PressPage = lazy(() => import("@/pages/landing/PressPage"));
 const BlogPage = lazy(() => import("@/pages/landing/BlogPage"));
 
+// Dynamic CMS page
+const DynamicPage = lazy(() => import("@/pages/landing/DynamicPage"));
+
 // Lazy-loaded route modules for major sections
 const AdminRoutes = lazy(() => import("@/routes/AdminRoutes").then(m => ({ default: m.AdminRoutes })));
 const DriverRoutes = lazy(() => import("@/routes/DriverRoutes").then(m => ({ default: m.DriverRoutes })));
@@ -324,6 +327,18 @@ function Router() {
           <Suspense fallback={<LoadingSpinner />}>
             <BlogPage />
           </Suspense>
+        </Route>
+
+        {/* Dynamic CMS Pages */}
+        <Route path="/p/:slug">
+          <Suspense fallback={<LoadingSpinner />}>
+            <DynamicPage />
+          </Suspense>
+        </Route>
+
+        {/* Become Partner redirect */}
+        <Route path="/become-partner">
+          <Redirect to="/partner/driver/register" />
         </Route>
 
         {/* Customer Routes */}

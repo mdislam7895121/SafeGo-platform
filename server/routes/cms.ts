@@ -1,18 +1,21 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
-import { requireAuth, requireAdmin } from '../middleware/auth';
-import { CmsPageCategory, CmsPageStatus, CmsPageVisibility } from '@prisma/client';
+import { authenticateToken, requireRole, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
 
 const router = Router();
+
+const CMS_PAGE_CATEGORIES = ['legal', 'company', 'support', 'partner'] as const;
+const CMS_PAGE_STATUSES = ['draft', 'published'] as const;
+const CMS_PAGE_VISIBILITIES = ['public_visible', 'partner_only'] as const;
 
 const createPageSchema = z.object({
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
   title: z.string().min(1).max(200),
   body: z.string(),
-  category: z.nativeEnum(CmsPageCategory).default('company'),
-  status: z.nativeEnum(CmsPageStatus).default('draft'),
-  visibility: z.nativeEnum(CmsPageVisibility).default('public_visible'),
+  category: z.enum(CMS_PAGE_CATEGORIES).default('company'),
+  status: z.enum(CMS_PAGE_STATUSES).default('draft'),
+  visibility: z.enum(CMS_PAGE_VISIBILITIES).default('public_visible'),
   metaDescription: z.string().optional(),
   metaKeywords: z.string().optional()
 });
@@ -23,7 +26,7 @@ router.get('/public/:slug', async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
     
-    const page = await prisma.cmsPage.findUnique({
+    const page = await (prisma as any).cmsPage.findUnique({
       where: { slug },
       select: {
         id: true,
@@ -67,16 +70,18 @@ router.get('/public/:slug', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/admin', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+const adminAuth = [authenticateToken, requireRole(['admin', 'super_admin', 'compliance_admin'])];
+
+router.get('/admin', ...adminAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { category, status, search } = req.query;
 
     const where: any = {};
     
-    if (category && Object.values(CmsPageCategory).includes(category as CmsPageCategory)) {
+    if (category && CMS_PAGE_CATEGORIES.includes(category as any)) {
       where.category = category;
     }
-    if (status && Object.values(CmsPageStatus).includes(status as CmsPageStatus)) {
+    if (status && CMS_PAGE_STATUSES.includes(status as any)) {
       where.status = status;
     }
     if (search && typeof search === 'string') {
@@ -86,7 +91,7 @@ router.get('/admin', requireAuth, requireAdmin, async (req: Request, res: Respon
       ];
     }
 
-    const pages = await prisma.cmsPage.findMany({
+    const pages = await (prisma as any).cmsPage.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
       select: {
@@ -108,11 +113,11 @@ router.get('/admin', requireAuth, requireAdmin, async (req: Request, res: Respon
   }
 });
 
-router.get('/admin/:id', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+router.get('/admin/:id', ...adminAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const page = await prisma.cmsPage.findUnique({
+    const page = await (prisma as any).cmsPage.findUnique({
       where: { id }
     });
 
@@ -127,12 +132,12 @@ router.get('/admin/:id', requireAuth, requireAdmin, async (req: Request, res: Re
   }
 });
 
-router.post('/admin', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+router.post('/admin', ...adminAuth, async (req: AuthRequest, res: Response) => {
   try {
     const validated = createPageSchema.parse(req.body);
-    const adminId = (req as any).user?.id;
+    const adminId = req.user?.id;
 
-    const existingPage = await prisma.cmsPage.findUnique({
+    const existingPage = await (prisma as any).cmsPage.findUnique({
       where: { slug: validated.slug }
     });
 
@@ -140,7 +145,7 @@ router.post('/admin', requireAuth, requireAdmin, async (req: Request, res: Respo
       return res.status(400).json({ error: 'A page with this slug already exists' });
     }
 
-    const page = await prisma.cmsPage.create({
+    const page = await (prisma as any).cmsPage.create({
       data: {
         ...validated,
         createdByAdminId: adminId,
@@ -158,13 +163,13 @@ router.post('/admin', requireAuth, requireAdmin, async (req: Request, res: Respo
   }
 });
 
-router.put('/admin/:id', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+router.put('/admin/:id', ...adminAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const validated = updatePageSchema.parse(req.body);
-    const adminId = (req as any).user?.id;
+    const adminId = req.user?.id;
 
-    const existingPage = await prisma.cmsPage.findUnique({
+    const existingPage = await (prisma as any).cmsPage.findUnique({
       where: { id }
     });
 
@@ -172,7 +177,7 @@ router.put('/admin/:id', requireAuth, requireAdmin, async (req: Request, res: Re
       return res.status(404).json({ error: 'Page not found' });
     }
 
-    const page = await prisma.cmsPage.update({
+    const page = await (prisma as any).cmsPage.update({
       where: { id },
       data: {
         ...validated,
@@ -190,11 +195,11 @@ router.put('/admin/:id', requireAuth, requireAdmin, async (req: Request, res: Re
   }
 });
 
-router.delete('/admin/:id', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+router.delete('/admin/:id', ...adminAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const existingPage = await prisma.cmsPage.findUnique({
+    const existingPage = await (prisma as any).cmsPage.findUnique({
       where: { id }
     });
 
@@ -202,7 +207,7 @@ router.delete('/admin/:id', requireAuth, requireAdmin, async (req: Request, res:
       return res.status(404).json({ error: 'Page not found' });
     }
 
-    await prisma.cmsPage.delete({ where: { id } });
+    await (prisma as any).cmsPage.delete({ where: { id } });
 
     return res.json({ success: true, message: 'Page deleted successfully' });
   } catch (error) {
