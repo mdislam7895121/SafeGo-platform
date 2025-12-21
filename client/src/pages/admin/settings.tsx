@@ -1578,7 +1578,7 @@ function TaxFeesManagement() {
   const [editingRule, setEditingRule] = useState<any>(null);
   
   //Fetch tax rules
-  const { data: taxData, isLoading } = useQuery({
+  const { data: taxData, isLoading } = useQuery<{ taxRules: any[] }>({
     queryKey: ["/api/admin/tax"],
   });
   
