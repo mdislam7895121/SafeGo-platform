@@ -1,0 +1,147 @@
+SYSTEM ROLE:
+You are a senior backend + admin-ops engineer working on the SafeGo Global Project.
+You MUST follow all SafeGo Master Rules strictly.
+If any rule is missed or simplified, you MUST rewrite until fully compliant.
+
+==================================================
+TASK TITLE
+==================================================
+ADMIN STEP 2 — IMPLEMENT ALL MUST-FIX ITEMS (PRIORITY LOCKED)
+
+==================================================
+CONTEXT
+==================================================
+- Solo founder operation
+- Bangladesh production focus
+- Ride service ACTIVE
+- Cash-only payments
+- Food & Parcel backend-ready but market OFF
+- USA backend MUST remain unaffected
+- No shareholders
+- Admin panel already exists and is production-ready
+- This task is to FIX operational risks discovered during dry-run
+
+==================================================
+FIX PRIORITY (DO NOT CHANGE ORDER)
+==================================================
+
+CRITICAL (Fix these FIRST):
+1) Settlement Click Safety
+2) Negative Balance Visibility
+3) Block Enforcement Consistency
+
+IMPORTANT:
+4) Partial Payment Clarity
+5) Admin Notes Discipline
+
+NICE-TO-HAVE (only if non-breaking):
+6) Ride Anomaly Signals
+7) Admin Time Cost Reduction
+
+==================================================
+FIX DETAILS (MANDATORY)
+==================================================
+
+### FIX 1: SETTLEMENT CLICK SAFETY (CRITICAL)
+- Add confirmation modal before "Mark as Paid"
+- Modal MUST show:
+  - Driver name
+  - Week range
+  - Amount due
+- Prevent double settlement for same driver + same week (HARD LOCK)
+- Add settlement_id uniqueness constraint
+
+PASS CONDITION:
+- Double settlement for same week is impossible
+
+---
+
+### FIX 2: NEGATIVE BALANCE VISIBILITY (CRITICAL)
+- Admin Dashboard MUST include cards:
+  - Drivers at Risk
+  - Negative Balance > 5000 BDT
+  - Unpaid > 14 days
+- Each card MUST be clickable and filtered
+
+PASS CONDITION:
+- Risk visible within 1 second of dashboard load
+
+---
+
+### FIX 3: BLOCK ENFORCEMENT CONSISTENCY (CRITICAL)
+- Block action MUST be immediate
+- Block effects:
+  - No ride assignment
+  - Login allowed, actions blocked
+- Block reason REQUIRED
+- Block timestamp + admin_id logged
+
+PASS CONDITION:
+- Block takes effect instantly everywhere
+
+---
+
+### FIX 4: PARTIAL PAYMENT CLARITY (IMPORTANT)
+- Partial payment auto-calculates remaining balance
+- Remaining balance carries forward to next week
+- At-risk flag auto-enabled on partial payment
+- Settlement screen shows carry-forward clearly
+
+PASS CONDITION:
+- No ambiguity after partial payment
+
+---
+
+### FIX 5: ADMIN NOTES DISCIPLINE (IMPORTANT)
+- Notes sorted chronologically
+- Notes highlighted on driver decision screens
+- Notes NEVER visible to driver or customer
+
+PASS CONDITION:
+- Admin decisions have context instantly
+
+---
+
+### FIX 6: RIDE ANOMALY SIGNALS (OPTIONAL, NON-BREAKING)
+- Flag:
+  - Very short rides
+  - High cancellation rate
+  - Repeated same route
+- Visual hint only (NO automation)
+
+PASS CONDITION:
+- Admin receives early warning, not auto-punishment
+
+---
+
+### FIX 7: ADMIN TIME COST REDUCTION (OPTIONAL)
+- Weekly settlement ≤ 60 minutes
+- Driver profile accessible within 2 clicks
+- Dashboard → key action within 1 click
+
+PASS CONDITION:
+- Total admin work ≤ 5 hours/week
+
+==================================================
+NON-BREAKING GUARANTEE (MANDATORY)
+==================================================
+- DO NOT rename existing fields
+- Only ADD nullable fields if required
+- Preserve all schemas
+- Preserve Food & Parcel compatibility
+- USA backend MUST remain unaffected
+
+==================================================
+OUTPUT REQUIREMENTS
+==================================================
+- List each fix implemented
+- Mention affected screens
+- Mention affected DB fields (if any)
+- Mention how pass condition is enforced
+- Single, complete response
+
+==================================================
+FAILURE CONDITION
+==================================================
+If ANY fix is missing, incomplete, or breaks SafeGo rules,
+YOU MUST rewrite the entire output until 100% compliant.
