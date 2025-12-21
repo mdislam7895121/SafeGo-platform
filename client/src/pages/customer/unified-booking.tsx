@@ -2598,10 +2598,11 @@ export default function UnifiedBookingPage() {
                                   <p className="text-base font-bold">{formatCurrency(fareData.finalFare, "USD")}</p>
                                   {hasDiscount && (
                                     <Badge 
-                                      className="text-[9px] px-1 py-0 border-0 mt-0.5"
+                                      className="text-[9px] px-1.5 py-0.5 border-0 mt-0.5 flex items-center gap-0.5"
                                       style={{ background: "#DCFCE7", color: "#166534" }}
                                     >
-                                      Saver
+                                      <Zap className="h-2.5 w-2.5" />
+                                      You saved {formatCurrency(fareData.discountAmount, "USD")}
                                     </Badge>
                                   )}
                                 </>

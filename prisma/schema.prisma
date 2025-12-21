@@ -4954,6 +4954,7 @@ model RidePromotion {
   maxDiscountAmount Decimal?              @db.Decimal(10, 2) // Cap for percentage discounts
 
   // Targeting
+  countryCode        String?            // "US" or "BD" - null means applies to all countries
   appliesTo          RidePromoAppliesTo @default(ALL)
   targetCities       String[]           @default([]) // City codes (if CITY)
   targetCategories   String[]           @default([]) // Vehicle categories (if CATEGORY)
@@ -4992,6 +4993,7 @@ model RidePromotion {
   @@index([isDefault])
   @@index([startAt, endAt])
   @@index([appliesTo])
+  @@index([countryCode])
   @@index([priority])
   @@map("ride_promotions")
 }
