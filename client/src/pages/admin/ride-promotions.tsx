@@ -622,6 +622,7 @@ export default function AdminRidePromotions() {
                   <TableRow>
                     <TableHead>Promotion</TableHead>
                     <TableHead>Discount</TableHead>
+                    <TableHead>Country</TableHead>
                     <TableHead>Targeting</TableHead>
                     <TableHead>Validity</TableHead>
                     <TableHead>Usage</TableHead>
@@ -658,6 +659,12 @@ export default function AdminRidePromotions() {
                             )}
                             <span className="font-medium">{formatDiscount(promo)}</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="w-fit text-xs flex items-center gap-1">
+                            <Globe className="h-3 w-3" />
+                            {countryLabels[promo.countryCode || "ALL"]}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
