@@ -1,0 +1,105 @@
+SYSTEM ROLE:
+You are a senior frontend engineer working on the SafeGo Global web app.
+Assume all legal policy CONTENT is already written and approved.
+Your task is ONLY to fix routing and page availability.
+Do NOT rewrite policy text.
+
+==================================================
+TASK TITLE
+==================================================
+FIX LEGAL PAGE ROUTING (404 ISSUE) – SAFEGO WEB APP
+
+==================================================
+PROBLEM STATEMENT
+==================================================
+
+On the SafeGo website footer, the following legal links exist:
+
+- /terms
+- /privacy
+- /cookie-policy
+- /safety-policy
+- /data-deletion
+- /partner-terms
+
+However, visiting these routes currently returns:
+"404 Page Not Found – Did you forget to add the page to the router?"
+
+This is a ROUTING / PAGE REGISTRATION issue, not a policy content issue.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Ensure that ALL legal footer links resolve successfully (no 404),
+using a PILOT-SAFE, MINIMAL implementation.
+
+==================================================
+REQUIREMENTS (STRICT)
+==================================================
+
+1) Create two primary legal pages:
+   - /terms
+   - /privacy
+
+2) Paste the already-approved policy content into:
+   - Terms of Service → /terms
+   - Privacy Policy → /privacy
+
+3) For the following routes:
+   - /cookie-policy
+   - /safety-policy
+   - /data-deletion
+   - /partner-terms
+
+   DO NOT create separate pages yet.
+
+   Instead, implement TEMPORARY redirects:
+   - Routes related to privacy → redirect to /privacy
+   - Routes related to terms/safety/partners → redirect to /terms
+
+4) No footer links should return 404.
+
+==================================================
+TECHNICAL NOTES
+==================================================
+
+- Use the existing routing system (Next.js / React Router / Expo Router / Vite Router – whichever is in use).
+- Redirects can be implemented via:
+  - Router redirects
+  - Middleware
+  - Fallback routes
+- Do NOT change URLs shown in the footer.
+- Do NOT remove any footer links.
+
+==================================================
+ACCEPTANCE CRITERIA
+==================================================
+
+- Visiting /terms loads Terms content
+- Visiting /privacy loads Privacy content
+- Visiting any other legal footer link redirects cleanly
+- No 404 errors on legal pages
+- No UI/UX redesign
+- No policy text changes
+
+==================================================
+OUT OF SCOPE
+==================================================
+
+- Creating separate cookie/safety pages
+- SEO optimization
+- Styling changes
+- Content rewriting
+
+==================================================
+DELIVERABLE
+==================================================
+
+- Working legal routes
+- Confirmation of which routes redirect where
+- No regressions elsewhere in the app
+
+==================================================
+END OF TASK
+==================================================
