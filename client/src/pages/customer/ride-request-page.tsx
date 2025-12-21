@@ -19,9 +19,7 @@ import { useKycStatus } from "@/hooks/useKycStatus";
 import { KycEnforcementBanner } from "@/components/KycEnforcementBanner";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { decodePolyline } from "@/lib/formatters";
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { GoogleMapsRideBooking } from "@/components/maps/GoogleMapsRideBooking";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -105,60 +103,6 @@ interface FareEstimateResponse {
 interface CityOption {
   code: string;
   name: string;
-}
-
-const pickupIcon = L.divIcon({
-  className: "custom-marker",
-  html: `<div style="
-    width: 32px; height: 32px; background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); 
-    border: 3px solid white; border-radius: 50%; 
-    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-    display: flex; align-items: center; justify-content: center;
-  ">
-    <span style="color: white; font-weight: bold; font-size: 14px;">A</span>
-  </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-});
-
-const dropoffIcon = L.divIcon({
-  className: "custom-marker",
-  html: `<div style="
-    width: 32px; height: 32px; background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); 
-    border: 3px solid white; border-radius: 50%; 
-    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-    display: flex; align-items: center; justify-content: center;
-  ">
-    <span style="color: white; font-weight: bold; font-size: 14px;">B</span>
-  </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-});
-
-function MapBoundsHandler({
-  pickupLocation,
-  dropoffLocation,
-}: {
-  pickupLocation: LocationData | null;
-  dropoffLocation: LocationData | null;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (pickupLocation && dropoffLocation) {
-      const bounds = L.latLngBounds(
-        [pickupLocation.lat, pickupLocation.lng],
-        [dropoffLocation.lat, dropoffLocation.lng]
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    } else if (pickupLocation) {
-      map.setView([pickupLocation.lat, pickupLocation.lng], 15);
-    } else if (dropoffLocation) {
-      map.setView([dropoffLocation.lat, dropoffLocation.lng], 15);
-    }
-  }, [map, pickupLocation, dropoffLocation]);
-
-  return null;
 }
 
 function getVehicleIcon(iconType: string) {
@@ -488,31 +432,14 @@ export default function RideRequestPage() {
       </header>
 
       <div className="flex-1 relative min-h-0">
-        <MapContainer
-          center={pickupLocation ? [pickupLocation.lat, pickupLocation.lng] : defaultCenter}
-          zoom={13}
-          style={{ height: "100%", width: "100%" }}
-          zoomControl={false}
-          aria-label="Ride booking map showing pickup and dropoff locations"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapBoundsHandler pickupLocation={pickupLocation} dropoffLocation={dropoffLocation} />
-          {pickupLocation && (
-            <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={pickupIcon} />
-          )}
-          {dropoffLocation && (
-            <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={dropoffIcon} />
-          )}
-          {routePolyline && routePolyline.length > 0 && (
-            <Polyline
-              positions={routePolyline}
-              pathOptions={{ color: "#3B82F6", weight: 4, opacity: 0.8 }}
-            />
-          )}
-        </MapContainer>
+        <GoogleMapsRideBooking
+          pickupLocation={pickupLocation}
+          dropoffLocation={dropoffLocation}
+          routePolyline={routePolyline}
+          defaultCenter={{ lat: defaultCenter[0], lng: defaultCenter[1] }}
+          defaultZoom={13}
+          className="h-full w-full"
+        />
 
         <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-[1000]">
           <Card className="shadow-lg">
