@@ -56,7 +56,7 @@ async function fetchLandingCms(country: string): Promise<LandingCmsData> {
       useFallback: true,
       country,
       settings: null,
-      sections: {}
+      sections: {} as Record<string, LandingSectionData>
     };
   }
 }

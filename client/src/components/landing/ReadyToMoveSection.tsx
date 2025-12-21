@@ -16,10 +16,14 @@ const CTA_CONFIG: Record<Region, { subtitle: string }> = {
 
 interface ReadyToMoveSectionProps {
   selectedRegion: Region;
+  cmsTitle?: string;
+  cmsSubtitle?: string;
 }
 
-export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedRegion }: ReadyToMoveSectionProps) {
+export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedRegion, cmsTitle, cmsSubtitle }: ReadyToMoveSectionProps) {
   const config = CTA_CONFIG[selectedRegion] || CTA_CONFIG.GLOBAL;
+  const title = cmsTitle || "Ready to move with SafeGo?";
+  const subtitle = cmsSubtitle || config.subtitle;
   
   return (
     <section 
@@ -57,14 +61,14 @@ export const ReadyToMoveSection = memo(function ReadyToMoveSection({ selectedReg
           className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white"
           style={{ marginBottom: '16px' }}
         >
-          Ready to move with SafeGo?
+          {title}
         </h2>
 
         <p 
           className="text-base sm:text-lg text-white/90 max-w-2xl mx-auto"
           style={{ marginBottom: '36px' }}
         >
-          {config.subtitle}
+          {subtitle}
         </p>
 
         {/* App Store Badges */}

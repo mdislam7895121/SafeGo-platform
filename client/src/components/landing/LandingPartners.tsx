@@ -5,8 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Region, PARTNER_CONFIG } from "./LandingConfig";
 
-export const PartnerSection = memo(function PartnerSection({ selectedRegion }: { selectedRegion: Region }) {
+interface PartnerSectionProps {
+  selectedRegion: Region;
+  cmsTitle?: string;
+  cmsSubtitle?: string;
+}
+
+export const PartnerSection = memo(function PartnerSection({ selectedRegion, cmsTitle, cmsSubtitle }: PartnerSectionProps) {
   const config = PARTNER_CONFIG[selectedRegion];
+
+  const title = cmsTitle || "Become a Partner";
+  const subtitle = cmsSubtitle || "Turn your time or business into earnings with SafeGo";
   
   return (
     <section id="partners" className="py-20 lg:py-24 bg-gray-50 dark:bg-gray-900">
@@ -16,10 +25,10 @@ export const PartnerSection = memo(function PartnerSection({ selectedRegion }: {
             Join Us
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
-            Become a Partner
+            {title}
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Turn your time or business into earnings with SafeGo
+            {subtitle}
           </p>
         </div>
         

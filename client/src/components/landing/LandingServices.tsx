@@ -3,8 +3,17 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Region, REGION_SERVICES } from "./LandingConfig";
 
-export const ServicesSection = memo(function ServicesSection({ selectedRegion }: { selectedRegion: Region }) {
+interface ServicesSectionProps {
+  selectedRegion: Region;
+  cmsTitle?: string;
+  cmsSubtitle?: string;
+}
+
+export const ServicesSection = memo(function ServicesSection({ selectedRegion, cmsTitle, cmsSubtitle }: ServicesSectionProps) {
   const services = REGION_SERVICES[selectedRegion];
+
+  const title = cmsTitle || "Everything in one app";
+  const subtitle = cmsSubtitle || "Choose a service to get started with SafeGo";
   
   return (
     <section id="services" className="py-20 lg:py-24 bg-white dark:bg-gray-950">
@@ -14,10 +23,10 @@ export const ServicesSection = memo(function ServicesSection({ selectedRegion }:
             Our Services
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
-            Everything in one app
+            {title}
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Choose a service to get started with SafeGo
+            {subtitle}
           </p>
         </div>
         

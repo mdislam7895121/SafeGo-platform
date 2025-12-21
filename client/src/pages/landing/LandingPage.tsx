@@ -59,6 +59,8 @@ export default function LandingPage() {
   const showTestingBanner = cmsData?.settings?.showTestingBanner ?? false;
   const testingBannerText = cmsData?.settings?.testingBannerText || 'Testing Environment - Not for production use';
 
+  const sections = cmsData?.sections || {};
+
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="landing-page">
       {showTestingBanner && (
@@ -70,14 +72,39 @@ export default function LandingPage() {
       <main className="flex-1">
         <HeroSection 
           selectedRegion={selectedRegion} 
-          onRegionChange={handleRegionChange} 
+          onRegionChange={handleRegionChange}
+          cmsTitle={sections.hero?.title}
+          cmsSubtitle={sections.hero?.subtitle}
         />
-        <ServicesSection selectedRegion={selectedRegion} />
-        <PartnerSection selectedRegion={selectedRegion} />
-        <HowItWorksSection selectedRegion={selectedRegion} />
-        <SafetySection />
-        <FAQSection selectedRegion={selectedRegion} />
-        <ReadyToMoveSection selectedRegion={selectedRegion} />
+        <ServicesSection 
+          selectedRegion={selectedRegion}
+          cmsTitle={sections.services?.title}
+          cmsSubtitle={sections.services?.subtitle}
+        />
+        <PartnerSection 
+          selectedRegion={selectedRegion}
+          cmsTitle={sections.partners?.title}
+          cmsSubtitle={sections.partners?.subtitle}
+        />
+        <HowItWorksSection 
+          selectedRegion={selectedRegion}
+          cmsTitle={sections.how_it_works?.title}
+          cmsSubtitle={sections.how_it_works?.subtitle}
+        />
+        <SafetySection 
+          cmsTitle={sections.safety?.title}
+          cmsSubtitle={sections.safety?.subtitle}
+        />
+        <FAQSection 
+          selectedRegion={selectedRegion}
+          cmsTitle={sections.faq?.title}
+          cmsSubtitle={sections.faq?.subtitle}
+        />
+        <ReadyToMoveSection 
+          selectedRegion={selectedRegion}
+          cmsTitle={sections.ready_to_move?.title}
+          cmsSubtitle={sections.ready_to_move?.subtitle}
+        />
       </main>
       <GlobalFooter 
         selectedRegion={selectedRegion === "GLOBAL" ? "BD" : selectedRegion}
