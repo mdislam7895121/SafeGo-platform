@@ -542,6 +542,20 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      {/* Partner Signup Redirects (for footer links) */}
+      <Route path="/driver/signup">
+        <Redirect to="/partner/driver/register" />
+      </Route>
+      <Route path="/restaurant/signup">
+        <Redirect to="/partner/restaurant/register" />
+      </Route>
+      <Route path="/partner/shop">
+        <Redirect to="/partner/shop/start" />
+      </Route>
+      <Route path="/partner/ticket">
+        <Redirect to="/partner/ticket/start" />
+      </Route>
+
         {/* 404 */}
         <Route component={NotFound} />
       </Switch>
