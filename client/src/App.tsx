@@ -599,6 +599,12 @@ function Router() {
         <Redirect to="/partner/ticket/start" />
       </Route>
 
+        {/* Route handlers for major sections (handled by external route modules) */}
+        {/* These prevent the 404 from matching - actual content rendered by AdminRoutes/DriverRoutes/RestaurantRoutes */}
+        <Route path="/admin/:rest*">{null}</Route>
+        <Route path="/driver/:rest*">{null}</Route>
+        <Route path="/restaurant/:rest*">{null}</Route>
+
         {/* 404 */}
         <Route component={NotFound} />
       </Switch>

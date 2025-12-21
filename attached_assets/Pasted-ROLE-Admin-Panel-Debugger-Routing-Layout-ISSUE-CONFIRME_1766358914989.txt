@@ -1,0 +1,48 @@
+ROLE: Admin Panel Debugger (Routing + Layout)
+
+ISSUE (CONFIRMED BY SCREENSHOT):
+Inside /admin, a 404 overlay card is still rendering (“Did you forget to add the page to the router?”).
+This means the admin routing/layout is STILL duplicated or a nested Router/Outlet is still mounted.
+
+GOAL:
+- Admin must have exactly ONE routing tree and ONE layout.
+- No global NotFound component may render inside AdminLayout.
+- Visiting /admin must never show any 404 overlay card.
+
+MANDATORY TASKS (DO NOT SKIP):
+
+1) FIND THE SOURCE OF THE 404 OVERLAY
+- Search codebase for the exact text:
+  "Did you forget to add the page to the router?"
+  "404 Page Not Found"
+- Identify which component renders it (file path + component name).
+- This is the component that must not render inside Admin pages.
+
+2) REMOVE NESTED ROUTER / DOUBLE OUTLET
+- Audit AdminLayout/AdminShell/AdminApp:
+  - Ensure there is only one <RouterProvider>/<BrowserRouter>/<Routes> (whatever framework used).
+  - Ensure there is only one <Outlet/> (or equivalent) at admin root.
+  - Ensure no admin page imports AdminLayout again.
+
+3) FIX ADMIN ROUTE TREE
+- Admin routes must be defined in one place.
+- /admin should render Dashboard, not a NotFound fallback.
+- /admin/cms-pages must resolve to CMS list page (no redirects masking issues).
+- Remove any fallback route that matches too broadly inside admin.
+
+4) STOP RENDERING GLOBAL NOTFOUND INSIDE ADMIN
+- If there is a global NotFound route/component, it must only render at app root routing level,
+  NOT inside admin layout.
+- Admin should have its own AdminNotFound page, but it should only render when an admin path is invalid.
+
+5) VERIFICATION (REQUIRED EVIDENCE)
+Provide screenshots (or console logs) proving:
+- /admin shows only one header + one sidebar
+- No 404 overlay card appears anywhere in admin
+- /admin/cms-pages loads (even if API fails, it must not 404)
+- DOM/React tree confirms single AdminLayout mount (no nested layout)
+
+DELIVERABLE FORMAT:
+- “Cause” (exact file/component causing overlay)
+- “Fix” (what you changed)
+- “Proof” (routes tested and results)
