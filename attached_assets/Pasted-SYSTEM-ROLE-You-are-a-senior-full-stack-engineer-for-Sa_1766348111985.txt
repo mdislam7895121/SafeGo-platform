@@ -1,0 +1,104 @@
+SYSTEM ROLE:
+You are a senior full-stack engineer for SafeGo Global.
+Your task is to eliminate ALL 404 pages for Company, Legal, Support, and Partner routes
+and connect them to an Admin-managed CMS.
+This must be scalable, non-breaking, and production-ready.
+
+==================================================
+PROBLEM
+==================================================
+
+All of the following routes return 404:
+
+/terms
+/privacy
+/cookies
+/safety
+/data-deletion
+/partner-terms
+/become-partner
+/careers
+/about
+/contact
+/help
+/accessibility
+/community-guidelines
+/report-issue
+
+These links already exist in the footer and UI.
+They MUST work.
+
+==================================================
+REQUIRED SOLUTION (STRICT)
+==================================================
+
+1. CREATE A SINGLE DYNAMIC PAGE SYSTEM
+   - One reusable public page component (e.g. PublicContentPage)
+   - URL pattern: /p/:slug
+
+2. MAP ALL EXISTING ROUTES TO THIS SYSTEM
+   Examples:
+   /terms            → /p/terms
+   /privacy          → /p/privacy
+   /become-partner   → /p/become-partner
+   /careers          → /p/careers
+
+   Use router rewrites or route aliases so old URLs do NOT break.
+
+3. ADMIN-MANAGED CONTENT (MANDATORY)
+   - Create admin section: Admin → Content / Pages
+   - Admin can:
+     • Create page
+     • Edit title
+     • Edit rich text (markdown or HTML)
+     • Set status: draft / published
+     • Set visibility: public / partner-only
+     • Update without redeploy
+
+4. DATABASE / API
+   Page model fields:
+   - id
+   - slug (unique)
+   - title
+   - body
+   - category (legal | company | support | partner)
+   - status (draft | published)
+   - created_at
+   - updated_at
+
+5. DEFAULT SEED DATA (IMPORTANT)
+   Pre-create these pages in DB:
+   - terms
+   - privacy
+   - cookies
+   - safety
+   - data-deletion
+   - become-partner
+   - careers
+   - about
+   - contact
+   - help
+
+   Body can be placeholder text:
+   “Content will be updated by SafeGo Admin.”
+
+6. UI REQUIREMENTS
+   - Public pages must use SafeGo layout + footer
+   - Mobile responsive
+   - SEO-friendly title per page
+   - Graceful fallback if page not published (show “Coming Soon”)
+
+7. WHAT NOT TO DO
+   ❌ Do NOT hardcode policy text
+   ❌ Do NOT create separate React pages for each policy
+   ❌ Do NOT remove existing footer links
+   ❌ Do NOT break current routing
+
+==================================================
+FINAL RESULT EXPECTED
+==================================================
+
+- No 404 on any Company / Legal / Partner link
+- Become Partner page loads correctly
+- Admin can fully control all legal & company pages
+- System scalable for future countries and services

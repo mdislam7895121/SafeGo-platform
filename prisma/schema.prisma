@@ -14927,3 +14927,50 @@ model SettlementOrder {
   @@index([orderType])
   @@map("settlement_orders")
 }
+
+
+// ========================================
+// CMS PAGES - ADMIN-MANAGED CONTENT
+// ========================================
+
+enum CmsPageCategory {
+  legal
+  company
+  support
+  partner
+}
+
+enum CmsPageStatus {
+  draft
+  published
+}
+
+enum CmsPageVisibility {
+  public_visible
+  partner_only
+}
+
+model CmsPage {
+  id                String              @id @default(uuid())
+  
+  slug              String              @unique
+  title             String
+  body              String              @db.Text
+  
+  category          CmsPageCategory     @default(company)
+  status            CmsPageStatus       @default(draft)
+  visibility        CmsPageVisibility   @default(public_visible)
+  
+  metaDescription   String?             @db.Text
+  metaKeywords      String?
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  createdByAdminId  String?
+  updatedByAdminId  String?
+  
+  @@index([slug])
+  @@index([category])
+  @@index([status])
+  @@map("cms_pages")
+}
