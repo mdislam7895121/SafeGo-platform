@@ -1,4 +1,5 @@
-import { Volume2, VolumeX, Mic } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Volume2, VolumeX, Mic, Globe } from 'lucide-react';
 import { useVoiceNavigation } from '@/hooks/useVoiceNavigation';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -7,7 +8,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import type { VoiceOption } from '@/lib/voiceNavigation';
 
 interface VoiceNavigationControlsProps {
   className?: string;
@@ -26,7 +35,16 @@ export function VoiceNavigationControls({
     toggleEnabled,
     setVolume,
     setRate,
+    setLanguage,
+    getAvailableLanguages,
   } = useVoiceNavigation();
+
+  const [languages, setLanguages] = useState<VoiceOption[]>([]);
+
+  useEffect(() => {
+    const availableLanguages = getAvailableLanguages();
+    setLanguages(availableLanguages);
+  }, [getAvailableLanguages]);
 
   if (!isAvailable) {
     return null;
@@ -125,6 +143,34 @@ export function VoiceNavigationControls({
               onValueChange={([r]) => setRate(r)}
               disabled={!isEnabled}
             />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <Globe className="h-4 w-4" />
+              <span>Language</span>
+            </div>
+            <Select
+              value={config.language}
+              onValueChange={setLanguage}
+              disabled={!isEnabled}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                {languages.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>
+                    <span className="flex items-center gap-2">
+                      <span>{lang.nativeName}</span>
+                      <span className="text-muted-foreground text-xs">
+                        ({lang.name})
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {isSpeaking && (
