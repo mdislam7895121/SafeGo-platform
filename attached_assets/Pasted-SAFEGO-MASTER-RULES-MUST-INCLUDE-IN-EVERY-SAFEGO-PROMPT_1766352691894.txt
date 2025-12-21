@@ -1,0 +1,79 @@
+SAFEGO MASTER RULES (MUST INCLUDE IN EVERY SAFEGO PROMPT)
+[KEEP EXACTLY THE SAME SAFEGO RULES AS PREVIOUS PROMPT — DO NOT REMOVE ANYTHING.
+Include 4 roles, 3 services, BD/US KYC branching, admin panel, rides/food_orders/deliveries collections,
+commission rules, security rules, status flows, onboarding, notifications.]
+
+TASK: SHOW “YOU SAVED” (DISCOUNT/SAVINGS) ON CHOOSE RIDE LIKE UBER
+
+USER REQUEST
+All pricing shows, but the app does NOT show how much the customer saved (Uber-style).
+
+GOAL
+On the customer ride “Choose a ride” UI, show:
+- A small badge/line: “You saved $X.XX” when savings > 0
+- Otherwise hide it (do not show $0.00)
+
+RULES
+- Savings MUST come from backend response (source of truth).
+- UI must not calculate discounts independently.
+- Must work for both US and BD currencies.
+- Non-breaking: only add fields; do not rename/remove existing fields.
+
+BACKEND CHANGES (ADDITIVE ONLY)
+For ride price quote response per vehicle, add:
+- base_fare_amount (number)  // price without discounts
+- final_fare_amount (number) // price after discounts
+- savings_amount (number)    // base - final, backend computed
+- applied_discount: {
+    type: "promo" | "auto" | "none",
+    code?: string,
+    description?: string,
+    percent_off?: number,
+    amount_off?: number
+  }
+- currency_code ("USD"|"BDT")
+- pricing_version (string) for audit/debug
+
+If discounts are not implemented yet:
+- Return base_fare_amount = final_fare_amount
+- savings_amount = 0
+- applied_discount.type="none"
+So UI stays stable.
+
+ADMIN PANEL (REQUIRED)
+Add a Pricing/Promotions section (non-breaking, admin-only):
+- Set global promo on/off per country (US/BD)
+- Define percent_off or amount_off
+- Optional promo code
+- Effective date range
+- Max discount cap
+- Save to existing pricing config tables/collections (add fields only)
+
+FRONTEND CHANGES
+On “Choose a ride” cards:
+- Keep current price display (final_fare_amount).
+- If savings_amount > 0:
+  - Show a subtle label under price:
+    “You saved {currency}{savings_amount}”
+  - If promo code exists, show “Promo applied” (small text).
+- If savings_amount == 0: show nothing.
+
+Also add a “Fare details” drawer/modal:
+- Base fare
+- Discount (as negative line)
+- Final fare
+- (Optional) taxes/fees later, but do not invent numbers.
+
+FILES / MODULES TO TOUCH (EXACT)
+- Pricing quote API handler (rides quote)
+- Shared pricing calculator module (must be backend-owned)
+- Admin: Pricing/Promotions settings page
+- Customer: Choose ride UI component rendering vehicle cards
+
+ACCEPTANCE CHECK
+- With a test promo enabled, cards show “You saved …”
+- Without promo, nothing shows
+- Currency correct (USD/BDT)
+- No breaking changes, old clients still work (fields optional)
+
+END

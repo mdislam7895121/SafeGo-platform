@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Edit, Trash2, Check, X, Zap, Percent, DollarSign, Tag, Users, Calendar, MapPin } from "lucide-react";
+import { Plus, Edit, Trash2, Check, X, Zap, Percent, DollarSign, Tag, Users, Calendar, MapPin, Globe } from "lucide-react";
 import { SocialShareButton, formatPromotionForShare, generatePromotionShareUrl } from "@/components/ui/social-share-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ interface RidePromotion {
   discountType: "PERCENT" | "FLAT";
   value: number;
   maxDiscountAmount: number | null;
+  countryCode: string | null;
   appliesTo: "ALL" | "CITY" | "CATEGORY" | "USER_SEGMENT";
   targetCities: string[];
   targetCategories: string[];
@@ -64,6 +65,12 @@ interface RidePromotion {
   createdAt: string;
   updatedAt: string;
 }
+
+const countryLabels: Record<string, string> = {
+  ALL: "All Countries",
+  US: "United States (USD)",
+  BD: "Bangladesh (BDT)",
+};
 
 const discountTypeLabels: Record<string, string> = {
   PERCENT: "Percentage",
@@ -96,6 +103,7 @@ export default function AdminRidePromotions() {
     discountType: "PERCENT" as "PERCENT" | "FLAT",
     value: "",
     maxDiscountAmount: "",
+    countryCode: "ALL" as "ALL" | "US" | "BD",
     appliesTo: "ALL" as "ALL" | "CITY" | "CATEGORY" | "USER_SEGMENT",
     targetCities: "",
     targetCategories: "",
@@ -195,6 +203,7 @@ export default function AdminRidePromotions() {
       discountType: "PERCENT",
       value: "",
       maxDiscountAmount: "",
+      countryCode: "ALL",
       appliesTo: "ALL",
       targetCities: "",
       targetCategories: "",
@@ -216,6 +225,7 @@ export default function AdminRidePromotions() {
       discountType: promo.discountType,
       value: promo.value.toString(),
       maxDiscountAmount: promo.maxDiscountAmount?.toString() || "",
+      countryCode: (promo.countryCode as "US" | "BD") || "ALL",
       appliesTo: promo.appliesTo,
       targetCities: promo.targetCities.join(", "),
       targetCategories: promo.targetCategories.join(", "),
@@ -236,6 +246,7 @@ export default function AdminRidePromotions() {
       discountType: formData.discountType,
       value: parseFloat(formData.value),
       maxDiscountAmount: formData.maxDiscountAmount ? parseFloat(formData.maxDiscountAmount) : null,
+      countryCode: formData.countryCode === "ALL" ? null : formData.countryCode,
       appliesTo: formData.appliesTo,
       targetCities: formData.targetCities ? formData.targetCities.split(",").map(c => c.trim()).filter(Boolean) : [],
       targetCategories: formData.targetCategories ? formData.targetCategories.split(",").map(c => c.trim()).filter(Boolean) : [],
@@ -400,6 +411,24 @@ export default function AdminRidePromotions() {
                       data-testid="input-promo-max-discount"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Country / Region
+                  </Label>
+                  <Select value={formData.countryCode} onValueChange={(v: any) => setFormData(prev => ({ ...prev, countryCode: v }))}>
+                    <SelectTrigger data-testid="select-country-code">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Countries</SelectItem>
+                      <SelectItem value="US">United States (USD)</SelectItem>
+                      <SelectItem value="BD">Bangladesh (BDT)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Currency and pricing will match the selected country</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
