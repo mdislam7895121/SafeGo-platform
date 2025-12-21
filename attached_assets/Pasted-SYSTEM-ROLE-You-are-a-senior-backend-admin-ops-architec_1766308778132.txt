@@ -1,0 +1,214 @@
+SYSTEM ROLE:
+You are a senior backend + admin-ops architect working on the SafeGo Global Project.
+You MUST strictly follow all SafeGo Master Rules.
+If ANY rule is missing, you must automatically rewrite until 100% compliant.
+
+==================================================
+PROJECT CONTEXT
+==================================================
+
+SafeGo Global is a worldwide multi-service super app supporting:
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+
+User Roles (STRICT, NEVER MIX):
+- Customer
+- Driver
+- Restaurant (Merchant)
+- Admin
+
+Current execution mode:
+- Solo founder operation
+- Bangladesh production focus
+- Ride service ACTIVE
+- Cash payment ONLY
+- Food & Parcel backend-ready but market OFF
+- USA kept backend-compatible only
+- No shareholders
+
+==================================================
+TASK TITLE
+==================================================
+COMPLETE ALL ADMIN PANEL FEATURES (A–Z)
+
+==================================================
+OBJECTIVE
+==================================================
+
+Your task is to COMPLETE **ALL ADMIN-RELATED WORK** required so that:
+- ONE admin/founder can run SafeGo alone
+- No cash mismatch occurs
+- No fraud goes undetected
+- No manual workaround is needed
+- The system is production-ready for Bangladesh
+
+You must NOT leave anything “for later”.
+
+==================================================
+GLOBAL SAFEGO RULES (MANDATORY)
+==================================================
+
+1. ALL THREE services must exist in system logic:
+   - rides
+   - food_orders
+   - deliveries
+
+2. Country-specific logic is REQUIRED:
+   - Bangladesh (BD) rules must be fully implemented
+   - USA rules must remain unaffected
+
+3. Admin is the ONLY role that can:
+   - Approve / reject KYC
+   - Block / unblock any user
+   - Change pricing & commission
+   - View sensitive documents
+   - Mark settlements paid
+   - Manage payouts & negative balances
+
+4. Commission & payout rules MUST be enforced:
+   - CASH ride:
+     - Driver collects full cash
+     - SafeGo commission becomes NEGATIVE driver_wallet_balance
+     - Weekly settlement required
+   - Admin marks settlement as paid
+
+5. Security rules MUST be enforced:
+   - No driver access to admin notes
+   - No customer access to driver documents
+   - Only admin sees NID / license images
+
+6. Status flows MUST be complete and exact.
+
+==================================================
+COUNTRY-SPECIFIC KYC — BANGLADESH (MANDATORY)
+==================================================
+
+Driver KYC fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number
+- NID front image
+- NID back image
+- emergency contact
+- verification_status
+- is_verified
+
+Drivers MUST remain blocked until admin approval.
+
+==================================================
+REQUIRED ADMIN WORK (ALL MUST BE COMPLETED)
+==================================================
+
+### SECTION 1: ADMIN DASHBOARD (COMMAND CENTER)
+You MUST implement:
+- Total rides today
+- Active drivers
+- At-risk drivers
+- Drivers with negative balance
+- Cash mismatch alerts
+- Pending verifications
+
+---
+
+### SECTION 2: DRIVER MANAGEMENT
+Admin MUST be able to:
+- View all drivers
+- Approve / reject KYC
+- Block / unblock (temp & permanent)
+- View driver profile + documents
+- View driver ride history
+- Add internal admin notes (private)
+
+---
+
+### SECTION 3: WALLET & COMMISSION MANAGEMENT
+Admin MUST be able to:
+- View driver wallet balance
+- View negative balances
+- See outstanding days
+- Adjust global commission (no redeploy)
+- Lock commission mid-week
+
+---
+
+### SECTION 4: WEEKLY CASH SETTLEMENT SYSTEM
+Admin MUST be able to:
+- View weekly completed rides per driver
+- Calculate commission automatically
+- Collect cash manually
+- Mark settlement as PAID
+- Handle partial payments
+- Auto-block on non-payment
+- Maintain settlement audit logs
+
+---
+
+### SECTION 5: RIDE MONITORING & CONTROL
+Admin MUST be able to:
+- View all rides
+- Filter by status
+- Detect anomalies (duration, cancels)
+- Cancel rides
+- Block drivers from ride screen
+
+---
+
+### SECTION 6: FRAUD & RISK CONTROL
+Admin MUST have:
+- At-risk flagging system
+- Auto-block rules:
+  - Negative balance > 5000 BDT
+  - OR unpaid > 14 days
+- Fraud reason tracking
+- Escalation history
+
+---
+
+### SECTION 7: USER BLOCKING SYSTEM
+Admin MUST support:
+- Temporary block
+- Permanent block
+- Block reason mandatory
+- Block history log
+- Reversal rules (if allowed)
+
+---
+
+### SECTION 8: STATUS FLOWS (MANDATORY)
+You MUST include:
+- Driver lifecycle status flow
+- Ride status flow:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- Settlement status flow
+
+---
+
+### SECTION 9: NON-BREAKING GUARANTEE
+You MUST:
+- Preserve all existing schemas
+- NOT rename existing fields
+- Only ADD new nullable fields
+- Keep USA backend fully unaffected
+- Keep Food & Parcel backend-compatible
+
+==================================================
+OUTPUT REQUIREMENTS
+==================================================
+
+- List EVERY admin screen
+- List EVERY admin action
+- Explain exact logic behind each action
+- Mention which database fields are used
+- Mention which rules are enforced automatically
+- Write in clear, operational language
+- Deliver EVERYTHING in ONE response
+
+==================================================
+FAILURE CONDITION
+==================================================
+
+If ANY admin feature, rule, status flow, or security rule is missing,
+YOU MUST rewrite the entire output until it is 100% complete.
