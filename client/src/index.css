@@ -303,16 +303,15 @@
   }
 }
 
-/* Leaflet map tile gap/seam fixes */
+/* Leaflet map tile rendering - clean tiles without artifacts */
 .leaflet-tile-container img,
 .leaflet-tile {
-  width: 256.5px !important;
-  height: 256.5px !important;
+  width: 256px !important;
+  height: 256px !important;
 }
 
 .leaflet-tile-pane {
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
+  image-rendering: auto;
 }
 
 .leaflet-container {
