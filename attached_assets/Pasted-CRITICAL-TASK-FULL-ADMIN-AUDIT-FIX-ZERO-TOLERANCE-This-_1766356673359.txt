@@ -1,0 +1,87 @@
+CRITICAL TASK — FULL ADMIN AUDIT & FIX (ZERO TOLERANCE)
+
+This is a PAID task with a strict condition:
+If ANY admin issue remains unfixed, the payment must be REFUNDED.
+No partial fixes. No skipping. No assumptions.
+
+SCOPE (ADMIN ONLY):
+You must audit and fix the ENTIRE SafeGo Admin Panel end-to-end.
+Do NOT touch landing page, customer app, maps, ride UI, or legal pages.
+ADMIN ONLY.
+
+OBJECTIVES (ALL MANDATORY):
+
+1) ROUTING & 404 — ZERO 404 ALLOWED
+- Crawl every /admin route (direct URL + refresh).
+- Fix all “404 Page Not Found” issues.
+- Ensure all sidebar/menu links map to valid routes.
+- Add proper nested routing under /admin.
+- Add Admin-only NotFound fallback (/admin/*), not global 404.
+
+2) SIDEBAR & LAYOUT — MUST BE STABLE
+- Sidebar must NOT jump, reset, or scroll to top on navigation.
+- Sidebar must have its own scroll container.
+- Content area must scroll independently.
+- Sidebar must stay mounted across route changes.
+- Layout must be height: 100vh and structurally correct.
+
+3) PAGE INTEGRITY CHECK (EVERY ADMIN PAGE)
+For EACH admin page:
+- Page loads without error
+- No blank screens
+- No console errors
+- No broken buttons or dead links
+- Data placeholders handled safely (no crashes if data = empty)
+
+4) PERMISSIONS & ACCESS
+- Admin pages must be protected.
+- Non-admin users must not access /admin routes.
+- If role guard exists, verify it works.
+- If missing, implement a basic admin guard.
+
+5) UI CONSISTENCY
+- Sidebar active state works correctly.
+- Page titles render properly.
+- No overlapping content.
+- No broken scroll or overflow bugs.
+
+6) FINAL VERIFICATION CHECKLIST (REQUIRED)
+You MUST manually verify and confirm:
+- Open /admin in new tab → works
+- Refresh on deep route (/admin/observability etc.) → works
+- Click every sidebar item → works
+- Scroll sidebar halfway → click another item → scroll position stays
+- Resize window → layout stable
+- No console errors across admin
+
+DELIVERABLES (MANDATORY):
+You must provide ALL of the following:
+
+A) Full Admin Route Table:
+- Route path
+- Component file
+- Status (fixed / already OK)
+
+B) Files Changed List:
+- Exact filenames
+- What was changed in each file
+
+C) Root Cause Summary:
+- Why 404s happened
+- Why sidebar scroll was broken
+- What architectural fix solved it
+
+D) Proof of Completion:
+- Clear explanation of how to reproduce and verify each fix
+
+E) Rollback Instructions:
+- Git revert or exact steps to undo changes safely
+
+STRICT RULES:
+- No guessing
+- No “should work”
+- No leaving TODOs
+- No partial fixes
+- If even ONE admin issue remains → task FAILED → REFUND REQUIRED
+
+This is a production-critical admin panel. Treat it as such.

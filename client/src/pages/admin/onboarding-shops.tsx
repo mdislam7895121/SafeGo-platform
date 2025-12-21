@@ -137,7 +137,7 @@ export default function AdminOnboardingShops() {
       <PageHeader
         title="Shops Onboarding"
         description="Manage shop partner applications (Bangladesh only)"
-        icon={<Store className="h-6 w-6" />}
+        icon={Store}
       />
 
       {data?.stats && <StatsCards stats={data.stats} />}

@@ -138,7 +138,7 @@ export default function AdminOnboardingRestaurants() {
       <PageHeader
         title="Restaurants Onboarding"
         description="Manage restaurant partner applications (Bangladesh only)"
-        icon={<UtensilsCrossed className="h-6 w-6" />}
+        icon={UtensilsCrossed}
       />
 
       {data?.stats && <StatsCards stats={data.stats} />}
