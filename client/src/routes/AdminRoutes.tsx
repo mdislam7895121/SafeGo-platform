@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, useLocation } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import { Link } from "wouter";
 import { AlertTriangle, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -146,7 +146,7 @@ function AdminNotFound() {
 
 export function AdminRoutes() {
   return (
-    <>
+    <Switch>
       <Route path="/admin">
         <AdminGuard>
           <AdminLayout>
@@ -889,6 +889,6 @@ export function AdminRoutes() {
           </AdminLayout>
         </AdminGuard>
       </Route>
-    </>
+    </Switch>
   );
 }
