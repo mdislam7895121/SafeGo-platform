@@ -1,0 +1,60 @@
+You are fixing a critical Admin routing/layout bug in SafeGo-platform.
+
+Observed bug
+- When clicking ANY top dashboard card (example route: /admin/onboarding-overview), the UI shows a duplicate admin dashboard shell and lands on “Page Not Found” inside admin.
+- Many admin routes show AdminNotFound/404 even though sidebar/cards link to them.
+- This indicates (a) wrong navigation paths (relative vs absolute) and/or (b) AdminLayout being rendered twice (nested admin shell), and/or (c) routing table mismatch.
+
+Goal
+- There must be exactly ONE AdminShell/AdminLayout.
+- Clicking any admin card or sidebar item must navigate to a valid page (no 404).
+- If a feature page isn’t implemented, the route must still exist and show a clean ComingSoon page INSIDE the same admin shell.
+- Fix the “duplicate admin” behavior completely.
+
+Step-by-step tasks (do not skip)
+1) Identify the routing system (Next.js App Router / Pages Router / React Router).
+2) Find where AdminShell/AdminLayout is mounted.
+   - Search for AdminLayout/AdminShell usage across the codebase.
+   - Ensure each admin route renders AdminLayout exactly once.
+   - Remove any double-wrapping (e.g., layout in both route group + page component).
+   - Check for nested routers or “AdminApp” mounted inside /admin routes.
+
+3) Fix navigation from dashboard cards
+   - Locate the dashboard cards component (where cards are clickable).
+   - Ensure every click uses ABSOLUTE paths: router.push("/admin/<route>") (never "admin/<route>" or "<route>" relative).
+   - Replace inline strings with route constants.
+
+4) Fix missing admin routes
+   - Create a single source of truth: src/admin/adminRoutes.ts exporting:
+     - ALL_ADMIN_ROUTES (array)
+     - route constants used by sidebar + cards
+   - For every path used by sidebar/cards (including /admin/onboarding-overview), make sure a real route exists.
+   - If the real page doesn’t exist yet, create a placeholder page component file that renders:
+     - AdminLayout (once)
+     - ComingSoon content with title + back-to-dashboard link
+
+5) Fix AdminNotFound logic
+   - Ensure AdminNotFound is only used for truly unknown paths.
+   - It must not intercept valid known routes.
+   - If there is a catch-all route under /admin that’s too aggressive, adjust it so real routes match first.
+
+6) Verification (must do)
+   - Click every top admin card one by one; confirm:
+     - URL is /admin/...
+     - No duplicate admin shell appears
+     - No 404 screen appears
+   - Directly open /admin/onboarding-overview in the browser and refresh:
+     - Must render inside AdminLayout, no 404
+   - Confirm sidebar and header remain a single instance.
+
+Deliverables
+- Fix duplicate admin shell
+- Fix /admin/onboarding-overview and all card targets so they resolve
+- Add adminRoutes.ts and use it for sidebar + cards
+- Add placeholder pages where needed so there are ZERO dead links in admin
+
+Important constraints
+- Do not refactor unrelated customer/driver/restaurant flows.
+- Keep changes minimal and safe.
+- Do not introduce a second admin layout.
+- If you need a fallback page, use ComingSoon inside AdminLayout, not a 404.

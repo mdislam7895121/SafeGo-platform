@@ -101,6 +101,14 @@ export const ADMIN_ROUTES = {
   PROMOTIONS: "/admin/promotions",
   TRUST_SAFETY: "/admin/trust-safety",
   PERFORMANCE: "/admin/performance",
+  DRIVER_PROMOTIONS: "/admin/driver-promotions",
+  MONITORING: "/admin/monitoring",
+  OPERATIONS: "/admin/operations",
+  OPPORTUNITY_BONUSES: "/admin/opportunity-bonuses",
+  REFERRAL_SETTINGS: "/admin/referral-settings",
+  REVENUE_ANALYTICS: "/admin/revenue-analytics",
+  SAFETY: "/admin/safety",
+  SUPPORT_CENTER: "/admin/support-chat",
 
   // Shop & Tickets
   SHOP_ORDERS: "/admin/shop-orders",
