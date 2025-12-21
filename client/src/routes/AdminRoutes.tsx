@@ -88,6 +88,7 @@ const AdminTicketOperators = lazy(() => import("@/pages/admin/ticket-operators")
 const AdminTicketOperatorDetails = lazy(() => import("@/pages/admin/ticket-operator-details"));
 const AdminOnboardingCenter = lazy(() => import("@/pages/admin/onboarding-center"));
 const AdminOnboardingDetail = lazy(() => import("@/pages/admin/onboarding-detail"));
+const AdminOnboardingOverview = lazy(() => import("@/pages/admin/onboarding-overview"));
 const AdminPayoutCenter = lazy(() => import("@/pages/admin/payout-center"));
 const AdminWalletDetails = lazy(() => import("@/pages/admin/wallet-details"));
 const AdminComplaintDetails = lazy(() => import("@/pages/admin/complaint-details"));
@@ -777,6 +778,27 @@ export function AdminRoutes() {
         <AdminGuard>
           <AdminLayout>
             <AdminSmsTemplates />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/dashboard">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminHome />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/onboarding">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminOnboardingCenter />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/onboarding-overview">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminOnboardingOverview />
           </AdminLayout>
         </AdminGuard>
       </Route>
