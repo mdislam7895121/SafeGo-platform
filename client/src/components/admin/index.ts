@@ -1,6 +1,5 @@
 export { AdminSidebar } from "./AdminSidebar";
 export { AdminHeader } from "./AdminHeader";
-export { AdminLayout } from "./AdminLayout";
 export { GlobalSearch } from "./GlobalSearch";
 
 export { StatusBadge, SeverityBadge, PriorityBadge } from "./StatusBadge";

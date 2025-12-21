@@ -48,7 +48,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { apiRequest, queryClient, fetchWithAuth } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
@@ -296,7 +295,6 @@ export default function SafePilotPage() {
   };
 
   return (
-    <AdminLayout>
       <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -607,6 +605,5 @@ export default function SafePilotPage() {
           </div>
         </div>
       </div>
-    </AdminLayout>
   );
 }
