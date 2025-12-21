@@ -1,0 +1,172 @@
+SAFEGO MASTER RULES (MUST INCLUDE IN EVERY SAFEGO PROMPT)
+
+A) ROLES — ALWAYS include all 4 roles: Customer, Driver, Restaurant, Admin.
+Each role must have signup requirements, KYC/verification rules (BD/US branching), dashboard, permissions, status flows. Never mix access.
+
+B) GLOBAL APP LOGIC — Always support 3 services: Ride-hailing, Food delivery, Parcel delivery. Worldwide + country-specific.
+
+C) COUNTRY-SPECIFIC KYC — MUST include BD vs US branching:
+BD: father_name, date_of_birth, present_address, permanent_address, NID number + front/back images, emergency contact, verification_status + is_verified.
+US: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, drivers: license + image + expiry, ssn_last4 optional, verification_status + is_verified.
+
+D) ADMIN PANEL — MUST: verify users, approve/reject KYC + reason, pricing/fees/commissions, block/unblock, payouts, negative balances.
+
+E) Collections — rides, food_orders, deliveries must exist and include identity, addresses+geo, fees+commission, payment, timestamps, status flows, rating+feedback.
+
+F) Commission rules — cash → driver/restaurant gets cash; commission becomes negative balance; weekly settlement; online → SafeGo keeps commission.
+
+G) Security — users see only their own data; customers cannot see driver docs; drivers cannot see customer NID; only admin changes pricing/verification/blocking.
+
+H) Status flows — include full flows for ride/food/parcel.
+
+I) Onboarding — multi-step, verification_status="pending", blocked until admin approval.
+
+J) Notifications — driver alerts, order updates, parcel updates, verification updates, admin notifications.
+
+IMPLEMENTATION RULES (NON-BREAKING)
+- Do not rename/remove existing routes/APIs/schemas.
+- Only ADD new tables/endpoints/components.
+- Landing page must remain functional if CMS is down (fallback to current content).
+- Keep current URLs, including existing footer links.
+- No new pricing or status logic inside landing page; it must call the existing backend.
+
+============================================================
+SERIAL STEP: ADMIN-CONTROLLED LANDING PAGE CMS (NON-BREAKING)
+============================================================
+
+GOAL
+Make the entire landing page controllable from Admin:
+- Section visibility (show/hide)
+- Text content, headlines, subheadlines
+- CTA buttons (labels + URLs)
+- “Coming soon” flags per service and per country
+- Footer links and social links
+- Region selector labels and default region
+- Hero banner, announcements (testing mode banner text)
+- Optional images (logo, hero image URLs)
+This must work worldwide with BD/US variations.
+
+SCOPE MUST INCLUDE ALL 4 ROLES + 3 SERVICES
+- Landing is customer-facing, but content controls must also support driver/restaurant promos (future).
+- Services: Ride/Food/Parcel are always present; Shop/Tickets can be BD-only and can be toggled “Coming soon”.
+
+DATA MODEL (ADD ONLY)
+Create new tables/collections:
+
+1) landing_pages
+Fields:
+- id
+- country (BD, US, GLOBAL)
+- locale (en default)
+- is_active (bool)
+- updated_at
+- updated_by_admin_id
+
+2) landing_sections
+Fields:
+- id
+- landing_page_id
+- key (hero, services, how_it_works, safety, partners, footer, announcement_bar, faq, contact_cta)
+- order_index
+- is_enabled (bool)
+- title (string)
+- subtitle (string)
+- body (text/markdown)
+- ctas (json array: {label, href, variant, is_enabled})
+- media (json: {image_url, icon_url})
+- settings (json: per-section config)
+
+3) landing_settings
+Fields:
+- id
+- country (BD, US, GLOBAL)
+- default_region
+- show_testing_banner (bool)
+- testing_banner_text (text)
+- support_email
+- support_phone (optional)
+- social_links (json)
+- footer_links (json)
+- legal_links (json)  // must keep existing paths
+- updated_at, updated_by_admin_id
+
+4) audit_logs_landing
+Fields:
+- id, admin_id, entity_type, entity_id, action, diff_summary, created_at
+
+API (ADD ONLY)
+Public read:
+- GET /public/landing?country=BD
+Returns merged config with fallback chain:
+1) country-specific active page
+2) GLOBAL active page
+If none exists, return “legacy static fallback” (current hardcoded content).
+
+Admin CRUD (admin auth only):
+- GET /admin/landing/pages
+- POST /admin/landing/pages
+- PUT /admin/landing/pages/:id
+- GET /admin/landing/pages/:id/sections
+- POST /admin/landing/sections
+- PUT /admin/landing/sections/:id
+- PUT /admin/landing/settings/:country
+- POST /admin/landing/publish/:country  (activate chosen landing page)
+- GET /admin/landing/audit
+
+FRONTEND IMPLEMENTATION (LANDING PAGE)
+- Keep existing landing page route and layout unchanged.
+- Replace hardcoded strings with CMS data from /public/landing.
+- IMPORTANT: If API fails or returns empty, use existing hardcoded content as fallback (no blank pages).
+- Region selector must continue to work; selected country determines which landing config to fetch.
+- “Choose ride” flow must remain unchanged; no new pricing engine here.
+
+ADMIN PANEL UI (NEW)
+Add: Admin → Website CMS → Landing Page
+Screens:
+1) Landing Settings (per country BD/US/GLOBAL)
+2) Sections list with reorder + enable/disable toggles
+3) Section editor:
+   - Title/subtitle/body
+   - CTA editor (label, link, enabled)
+   - Media URL fields
+   - “Coming soon” toggles for services shown in services section
+4) Preview mode:
+   - Preview landing for BD/US
+   - Desktop + mobile preview
+5) Publish button with confirmation modal
+6) Audit log view
+
+SECURITY / PERMISSIONS
+- Only admin can edit/publish landing content.
+- Public can only read published landing config.
+- Sanitize HTML if rich text is used (XSS prevention).
+- Rate-limit public endpoint.
+
+ACCEPTANCE TESTS
+- No routes break; landing still loads even if CMS is unavailable.
+- Admin changes hero headline → immediately reflects after publish.
+- BD and US show different “coming soon” flags.
+- Footer links remain same paths; no 404 on company/legal pages.
+- Audit log records every publish and edit.
+
+DELIVERABLES
+- DB migrations / models
+- API endpoints
+- Admin CMS UI
+- Landing page wired to CMS with fallback
+- Documentation: docs/LANDING_CMS.md
+
+FILES / MODULES THAT WILL CHANGE (NON-BREAKING)
+Backend:
+- NEW models/migrations for landing_pages, landing_sections, landing_settings, audit_logs_landing
+- NEW admin routes/controllers
+- NEW public landing endpoint
+Frontend:
+- landing page fetch + render from CMS (additive)
+- new Admin CMS screens (additive)
+- no removal of existing footer links or routes
+
+WHY NON-BREAKING
+- Existing routes remain.
+- CMS is additive; fallback preserves current landing behavior.
+- No modifications to pricing/status engines; landing only reads backend responses.

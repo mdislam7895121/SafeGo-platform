@@ -14974,3 +14974,107 @@ model CmsPage {
   @@index([status])
   @@map("cms_pages")
 }
+
+enum LandingCountry {
+  BD
+  US
+  GLOBAL
+}
+
+model LandingPage {
+  id                String          @id @default(uuid())
+  country           LandingCountry  @default(GLOBAL)
+  locale            String          @default("en")
+  isActive          Boolean         @default(false)
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  updatedByAdminId  String?
+  
+  sections          LandingSection[]
+  
+  @@unique([country, locale])
+  @@index([country])
+  @@index([isActive])
+  @@map("landing_pages")
+}
+
+enum LandingSectionKey {
+  hero
+  services
+  how_it_works
+  safety
+  partners
+  faq
+  ready_to_move
+  footer
+  announcement_bar
+  contact_cta
+}
+
+model LandingSection {
+  id              String              @id @default(uuid())
+  landingPageId   String
+  landingPage     LandingPage         @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  
+  key             LandingSectionKey
+  orderIndex      Int                 @default(0)
+  isEnabled       Boolean             @default(true)
+  
+  title           String?
+  subtitle        String?
+  body            String?             @db.Text
+  
+  ctas            Json?
+  media           Json?
+  settings        Json?
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  @@unique([landingPageId, key])
+  @@index([landingPageId])
+  @@index([key])
+  @@map("landing_sections")
+}
+
+model LandingSettings {
+  id                  String          @id @default(uuid())
+  country             LandingCountry  @unique
+  
+  defaultRegion       String          @default("BD")
+  showTestingBanner   Boolean         @default(false)
+  testingBannerText   String?         @db.Text
+  
+  supportEmail        String?
+  supportPhone        String?
+  
+  socialLinks         Json?
+  footerLinks         Json?
+  legalLinks          Json?
+  
+  servicesConfig      Json?
+  
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  updatedByAdminId    String?
+  
+  @@index([country])
+  @@map("landing_settings")
+}
+
+model LandingAuditLog {
+  id            String          @id @default(uuid())
+  adminId       String
+  entityType    String
+  entityId      String
+  action        String
+  diffSummary   Json?
+  
+  createdAt     DateTime        @default(now())
+  
+  @@index([adminId])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("landing_audit_logs")
+}
