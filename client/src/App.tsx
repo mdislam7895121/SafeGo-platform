@@ -42,6 +42,12 @@ const SupportPage = lazy(() => import("@/pages/landing/SupportPage"));
 const AccessibilityPage = lazy(() => import("@/pages/landing/AccessibilityPage"));
 const CommunityGuidelinesPage = lazy(() => import("@/pages/landing/CommunityGuidelinesPage"));
 
+// Lazy-loaded company pages
+const AboutPage = lazy(() => import("@/pages/landing/AboutPage"));
+const CareersPage = lazy(() => import("@/pages/landing/CareersPage"));
+const PressPage = lazy(() => import("@/pages/landing/PressPage"));
+const BlogPage = lazy(() => import("@/pages/landing/BlogPage"));
+
 // Lazy-loaded route modules for major sections
 const AdminRoutes = lazy(() => import("@/routes/AdminRoutes").then(m => ({ default: m.AdminRoutes })));
 const DriverRoutes = lazy(() => import("@/routes/DriverRoutes").then(m => ({ default: m.DriverRoutes })));
@@ -295,6 +301,28 @@ function Router() {
         <Route path="/community-guidelines">
           <Suspense fallback={<LoadingSpinner />}>
             <CommunityGuidelinesPage />
+          </Suspense>
+        </Route>
+
+        {/* Company Pages */}
+        <Route path="/about">
+          <Suspense fallback={<LoadingSpinner />}>
+            <AboutPage />
+          </Suspense>
+        </Route>
+        <Route path="/careers">
+          <Suspense fallback={<LoadingSpinner />}>
+            <CareersPage />
+          </Suspense>
+        </Route>
+        <Route path="/press">
+          <Suspense fallback={<LoadingSpinner />}>
+            <PressPage />
+          </Suspense>
+        </Route>
+        <Route path="/blog">
+          <Suspense fallback={<LoadingSpinner />}>
+            <BlogPage />
           </Suspense>
         </Route>
 
