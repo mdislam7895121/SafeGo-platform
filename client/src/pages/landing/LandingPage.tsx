@@ -26,6 +26,7 @@ import { HowItWorksSection } from "@/components/landing/LandingHowItWorks";
 import { SafetySection } from "@/components/landing/LandingSafety";
 import { FAQSection } from "@/components/landing/LandingFAQ";
 import { Region, HERO_CONFIG } from "@/components/landing/LandingConfig";
+import { useLandingCms } from "@/hooks/useLandingCms";
 
 export default function LandingPage() {
   const [selectedRegion, setSelectedRegion] = useState<Region>("BD");
@@ -42,6 +43,8 @@ export default function LandingPage() {
     localStorage.setItem("safego-region", region);
   };
 
+  const { data: cmsData } = useLandingCms(selectedRegion);
+
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://safego.replit.app';
 
   useLandingSeo({
@@ -53,8 +56,16 @@ export default function LandingPage() {
     breadcrumbs: [{ name: 'Home', url: '/' }]
   });
 
+  const showTestingBanner = cmsData?.settings?.showTestingBanner ?? false;
+  const testingBannerText = cmsData?.settings?.testingBannerText || 'Testing Environment - Not for production use';
+
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950" data-testid="landing-page">
+      {showTestingBanner && (
+        <div className="bg-yellow-500 text-black text-center py-2 text-sm font-medium">
+          {testingBannerText}
+        </div>
+      )}
       <SafeGoHeader selectedRegion={selectedRegion} onRegionChange={handleRegionChange} />
       <main className="flex-1">
         <HeroSection 
