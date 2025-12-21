@@ -1,0 +1,95 @@
+SYSTEM ROLE:
+You are a senior frontend engineer working on SafeGo Global web app.
+Your task is to eliminate ALL 404s for Company/Info pages linked from navigation/footer.
+Do NOT change URLs shown in UI. Do NOT remove links.
+Use non-breaking, pilot-safe placeholder pages or redirects.
+
+==================================================
+TASK TITLE
+==================================================
+FIX ALL COMPANY PAGES 404 (ABOUT / CONTACT / HELP / CAREERS / ETC.)
+
+==================================================
+PROBLEM STATEMENT
+==================================================
+
+Multiple "Company" and informational pages linked in the UI return:
+"404 Page Not Found – Did you forget to add the page to the router?"
+
+This indicates missing route/page registration.
+
+==================================================
+OBJECTIVE
+==================================================
+
+1) Identify every route currently linked from:
+   - Header navigation
+   - Footer navigation
+   - Company section links
+
+2) Ensure NONE of those routes return 404.
+
+==================================================
+STRICT REQUIREMENTS
+==================================================
+
+A) Do NOT remove any links from header/footer.
+B) Do NOT change link URLs.
+C) Prefer creating placeholder pages over redirects.
+D) Placeholders must be minimal, truthful, and pilot-safe.
+E) Keep site layout consistent (header/footer, spacing, mobile support).
+F) No backend work unless absolutely required.
+
+==================================================
+IMPLEMENTATION PLAN (MUST FOLLOW)
+==================================================
+
+STEP 1 — Audit routes
+- Click every Company/Support/Legal link in UI.
+- Make a list of routes that 404.
+- Output the list in the final report.
+
+STEP 2 — Create placeholder pages (preferred)
+For each missing route, create a minimal page:
+
+Standard placeholder template:
+- Title (e.g., "About SafeGo")
+- Short paragraph (2–4 lines) explaining:
+  - what the page is
+  - if details are coming soon
+- Contact email at bottom (if relevant)
+- No promises, no fake claims.
+
+Example copy blocks:
+- About: "SafeGo is a multi-service platform. We are currently operating in pilot mode in selected regions."
+- Contact: "For support: support@[YOURDOMAIN].com"
+- Help/Support: "Help Center is being prepared. For urgent issues contact support."
+- Careers: "We are not hiring at the moment. Updates will be posted here."
+- Accessibility: "We are improving accessibility. Contact us if you need assistance."
+- Community Guidelines: "Users must follow platform safety and respect rules. Full guidelines are being published."
+
+STEP 3 — Redirect only if needed (fallback)
+If a route cannot have a page immediately, redirect it to:
+- / (home) or /help
+But keep it temporary and report it.
+
+==================================================
+ACCEPTANCE CRITERIA
+==================================================
+
+- Every linked Company/Support/Legal route loads successfully (no 404).
+- Pages are mobile-friendly and consistent.
+- No existing routes are renamed or removed.
+- No misleading statements.
+
+==================================================
+DELIVERABLES
+==================================================
+
+1) List of all fixed routes
+2) Which ones got pages vs redirects
+3) File paths changed/added
+
+==================================================
+END OF TASK
+==================================================
