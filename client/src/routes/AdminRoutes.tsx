@@ -97,6 +97,14 @@ const AdminSupportChat = lazy(() => import("@/pages/admin/support-chat"));
 const AdminSmsTemplates = lazy(() => import("@/pages/admin/sms-templates"));
 const AdminPromotions = lazy(() => import("@/pages/admin/promotions"));
 const AdminRoutesHealth = lazy(() => import("@/pages/admin/routes-health"));
+const AdminDriverPromotions = lazy(() => import("@/pages/admin/driver-promotions"));
+const AdminMonitoring = lazy(() => import("@/pages/admin/monitoring"));
+const AdminOperations = lazy(() => import("@/pages/admin/operations"));
+const AdminOpportunityBonuses = lazy(() => import("@/pages/admin/opportunity-bonuses"));
+const AdminReferralSettings = lazy(() => import("@/pages/admin/referral-settings"));
+const AdminRevenueAnalytics = lazy(() => import("@/pages/admin/revenue-analytics"));
+const AdminSafety = lazy(() => import("@/pages/admin/safety"));
+const AdminSupportCenter = lazy(() => import("@/pages/admin/support-center"));
 
 function LoadingFallback() {
   return (
@@ -776,6 +784,13 @@ export function AdminRoutes() {
           </AdminLayout>
         </AdminGuard>
       </Route>
+      <Route path="/admin/support-chat">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminSupportCenter />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
       <Route path="/admin/sms-templates">
         <AdminGuard>
           <AdminLayout>
@@ -815,6 +830,55 @@ export function AdminRoutes() {
         <AdminGuard>
           <AdminLayout>
             <AdminRoutesHealth />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/driver-promotions">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminDriverPromotions />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/monitoring">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminMonitoring />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/operations">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminOperations />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/opportunity-bonuses">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminOpportunityBonuses />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/referral-settings">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminReferralSettings />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/revenue-analytics">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminRevenueAnalytics />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/safety">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminSafety />
           </AdminLayout>
         </AdminGuard>
       </Route>
