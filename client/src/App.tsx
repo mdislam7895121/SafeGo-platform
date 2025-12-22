@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 const SafePilotButton = lazy(() => import("@/components/safepilot/SafePilotButton").then(m => ({ default: m.SafePilotButton })));
+const SafePilotChat = lazy(() => import("@/components/safepilot/SafePilotChat").then(m => ({ default: m.SafePilotChat })));
 import { NotificationSoundProvider } from "@/contexts/NotificationSoundContext";
 import { EatsCartProvider } from "@/contexts/EatsCartContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -657,6 +658,9 @@ export default function App() {
                   </ErrorBoundary>
                   <Suspense fallback={null}>
                     <SafePilotButton />
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <SafePilotChat />
                   </Suspense>
                 </TooltipProvider>
               </EatsCartProvider>
