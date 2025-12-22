@@ -207,10 +207,13 @@ export function RealTimeAnalytics() {
           Authorization: `Bearer ${token}`,
         },
       });
+      
+      // Always stop loading regardless of response status
+      setIsLoading(false);
+      
       if (response.ok) {
         const data = await response.json();
         setAnalytics(data);
-        setIsLoading(false);
         
         const now = new Date().toLocaleTimeString();
         setChartHistory(prev => ({
@@ -219,6 +222,9 @@ export function RealTimeAnalytics() {
           rides: [...prev.rides.slice(-29), { time: now, value: data.activeRides || 0 }],
           failures: [...prev.failures.slice(-29), { time: now, value: data.failureRate || 0 }],
         }));
+      } else if (response.status === 401 || response.status === 403) {
+        // Auth error - clear analytics but don't keep retrying
+        console.warn("Analytics fetch failed with auth error:", response.status);
       }
     } catch (err) {
       console.error("Failed to fetch analytics:", err);
@@ -269,6 +275,34 @@ export function RealTimeAnalytics() {
           </div>
         ))}
       </AnalyticsGrid>
+    );
+  }
+
+  // Show empty state UI if no analytics data available (auth error or no data)
+  if (!analytics) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <Activity className="h-5 w-5 text-[#111827] dark:text-white" />
+            <h2 className="text-lg font-semibold text-[#111827] dark:text-white">Real-Time Analytics</h2>
+            <ConnectionBadge isConnected={isConnected} />
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            className="gap-2"
+            data-testid="button-refresh-analytics"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
+        <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] text-center">
+          <p className="text-[#6B7280] dark:text-[#9CA3AF]">Analytics data unavailable. Click refresh to try again.</p>
+        </div>
+      </div>
     );
   }
 
