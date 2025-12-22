@@ -699,30 +699,32 @@ router.get("/customer/triggers", async (req: AuthRequest, res) => {
       priority: string;
     }> = [];
 
-    const customer = await prisma.customerProfile.findFirst({
+    const customerProfile = await prisma.customerProfile.findFirst({
       where: { userId },
       select: { id: true, verificationStatus: true, rejectionReason: true },
     });
 
-    if (customer?.verificationStatus === "pending" || customer?.verificationStatus === "resubmit_required") {
+    const customerProfileId = customerProfile?.id;
+
+    if (customerProfile?.verificationStatus === "pending" || customerProfile?.verificationStatus === "resubmit_required") {
       triggers.push({
         id: "verification_pending",
         triggerType: "verification_pending",
-        message: customer.verificationStatus === "resubmit_required"
-          ? `I noticed your verification needs attention. ${customer.rejectionReason || "Some documents need to be resubmitted."} I can help you understand what's needed.`
+        message: customerProfile.verificationStatus === "resubmit_required"
+          ? `I noticed your verification needs attention. ${customerProfile.rejectionReason || "Some documents need to be resubmitted."} I can help you understand what's needed.`
           : "I noticed your account verification is still pending. Would you like me to explain what's needed to complete it?",
         actions: [
-          { id: "upload_docs", label: "Upload Documents", actionType: "navigate", route: "/profile/verification", icon: "upload" },
+          { id: "upload_docs", label: "Upload Documents", actionType: "navigate", route: "/customer/profile", icon: "upload" },
           { id: "explain_process", label: "Explain Process", actionType: "api_call", icon: "navigate" },
         ],
         priority: "high",
       });
     }
 
-    if (service === "RIDE" || service === "ALL") {
+    if ((service === "RIDE" || service === "ALL") && customerProfileId) {
       const recentCancelledRide = await prisma.ride.findFirst({
         where: {
-          customerId: userId,
+          customerId: customerProfileId,
           status: { in: ["cancelled_by_driver", "cancelled_by_system", "cancelled_no_drivers"] },
           createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
@@ -741,7 +743,7 @@ router.get("/customer/triggers", async (req: AuthRequest, res) => {
           triggerType: "ride_cancelled",
           message: statusMessages[recentCancelledRide.status] || "Your recent ride was cancelled. Would you like to rebook?",
           actions: [
-            { id: "rebook_ride", label: "Rebook Ride", actionType: "navigate", route: "/ride/book", icon: "ride" },
+            { id: "rebook_ride", label: "Rebook Ride", actionType: "navigate", route: "/unified-booking", icon: "ride" },
             { id: "contact_support", label: "Contact Support", actionType: "escalate", icon: "escalate" },
           ],
           priority: "medium",
@@ -749,10 +751,10 @@ router.get("/customer/triggers", async (req: AuthRequest, res) => {
       }
     }
 
-    if (service === "FOOD" || service === "ALL") {
+    if ((service === "FOOD" || service === "ALL") && customerProfileId) {
       const activeOrder = await prisma.foodOrder.findFirst({
         where: {
-          customerId: userId,
+          customerId: customerProfileId,
           status: { in: ["preparing", "ready_for_pickup", "picked_up", "on_the_way"] },
           createdAt: { gte: new Date(Date.now() - 2 * 60 * 60 * 1000) },
         },
@@ -766,7 +768,7 @@ router.get("/customer/triggers", async (req: AuthRequest, res) => {
           triggerType: "order_delayed",
           message: "I noticed your food order is taking longer than expected. I'm sorry for the wait. Would you like me to check on the status?",
           actions: [
-            { id: "track_order", label: "Track Order", actionType: "navigate", route: "/orders", icon: "food" },
+            { id: "track_order", label: "Track Order", actionType: "navigate", route: "/customer/food-orders-history", icon: "food" },
             { id: "contact_support", label: "Contact Support", actionType: "escalate", icon: "escalate" },
           ],
           priority: "high",
@@ -774,10 +776,10 @@ router.get("/customer/triggers", async (req: AuthRequest, res) => {
       }
     }
 
-    if (service === "PARCEL" || service === "ALL") {
+    if ((service === "PARCEL" || service === "ALL") && customerProfileId) {
       const failedDelivery = await prisma.delivery.findFirst({
         where: {
-          customerId: userId,
+          customerId: customerProfileId,
           status: { in: ["failed", "cancelled"] },
           updatedAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
         },
@@ -791,7 +793,7 @@ router.get("/customer/triggers", async (req: AuthRequest, res) => {
           triggerType: "delivery_failed",
           message: "Your recent delivery couldn't be completed. The recipient may have been unavailable. Would you like to reschedule?",
           actions: [
-            { id: "reschedule", label: "Reschedule Delivery", actionType: "navigate", route: "/deliveries", icon: "parcel" },
+            { id: "reschedule", label: "Reschedule Delivery", actionType: "navigate", route: "/customer/parcel-request", icon: "parcel" },
             { id: "contact_support", label: "Contact Support", actionType: "escalate", icon: "escalate" },
           ],
           priority: "medium",
