@@ -118,7 +118,10 @@ export async function checkFollowUpConditions(userId: string): Promise<PendingFo
 
     const openTickets = await prisma.customerSupportTicket.findMany({
       where: {
-        customerId: customerProfile?.id || userId,
+        OR: [
+          { customerId: customerProfile?.id },
+          { customerId: userId },
+        ],
         status: "open",
         channel: "safepilot",
         createdAt: { lte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
@@ -155,15 +158,36 @@ async function getFollowUpCount(
   entityId?: string
 ): Promise<number> {
   try {
-    const count = await prisma.safePilotAuditLog.count({
-      where: {
-        actorUserId: userId,
-        action: "ask",
-        metadata: {
-          path: ["type"],
-          equals: "follow_up",
+    const whereCondition: any = {
+      actorUserId: userId,
+      action: "ask",
+      AND: [
+        {
+          metadata: {
+            path: ["type"],
+            equals: "follow_up",
+          },
         },
-      },
+        {
+          metadata: {
+            path: ["conditionType"],
+            equals: conditionType,
+          },
+        },
+      ],
+    };
+
+    if (entityId) {
+      whereCondition.AND.push({
+        metadata: {
+          path: ["entityId"],
+          equals: entityId,
+        },
+      });
+    }
+
+    const count = await prisma.safePilotAuditLog.count({
+      where: whereCondition,
     });
     return count;
   } catch {
