@@ -1,0 +1,128 @@
+ROLE: Senior Full-Stack AI Systems Engineer (Admin AI Specialist)
+
+PROJECT:
+Fix and professionalize **Admin SafePilot** so it behaves as a true enterprise-grade admin AI assistant.
+
+NON-NEGOTIABLE GOALS:
+1. Admin SafePilot must NOT reuse Customer Support logic, prompts, models, or formatters.
+2. Same question must NOT return the same static response.
+3. Responses must be intent-based, data-aware, and context-specific.
+4. UI output must be clean, professional, and enterprise-style (no repeated headers, no canned text).
+5. Customer Support AI behavior must remain unchanged.
+
+---
+
+SCOPE (DO NOT SKIP ANY):
+
+A. STRICT ROLE ISOLATION
+- Create or enforce a hard separation:
+  - Admin SafePilot
+  - Customer Support AI
+- No shared prompt files
+- No shared formatter functions
+- No shared response templates
+
+---
+
+B. INTENT-BASED RESPONSE ENGINE (MANDATORY)
+- Implement intent classification for admin queries:
+  - Metrics / KPIs
+  - KYC queues
+  - Fraud & risk
+  - Payments & payouts
+  - Drivers & operations
+  - System health
+- Route each intent to a dedicated handler.
+- Never return a generic summary if a specific intent is detected.
+
+---
+
+C. REMOVE STATIC RESPONSE BEHAVIOR
+- Identify and FIX any function that:
+  - Adds fixed headers (e.g. [GUARD MODE], [MODE])
+  - Injects the same “Summary / Signals / Actions” block for all queries
+- Responses must be assembled dynamically based on:
+  - Question intent
+  - Data availability
+  - Time range
+  - Admin permissions
+
+---
+
+D. RESPONSE FORMAT RULES (ADMIN STANDARD)
+- No emojis
+- No marketing language
+- No repeated boilerplate
+- Use this structure ONLY when relevant:
+
+  Title (1 line)
+  Key Findings (bullets)
+  Data Snapshot (optional, table or bullets)
+  Risks / Notes (only if applicable)
+  Recommended Actions (actionable, admin-level)
+
+- If data is unavailable, explain WHY and suggest the next best query.
+
+---
+
+E. MODEL & LOGIC
+- Admin SafePilot must use:
+  - Advanced model profile
+  - Intent detection = ON
+  - Cross-domain reasoning = ON
+- Customer Support model settings must remain untouched.
+
+---
+
+F. SETTINGS INTEGRATION
+Admin SafePilot must respect these settings:
+- Response length
+- Tone
+- Data scope
+- Guard mode
+- Logging
+- Auto-send behavior
+- Quick actions enable/disable
+
+---
+
+G. QUICK ACTIONS (ADMIN ONLY)
+- Quick actions must:
+  - Populate the input with a real query
+  - Respect intent routing
+  - Produce different answers depending on current data
+- Never send a placeholder or demo response.
+
+---
+
+H. VALIDATION & FALLBACK
+- If schema validation fails:
+  - Extract the raw question
+  - Classify intent manually
+  - Continue execution
+- NEVER respond with:
+  “Please provide a valid question”
+
+---
+
+I. TEST CASES (YOU MUST RUN THESE)
+1. Ask about KYC age buckets → must return real breakdown logic
+2. Ask about fraud signals → must NOT return KYC content
+3. Ask same question twice → responses must differ in wording or data framing
+4. Switch page → SafePilot context must update
+5. Customer Support page → Admin SafePilot must NOT appear
+
+---
+
+J. DELIVERY REQUIREMENTS
+- Make all changes incremental (non-breaking)
+- Clearly comment admin-only logic
+- Do NOT refactor unrelated files
+- Ensure production-ready cleanliness
+
+---
+
+FINAL CHECK:
+If Admin SafePilot still gives the same answer to different questions, the task is NOT complete.
+
+Proceed step-by-step, test after each change, and only finish when Admin SafePilot behaves like a real enterprise admin AI.
