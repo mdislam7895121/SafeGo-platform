@@ -362,8 +362,9 @@ export default function AdminHome() {
     },
   ];
 
-  // Loading state
-  if (isLoadingCapabilities) {
+  // Loading state - only show spinner if we have a token AND query is pending
+  // When token is null/cleared (after logout), skip loading to avoid infinite spinner
+  if (isLoadingCapabilities && token) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
