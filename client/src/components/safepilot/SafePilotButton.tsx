@@ -1292,11 +1292,11 @@ export function SafePilotButton() {
                       </div>
                     )}
 
-                    {queryResponse.insights?.length > 0 && (
+                    {(queryResponse.insights?.length ?? 0) > 0 && (
                       <div>
                         <h4 className="font-medium text-sm mb-2">Insights</h4>
                         <div className="space-y-2">
-                          {queryResponse.insights.map((insight, idx) => (
+                          {queryResponse.insights?.map((insight, idx) => (
                             <Card key={idx} className={`p-2 border ${getSeverityColor(insight.severity)}`}>
                               <div className="flex items-start gap-2">
                                 {getInsightIcon(insight.type)}
@@ -1311,11 +1311,11 @@ export function SafePilotButton() {
                       </div>
                     )}
 
-                    {queryResponse.suggestions?.length > 0 && (
+                    {(queryResponse.suggestions?.length ?? 0) > 0 && (
                       <div>
                         <h4 className="font-medium text-sm mb-2">Quick Actions</h4>
                         <div className="flex flex-wrap gap-2">
-                          {queryResponse.suggestions.map((suggestion) => (
+                          {queryResponse.suggestions?.map((suggestion) => (
                             <Button
                               key={suggestion.key}
                               variant="outline"
