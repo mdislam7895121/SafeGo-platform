@@ -487,10 +487,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/access-reviews", accessReviewsRoutes); // Periodic Access Review (Governance)
   app.use("/api/admin/releases", releasesRoutes); // Release & Environment Promotion Console
   app.use("/api/admin/observability", observabilityRoutes); // Phase 5A: Admin Observability Center
-  app.use("/api/admin/safepilot", safePilotRoutes); // SafePilot: AI Admin Assistant
-  app.use("/api/safepilot", safePilotChatRoutes); // SafePilot: RAG AI Chat System for all users
+  // IMPORTANT: Route order matters - more specific routes must come FIRST
   app.use("/api/admin/safepilot/support", adminSafePilotSupportRoutes); // Admin SafePilot Support Center
-  app.use("/api/admin/safepilot", adminSafePilotQueryRoutes); // Admin SafePilot Query (ADMIN only)
+  app.use("/api/admin/safepilot", adminSafePilotQueryRoutes); // Admin SafePilot Query (ADMIN only) - MUST come before generic safePilotRoutes
+  app.use("/api/admin/safepilot", safePilotRoutes); // SafePilot: AI Admin Assistant (fallback for non-/query routes)
+  app.use("/api/safepilot", safePilotChatRoutes); // SafePilot: RAG AI Chat System for all users
   app.use("/api/support/safepilot", supportSafePilotQueryRoutes); // Support SafePilot Query (SUPPORT_ADMIN only)
   app.use("/api/profile", profilePhotoRoutes); // Profile Picture System
 
