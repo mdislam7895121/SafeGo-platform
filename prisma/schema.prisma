@@ -15221,3 +15221,51 @@ model SafePilotAuditLog {
   @@index([createdAt])
   @@map("safepilot_audit_logs")
 }
+
+enum SafePilotCacheKind {
+  EMBEDDING
+  KB_RESULTS
+}
+
+model SafePilotCache {
+  id          String              @id @default(uuid())
+  cacheKey    String              @unique
+  kind        SafePilotCacheKind
+  payloadJson Json
+  createdAt   DateTime            @default(now())
+  expiresAt   DateTime
+  
+  @@index([kind])
+  @@index([expiresAt])
+  @@map("safepilot_cache")
+}
+
+model SafePilotRateLimit {
+  id          String              @id @default(uuid())
+  userId      String
+  role        SafePilotRoleScope
+  windowStart DateTime
+  requestCount Int                @default(0)
+  
+  @@unique([userId, windowStart])
+  @@index([userId])
+  @@index([windowStart])
+  @@map("safepilot_rate_limits")
+}
+
+model SafePilotNotification {
+  id          String              @id @default(uuid())
+  userId      String
+  triggerType String
+  title       String
+  message     String              @db.Text
+  metadata    Json?
+  isRead      Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  
+  @@index([userId])
+  @@index([triggerType])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("safepilot_notifications")
+}
