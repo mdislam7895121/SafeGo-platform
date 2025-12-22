@@ -1,0 +1,76 @@
+SAFEGO / SAFEPILOT — ADMIN CHAT RESPONSE NOT RENDERING FIX
+=========================================================
+
+STATUS:
+- Singleton guards are correct.
+- Only one SafePilot instance renders.
+- Admin requests hit /api/admin/safepilot/query with 200 OK.
+- Role = ADMIN confirmed.
+- Backend works.
+
+PROBLEM:
+Admin SafePilot chat sends and receives data, but responses are not rendered in the Chat tab.
+
+ROOT CAUSE:
+Admin API response shape differs from customer API response shape.
+UI only renders customer-style fields (reply/message) and ignores admin response fields.
+
+TASK:
+Fix ADMIN chat rendering without breaking CUSTOMER chat.
+
+RULES:
+- Additive only.
+- Do NOT change existing APIs.
+- Do NOT break customer chat.
+- Same SafePilot backend.
+- Only UI normalization layer change.
+
+STEP 1 — NORMALIZE RESPONSE (MANDATORY)
+In chatApi.ts (or equivalent helper), add a normalizer:
+
+- Accept ALL possible response shapes:
+  - data.reply
+  - data.response
+  - data.answer
+  - data.result
+  - data.text
+
+Return a single normalized field:
+  {
+    text: string;
+    meta?: object;
+  }
+
+Example logic:
+- text = first non-empty of (reply, response, answer, result, text)
+- If none found, show explicit error message in chat
+
+STEP 2 — ADMIN CHAT MUST USE NORMALIZER
+In SafePilotChat rendering logic:
+- Always render normalized.text
+- Never read raw API fields directly
+
+STEP 3 — OPTIMISTIC RENDERING (ADMIN TOO)
+- On Send:
+  - Push user message to messages[]
+  - Clear input immediately
+  - Show loading bubble
+- Replace loading bubble with AI reply after response
+
+STEP 4 — VISIBLE ERROR IF EMPTY
+If normalized.text is empty:
+- Render a red error bubble:
+  "SafePilot returned no response (admin mode). Check logs."
+
+STEP 5 — VERIFY
+Admin dashboard:
+- Ask: "Why is my verification pending?"
+- You must see:
+  - Your question bubble
+  - AI response bubble
+
+OUTPUT REQUIRED:
+- File(s) changed
+- Normalizer function
+- Confirmation customer chat still works
+Proceed now.

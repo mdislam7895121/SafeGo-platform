@@ -553,14 +553,21 @@ export function SafePilotButton() {
       
       // STEP 3: Use universal normalizer to extract reply text
       const normalizedReply = normalizeSafePilotReply(data);
+      console.log('[SafePilot Admin] Normalized reply:', normalizedReply?.slice(0, 100));
+      
+      // Check if we got an actual reply
+      const isEmptyResponse = !normalizedReply || normalizedReply.trim().length === 0;
+      const displayContent = isEmptyResponse 
+        ? "SafePilot returned no response (admin mode). Please check logs or try a different question."
+        : normalizedReply;
       
       // Add assistant message
       setChatMessages(prev => [...prev, {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: normalizedReply,
+        content: displayContent,
         timestamp: new Date(),
-        isError: !res.ok,
+        isError: !res.ok || isEmptyResponse,
       }]);
       
       // Also store structured response for the detail view
@@ -571,16 +578,16 @@ export function SafePilotButton() {
           keySignals: data.keySignals || [],
           actions: data.actions || [],
           monitor: data.monitor || [],
-          answerText: normalizedReply,
+          answerText: displayContent,
           insights: data.insights || [],
           suggestions: data.suggestions || [],
           riskLevel: data.riskLevel || 'LOW',
-          error: !res.ok ? (data.error || `HTTP ${res.status}`) : undefined,
+          error: !res.ok || isEmptyResponse ? (data.error || `HTTP ${res.status}`) : undefined,
         };
         setQueryResponse(response);
       }
 
-      console.log('[SafePilot Admin] Query complete:', { status: res.status, replyLength: normalizedReply.length });
+      console.log('[SafePilot Admin] Query complete:', { status: res.status, replyLength: displayContent.length, isEmptyResponse });
       
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     } catch (error) {
