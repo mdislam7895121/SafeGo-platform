@@ -539,6 +539,31 @@ export const partnerSuccessCoach = {
   /**
    * Get partner success summary
    */
+  async getDashboard(countryCode?: string): Promise<{
+    lowPerformers: LowPerformer[];
+    personalizedActions: PersonalizedAction[];
+    trainingPlansGenerated: number;
+    topPerformers: number;
+  }> {
+    const [lowPerformers, actions, topDrivers] = await Promise.all([
+      this.detectLowPerformers(countryCode),
+      this.generatePersonalizedActions(countryCode),
+      prisma.driverProfile.count({
+        where: {
+          rating: { gte: 4.8 },
+          ...(countryCode ? { user: { countryCode } } : {}),
+        },
+      }),
+    ]);
+
+    return {
+      lowPerformers,
+      personalizedActions: actions,
+      trainingPlansGenerated: actions.filter(a => a.actionType === 'TRAINING').length,
+      topPerformers: topDrivers,
+    };
+  },
+
   async getPartnerSuccessSummary(countryCode?: string): Promise<{
     lowPerformerCount: number;
     criticalCount: number;

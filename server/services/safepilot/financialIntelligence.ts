@@ -470,6 +470,34 @@ export const financialIntelligence = {
   },
 
   /**
+   * Get dashboard data for Vision 2030 module endpoint
+   */
+  async getDashboard(countryCode?: string): Promise<{
+    earnings: { weekly: number; monthly: number; trend: 'UP' | 'STABLE' | 'DOWN' };
+    negativeBalanceRisks: NegativeBalanceRisk[];
+    settlementRisks: SettlementRisk[];
+    payoutOptimizations: PayoutOptimization[];
+    revenueInsights: RevenueInsight[];
+  }> {
+    const [weekly, monthly, negRisks, settleRisks, optimizations, insights] = await Promise.all([
+      this.predictEarnings('WEEKLY', countryCode),
+      this.predictEarnings('MONTHLY', countryCode),
+      this.detectNegativeBalanceRisks(countryCode),
+      this.detectSettlementRisks(countryCode),
+      this.suggestPayoutOptimizations(countryCode),
+      this.getRevenueInsights(countryCode),
+    ]);
+
+    return {
+      earnings: { weekly: weekly.predicted, monthly: monthly.predicted, trend: weekly.trend },
+      negativeBalanceRisks: negRisks,
+      settlementRisks: settleRisks,
+      payoutOptimizations: optimizations,
+      revenueInsights: insights,
+    };
+  },
+
+  /**
    * Get financial summary
    */
   async getFinancialSummary(countryCode?: string): Promise<{

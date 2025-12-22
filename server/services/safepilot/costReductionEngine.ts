@@ -524,6 +524,35 @@ export const costReductionEngine = {
   },
 
   /**
+   * Get dashboard data for Vision 2030 module endpoint
+   */
+  async getDashboard(countryCode?: string): Promise<{
+    totalPotentialSavings: number;
+    refundAbusers: Array<{ customerId: string; estimatedLoss: number }>;
+    discountAbusers: Array<{ entityId: string; suspicionLevel: string }>;
+    incentiveOverspend: Array<{ category: string; overspendAmount: number }>;
+    payoutLeakage: Array<{ driverId: string; amount: number }>;
+  }> {
+    const [refunds, discounts, incentives, payouts, actions] = await Promise.all([
+      this.detectRefundAbuse(countryCode),
+      this.detectDiscountAbuse(countryCode),
+      this.detectIncentiveOverspend(countryCode),
+      this.detectPayoutLeakage(countryCode),
+      this.generateCostSavingActions(countryCode),
+    ]);
+
+    const totalSavings = actions.reduce((sum, a) => sum + a.estimatedSavings, 0);
+
+    return {
+      totalPotentialSavings: Math.round(totalSavings),
+      refundAbusers: refunds.map(r => ({ customerId: r.customerId, estimatedLoss: r.totalRefundAmount })),
+      discountAbusers: discounts.map(d => ({ entityId: d.entityId, suspicionLevel: d.suspicionLevel })),
+      incentiveOverspend: incentives.map(i => ({ category: i.category, overspendAmount: i.overspendAmount })),
+      payoutLeakage: payouts.map(p => ({ driverId: p.driverId, amount: p.amount })),
+    };
+  },
+
+  /**
    * Get cost reduction summary
    */
   async getCostSummary(countryCode?: string): Promise<{

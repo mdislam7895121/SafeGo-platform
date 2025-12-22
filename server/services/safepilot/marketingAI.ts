@@ -414,6 +414,34 @@ export const marketingAI = {
   },
 
   /**
+   * Get dashboard data for Vision 2030 module endpoint
+   */
+  async getDashboard(countryCode?: string): Promise<{
+    socialCaptions: Array<{ id: string; platform: string; type: string }>;
+    notificationTemplates: Array<{ id: string; channel: string; estimatedReach: number }>;
+    localIdeas: Array<{ id: string; area: string }>;
+    seasonalCampaigns: Array<{ id: string; name: string; estimatedImpact: number }>;
+    totalEstimatedReach: number;
+  }> {
+    const [captions, notifications, ideas, campaigns] = await Promise.all([
+      this.generateSocialCaptions(countryCode),
+      this.generateNotificationTemplates(countryCode),
+      this.generateLocalMarketingIdeas(countryCode),
+      this.generateSeasonalCampaigns(countryCode),
+    ]);
+
+    const totalReach = notifications.reduce((sum, n) => sum + n.estimatedReach, 0);
+
+    return {
+      socialCaptions: captions.map(c => ({ id: c.id, platform: c.platform, type: c.type })),
+      notificationTemplates: notifications.map(n => ({ id: n.id, channel: n.channel, estimatedReach: n.estimatedReach })),
+      localIdeas: ideas.map(i => ({ id: i.id, area: i.area })),
+      seasonalCampaigns: campaigns.map(c => ({ id: c.id, name: c.name, estimatedImpact: c.estimatedImpact })),
+      totalEstimatedReach: totalReach,
+    };
+  },
+
+  /**
    * Get marketing summary
    */
   async getMarketingSummary(countryCode?: string): Promise<{

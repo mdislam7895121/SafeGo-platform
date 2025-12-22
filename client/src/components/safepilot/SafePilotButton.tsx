@@ -1222,8 +1222,8 @@ export function SafePilotButton() {
                         >
                           {(queryResponse as any).mode} MODE
                         </Badge>
-                        <Badge className={getSeverityColor(queryResponse.riskLevel)}>
-                          {queryResponse.riskLevel} Risk
+                        <Badge className={getSeverityColor(queryResponse.riskLevel || 'LOW')}>
+                          {queryResponse.riskLevel || 'LOW'} Risk
                         </Badge>
                       </div>
                     )}
