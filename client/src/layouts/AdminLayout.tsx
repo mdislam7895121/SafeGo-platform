@@ -73,9 +73,9 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
       <AdminSidebar />
       
       {/* Content Area - Only this scrolls */}
-      <SidebarInset className="flex flex-col h-screen overflow-hidden">
+      <SidebarInset className="flex flex-col h-screen overflow-hidden bg-[#F8FAFC] dark:bg-slate-950">
         {/* Header - Fixed at top of content area */}
-        <header className="sticky top-0 z-[100] flex h-14 sm:h-16 items-center gap-2 sm:gap-4 border-b bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 shadow-sm px-3 sm:px-4 md:px-6 flex-shrink-0">
+        <header className="sticky top-0 z-[100] flex h-14 sm:h-16 items-center gap-2 sm:gap-4 border-b border-[#E5E7EB] bg-white dark:bg-slate-900 shadow-sm px-3 sm:px-4 md:px-6 flex-shrink-0">
             {/* Sidebar Toggle - 44px minimum tap target */}
             <SidebarTrigger className="-ml-1 min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9" data-testid="button-sidebar-toggle">
               <PanelLeft className="h-5 w-5" />
@@ -84,7 +84,7 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
             <Separator orientation="vertical" className="hidden sm:block h-6" />
 
             {/* Page Title - Responsive typography */}
-            <h1 className="text-sm sm:text-base font-semibold text-foreground/90 truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none" data-testid="text-admin-page-title">
+            <h1 className="text-sm sm:text-base font-semibold text-[#0F172A] dark:text-white truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none" data-testid="text-admin-page-title">
               {pageTitle}
             </h1>
 

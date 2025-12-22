@@ -537,7 +537,7 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
+    <Sidebar collapsible="icon" className="border-r border-[#E5E7EB] bg-white dark:bg-slate-900">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-sm shrink-0">
@@ -547,10 +547,10 @@ export function AdminSidebar() {
             "flex flex-col overflow-hidden transition-all duration-200",
             state === "collapsed" && "w-0 opacity-0"
           )}>
-            <span className="font-bold text-base leading-tight whitespace-nowrap">
+            <span className="font-bold text-base leading-tight whitespace-nowrap text-[#0F172A] dark:text-white">
               SafeGo
             </span>
-            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[10px] text-[#475569] dark:text-slate-400 font-medium uppercase tracking-wider whitespace-nowrap">
               Admin Console
             </span>
           </div>
@@ -561,7 +561,7 @@ export function AdminSidebar() {
 
       <SidebarContent className="px-2 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+          <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
             Overview
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -573,7 +573,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(managementNavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Management
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -586,7 +586,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(securityNavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Security
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -599,7 +599,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(configNavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Configuration
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -612,7 +612,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(financeDashboardNavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Finance Dashboard
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -625,7 +625,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(regionalNavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Regional
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -638,7 +638,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(phase3aNavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Enterprise Tools
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -651,7 +651,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(phase3cNavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Intelligence Layer
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -664,7 +664,7 @@ export function AdminSidebar() {
 
         {renderNavGroup(phase4NavItems) && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-[#475569] dark:text-slate-400 uppercase tracking-wider px-2 mb-2">
               Advanced Admin Tools
             </SidebarGroupLabel>
             <SidebarGroupContent>
