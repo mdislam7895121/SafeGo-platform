@@ -1025,4 +1025,280 @@ router.post("/customer/resolve-issue", async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/admin/flags", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { getSafePilotFlags } = await import("../services/safepilot/featureFlags");
+    const flags = await getSafePilotFlags();
+
+    res.json({ flags });
+  } catch (error) {
+    console.error("[SafePilot] Get flags error:", error);
+    res.status(500).json({ error: "Failed to get feature flags" });
+  }
+});
+
+router.put("/admin/flags/:key", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { key } = req.params;
+    const { enabled, rolloutPercentage } = req.body;
+
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "enabled must be a boolean" });
+    }
+
+    const { updateSafePilotFlag } = await import("../services/safepilot/featureFlags");
+    const success = await updateSafePilotFlag(key, enabled, rolloutPercentage);
+
+    if (success) {
+      await logAdminAction(req.user.id, "update_feature_flag", {
+        key,
+        enabled,
+        rolloutPercentage,
+      });
+    }
+
+    res.json({ success, key, enabled, rolloutPercentage });
+  } catch (error) {
+    console.error("[SafePilot] Update flag error:", error);
+    res.status(500).json({ error: "Failed to update feature flag" });
+  }
+});
+
+router.post("/admin/flags/kill-switch", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { disable } = req.body;
+    const { updateSafePilotFlag } = await import("../services/safepilot/featureFlags");
+
+    if (disable) {
+      await updateSafePilotFlag("safepilot_proactive_triggers", false);
+      await updateSafePilotFlag("safepilot_auto_followups", false);
+      await updateSafePilotFlag("safepilot_auto_escalation", false);
+    } else {
+      await updateSafePilotFlag("safepilot_proactive_triggers", true);
+      await updateSafePilotFlag("safepilot_auto_followups", true);
+      await updateSafePilotFlag("safepilot_auto_escalation", true);
+    }
+
+    await logAdminAction(req.user.id, "kill_switch_toggle", {
+      disabled: disable,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.json({ 
+      success: true, 
+      message: disable ? "SafePilot automation disabled" : "SafePilot automation enabled",
+      disabled: disable,
+    });
+  } catch (error) {
+    console.error("[SafePilot] Kill switch error:", error);
+    res.status(500).json({ error: "Failed to toggle kill switch" });
+  }
+});
+
+const kpiFiltersSchema = z.object({
+  period: z.enum(["today", "7days", "30days"]).default("7days"),
+  country: z.enum(["US", "BD"]).optional(),
+  service: z.enum(["ride", "food", "parcel"]).optional(),
+});
+
+router.get("/admin/kpi", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const parsed = kpiFiltersSchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid filters", details: parsed.error.errors });
+    }
+
+    const { period, country, service } = parsed.data;
+
+    const now = new Date();
+    let startDate: Date;
+    switch (period) {
+      case "today":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case "30days":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "7days":
+      default:
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    const { getSafePilotKPIs } = await import("../services/safepilot/kpiDashboard");
+    const kpis = await getSafePilotKPIs({
+      startDate,
+      endDate: now,
+      country: country as "US" | "BD" | undefined,
+      service: service as "ride" | "food" | "parcel" | undefined,
+    });
+
+    res.json({ kpis, period, filters: { country, service } });
+  } catch (error) {
+    console.error("[SafePilot] KPI error:", error);
+    res.status(500).json({ error: "Failed to get KPIs" });
+  }
+});
+
+router.get("/admin/cost-report", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const parsed = kpiFiltersSchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid filters", details: parsed.error.errors });
+    }
+
+    const { period, country, service } = parsed.data;
+
+    const now = new Date();
+    let startDate: Date;
+    switch (period) {
+      case "today":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case "30days":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "7days":
+      default:
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    const { getSafePilotCostReport } = await import("../services/safepilot/kpiDashboard");
+    const report = await getSafePilotCostReport({
+      startDate,
+      endDate: now,
+      country: country as "US" | "BD" | undefined,
+      service: service as "ride" | "food" | "parcel" | undefined,
+    });
+
+    res.json({ report, period, filters: { country, service } });
+  } catch (error) {
+    console.error("[SafePilot] Cost report error:", error);
+    res.status(500).json({ error: "Failed to get cost report" });
+  }
+});
+
+router.get("/admin/cost-report/download", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const format = (req.query.format as string) || "csv";
+    const period = (req.query.period as string) || "7days";
+
+    const now = new Date();
+    let startDate: Date;
+    switch (period) {
+      case "today":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case "30days":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "7days":
+      default:
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    const { getSafePilotCostReport, generateCostReportCSV } = await import("../services/safepilot/kpiDashboard");
+    const report = await getSafePilotCostReport({ startDate, endDate: now });
+
+    if (format === "json") {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename=safepilot-cost-report-${period}.json`);
+      res.send(JSON.stringify(report, null, 2));
+    } else {
+      const csv = generateCostReportCSV(report);
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename=safepilot-cost-report-${period}.csv`);
+      res.send(csv);
+    }
+  } catch (error) {
+    console.error("[SafePilot] Cost report download error:", error);
+    res.status(500).json({ error: "Failed to download cost report" });
+  }
+});
+
+router.get("/admin/review-samples", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { isAdminReviewModeEnabled } = await import("../services/safepilot/featureFlags");
+    const reviewModeEnabled = await isAdminReviewModeEnabled();
+
+    if (!reviewModeEnabled) {
+      return res.status(400).json({ 
+        error: "Admin review mode is not enabled",
+        hint: "Enable safepilot_admin_review_mode flag first",
+      });
+    }
+
+    const limit = parseInt(req.query.limit as string) || 10;
+    const { sampleResponsesForReview } = await import("../services/safepilot/trustGuardrails");
+    const samples = await sampleResponsesForReview(prisma, limit);
+
+    res.json({ samples, count: samples.length });
+  } catch (error) {
+    console.error("[SafePilot] Review samples error:", error);
+    res.status(500).json({ error: "Failed to get review samples" });
+  }
+});
+
 export default router;

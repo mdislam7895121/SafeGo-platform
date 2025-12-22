@@ -8,6 +8,8 @@ import { checkRateLimit, incrementRateLimit } from "./rateLimit";
 import { z } from "zod";
 import { detectEmotion, getEmotionAwareResponseGuidelines, EmotionType } from "./emotionDetection";
 import { checkEscalationTriggers, createEscalationTicket, getEscalationConfirmationMessage, getConversationAttemptCount, extractEntityIdsFromConversation, EscalationContext } from "./escalationEngine";
+import { isUserInRollout, isAutoEscalationEnabled, logMonitoringEvent } from "./featureFlags";
+import { applyTrustGuardrails, getTrustGuidelines } from "./trustGuardrails";
 
 export interface ChatRequest {
   message: string;
@@ -251,6 +253,8 @@ ${brandRules}
 
 ${emotionGuidelines ? `## ${emotionGuidelines}` : ""}
 
+${getTrustGuidelines(country === "BD" || country === "US" ? country : "US")}
+
 ## Service Status Flows
 ### Ride-hailing
 requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled
@@ -356,8 +360,9 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
   };
 
   const escalationDecision = checkEscalationTriggers(message, escalationContext);
+  const autoEscalationEnabled = await isAutoEscalationEnabled();
 
-  if (escalationDecision.shouldEscalate && role === "CUSTOMER") {
+  if (escalationDecision.shouldEscalate && role === "CUSTOMER" && autoEscalationEnabled) {
     const { ticketId, ticketCode } = await createEscalationTicket(escalationContext, escalationDecision);
     const escalationMessage = getEscalationConfirmationMessage(ticketCode);
 
@@ -375,6 +380,18 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
         conversationId: conversation.id,
         direction: "assistant",
         content: escalationMessage,
+      },
+    });
+
+    await logMonitoringEvent({
+      userId,
+      conversationId: conversation.id,
+      eventType: "escalated",
+      emotion: detectedEmotion,
+      metadata: {
+        reason: escalationDecision.reason,
+        ticketId,
+        ticketCode,
       },
     });
 
@@ -531,6 +548,9 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     };
   }
 
+  const { sanitized: guardrailedReply, violations: trustViolations } = applyTrustGuardrails(finalReply);
+  const safeReply = trustViolations.length > 0 ? guardrailedReply : finalReply;
+
   await prisma.safePilotMessage.create({
     data: {
       conversationId: conversation.id,
@@ -546,9 +566,25 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     data: {
       conversationId: conversation.id,
       direction: "assistant",
-      content: finalReply,
+      content: safeReply,
       moderationFlags: outputModeration,
       sources: sanitizedSources,
+    },
+  });
+
+  const conversationStartTime = conversation.createdAt?.getTime() || Date.now();
+  const resolutionTimeMs = Date.now() - conversationStartTime;
+
+  await logMonitoringEvent({
+    userId,
+    conversationId: conversation.id,
+    eventType: "ai_resolved",
+    emotion: detectedEmotion,
+    resolutionTimeMs,
+    metadata: {
+      trustViolations,
+      toolsUsed,
+      sourceCount: kbResults.length,
     },
   });
 
@@ -573,7 +609,7 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
   const suggestedActions = generateSuggestedActions(message, role, intentResult.route);
 
   const response: ChatResponse = {
-    reply: finalReply,
+    reply: safeReply,
     conversationId: conversation.id,
     sources: sanitizedSources,
     suggestedActions,
