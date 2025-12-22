@@ -1,0 +1,86 @@
+SAFEGO / SAFEPILOT — ADMIN CHAT NOT WORKING FIX (CODE REQUIRED)
+==============================================================
+
+ABSOLUTE RULES:
+- Additive only. Do NOT rename/remove existing APIs/routes/schemas/UI.
+- Keep SafeGo core rules: 4 roles, 3 services, BD/US branching, RBAC, security.
+- Customers cannot see driver docs; drivers cannot see customer NID; only admin can do admin actions.
+- Goal: SafePilot chat must work on Admin routes as ADMIN role, without leaking data.
+
+PROBLEM OBSERVED:
+- SafePilot modal opens on Admin dashboard, but Chat tab stays empty / no answers.
+- Likely because of route guards that exclude /admin paths, or role wiring always assumes CUSTOMER.
+
+TASK:
+1) Make SafePilot chat render on Admin routes when user role is ADMIN.
+2) Ensure request payload includes role="ADMIN".
+3) Ensure API response renders and errors are visible (no silent failures).
+4) Keep customer-only proactive triggers limited to customer routes, but chat itself must be allowed for admin.
+
+FILES TO LOCATE (do not guess; search in repo):
+- client/src/components/safepilot/SafePilotChat.tsx
+- client/src/components/safepilot/SafePilotWidget.tsx OR SafePilotButton.tsx OR where widget is mounted
+- any file that contains route filtering like:
+  - "exclude admin/driver/restaurant paths"
+  - "strict path prefix matching"
+  - "customer-only paths"
+- server/routes/safepilot-chat.ts (do not change unless needed; additive only)
+
+STEP 1 — FIND AND FIX ROUTE GUARD (MOST IMPORTANT)
+- Search for code that prevents widget/chat rendering on admin pages.
+Examples to search:
+  "exclude", "admin/", "restaurant/", "driver/", "path prefix", "pathname"
+- If there is logic like:
+  if (pathname.startsWith("/admin")) return null;
+Change it to:
+  - Allow the widget to mount for ADMIN users on /admin
+  - Keep proactive customer triggers disabled on /admin (separate gate)
+
+Implement this pattern (additive):
+- canShowWidget: role-aware
+- canRunCustomerTriggers: customer-only + customer routes
+
+Pseudo-logic (must convert to real code in repo):
+  const isAdminRoute = pathname.startsWith("/admin");
+  const role = session.role; // ADMIN/DRIVER/RESTAURANT/CUSTOMER
+  const canShowWidget = role === "CUSTOMER" ? isCustomerRoute : role === "ADMIN" ? isAdminRoute : false;
+  const canRunCustomerTriggers = role === "CUSTOMER" && isCustomerRoute;
+
+STEP 2 — ENSURE ADMIN ROLE IS PASSED TO CHAT REQUEST
+In the send request payload to /api/safepilot/chat, ensure:
+  role: "ADMIN"
+not "CUSTOMER"
+
+Also include country/service if available, but admin chat may be global:
+  country: selectedCountry || detectedCountry
+  service: current service tab if relevant
+
+STEP 3 — ADD ADMIN DEBUG STRIP (VISIBLE)
+Inside the chat UI add a small strip showing:
+- role being used (ADMIN)
+- endpoint URL
+- last HTTP status
+- last error text
+This prevents silent failures.
+
+STEP 4 — ADMIN SAFE TOOLS (ADD ONLY, NO BREAKING)
+Admin chat must NOT expose sensitive docs to non-admin.
+But admin can ask things like:
+- "Show verification pending count (BD/US)"
+- "Why was this KYC rejected?"
+- "How many escalations today?"
+- "Show negative balances (drivers/restaurants)"
+If server supports tools, keep RBAC check strict: only ADMIN can call admin tools.
+If tools don’t exist, respond with “not available yet” and link to admin pages, do not hallucinate.
+
+ACCEPTANCE TESTS:
+1) Login as admin → open SafePilot on /admin → Chat tab shows input + messages area.
+2) Type "Show today's escalations" → request payload role=ADMIN → response renders OR error is visible.
+3) Admin route must not show customer-only proactive triggers.
+4) Customer route still works unchanged.
+
+OUTPUT REQUIRED:
+- List all files changed
+- Identify the exact guard that blocked admin
+- Confirm additive-only + non-breaking
+Proceed now. No questions.

@@ -375,6 +375,13 @@ export function SafePilotButton() {
   const [activeTab, setActiveTab] = useState('intelligence');
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{
+    lastUrl: string;
+    lastStatus: number | null;
+    lastError: string | null;
+    role: string;
+  }>({ lastUrl: '', lastStatus: null, lastError: null, role: 'ADMIN' });
   
   const [crisisReport, setCrisisReport] = useState<CrisisReportData | null>(null);
   const [isCrisisLoading, setIsCrisisLoading] = useState(false);
@@ -475,17 +482,22 @@ export function SafePilotButton() {
     }
 
     setIsSubmitting(true);
-    console.log('[SafePilot] Submitting question:', question.trim().slice(0, 50));
+    const url = '/api/admin/safepilot/query';
+    setDebugInfo(prev => ({ ...prev, lastUrl: url, lastStatus: null, lastError: null }));
+    console.log('[SafePilot Admin] Submitting question:', { question: question.trim().slice(0, 50), role: 'ADMIN', pageKey });
     
     try {
-      const res = await fetchWithAuth('/api/admin/safepilot/query', {
+      const res = await fetchWithAuth(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageKey,
           question: question.trim(),
+          role: 'ADMIN',
         }),
       });
+      
+      setDebugInfo(prev => ({ ...prev, lastStatus: res.status }));
       
       // Parse response (backend now ALWAYS returns valid JSON)
       let data;
@@ -516,18 +528,19 @@ export function SafePilotButton() {
         error: undefined, // Never set error if we got a response
       };
 
-      console.log('[SafePilot] Query successful, mode:', response.mode);
+      console.log('[SafePilot Admin] Query successful:', { mode: response.mode, status: res.status });
       setQueryResponse(response);
       setActiveTab('response');
       setQuestion('');
       
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     } catch (error) {
-      console.error('[SafePilot] Request error:', error);
+      console.error('[SafePilot Admin] Request error:', error);
+      setDebugInfo(prev => ({ ...prev, lastError: error instanceof Error ? error.message : String(error) }));
       
       // Retry on network errors
       if (retryCount < 2) {
-        console.log('[SafePilot] Retrying...', retryCount + 1);
+        console.log('[SafePilot Admin] Retrying...', retryCount + 1);
         await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
         setIsSubmitting(false);
         return handleSubmitQuestion(retryCount + 1);
@@ -872,18 +885,53 @@ export function SafePilotButton() {
           side="right"
         >
           <SheetHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b shrink-0">
-            <div className="flex items-center min-w-0 pl-4">
-              <div className="shrink-0" style={{ width: 48, height: 48 }}>
-                <SafePilotIcon size="lg" />
+            <div className="flex items-center justify-between min-w-0 pl-4">
+              <div className="flex items-center min-w-0">
+                <div className="shrink-0" style={{ width: 48, height: 48 }}>
+                  <SafePilotIcon size="lg" />
+                </div>
+                <div className="min-w-0 ml-3">
+                  <SheetTitle className="text-base sm:text-lg bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent font-semibold">SafePilot</SheetTitle>
+                  <SheetDescription className="text-xs truncate">
+                    AI Intelligence Engine
+                  </SheetDescription>
+                </div>
               </div>
-              <div className="min-w-0 ml-3">
-                <SheetTitle className="text-base sm:text-lg bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] bg-clip-text text-transparent font-semibold">SafePilot</SheetTitle>
-                <SheetDescription className="text-xs truncate">
-                  AI Intelligence Engine
-                </SheetDescription>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowDebug(!showDebug)}
+                className={`h-8 w-8 ${showDebug ? 'bg-yellow-500/20' : ''}`}
+                title="Toggle debug info"
+              >
+                <Bug className="h-4 w-4" />
+              </Button>
             </div>
           </SheetHeader>
+
+          {showDebug && (
+            <div className="p-2 bg-yellow-50 dark:bg-yellow-900/30 border-b text-xs font-mono shrink-0">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-bold text-yellow-800 dark:text-yellow-200">Admin Debug</span>
+                <Badge variant="outline" className="text-xs">Role: {debugInfo.role}</Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-yellow-700 dark:text-yellow-300">
+                <span>URL:</span><span className="truncate">{debugInfo.lastUrl || '-'}</span>
+                <span>Status:</span>
+                <span className={debugInfo.lastStatus && debugInfo.lastStatus >= 400 ? 'text-red-600' : ''}>
+                  {debugInfo.lastStatus ?? '-'}
+                </span>
+                {debugInfo.lastError && (
+                  <>
+                    <span>Error:</span><span className="text-red-600 truncate">{debugInfo.lastError}</span>
+                  </>
+                )}
+              </div>
+              <div className="mt-1 text-yellow-600 dark:text-yellow-400">
+                Page: {pageKey}
+              </div>
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
             <div className="px-4 sm:px-6 mt-3 sm:mt-4 shrink-0">
