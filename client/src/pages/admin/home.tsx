@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw, Home, Bot } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw, Home } from "lucide-react";
 import { SystemAlert } from "@/components/ui/system-alert";
 import { WelcomeMessage } from "@/components/ui/welcome-message";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
