@@ -1,0 +1,114 @@
+ROLE: You are the implementation agent inside the SafeGo-platform repo. You will update Admin SafePilot so it is fully functional (no dead UI), keep strict role separation, and remove duplication. Deliver clean, minimal, non-breaking changes.
+
+GOAL (Single Source of Truth):
+- Admin area must have exactly ONE SafePilot entry point: the floating widget.
+- Sidebar/menu must NOT have a SafePilot item anymore.
+- Support console (/admin/support-console) must keep Support SafePilot, and MUST NOT show Admin floating widget there.
+
+A) PROMPT ROUTING MAP (must implement exactly)
+
+1) Widget Tabs (mode)
+- Intel   -> mode = "intel"
+- Context -> mode = "context"
+- Chat    -> mode = "chat"
+
+2) Priority/Intensity (tier)
+- Ultra    -> tier = "ultra"
+- Crisis   -> tier = "crisis"
+- Survival -> tier = "survival"
+- History  -> tier = "history"
+
+3) Send behavior
+- Every time user presses Send OR clicks a Quick Action:
+  - Build a final prompt string = buildPrompt({mode, tier, userText})
+  - POST to existing admin SafePilot endpoint (use current working endpoint used by the widget)
+  - Render response in the chat area
+  - Auto-scroll to newest message
+
+4) Quick Actions (must do real action)
+- Quick actions must either:
+  - (Default) auto-send immediately
+  - OR (If Auto-Send toggle is OFF) populate input only
+- Add an "Auto-send" toggle in the widget header (default ON)
+
+Quick Actions (minimum 10) + exact query text:
+Support
+1. Support Issues: "Show today's unresolved customer support tickets: counts by status, oldest 10, and suggested next actions."
+2. KYC Queue: "Show KYC pending approvals by age bucket (0-2h, 2-24h, 1-3d, 3d+) and top risk reasons."
+
+Fraud
+3. Fraud Signals: "Summarize fraud signals in the last 24h: suspicious devices, repeat payment failures, abnormal refunds."
+4. High-Risk Users: "List top 20 high-risk users with reason codes, last activity, and recommended actions."
+
+Operations
+5. Driver Violations: "Show driver violations in last 7 days: types, counts, repeat offenders, suggested enforcement."
+6. System Health: "Give system health summary: error rate, slow endpoints, memory/CPU warnings, and top fixes."
+
+Finance
+7. Payout Anomalies: "Detect payout anomalies: spikes, duplicates, unusual amounts; list top 20 with reasons."
+8. Earnings Disputes: "Summarize earnings disputes: open vs resolved, average resolution time, top dispute causes."
+
+Health / KPI
+9. Platform KPIs: "Show core KPIs for last 24h: rides, cancellations, refunds, disputes, KYC throughput, and trend vs prior day."
+10. Recommended Actions: "Based on KPIs and incidents, recommend the top 5 actions to improve reliability and reduce fraud."
+
+B) SYSTEM PROMPT TEMPLATES (must be applied in buildPrompt)
+
+Create a function buildPrompt that combines:
+- A base system instruction for Admin SafePilot
+- A tier-specific prefix
+- A mode-specific instruction
+- The user text / quick action query
+Return ONE final string.
+
+Base system instruction (Admin SafePilot):
+"You are Admin SafePilot for SafeGo. You answer ONLY admin/operator questions: metrics, KPIs, platform ops, KYC queues, fraud/risk signals, payouts, disputes, system health, and recommended actions. You must not handle end-user support conversations. If asked to do customer-support agent tasks, respond: 'Use Support SafePilot on /admin/support-console.' Be concise, action-oriented, and provide clear next steps. When you list items, include IDs and timestamps if available."
+
+Tier prefixes:
+- ultra:    "Priority: ULTRA. Be decisive. Provide immediate actions and the shortest path to fix."
+- crisis:   "Priority: CRISIS. Focus on incident response: impact, scope, mitigation, owner actions, and follow-up."
+- survival: "Priority: SURVIVAL. Focus on stabilizing core operations, reducing risk, and preventing recurrence."
+- history:  "Priority: HISTORY. Provide trends, comparisons, and insights over time."
+
+Mode instructions:
+- intel:   "Mode: INTEL. Summarize signals, risks, and what to watch. Use bullet points."
+- context: "Mode: CONTEXT. Explain what is happening, why, and dependencies. Include assumptions."
+- chat:    "Mode: CHAT. Answer as a helpful operator assistant and ask one short follow-up only if needed."
+
+C) UI/UX REQUIREMENTS (must implement)
+- The tabs and tier buttons must visibly show active state.
+- If user clicks a tab/tier, content area should update (even before sending) to reflect active selection.
+- Chat area must have a fixed height with scroll.
+- New messages must auto-scroll into view.
+- Add a small label above input showing current: "Mode: X | Priority: Y"
+- Ensure the widget is usable on smaller screens (no overflow off-screen).
+
+D) DUPLICATION REMOVAL (must implement)
+- Remove SafePilot from left sidebar menu in admin console.
+- Ensure only floating button triggers the widget.
+- If an embedded Admin SafePilot panel exists on any page (like admin/home.tsx), remove it.
+
+E) ROUTE SEPARATION (must not break)
+- Support SafePilot stays on /admin/support-console and is accessible only to SUPPORT_ADMIN role.
+- Admin floating widget must be hidden on /admin/support-console.
+- Any backend endpoints used by Support SafePilot must remain restricted to SUPPORT_ADMIN.
+- Admin endpoints must remain restricted to ADMIN roles.
+
+F) FILES (expected likely areas; confirm in repo)
+- client/src/components/safepilot/SafePilotButton.tsx (floating launcher)
+- client/src/components/safepilot/AdminSafePilotWidget.tsx (or current widget component)
+- client/src/pages/admin/home.tsx (remove embedded panel if present)
+- client/src/layouts/admin/* or navigation file (remove menu item)
+If file names differ, locate the existing components and update there.
+
+G) VERIFICATION CHECKLIST (must complete and report)
+1) /admin/dashboard -> floating widget visible; sidebar has NO SafePilot item; quick action sends and shows response.
+2) /admin/users -> floating widget visible; switching tabs changes mode; tier changes prompt behavior.
+3) /admin/support-console -> NO admin floating widget; support panel still works; role restrictions unchanged.
+4) Click each of the 10 quick actions: must produce a visible assistant response.
+5) No console errors; no dead clicks.
+
+DELIVERABLES
+- Commit-ready code changes with minimal diff.
+- Short summary of files changed and why.
+- Screenshots or notes of verification steps completed.
