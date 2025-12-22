@@ -83,3 +83,4 @@ The platform features two separate RAG-based AI assistants with strict role-base
 - Each assistant has dedicated backend endpoints with strict role guards
 - Admin SafePilot: floating widget on all admin pages (hidden on support-console)
 - Support SafePilot: embedded panel only on /admin/support-console
+- Sidebar link removed: Admin SafePilot is floating-only; no sidebar menu item
