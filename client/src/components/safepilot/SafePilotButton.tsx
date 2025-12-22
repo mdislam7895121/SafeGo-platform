@@ -895,14 +895,13 @@ export function SafePilotButton() {
     }
   };
 
-  // Only show on admin pages, but not on admin home (which has embedded AdminSafePilotPanel)
-  // Also don't show on support-console (which has embedded SupportSafePilotPanel)
+  // Only show on admin pages
   if (!location.startsWith('/admin')) {
     return null;
   }
   
-  // Don't show on pages with embedded SafePilot panels
-  if (location === '/admin' || location === '/admin/' || location === '/admin/home' || location === '/admin/support-console') {
+  // Don't show on support-console (which has embedded SupportSafePilotPanel)
+  if (location === '/admin/support-console') {
     return null;
   }
 
@@ -911,30 +910,43 @@ export function SafePilotButton() {
   return (
     <>
       {!isOpen && createPortal(
-        <button
-          data-testid="button-safepilot-launcher"
-          type="button"
-          aria-label="Open SafePilot AI assistant"
-          onClick={() => setIsOpen(true)}
-          className="rounded-full shadow-lg shadow-primary/25 bg-gradient-to-br from-[#0a1929] to-[#0d2137] hover:from-[#0d2137] hover:to-[#112a45] touch-manipulation transition-all duration-200 active:scale-95 border border-[#1e4976]/50 ring-2 ring-[#2F80ED]/20 hover:ring-[#2F80ED]/40 hover:shadow-xl hover:shadow-[#2F80ED]/30 flex items-center justify-center cursor-pointer"
+        <div
+          className="group"
           style={{ 
             position: 'fixed',
             bottom: '24px',
             right: '24px',
-            width: '56px',
-            height: '56px',
             zIndex: 9999,
-            WebkitTapHighlightColor: 'transparent',
             pointerEvents: 'auto',
           }}
         >
-          <SafePilotIcon size="md" />
-          {alertCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium ring-2 ring-white">
-              {alertCount > 9 ? '9+' : alertCount}
+          {/* Tooltip label on hover */}
+          <div className="absolute right-16 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+            <span className="bg-gray-900 text-white text-sm px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5">
+              Open SafePilot
+              <span className="text-xs text-gray-400">AI</span>
             </span>
-          )}
-        </button>,
+          </div>
+          <button
+            data-testid="button-safepilot-launcher"
+            type="button"
+            aria-label="Open SafePilot AI assistant"
+            onClick={() => setIsOpen(true)}
+            className="rounded-full shadow-lg shadow-primary/25 bg-gradient-to-br from-[#0a1929] to-[#0d2137] hover:from-[#0d2137] hover:to-[#112a45] touch-manipulation transition-all duration-200 active:scale-95 border border-[#1e4976]/50 ring-2 ring-[#2F80ED]/20 hover:ring-[#2F80ED]/40 hover:shadow-xl hover:shadow-[#2F80ED]/30 flex items-center justify-center cursor-pointer"
+            style={{ 
+              width: '56px',
+              height: '56px',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <SafePilotIcon size="md" />
+            {alertCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center font-medium ring-2 ring-white">
+                {alertCount > 9 ? '9+' : alertCount}
+              </span>
+            )}
+          </button>
+        </div>,
         document.body
       )}
 
