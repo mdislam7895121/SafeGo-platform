@@ -105,6 +105,7 @@ const AdminReferralSettings = lazy(() => import("@/pages/admin/referral-settings
 const AdminRevenueAnalytics = lazy(() => import("@/pages/admin/revenue-analytics"));
 const AdminSafety = lazy(() => import("@/pages/admin/safety"));
 const AdminSupportCenter = lazy(() => import("@/pages/admin/support-center"));
+const AdminSupportConsole = lazy(() => import("@/pages/admin/support-console"));
 
 function LoadingFallback() {
   return (
@@ -879,6 +880,13 @@ export function AdminRoutes() {
         <AdminGuard>
           <AdminLayout>
             <AdminSafety />
+          </AdminLayout>
+        </AdminGuard>
+      </Route>
+      <Route path="/admin/support-console">
+        <AdminGuard>
+          <AdminLayout>
+            <AdminSupportConsole />
           </AdminLayout>
         </AdminGuard>
       </Route>
