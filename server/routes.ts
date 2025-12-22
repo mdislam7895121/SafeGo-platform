@@ -85,6 +85,7 @@ import releasesRoutes from "./routes/releases"; // Release & Environment Promoti
 import observabilityRoutes from "./routes/observability"; // Phase 5A: Admin Observability Center
 import safePilotRoutes from "./routes/safepilot"; // SafePilot: AI Admin Assistant
 import safePilotChatRoutes from "./routes/safepilot-chat"; // SafePilot: RAG AI Chat System
+import adminSafePilotSupportRoutes from "./routes/admin-safepilot-support"; // Admin SafePilot Support Center
 import profilePhotoRoutes from "./routes/profile-photo"; // Profile Picture System
 import bdRidesRoutes from "./routes/bd-rides"; // BD Ride Pricing Engine
 import adminRidePricingRoutes from "./routes/admin-ride-pricing"; // Admin Ride Pricing Management
@@ -486,6 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/observability", observabilityRoutes); // Phase 5A: Admin Observability Center
   app.use("/api/admin/safepilot", safePilotRoutes); // SafePilot: AI Admin Assistant
   app.use("/api/safepilot", safePilotChatRoutes); // SafePilot: RAG AI Chat System for all users
+  app.use("/api/admin/safepilot/support", adminSafePilotSupportRoutes); // Admin SafePilot Support Center
   app.use("/api/profile", profilePhotoRoutes); // Profile Picture System
 
   // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)

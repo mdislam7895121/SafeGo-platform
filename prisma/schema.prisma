@@ -15177,15 +15177,34 @@ model SafePilotConversation {
   userId          String
   userRole        SafePilotRoleScope
   country         SafePilotCountryScope
+  service         SafePilotServiceScope     @default(ALL)
+  
+  // Status for admin support center
+  status          String                    @default("open") // open, escalated, resolved
+  
+  // Related entity links
+  rideId          String?
+  foodOrderId     String?
+  deliveryId      String?
+  
+  // Admin support tracking
+  isEscalated     Boolean                   @default(false)
+  escalatedAt     DateTime?
+  assignedAdminId String?
   
   lastSeenAt      DateTime                  @default(now())
   createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
   
   messages        SafePilotMessage[]
   
   @@index([userId])
   @@index([userRole])
   @@index([country])
+  @@index([service])
+  @@index([status])
+  @@index([isEscalated])
+  @@index([createdAt])
   @@map("safepilot_conversations")
 }
 
@@ -15268,4 +15287,68 @@ model SafePilotNotification {
   @@index([isRead])
   @@index([createdAt])
   @@map("safepilot_notifications")
+}
+
+// Admin Support Center: SafePilot Support Ticket
+enum SafePilotTicketStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+}
+
+enum SafePilotTicketSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model SafePilotSupportTicket {
+  id                    String                    @id @default(uuid())
+  ticketCode            String                    @unique // e.g., "SP-2025-000123"
+  conversationId        String
+  roleScope             SafePilotRoleScope
+  userId                String
+  country               SafePilotCountryScope
+  service               SafePilotServiceScope
+  
+  reason                String                    @db.Text
+  severity              SafePilotTicketSeverity   @default(MEDIUM)
+  status                SafePilotTicketStatus     @default(OPEN)
+  
+  assignedToAdminId     String?
+  resolutionReason      String?                   @db.Text
+  
+  // Related entity links
+  rideId                String?
+  foodOrderId           String?
+  deliveryId            String?
+  
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  resolvedAt            DateTime?
+  
+  // Relations
+  internalNotes         SafePilotInternalNote[]
+  
+  @@index([conversationId])
+  @@index([roleScope, country, service, status])
+  @@index([status])
+  @@index([assignedToAdminId])
+  @@index([createdAt])
+  @@map("safepilot_support_tickets")
+}
+
+// Admin Support Center: Internal Notes (admin-only)
+model SafePilotInternalNote {
+  id                    String                    @id @default(uuid())
+  ticketId              String
+  ticket                SafePilotSupportTicket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  adminUserId           String
+  note                  String                    @db.Text
+  createdAt             DateTime                  @default(now())
+  
+  @@index([ticketId])
+  @@index([adminUserId])
+  @@index([createdAt])
+  @@map("safepilot_internal_notes")
 }
