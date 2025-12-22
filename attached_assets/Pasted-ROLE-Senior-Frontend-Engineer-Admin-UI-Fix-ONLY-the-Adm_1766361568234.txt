@@ -1,0 +1,81 @@
+ROLE: Senior Frontend Engineer (Admin UI) — Fix ONLY the Admin Sidebar scrolling bug
+
+CONTEXT
+In the SafeGo web Admin Panel, the left sidebar is scrolling together with the full page and “slides up” instead of staying anchored. This makes navigation unusable. You must fix ONLY the sidebar behavior. Do NOT touch routing, cards, 404 pages, API calls, or other UI.
+
+GOAL
+Make the Admin layout behave like a standard dashboard:
+1) Sidebar stays fixed (or sticky) on the left across all admin pages.
+2) Only the sidebar menu area scrolls when the menu is long.
+3) Only the main content area scrolls for page content.
+4) The overall browser/page should NOT scroll the entire dashboard container (avoid double scroll bugs).
+
+WHAT TO DO (REQUIRED)
+A) Locate the Admin layout wrapper
+- Find the component that renders the admin shell: Sidebar + Header + Content.
+- Common locations: src/components/admin/*, app/admin/*, pages/admin/*, layouts/AdminLayout.tsx, AdminShell.tsx, DashboardLayout.tsx.
+- Identify the top-level container that wraps both sidebar and main content.
+
+B) Implement the correct layout structure (desktop)
+Use this structure (adapt to your codebase/framework):
+
+- Root container: full viewport height, prevents body scroll:
+  - height: 100vh (or 100dvh)
+  - overflow: hidden
+  - display: flex
+- Sidebar:
+  - width: fixed (e.g., 260px)
+  - position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    OR position: fixed; left: 0; top: 0; bottom: 0; overflow-y: auto;
+  - Ensure it does NOT shrink: flex: 0 0 260px;
+- Main area:
+  - flex: 1
+  - height: 100vh
+  - overflow-y: auto
+  - contains header + page content
+  - If header is inside main, keep header sticky inside main (optional), but do not break.
+
+C) Remove the cause of the bug
+Common causes you must check and fix:
+1) Sidebar is inside the same scroll container as the page content.
+2) Parent container uses overflow-y: auto on the whole page instead of splitting sidebar/main.
+3) Sidebar has no height constraint, so it moves with page scroll.
+4) Sidebar is placed inside a content wrapper that is being scrolled.
+5) Using position: sticky but parent has overflow: hidden/auto incorrectly, breaking sticky.
+
+D) Make sidebar menu scroll independently
+- Only the menu list area should scroll, not the logo/header section of the sidebar (if present).
+- Example: sidebar has a top section (logo/profile) with flex: 0, and menu area with flex: 1; overflow-y: auto.
+
+E) Mobile behavior (do not redesign, just keep stable)
+- If there is a hamburger/collapsible sidebar:
+  - When opened: sidebar overlays content with fixed position and its own scroll
+  - When closed: content takes full width
+- Do NOT change visuals, only prevent the sidebar from drifting during scroll.
+
+IMPLEMENTATION NOTES (CHOOSE ONE APPROACH)
+Approach 1: Sticky sidebar (preferred if header exists inside main)
+- Sidebar: position: sticky; top: 0; height: 100vh; overflow-y: auto;
+
+Approach 2: Fixed sidebar (safer)
+- Sidebar: position: fixed; top: 0; bottom: 0; left: 0; overflow-y: auto;
+- Main wrapper must have margin-left/padding-left equal to sidebar width.
+
+ACCEPTANCE CRITERIA (MUST PASS)
+1) On /admin/dashboard and at least 5 other admin pages, sidebar stays in place while main content scrolls.
+2) If menu is long, mouse wheel over sidebar scrolls the menu; mouse wheel over main scrolls the page content.
+3) No “double scrollbar” on the whole page (avoid body scroll + main scroll).
+4) Works in Chrome on Windows (current environment).
+
+DELIVERABLES
+1) Exact files changed (list them).
+2) Code changes with clean CSS (CSS module, Tailwind, styled-components, or plain CSS—match current project style).
+3) Before/after explanation of what caused the sidebar to scroll with the page and why your fix prevents it.
+
+DO NOT
+- Do not touch admin routing, cards, links, 404 handling, CMS pages, finance pages, or backend calls.
+- Do not refactor unrelated components.
+- Do not change UI design.
+
+START NOW
+Find the Admin layout component and implement the split-scroll layout so sidebar is anchored and independently scrollable.
