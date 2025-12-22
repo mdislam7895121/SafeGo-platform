@@ -1,0 +1,168 @@
+SAFEGO / SAFEPILOT — CUSTOMER SUPPORT GO-LIVE & BUSINESS CONTROL
+STEP 7–10 MASTER PROMPT (FINAL PHASE)
+===============================================================
+
+ABSOLUTE RULES (NON-NEGOTIABLE):
+- Additive only. Do NOT rename/remove any existing APIs, routes, schemas, UI.
+- Preserve ALL SafeGo rules:
+  - Roles: Customer, Driver, Restaurant, Admin (never mix access)
+  - Services: Ride, Food, Parcel
+  - Country rules: BD + US (KYC, payments, status flows)
+- SafePilot STEP 1–6 are COMPLETE. This task is STEP 7–10 ONLY.
+- Production-ready code only. No pseudo code.
+- Complete everything in ONE execution. Do NOT ask follow-up questions.
+
+---------------------------------------------------------------
+GOAL
+---------------------------------------------------------------
+Safely move SafePilot into production, measure its impact,
+control risk, prove ROI, and lock customer trust.
+
+---------------------------------------------------------------
+STEP 7 — GO-LIVE SAFETY GATE (FEATURE-FLAGGED ROLLOUT)
+---------------------------------------------------------------
+Objective:
+Launch SafePilot gradually without breaking customer experience.
+
+Implementation:
+
+A) Feature Flag
+- Introduce SafePilot rollout flag (customer_safe_pilot_enabled)
+- Support percentage rollout (e.g. 10%, 25%, 50%, 100%)
+- Admin can change rollout % without redeploy
+
+B) Kill Switch
+- Admin-only switch to instantly disable:
+  - Proactive triggers
+  - Auto follow-ups
+  - Auto escalation
+- Existing chat still works if disabled
+
+C) Monitoring Hooks
+Log the following per user:
+- AI resolved vs escalated
+- Emotion detected
+- Follow-up sent count
+- Time to resolution
+
+Deliverables STEP 7:
+- Feature flag + admin control
+- Kill switch
+- Audit + monitoring metadata
+
+---------------------------------------------------------------
+STEP 8 — CUSTOMER SUPPORT KPI DASHBOARD (ADMIN)
+---------------------------------------------------------------
+Objective:
+Make AI performance visible and measurable.
+
+Dashboard Metrics (minimum):
+- Total customer conversations
+- % resolved by SafePilot (no human)
+- % escalated to human
+- Avg time to resolution
+- Angry → resolved rate
+- Follow-up success rate
+- Support ticket reduction %
+
+Implementation:
+- Create admin-only endpoint(s) to aggregate metrics
+- Time filters: today / last 7 days / last 30 days
+- Country filter: BD / US
+- Service filter: Ride / Food / Parcel
+
+UI:
+- Simple, clean dashboard
+- No raw data exposure to non-admins
+
+Deliverables STEP 8:
+- Aggregation logic
+- Admin API
+- Admin UI page or panel
+
+---------------------------------------------------------------
+STEP 9 — SUPPORT COST & SAVINGS REPORT
+---------------------------------------------------------------
+Objective:
+Prove business value in numbers (founder + investor ready).
+
+Implementation:
+
+A) Baseline Capture
+- Store historical support ticket volume (pre-SafePilot)
+- Avg handling time per ticket (configurable constant)
+
+B) Savings Calculation
+Compute:
+- Tickets avoided by AI
+- Human hours saved
+- Estimated cost saved
+- AI cost vs human cost comparison
+
+C) Report Output
+- Admin-only report endpoint
+- Downloadable summary (JSON or CSV)
+- Clear before/after comparison
+
+Deliverables STEP 9:
+- Cost calculation logic
+- Report endpoint
+- Admin access only
+
+---------------------------------------------------------------
+STEP 10 — CUSTOMER TRUST & BRAND POLISH (FINAL LOCK)
+---------------------------------------------------------------
+Objective:
+Ensure SafePilot never damages brand trust.
+
+Implementation:
+
+A) Response Copy Guardrails
+- Never promise refunds/credits unless backend confirms
+- Always explain “why” in simple language
+- Never blame customer or driver
+- Always offer a next step
+
+B) Country-Specific Trust Templates
+- BD: KYC, NID, cash rules explained clearly
+- US: ID, compliance, payment rules explained clearly
+
+C) Consistency Check
+- Same issue → same explanation across app
+- Tone aligned with SafeGo brand voice
+
+D) Final Review Mode
+- Admin-only toggle to sample AI responses
+- View emotion, escalation reason, and final message
+
+Deliverables STEP 10:
+- Copy guardrails enforced in code
+- Country-aware trust templates
+- Admin review toggle
+
+---------------------------------------------------------------
+ACCEPTANCE TESTS (MANDATORY)
+---------------------------------------------------------------
+1) Enable SafePilot for 10% customers → verify others unaffected
+2) Trigger angry case → logged, resolved or escalated correctly
+3) Disable via kill switch → no proactive messages sent
+4) KPI dashboard shows real metrics
+5) Cost report shows clear savings
+6) AI response never promises unsupported actions
+
+---------------------------------------------------------------
+OUTPUT REQUIREMENTS
+---------------------------------------------------------------
+At the end, provide:
+1) Files changed / added
+2) Feature flag + kill switch explanation
+3) KPI definitions and formulas
+4) Cost calculation assumptions
+5) Proof all changes are additive (non-breaking)
+
+DO NOT:
+- Re-explain SafePilot architecture
+- Add new customer features beyond STEP 7–10
+- Ask what to do next
+
+Proceed now.

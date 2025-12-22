@@ -51,7 +51,7 @@ export async function getAuditLogs(filters: AuditLogFilters): Promise<{
 
 export async function logAdminAction(
   adminId: string,
-  action: "kb_upload" | "kb_disable" | "kb_reembed" | "kb_update",
+  action: "kb_upload" | "kb_disable" | "kb_reembed" | "kb_update" | "update_feature_flag" | "kill_switch_toggle",
   metadata: Record<string, any>
 ): Promise<void> {
   await prisma.safePilotAuditLog.create({
