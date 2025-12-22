@@ -6,6 +6,8 @@ import { executeTool, ToolName } from "./tools";
 import { classifyIntent, getRefusalResponse, getNextActionsForNoKB, IntentRoute } from "./intentRouter";
 import { checkRateLimit, incrementRateLimit } from "./rateLimit";
 import { z } from "zod";
+import { detectEmotion, getEmotionAwareResponseGuidelines, EmotionType } from "./emotionDetection";
+import { checkEscalationTriggers, createEscalationTicket, getEscalationConfirmationMessage, getConversationAttemptCount, extractEntityIdsFromConversation, EscalationContext } from "./escalationEngine";
 
 export interface ChatRequest {
   message: string;
@@ -38,6 +40,12 @@ export interface ChatResponse {
     countryRulesApplied: string;
     cacheHit: boolean;
   };
+  escalated?: {
+    ticketId: string;
+    ticketCode: string;
+    reason: string;
+  };
+  emotion?: EmotionType;
 }
 
 const TOOL_ARG_SCHEMAS: Record<string, z.ZodSchema> = {
@@ -185,7 +193,8 @@ function buildSystemPrompt(
   service: ServiceScope,
   kbContext: string,
   kbHasResults: boolean,
-  route: IntentRoute
+  route: IntentRoute,
+  emotion?: EmotionType
 ): string {
   const countryRules = getCountryRules(country);
   const permissions = getToolPermissions(role);
@@ -208,13 +217,17 @@ function buildSystemPrompt(
     hallucinationPrevention = `Use the tools provided to get the user's real data. If tools don't return the needed information, be honest about what you couldn't find.`;
   }
 
+  const emotionGuidelines = emotion ? getEmotionAwareResponseGuidelines(emotion) : "";
+
   const brandRules = `
 ## Brand & Response Rules
 ${tonePreset}
 - Never promise actions you cannot perform
 - Always specify clear next steps
 - Never expose restricted fields or other users' data
-- If uncertain, recommend contacting SafeGo Support`;
+- If uncertain, recommend contacting SafeGo Support
+- NEVER blame the customer for any issue
+- NEVER promise refunds, compensation, or policy changes without backend confirmation`;
 
   return `You are SafePilot, the in-app AI assistant for SafeGo - a super-app offering ride-hailing, food delivery, and parcel delivery services.
 
@@ -235,6 +248,8 @@ ${privacyRules}
 - Available payment methods: ${countryRules.paymentMethods.join(", ")}
 - KYC requirements: ${countryRules.kycFields.join(", ")}
 ${brandRules}
+
+${emotionGuidelines ? `## ${emotionGuidelines}` : ""}
 
 ## Service Status Flows
 ### Ride-hailing
@@ -298,6 +313,9 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     };
   }
 
+  const emotionResult = detectEmotion(message);
+  const detectedEmotion = emotionResult.emotion;
+
   const { results: kbResults, metadata: kbMetadata } = await searchKBWithMetadata({ query: message, country, role, service, limit: 6 });
   const kbHasResults = kbResults.length > 0;
 
@@ -306,7 +324,7 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     : "";
 
   const tools = buildToolDefinitions(role);
-  const systemPrompt = buildSystemPrompt(role, country, service, kbContext, kbHasResults, intentResult.route);
+  const systemPrompt = buildSystemPrompt(role, country, service, kbContext, kbHasResults, intentResult.route, detectedEmotion);
 
   let conversation = conversationId
     ? await prisma.safePilotConversation.findUnique({
@@ -320,6 +338,60 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
       data: { userId, userRole: role, country },
       include: { messages: true },
     });
+  }
+
+  const attemptCount = await getConversationAttemptCount(conversation.id);
+  const entityIds = await extractEntityIdsFromConversation(conversation.id);
+
+  const escalationContext: EscalationContext = {
+    userId,
+    conversationId: conversation.id,
+    emotion: detectedEmotion,
+    attemptCount,
+    entityIds,
+    conversationHistory: conversation.messages.map(m => ({
+      role: m.direction === "user" ? "user" : "assistant",
+      content: m.content,
+    })),
+  };
+
+  const escalationDecision = checkEscalationTriggers(message, escalationContext);
+
+  if (escalationDecision.shouldEscalate && role === "CUSTOMER") {
+    const { ticketId, ticketCode } = await createEscalationTicket(escalationContext, escalationDecision);
+    const escalationMessage = getEscalationConfirmationMessage(ticketCode);
+
+    await prisma.safePilotMessage.create({
+      data: {
+        conversationId: conversation.id,
+        direction: "user",
+        content: message,
+        moderationFlags: inputModeration,
+      },
+    });
+
+    await prisma.safePilotMessage.create({
+      data: {
+        conversationId: conversation.id,
+        direction: "assistant",
+        content: escalationMessage,
+      },
+    });
+
+    await incrementRateLimit(userId, role);
+
+    return {
+      reply: escalationMessage,
+      conversationId: conversation.id,
+      sources: [],
+      suggestedActions: ["View Support Tickets"],
+      escalated: {
+        ticketId,
+        ticketCode,
+        reason: escalationDecision.reason,
+      },
+      emotion: detectedEmotion,
+    };
   }
 
   const conversationHistory = conversation.messages
@@ -494,6 +566,8 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     toolsUsed,
     conversationId: conversation.id,
     cache: { hit: kbMetadata.cacheHit, kind: kbMetadata.cacheKind },
+    emotion: detectedEmotion,
+    emotionSignals: emotionResult.signals,
   });
 
   const suggestedActions = generateSuggestedActions(message, role, intentResult.route);
@@ -512,6 +586,7 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
       remaining: rateResult.remaining,
       resetAt: rateResult.resetAt,
     },
+    emotion: detectedEmotion,
   };
 
   if (explain || role === "ADMIN") {
