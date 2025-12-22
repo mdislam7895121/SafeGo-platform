@@ -1,7 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { CustomerSafePilotWidget, ServiceType } from './CustomerSafePilotWidget';
+
+// Singleton guard to prevent duplicate mounts
+let __CUSTOMER_SAFEPILOT_MOUNTED__ = false;
 
 function detectServiceFromPath(path: string): { service: ServiceType; entityId?: string; entityType?: 'ride' | 'order' | 'delivery' } {
   if (!path) return { service: 'ALL' };
@@ -84,6 +87,21 @@ function isCustomerPath(path: string): boolean {
 export function CustomerSafePilotWrapper() {
   const [location] = useLocation();
   const { user } = useAuth();
+  
+  // Singleton guard effect
+  useEffect(() => {
+    if (__CUSTOMER_SAFEPILOT_MOUNTED__) {
+      console.warn('[CustomerSafePilotWrapper] Duplicate mount prevented');
+      return;
+    }
+    __CUSTOMER_SAFEPILOT_MOUNTED__ = true;
+    console.log('[CustomerSafePilotWrapper] Mounted');
+    
+    return () => {
+      __CUSTOMER_SAFEPILOT_MOUNTED__ = false;
+      console.log('[CustomerSafePilotWrapper] Unmounted');
+    };
+  }, []);
   
   const isCustomerRole = user?.role?.toLowerCase() === 'customer' || user?.role?.toLowerCase() === 'pending_customer';
   
