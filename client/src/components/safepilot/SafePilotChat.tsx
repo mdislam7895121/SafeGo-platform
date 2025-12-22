@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { MessageCircle, X, Send, Loader2, Bot, User as UserIcon, RefreshCw, Trash2 } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Bot, User as UserIcon, RefreshCw, Trash2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,14 +14,23 @@ interface ChatMessage {
   content: string;
   flagged?: boolean;
   createdAt: string;
+  error?: boolean;
 }
 
 interface ChatResponse {
   conversationId: string;
-  messageId: string;
-  response: string;
-  flagged: boolean;
+  messageId?: string;
+  reply?: string;
+  response?: string;
+  flagged?: boolean;
   sources?: string[];
+}
+
+interface DebugInfo {
+  lastUrl: string;
+  lastStatus: number | null;
+  lastError: string | null;
+  lastResponse: string | null;
 }
 
 interface Conversation {
@@ -35,6 +44,13 @@ export function SafePilotChat() {
   const [message, setMessage] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo>({
+    lastUrl: '',
+    lastStatus: null,
+    lastError: null,
+    lastResponse: null,
+  });
+  const [showDebug, setShowDebug] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -109,7 +125,12 @@ export function SafePilotChat() {
 
   const chatMutation = useMutation({
     mutationFn: async (text: string) => {
-      const res = await fetch('/api/safepilot/chat', {
+      const url = '/api/safepilot/chat';
+      setDebugInfo(prev => ({ ...prev, lastUrl: url, lastStatus: null, lastError: null }));
+      
+      console.log('[SafePilot] Sending message:', { text, role: getRole(), country: getCountry() });
+      
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -121,20 +142,43 @@ export function SafePilotChat() {
           conversationId: conversationId || undefined,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Chat failed');
+      
+      const responseText = await res.text();
+      let data: ChatResponse | null = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        data = null;
       }
-      return res.json() as Promise<ChatResponse>;
+      
+      setDebugInfo({
+        lastUrl: url,
+        lastStatus: res.status,
+        lastError: !res.ok ? ((data as any)?.error || `HTTP ${res.status}`) : null,
+        lastResponse: responseText?.substring(0, 120) || null,
+      });
+      
+      console.log('[SafePilot] Response:', { status: res.status, data });
+      
+      if (!res.ok) {
+        throw new Error((data as any)?.error || `Request failed (${res.status})`);
+      }
+      
+      if (!data) {
+        throw new Error('Empty response from server');
+      }
+      
+      return data;
     },
     onSuccess: (data) => {
       setConversationId(data.conversationId);
+      const replyText = data.reply || data.response || 'No response received.';
       setMessages((prev) => [
         ...prev,
         {
-          id: data.messageId,
+          id: data.messageId || `msg-${Date.now()}`,
           role: 'assistant',
-          content: data.response,
+          content: replyText,
           flagged: data.flagged,
           createdAt: new Date().toISOString(),
         },
@@ -142,6 +186,17 @@ export function SafePilotChat() {
       refetchConversations();
     },
     onError: (error: Error) => {
+      console.error('[SafePilot] Chat error:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: `Error: ${error.message}`,
+          createdAt: new Date().toISOString(),
+          error: true,
+        },
+      ]);
       toast({
         title: 'Chat Error',
         description: error.message,
@@ -210,6 +265,17 @@ export function SafePilotChat() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {debugInfo.lastUrl && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowDebug(!showDebug)}
+                    className={`text-white hover:bg-white/20 ${showDebug ? 'bg-white/20' : ''}`}
+                    title="Toggle debug info"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -230,6 +296,36 @@ export function SafePilotChat() {
               </div>
             </div>
           </SheetHeader>
+
+          {showDebug && (
+            <div className="p-2 bg-yellow-50 dark:bg-yellow-900/30 border-b text-xs font-mono">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-bold text-yellow-800 dark:text-yellow-200">Debug Info</span>
+                <button onClick={() => setShowDebug(false)} className="text-yellow-600 hover:text-yellow-800">hide</button>
+              </div>
+              <div className="space-y-0.5 text-yellow-700 dark:text-yellow-300">
+                <div>URL: {debugInfo.lastUrl || 'none'}</div>
+                <div>Status: {debugInfo.lastStatus ?? 'pending'}</div>
+                {debugInfo.lastError && <div className="text-red-600">Error: {debugInfo.lastError}</div>}
+                {debugInfo.lastResponse && <div>Response: {debugInfo.lastResponse}</div>}
+              </div>
+            </div>
+          )}
+
+          {!showDebug && debugInfo.lastError && (
+            <div className="p-2 bg-red-50 dark:bg-red-900/30 border-b">
+              <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                <AlertCircle className="w-4 h-4" />
+                <span>{debugInfo.lastError}</span>
+                <button 
+                  onClick={() => setShowDebug(true)} 
+                  className="ml-auto text-xs underline hover:no-underline"
+                >
+                  Details
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 flex overflow-hidden">
             {conversations.length > 0 && !conversationId && (
@@ -296,20 +392,30 @@ export function SafePilotChat() {
                       className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       {msg.role === 'assistant' && (
-                        <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center flex-shrink-0">
-                          <Bot className="w-4 h-4 text-white" />
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.error ? 'bg-red-500' : 'bg-teal-500'}`}>
+                          {msg.error ? <AlertCircle className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-white" />}
                         </div>
                       )}
                       <div
                         className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                           msg.role === 'user'
                             ? 'bg-teal-500 text-white rounded-br-md'
+                            : msg.error
+                            ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-bl-md'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-md'
                         } ${msg.flagged ? 'border-2 border-red-500' : ''}`}
                       >
                         <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                         {msg.flagged && (
                           <p className="text-xs mt-1 text-red-500">Content flagged</p>
+                        )}
+                        {msg.error && (
+                          <button 
+                            onClick={() => setShowDebug(true)} 
+                            className="text-xs mt-1 underline hover:no-underline"
+                          >
+                            View details
+                          </button>
                         )}
                       </div>
                       {msg.role === 'user' && (
