@@ -51,11 +51,12 @@ const contextQuerySchema = z.object({
 });
 
 const queryRequestSchema = z.object({
-  pageKey: z.string(),
-  question: z.string().min(1).max(500),
+  pageKey: z.string().optional().default('admin.dashboard'),
+  question: z.string().min(1),
   countryCode: z.string().optional(),
   context: z.record(z.string()).optional(),
   mode: z.enum(['ASK', 'WATCH', 'GUARD', 'OPTIMIZE']).optional(),
+  role: z.string().optional(),
   filters: z.object({
     dateRange: z.string().optional(),
     entityType: z.string().optional(),
@@ -217,15 +218,37 @@ router.post(
     });
 
     try {
-      // Validate request body
+      // Validate request body - accept any non-empty question
+      let body: {
+        pageKey: string;
+        question: string;
+        countryCode?: string;
+        context?: Record<string, string>;
+        mode?: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE';
+      };
+      
       const bodyResult = queryRequestSchema.safeParse(req.body);
       if (!bodyResult.success) {
-        console.warn('[SafePilot] Invalid request body:', bodyResult.error.errors);
-        res.json(createFallbackResponse('Please provide a valid question. Try asking about drivers, customers, fraud, or platform metrics.'));
-        return;
+        console.warn('[SafePilot] Request validation issue:', bodyResult.error.errors);
+        // Still try to process if we have a question
+        const rawQuestion = req.body?.question;
+        if (rawQuestion && typeof rawQuestion === 'string' && rawQuestion.trim().length > 0) {
+          // Extract valid body manually
+          body = {
+            pageKey: req.body?.pageKey || 'admin.dashboard',
+            question: rawQuestion.trim(),
+            countryCode: req.body?.countryCode,
+            context: req.body?.context,
+            mode: req.body?.mode,
+          };
+          console.log('[SafePilot] Proceeding with manual body extraction');
+        } else {
+          res.json(createFallbackResponse('I can help you with platform metrics, driver stats, fraud alerts, KYC queues, and more. What would you like to know?'));
+          return;
+        }
+      } else {
+        body = bodyResult.data;
       }
-      
-      const body = bodyResult.data;
       
       if (!req.user?.id) {
         console.warn('[SafePilot] No user ID in request');
