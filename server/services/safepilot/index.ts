@@ -20,7 +20,8 @@ export { predictiveAnalytics } from './predictiveAnalytics';
 export { autoDecisionEngine } from './autoDecisionEngine';
 
 // SafePilot RAG AI Assistant exports
-export { openai, SAFEPILOT_MODEL, SAFEPILOT_EMBED_MODEL, generateEmbedding, moderateText, chatCompletion } from "./openaiClient";
+export { openai, SAFEPILOT_MODEL, SAFEPILOT_EMBED_MODEL, generateEmbedding, moderateText, chatCompletion, chatCompletionWithTools } from "./openaiClient";
+export type { ToolDefinition, ToolCallResult } from "./openaiClient";
 export { canUseAdminKB, canAccessDocument, sanitizeSourcesForRole, getToolPermissions, getCountryRules, validatePrivacyRequest } from "./rbac";
 export type { Role, Country, ServiceScope } from "./rbac";
 export { searchKB, getDocumentById, createDocumentWithEmbeddings, reembedDocument, updateDocumentStatus, listDocuments } from "./kbSearch";
