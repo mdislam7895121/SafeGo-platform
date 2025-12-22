@@ -66,6 +66,7 @@ import {
 } from '@/components/ui/sheet';
 import { apiRequest, queryClient, fetchWithAuth } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeSafePilotReply } from './chatApi';
 
 interface SafePilotSuggestion {
   key: string;
@@ -367,6 +368,14 @@ const getInsightIcon = (type: string) => {
   }
 };
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  isError?: boolean;
+}
+
 export function SafePilotButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -382,6 +391,7 @@ export function SafePilotButton() {
     lastError: string | null;
     role: string;
   }>({ lastUrl: '', lastStatus: null, lastError: null, role: 'ADMIN' });
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   
   const [crisisReport, setCrisisReport] = useState<CrisisReportData | null>(null);
   const [isCrisisLoading, setIsCrisisLoading] = useState(false);
@@ -481,10 +491,25 @@ export function SafePilotButton() {
       return;
     }
 
+    const userQuestion = question.trim();
+    
+    // STEP 1: Optimistic rendering - add user message immediately
+    const userMessageId = `user-${Date.now()}`;
+    setChatMessages(prev => [...prev, {
+      id: userMessageId,
+      role: 'user',
+      content: userQuestion,
+      timestamp: new Date(),
+    }]);
+    
+    // STEP 2: Clear input immediately
+    setQuestion('');
+    setActiveTab('response');
+
     setIsSubmitting(true);
     const url = '/api/admin/safepilot/query';
     setDebugInfo(prev => ({ ...prev, lastUrl: url, lastStatus: null, lastError: null }));
-    console.log('[SafePilot Admin] Submitting question:', { question: question.trim().slice(0, 50), role: 'ADMIN', pageKey });
+    console.log('[SafePilot Admin] Submitting question:', { question: userQuestion.slice(0, 50), role: 'ADMIN', pageKey });
     
     try {
       const res = await fetchWithAuth(url, {
@@ -492,51 +517,58 @@ export function SafePilotButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageKey,
-          question: question.trim(),
+          question: userQuestion,
           role: 'ADMIN',
         }),
       });
       
       setDebugInfo(prev => ({ ...prev, lastStatus: res.status }));
       
-      // Parse response (backend now ALWAYS returns valid JSON)
+      // Parse response
       let data;
       try {
         data = await res.json();
       } catch (parseError) {
-        console.error('[SafePilot] JSON parse error:', parseError);
-        data = {
-          mode: 'ASK',
-          summary: ['Response parsing issue. Please try again.'],
-          keySignals: [],
-          actions: [],
-          monitor: [],
-        };
+        console.error('[SafePilot Admin] JSON parse error:', parseError);
+        data = null;
       }
       
-      // Normalize the response with defaults
-      const response: SafePilotQueryResponse = {
-        mode: data.mode || 'ASK',
-        summary: data.summary?.length > 0 ? data.summary : ['Analysis complete.'],
-        keySignals: data.keySignals || [],
-        actions: data.actions || [],
-        monitor: data.monitor || [],
-        answerText: data.answerText || data.summary?.join(' ') || '',
-        insights: data.insights || [],
-        suggestions: data.suggestions || [],
-        riskLevel: data.riskLevel || 'LOW',
-        error: undefined, // Never set error if we got a response
-      };
+      // STEP 3: Use universal normalizer to extract reply text
+      const normalizedReply = normalizeSafePilotReply(data);
+      
+      // Add assistant message
+      setChatMessages(prev => [...prev, {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: normalizedReply,
+        timestamp: new Date(),
+        isError: !res.ok,
+      }]);
+      
+      // Also store structured response for the detail view
+      if (data) {
+        const response: SafePilotQueryResponse = {
+          mode: data.mode || 'ASK',
+          summary: data.summary?.length > 0 ? data.summary : [],
+          keySignals: data.keySignals || [],
+          actions: data.actions || [],
+          monitor: data.monitor || [],
+          answerText: normalizedReply,
+          insights: data.insights || [],
+          suggestions: data.suggestions || [],
+          riskLevel: data.riskLevel || 'LOW',
+          error: !res.ok ? (data.error || `HTTP ${res.status}`) : undefined,
+        };
+        setQueryResponse(response);
+      }
 
-      console.log('[SafePilot Admin] Query successful:', { mode: response.mode, status: res.status });
-      setQueryResponse(response);
-      setActiveTab('response');
-      setQuestion('');
+      console.log('[SafePilot Admin] Query complete:', { status: res.status, replyLength: normalizedReply.length });
       
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     } catch (error) {
       console.error('[SafePilot Admin] Request error:', error);
-      setDebugInfo(prev => ({ ...prev, lastError: error instanceof Error ? error.message : String(error) }));
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      setDebugInfo(prev => ({ ...prev, lastError: errorMsg }));
       
       // Retry on network errors
       if (retryCount < 2) {
@@ -546,19 +578,15 @@ export function SafePilotButton() {
         return handleSubmitQuestion(retryCount + 1);
       }
       
-      // Final fallback after retries
-      setQueryResponse({
-        mode: 'ASK',
-        summary: ['Network issue detected. Please check your connection and try again.'],
-        keySignals: ['Connection may be unstable'],
-        actions: [{ label: 'Retry your question', risk: 'SAFE' }],
-        monitor: ['Monitor connection status'],
-        answerText: '',
-        insights: [],
-        suggestions: [],
-        riskLevel: 'LOW',
-      });
-      setActiveTab('response');
+      // Add error message to chat
+      setChatMessages(prev => [...prev, {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: `Error: ${errorMsg}. Please check your network and try again.`,
+        timestamp: new Date(),
+        isError: true,
+      }]);
+      
       toast({
         title: 'Connection Issue',
         description: 'Please check your network and try again.',
@@ -1256,8 +1284,69 @@ export function SafePilotButton() {
 
             <TabsContent value="response" className="flex-1 flex flex-col mt-0 min-h-0">
               <ScrollArea className="flex-1 p-4 sm:p-6">
-                {queryResponse ? (
-                  <div className="space-y-4">
+                {/* Chat Message Bubbles */}
+                {chatMessages.length > 0 ? (
+                  <div className="space-y-4 mb-4">
+                    {chatMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        {msg.role === 'assistant' && (
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.isError ? 'bg-red-500' : 'bg-gradient-to-br from-[#2F80ED] to-[#56CCF2]'}`}>
+                            <SafePilotIcon size="sm" />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                            msg.role === 'user'
+                              ? 'bg-gradient-to-r from-[#2F80ED] to-[#56CCF2] text-white rounded-br-md'
+                              : msg.isError
+                              ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-bl-md'
+                              : 'bg-muted text-foreground rounded-bl-md'
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          <p className="text-xs opacity-60 mt-1">
+                            {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        {msg.role === 'user' && (
+                          <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center flex-shrink-0">
+                            <Users className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {isSubmitting && (
+                      <div className="flex gap-3 justify-start">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2F80ED] to-[#56CCF2] flex items-center justify-center flex-shrink-0">
+                          <SafePilotIcon size="sm" />
+                        </div>
+                        <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                          <div className="flex gap-1">
+                            <div className="w-2 h-2 bg-[#2F80ED] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-2 h-2 bg-[#2F80ED] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-2 h-2 bg-[#2F80ED] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 mb-4 opacity-30" />
+                    <p>Ask a question to see SafePilot's response.</p>
+                    <p className="text-xs mt-2">
+                      Try asking about high-risk drivers, pending KYC, or fraud alerts.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Structured Response Details (shown below chat bubbles) */}
+                {queryResponse && chatMessages.length > 0 && (
+                  <div className="space-y-4 border-t pt-4 mt-4">
                     {(queryResponse as any).mode && (
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge 
@@ -1273,20 +1362,6 @@ export function SafePilotButton() {
                         <Badge className={getSeverityColor(queryResponse.riskLevel || 'LOW')}>
                           {queryResponse.riskLevel || 'LOW'} Risk
                         </Badge>
-                      </div>
-                    )}
-
-                    {(queryResponse as any).summary?.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2">Summary</h4>
-                        <div className="space-y-2">
-                          {(queryResponse as any).summary.map((item: string, idx: number) => (
-                            <div key={idx} className="flex items-start gap-2 text-sm bg-muted/50 p-2 rounded-lg">
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                              <span className="break-words">{item}</span>
-                            </div>
-                          ))}
-                        </div>
                       </div>
                     )}
 
@@ -1379,14 +1454,6 @@ export function SafePilotButton() {
                         </div>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mb-4 opacity-30" />
-                    <p>Ask a question to see SafePilot's response.</p>
-                    <p className="text-xs mt-2">
-                      Try asking about high-risk drivers, pending KYC, or fraud alerts.
-                    </p>
                   </div>
                 )}
               </ScrollArea>
