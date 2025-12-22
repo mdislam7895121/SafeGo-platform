@@ -194,34 +194,18 @@ function Router() {
 
   return (
       <Switch>
-        {/* Major route modules - must be inside Switch to prevent 404 overlay */}
-        {/* Note: Need both exact /admin and /admin/:rest* patterns for wouter */}
-        <Route path="/admin">
+        {/* Major route modules - use wouter v3 wildcard for matching */}
+        <Route path="/admin/*?">
           <Suspense fallback={<LoadingSpinner />}>
             <AdminRoutes />
           </Suspense>
         </Route>
-        <Route path="/admin/:rest*">
-          <Suspense fallback={<LoadingSpinner />}>
-            <AdminRoutes />
-          </Suspense>
-        </Route>
-        <Route path="/driver">
+        <Route path="/driver/*?">
           <Suspense fallback={<LoadingSpinner />}>
             <DriverRoutes />
           </Suspense>
         </Route>
-        <Route path="/driver/:rest*">
-          <Suspense fallback={<LoadingSpinner />}>
-            <DriverRoutes />
-          </Suspense>
-        </Route>
-        <Route path="/restaurant">
-          <Suspense fallback={<LoadingSpinner />}>
-            <RestaurantRoutes />
-          </Suspense>
-        </Route>
-        <Route path="/restaurant/:rest*">
+        <Route path="/restaurant/*?">
           <Suspense fallback={<LoadingSpinner />}>
             <RestaurantRoutes />
           </Suspense>

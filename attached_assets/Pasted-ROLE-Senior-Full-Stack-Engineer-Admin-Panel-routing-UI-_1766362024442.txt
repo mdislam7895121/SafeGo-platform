@@ -1,0 +1,47 @@
+ROLE: Senior Full-Stack Engineer (Admin Panel routing + UI)
+
+TASK: Fix ONLY the Admin Finance section 404 issue.
+Symptoms:
+- Navigating to these URLs returns 404 Page Not Found:
+  1) /admin/finance/overview
+  2) /admin/finance/gateway-reports
+- Finance sidebar items are broken because routes are missing or miswired.
+
+STRICT SCOPE:
+- Do NOT touch other modules (rides, users, parcels, etc.).
+- Do NOT refactor the whole admin.
+- Do NOT create “duplicate admin dashboards”.
+- Only fix Finance routes and the navigation to Finance pages.
+
+WHAT TO DO (Step-by-step):
+1) Identify the admin router system used in this project (React Router / Next.js / file-based routing / custom route table).
+2) Locate the source of truth for admin routes and sidebar links (examples: src/routes/adminRoutes.ts, adminRouter.tsx, pages/admin/**, app/admin/**, routes.ts, etc.).
+3) Search for existing Finance pages/components already in codebase:
+   - Look for files or components containing: "Finance", "gateway-reports", "payout", "wallet", "revenue", "transactions".
+   - If Finance page components exist but routes are missing, REGISTER them properly.
+4) Ensure these exact routes are implemented and render a real page (not fallback):
+   - /admin/finance/overview  -> FinanceOverview page
+   - /admin/finance/gateway-reports -> GatewayReports page
+5) Fix sidebar navigation targets so they match the registered routes exactly.
+   - No relative path mistakes, no duplicated base path, no wrong nesting.
+6) Confirm there is only ONE admin router/layout wrapper handling navigation.
+   - If Finance links are being handled by a different/duplicate router causing fallback, remove/disable that duplicate handling ONLY for Finance navigation (do not change global admin behavior).
+7) Add a minimal safe fallback:
+   - If a Finance page is not implemented yet, show a placeholder page with title + “Coming soon” instead of 404.
+   - But still keep the route valid.
+
+ACCEPTANCE TESTS:
+- Visiting /admin/finance/overview loads a Finance Overview screen (even if basic).
+- Visiting /admin/finance/gateway-reports loads a Gateway Reports screen (even if basic).
+- Clicking Finance items from the sidebar lands on these pages with no 404.
+- No new duplicate admin dashboards appear.
+
+DELIVERABLES:
+- List the exact files changed.
+- Show the route table / router diff.
+- Provide proof via screenshots or console logs showing the two URLs render successfully.
+
+IMPORTANT:
+- Keep changes minimal and non-breaking.
+- Do not touch authentication logic.
+- Do not change unrelated admin routes.
