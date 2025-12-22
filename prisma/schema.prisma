@@ -15080,3 +15080,144 @@ model LandingAuditLog {
   @@index([createdAt])
   @@map("landing_audit_logs")
 }
+
+// ============================================================
+// SafePilot AI Assistant System
+// RAG-based knowledge base with RBAC and country-aware logic
+// ============================================================
+
+enum SafePilotCountryScope {
+  GLOBAL
+  BD
+  US
+}
+
+enum SafePilotRoleScope {
+  ALL
+  CUSTOMER
+  DRIVER
+  RESTAURANT
+  ADMIN
+}
+
+enum SafePilotServiceScope {
+  ALL
+  RIDE
+  FOOD
+  PARCEL
+}
+
+enum SafePilotDocumentSource {
+  admin_upload
+  policy
+  faq
+  runbook
+}
+
+enum SafePilotMessageDirection {
+  user
+  assistant
+}
+
+enum SafePilotAuditAction {
+  ask
+  answer
+  tool_call
+  kb_upload
+  kb_disable
+  kb_reembed
+  kb_update
+}
+
+model SafePilotKBDocument {
+  id              String                    @id @default(uuid())
+  title           String
+  body            String                    @db.Text
+  tags            String[]
+  
+  countryScope    SafePilotCountryScope     @default(GLOBAL)
+  roleScope       SafePilotRoleScope        @default(ALL)
+  serviceScope    SafePilotServiceScope     @default(ALL)
+  source          SafePilotDocumentSource   @default(admin_upload)
+  
+  version         Int                       @default(1)
+  isActive        Boolean                   @default(true)
+  
+  createdByAdminId String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  
+  embeddings      SafePilotKBEmbedding[]
+  
+  @@index([countryScope])
+  @@index([roleScope])
+  @@index([serviceScope])
+  @@index([isActive])
+  @@index([source])
+  @@map("safepilot_kb_documents")
+}
+
+model SafePilotKBEmbedding {
+  id              String                    @id @default(uuid())
+  documentId      String
+  document        SafePilotKBDocument       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  chunkIndex      Int
+  chunkText       String                    @db.Text
+  embedding       Float[]
+  
+  createdAt       DateTime                  @default(now())
+  
+  @@index([documentId])
+  @@map("safepilot_kb_embeddings")
+}
+
+model SafePilotConversation {
+  id              String                    @id @default(uuid())
+  userId          String
+  userRole        SafePilotRoleScope
+  country         SafePilotCountryScope
+  
+  lastSeenAt      DateTime                  @default(now())
+  createdAt       DateTime                  @default(now())
+  
+  messages        SafePilotMessage[]
+  
+  @@index([userId])
+  @@index([userRole])
+  @@index([country])
+  @@map("safepilot_conversations")
+}
+
+model SafePilotMessage {
+  id              String                    @id @default(uuid())
+  conversationId  String
+  conversation    SafePilotConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  direction       SafePilotMessageDirection
+  content         String                    @db.Text
+  moderationFlags Json?
+  sources         Json?
+  
+  createdAt       DateTime                  @default(now())
+  
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("safepilot_messages")
+}
+
+model SafePilotAuditLog {
+  id              String                    @id @default(uuid())
+  actorUserId     String
+  actorRole       SafePilotRoleScope
+  action          SafePilotAuditAction
+  metadata        Json?
+  
+  createdAt       DateTime                  @default(now())
+  
+  @@index([actorUserId])
+  @@index([actorRole])
+  @@index([action])
+  @@index([createdAt])
+  @@map("safepilot_audit_logs")
+}
