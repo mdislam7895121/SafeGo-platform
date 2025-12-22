@@ -1,0 +1,32 @@
+You are working on the SafeGo-platform repo. Goal: Admin panel must show ONLY ONE SafePilot in a fixed, easy-to-find floating position. Right now SafePilot appears twice (embedded “Admin SafePilot” panel + floating bubble). We want TWO separate assistants overall, but not duplicated on the same page:
+
+A) Admin SafePilot (ADMIN role)
+- Visible across ALL /admin pages as a single floating widget (bottom-right or another fixed corner).
+- Must NOT also appear as an embedded panel/card inside any admin page.
+- Uses ADMIN endpoints (e.g., /api/admin/safepilot/query) and must show responses inside its own chat UI.
+- The /admin sidebar “SafePilot” menu item must NOT create another embedded chat. It should either:
+  Option 1 (preferred): Open a “SafePilot Center” page for docs/history/settings ONLY (no second chat instance).
+  Option 2: Remove/disable that menu item and rely purely on the floating widget.
+
+B) Support SafePilot (SUPPORT_ADMIN role)
+- Only available in /admin/support-console (or support console route you already created).
+- Must remain separate, role-gated, and should not appear anywhere else.
+- Keep strict RBAC: requests to /api/support/admin/* must be blocked for non-SUPPORT_ADMIN (403 is correct).
+
+Tasks:
+1) Find and REMOVE the embedded Admin SafePilot panel/card from Admin Dashboard (the “Ask SafePilot” panel inside the page). Search for: “Admin SafePilot”, “Ask SafePilot”, “AdminSafePilotPanel”, “SafePilotPanel”, “SafePilotCard”, or the component rendering that panel. Delete/disable it so it never mounts on admin pages.
+2) Ensure the floating widget mounts ONLY ONCE for admin routes. Put it in a single Admin root layout/shell component, not in individual pages. Remove any duplicate mount points. Do NOT rely on global window flags for normal behavior; fix the actual render tree so it only mounts once.
+3) Confirm: On /admin/dashboard there is only the floating SafePilot. No second panel anywhere. On /admin/support-console the support assistant works and the admin floating widget is hidden if needed to avoid duplicates.
+4) Fix “answer not showing” issue in admin chat UI:
+   - When user sends a message, show loading state and render assistant reply in the chat thread.
+   - If API returns empty/unknown shape, render a visible error message.
+   - Log the normalized reply in console for debugging, but UI must show something.
+5) Add a small “Open SafePilot” label/tooltip on hover for the floating button (admin only), so it’s easy to find.
+6) Provide a short verification checklist with exact URLs to test:
+   - /admin/dashboard (ADMIN) → only floating widget, responses render
+   - /admin/safepilot (if exists) → settings/history only (no second chat)
+   - /admin/support-console (SUPPORT_ADMIN) → support assistant works, RBAC enforced
+
+Deliverable:
+- Commit with clear message like: “Admin: single SafePilot floating widget; remove embedded duplicate; fix admin reply rendering”
+- List files changed and why.
