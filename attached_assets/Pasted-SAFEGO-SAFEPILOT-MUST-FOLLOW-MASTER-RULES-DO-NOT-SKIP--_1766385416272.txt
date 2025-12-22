@@ -1,0 +1,123 @@
+SAFEGO / SAFEPILOT — MUST-FOLLOW MASTER RULES (DO NOT SKIP)
+-----------------------------------------------------------
+A) ROLES — ALWAYS include all 4 roles:
+1) Customer  2) Driver  3) Restaurant  4) Admin
+Each role MUST have: signup requirements, KYC/verification rules, dashboard, permissions, status flows.
+NEVER mix role access.
+
+B) GLOBAL APP LOGIC — ALWAYS required (all 3 services)
+1) Ride-hailing  2) Food delivery  3) Parcel delivery
+Worldwide + country-specific rules.
+
+C) COUNTRY-SPECIFIC KYC (BD + US branching required)
+BD mandatory: father_name, date_of_birth, present_address, permanent_address, NID number+front/back images,
+emergency contact, verification_status + is_verified
+US mandatory: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4,
+(drivers) license+image+expiry, (drivers) ssn_last4 optional, verification_status + is_verified
+
+D) ADMIN PANEL mandatory: verify all, approve/reject KYC + rejection_reason, update pricing/fees/commissions,
+block/unblock, payouts, view driver/restaurant negative balance.
+
+E) Collections required: rides, food_orders, deliveries (identity, geo, fees/commission, payments, timestamps, status flow, rating/feedback)
+
+F) Commission rules required (cash negative balance, online auto commission, admin settlement)
+
+G) Security rules mandatory (no doc leaks; only admin can change pricing/verification/blocking)
+
+H) Status flows mandatory (ride/food/parcel exact sequences)
+
+I) Onboarding multi-step + verification pending + blocked until approved
+
+J) Notifications mandatory
+
+ABSOLUTE: Additive-only. No renames/removals. Preserve existing APIs/routes/schemas unless explicitly allowed.
+
+===========================================================
+TASK: Admin SafePilot returns 200 but UI shows blank (MODE ASK not rendered)
+===========================================================
+
+Observed from screenshots:
+- Admin Debug strip shows:
+  URL: /api/admin/safepilot/query
+  Status: 200
+  Role: ADMIN
+- Chat UI shows no message bubbles (neither user nor assistant).
+- Input still contains text after send attempt.
+Conclusion:
+- We must (1) guarantee optimistic rendering of user message, (2) guarantee rendering of ANY 200 response
+  even when the backend returns { mode: "ASK", ... } or any non-standard shape.
+- No silent failures.
+
+GOAL:
+- On Send: input clears, user bubble appears immediately
+- Then assistant bubble appears with:
+  reply OR response OR message OR question OR fallback raw JSON string
+- If backend returns mode=ASK, show the question to the user (do NOT blank)
+- Show error inline for non-200
+
+FILES:
+- client/src/components/safepilot/SafePilotChat.tsx (or current widget chat panel)
+- client/src/components/safepilot/chatApi.ts (helper, additive if needed)
+
+STEP 1 — Add a universal response normalizer (additive)
+Create/Update: client/src/components/safepilot/chatApi.ts
+
+```ts
+export type AnyJson = any;
+
+export function normalizeSafePilotReply(payload: AnyJson): string {
+  if (!payload) return "No payload returned.";
+
+  // common fields
+  const direct =
+    payload.reply ??
+    payload.response ??
+    payload.message ??
+    payload.text ??
+    payload.answer;
+
+  if (typeof direct === "string" && direct.trim()) return direct;
+
+  // mode-based (we saw mode: "ASK")
+  const mode = payload.mode ?? payload.data?.mode;
+  if (mode === "ASK") {
+    const q =
+      payload.question ??
+      payload.followup_question ??
+      payload.prompt ??
+      payload.data?.question ??
+      payload.data?.followup_question;
+    if (typeof q === "string" && q.trim()) return q;
+    return "I need more details to answer. Please provide the missing info.";
+  }
+
+  // tool / structured results
+  const summary =
+    payload.summary ??
+    payload.result?.summary ??
+    payload.data?.summary;
+
+  if (typeof summary === "string" && summary.trim()) return summary;
+
+  // last resort: show raw JSON so nothing is blank
+  try {
+    return "RAW RESPONSE:\n" + JSON.stringify(payload, null, 2).slice(0, 2000);
+  } catch {
+    return "RAW RESPONSE (unstringifiable).";
+  }
+}
+
+export async function postAdminSafePilotQuery(body: AnyJson) {
+  const res = await fetch("/api/admin/safepilot/query", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+
+  const text = await res.text().catch(() => "");
+  let json: AnyJson = null;
+  try { json = text ? JSON.parse(text) : null; } catch {}
+
+  return { ok: res.ok, status: res.status, text, json };
+}
