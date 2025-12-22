@@ -1,0 +1,157 @@
+SAFEGO / SAFEPILOT — CUSTOMER UPGRADE (STEP 4–6) MASTER PROMPT
+==============================================================
+
+ABSOLUTE RULES (NON-NEGOTIABLE):
+- Additive only. Do NOT rename/remove existing APIs, routes, schemas, UI.
+- Preserve all SafeGo rules:
+  - Roles: Customer, Driver, Restaurant, Admin (no mixing)
+  - Services: Ride, Food, Parcel
+  - Country rules: BD + US (KYC, payments, status flows)
+- SafePilot STEP 1–3 are already complete. This task is STEP 4–6 ONLY.
+- Production-ready code only. No pseudo code.
+- Complete everything in ONE execution. Do NOT ask follow-up questions.
+
+--------------------------------------------------------------
+GOAL
+--------------------------------------------------------------
+Turn SafePilot into a HUMAN-LEVEL CUSTOMER SUPPORT ENGINE by adding:
+- Emotion-aware responses
+- Smart AI → Human escalation
+- Auto follow-up until resolution
+
+--------------------------------------------------------------
+STEP 4 — EMOTION-AWARE SUPPORT LAYER
+--------------------------------------------------------------
+Objective:
+SafePilot must detect customer emotion and adapt tone BEFORE answering.
+
+Implementation:
+
+A) Emotion Detection
+- Detect emotion from the last user message:
+  - "ANGRY" (complaints, caps, repeated frustration, negative words)
+  - "CONFUSED" (how/why/what, unclear intent)
+  - "NORMAL"
+- Use deterministic rules first; lightweight model call only if needed.
+- Store detected emotion in SafePilotConversation.metadata.emotion
+
+B) Response Rules
+- ANGRY:
+  1) Acknowledge frustration (short, sincere)
+  2) Explain what happened (fact-based)
+  3) Offer an action (button or next step)
+- CONFUSED:
+  - Step-by-step explanation
+  - Avoid jargon
+- NORMAL:
+  - Short, direct, action-oriented
+
+C) Safety
+- Never blame the customer
+- Never promise refunds/changes unless backend confirms
+- Never expose restricted data
+
+Deliverables STEP 4:
+- Emotion detection logic
+- Tone-aware response templates
+- Metadata logging (emotion)
+
+--------------------------------------------------------------
+STEP 5 — SMART ESCALATION TO HUMAN SUPPORT (AI → HUMAN)
+--------------------------------------------------------------
+Objective:
+SafePilot decides WHEN a human is required and escalates with full context.
+
+Escalation MUST trigger if ANY condition matches:
+- Payment / refund / charge dispute
+- Legal or policy dispute
+- Same issue unresolved after 2 AI attempts
+- Emotion = ANGRY AND issue unresolved
+- Explicit request: "talk to human", "agent", "support"
+
+Implementation:
+
+A) Escalation Action
+- Auto-create support ticket
+- Attach:
+  - Conversation history
+  - Detected emotion
+  - Relevant IDs (ride_id / order_id / delivery_id)
+  - Tool results already fetched
+- Notify customer:
+  “I’ve shared this with our support team. You won’t need to repeat anything.”
+
+B) Restrictions
+- Customer never sees internal notes
+- Human agent sees full context
+
+C) Logging
+- Log escalation_reason in SafePilotAuditLog
+
+Deliverables STEP 5:
+- Escalation decision engine
+- Ticket creation with context
+- Customer confirmation message
+
+--------------------------------------------------------------
+STEP 6 — AUTO FOLLOW-UP & RESOLUTION TRACKING
+--------------------------------------------------------------
+Objective:
+SafePilot must follow up until the issue is resolved.
+
+Implementation:
+
+A) Follow-Up Triggers
+- Verification pending > 12h after explanation
+- Document upload incomplete
+- Escalated ticket still open after 24h
+- Order/ride/delivery still unresolved after SLA
+
+B) Follow-Up Behavior
+- Send polite reminder with:
+  - Current status
+  - What’s missing
+  - Clear next action
+- Max follow-ups:
+  - Customer: 2 reminders
+  - After that → human escalation
+
+C) Stop Conditions
+- Issue resolved
+- Ticket closed
+- User explicitly dismisses help
+
+D) Logging
+- Each follow-up logged with followup_count
+
+Deliverables STEP 6:
+- Follow-up scheduler/trigger
+- Resolution state tracking
+- Reminder messages + audit logs
+
+--------------------------------------------------------------
+ACCEPTANCE TESTS (MANDATORY)
+--------------------------------------------------------------
+Prove the following manually:
+
+1) Angry customer message → apology + explanation + action
+2) Same issue repeated twice → automatic escalation
+3) Escalation creates ticket with full context
+4) Pending verification → reminder after 12h
+5) Follow-ups stop after resolution
+
+--------------------------------------------------------------
+OUTPUT REQUIREMENTS
+--------------------------------------------------------------
+At the end, provide:
+1) Files changed / added
+2) What was implemented in STEP 4, STEP 5, STEP 6
+3) Manual test steps
+4) Proof all changes are additive (non-breaking)
+
+DO NOT:
+- Re-explain SafePilot architecture
+- Add features beyond STEP 4–6
+- Ask what to do next
+
+Proceed now.

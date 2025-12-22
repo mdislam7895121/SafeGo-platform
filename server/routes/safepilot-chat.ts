@@ -961,4 +961,68 @@ router.delete("/admin/cache/clear", async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/customer/follow-ups", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required", followUps: [] });
+    }
+
+    const { checkFollowUpConditions, shouldSendFollowUp, logFollowUp } = await import("../services/safepilot/followUpScheduler");
+    
+    const pendingFollowUps = await checkFollowUpConditions(req.user.id);
+    
+    const validFollowUps = [];
+    for (const followUp of pendingFollowUps) {
+      const shouldSend = await shouldSendFollowUp(req.user.id, followUp.conditionType, followUp.entityId);
+      if (shouldSend) {
+        validFollowUps.push(followUp);
+        await logFollowUp(req.user.id, followUp.conditionType, followUp.entityId, followUp.followUpCount);
+      }
+    }
+
+    res.json({ followUps: validFollowUps });
+  } catch (error) {
+    console.error("[SafePilot] Customer follow-ups error:", error);
+    res.json({ followUps: [] });
+  }
+});
+
+router.post("/customer/dismiss-help", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const { dismissHelp } = await import("../services/safepilot/followUpScheduler");
+    await dismissHelp(req.user.id);
+
+    res.json({ success: true, message: "Help dismissed for 7 days" });
+  } catch (error) {
+    console.error("[SafePilot] Dismiss help error:", error);
+    res.status(500).json({ error: "Failed to dismiss help" });
+  }
+});
+
+router.post("/customer/resolve-issue", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const { conditionType, entityId } = req.body;
+    
+    if (!conditionType) {
+      return res.status(400).json({ error: "conditionType is required" });
+    }
+
+    const { markIssueResolved } = await import("../services/safepilot/followUpScheduler");
+    await markIssueResolved(req.user.id, conditionType, entityId);
+
+    res.json({ success: true, message: "Issue marked as resolved" });
+  } catch (error) {
+    console.error("[SafePilot] Resolve issue error:", error);
+    res.status(500).json({ error: "Failed to resolve issue" });
+  }
+});
+
 export default router;
