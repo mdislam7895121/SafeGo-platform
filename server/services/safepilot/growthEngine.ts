@@ -376,6 +376,34 @@ export const growthEngine = {
   },
 
   /**
+   * Get dashboard data for Vision 2030 module endpoint
+   */
+  async getDashboard(countryCode?: string): Promise<{
+    demandForecast: Array<{ area: string; demandLevel: 'HIGH' | 'MEDIUM' | 'LOW'; demandScore: number }>;
+    supplyGaps: Array<{ area: string; priority: string }>;
+    onboardingPipeline: Array<{ area: string; partnerType: string }>;
+    surgeRecommendations: Array<{ area: string; recommendedMultiplier: number }>;
+  }> {
+    const [demandZones, gaps, onboarding, surge] = await Promise.all([
+      this.detectDemandZones(countryCode),
+      this.detectSupplyGaps(countryCode),
+      this.recommendOnboardingAreas(countryCode),
+      this.recommendSurgePricing(countryCode),
+    ]);
+
+    return {
+      demandForecast: demandZones.map(z => ({
+        area: z.area,
+        demandLevel: z.demandScore > 70 ? 'HIGH' as const : z.demandScore > 40 ? 'MEDIUM' as const : 'LOW' as const,
+        demandScore: z.demandScore,
+      })),
+      supplyGaps: gaps.map(g => ({ area: g.area, priority: g.priority })),
+      onboardingPipeline: onboarding.map(o => ({ area: o.area, partnerType: o.partnerType })),
+      surgeRecommendations: surge.map(s => ({ area: s.area, recommendedMultiplier: s.recommendedMultiplier })),
+    };
+  },
+
+  /**
    * Get growth summary for dashboard
    */
   async getGrowthSummary(countryCode?: string): Promise<{

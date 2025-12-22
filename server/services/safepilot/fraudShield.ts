@@ -657,6 +657,28 @@ export const fraudShield = {
   /**
    * Get fraud shield summary
    */
+  async getDashboard(countryCode?: string): Promise<{
+    totalAlerts: number;
+    estimatedTotalLoss: number;
+    alerts: FraudAlert[];
+    suspiciousDrivers: Array<{ driverId: string; suspicionScore: number }>;
+    coordinatedFraudRings: Array<{ id: string; pattern: string }>;
+  }> {
+    const [alerts, ghostTrips, collusion] = await Promise.all([
+      this.generateFraudAlerts(countryCode),
+      this.detectGhostTrips(countryCode),
+      this.detectCollusion(countryCode),
+    ]);
+
+    return {
+      totalAlerts: alerts.length,
+      estimatedTotalLoss: alerts.reduce((sum, a) => sum + a.estimatedLoss, 0),
+      alerts,
+      suspiciousDrivers: ghostTrips.map(g => ({ driverId: g.driverId, suspicionScore: g.suspicionScore })),
+      coordinatedFraudRings: collusion.map(c => ({ id: c.pattern, pattern: c.pattern })),
+    };
+  },
+
   async getFraudSummary(countryCode?: string): Promise<{
     totalAlerts: number;
     criticalAlerts: number;

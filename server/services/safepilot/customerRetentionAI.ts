@@ -564,6 +564,26 @@ export const customerRetentionAI = {
   /**
    * Get retention summary
    */
+  async getDashboard(countryCode?: string): Promise<{
+    unhappyCustomers: UnhappyCustomer[];
+    winBackStrategies: WinBackStrategy[];
+    churnPredictions: ChurnPrediction[];
+    totalRetentionValue: number;
+  }> {
+    const [unhappy, winBack, churn] = await Promise.all([
+      this.detectUnhappyCustomers(countryCode),
+      this.generateWinBackStrategies(countryCode),
+      this.predictChurn(countryCode),
+    ]);
+
+    return {
+      unhappyCustomers: unhappy,
+      winBackStrategies: winBack,
+      churnPredictions: churn,
+      totalRetentionValue: churn.reduce((sum, c) => sum + c.retentionValue, 0),
+    };
+  },
+
   async getRetentionSummary(countryCode?: string): Promise<{
     unhappyCustomerCount: number;
     criticalChurnRisk: number;

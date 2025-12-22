@@ -466,6 +466,38 @@ export const complianceGuard = {
   },
 
   /**
+   * Get dashboard data for Vision 2030 module endpoint
+   */
+  async getDashboard(countryCode?: string): Promise<{
+    violations: ComplianceViolation[];
+    pendingActions: ComplianceAction[];
+    complianceScore: number;
+    criticalViolations: number;
+  }> {
+    const [bdViolations, usViolations, actions] = await Promise.all([
+      this.detectBDViolations(),
+      this.detectUSViolations(),
+      this.generateComplianceActions(countryCode),
+    ]);
+
+    const allViolations = [...bdViolations, ...usViolations];
+    const criticalCount = allViolations.filter(v => v.severity === 'CRITICAL').length;
+
+    const baseScore = 100;
+    const deductions = 
+      (criticalCount * 10) + 
+      (allViolations.filter(v => v.severity === 'HIGH').length * 5) +
+      (allViolations.filter(v => v.severity === 'MEDIUM').length * 2);
+
+    return {
+      violations: allViolations,
+      pendingActions: actions,
+      complianceScore: Math.max(0, baseScore - deductions),
+      criticalViolations: criticalCount,
+    };
+  },
+
+  /**
    * Get compliance summary
    */
   async getComplianceSummary(countryCode?: string): Promise<{
