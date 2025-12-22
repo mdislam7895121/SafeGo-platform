@@ -161,7 +161,7 @@ export const DYNAMIC_ROUTES = [
  * Static routes for validation (no dynamic parameters)
  */
 export const STATIC_ADMIN_ROUTES = ALL_ADMIN_ROUTES.filter(
-  route => !DYNAMIC_ROUTES.includes(route)
+  route => !(DYNAMIC_ROUTES as readonly string[]).includes(route)
 );
 
 /**
