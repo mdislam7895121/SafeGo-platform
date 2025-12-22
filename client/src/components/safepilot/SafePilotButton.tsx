@@ -31,6 +31,7 @@ import {
 import { fetchWithAuth, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { normalizeSafePilotReply } from './chatApi';
+import { SafePilotSettingsDialog, SafePilotSettingsState, loadSettings } from './SafePilotSettings';
 
 let __SAFEPILOT_BUTTON_MOUNTED__ = false;
 
@@ -176,9 +177,11 @@ export function SafePilotButton() {
   const [autoSendEnabled, setAutoSendEnabled] = useState(true);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [modePopoverOpen, setModePopoverOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [safepilotSettings, setSafepilotSettings] = useState<SafePilotSettingsState>(() => loadSettings());
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -234,6 +237,20 @@ export function SafePilotButton() {
           pageKey,
           question: buildPrompt(currentMode, currentPriority, userQuestion),
           role: 'ADMIN',
+          settings: {
+            responseMode: safepilotSettings.responseMode,
+            dataWindow: safepilotSettings.dataWindow,
+            maskPii: safepilotSettings.maskPii,
+            autoSuggestFollowups: safepilotSettings.autoSuggestFollowups,
+            readOnlyMode: safepilotSettings.readOnlyMode,
+            scopes: {
+              drivers: safepilotSettings.scopeDrivers,
+              kyc: safepilotSettings.scopeKyc,
+              fraud: safepilotSettings.scopeFraud,
+              payouts: safepilotSettings.scopePayouts,
+              security: safepilotSettings.scopeSecurity,
+            },
+          },
         }),
       });
 
@@ -364,8 +381,15 @@ export function SafePilotButton() {
                   <Settings className="w-4 h-4" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-44 p-1.5 rounded-xl" sideOffset={8}>
+              <PopoverContent align="end" className="w-48 p-1.5 rounded-xl" sideOffset={8}>
                 <div className="space-y-0.5">
+                  <button
+                    onClick={() => { setSettingsOpen(false); setSettingsDialogOpen(true); }}
+                    className="flex items-center gap-2.5 w-full px-2.5 py-2 text-sm font-medium hover:bg-muted/60 rounded-lg transition-colors text-left"
+                  >
+                    <Settings className="w-4 h-4 text-muted-foreground" />
+                    SafePilot Settings
+                  </button>
                   <label className="flex items-center gap-2.5 px-2.5 py-2 text-sm cursor-pointer hover:bg-muted/60 rounded-lg transition-colors">
                     <input
                       type="checkbox"
@@ -577,6 +601,12 @@ export function SafePilotButton() {
     <>
       {!isOpen && floatingButton}
       {chatPanel}
+      <SafePilotSettingsDialog
+        open={settingsDialogOpen}
+        onOpenChange={setSettingsDialogOpen}
+        settings={safepilotSettings}
+        onSettingsChange={setSafepilotSettings}
+      />
     </>,
     document.body
   );
