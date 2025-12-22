@@ -1,0 +1,149 @@
+SAFEGO / SAFEPILOT — CUSTOMER UPGRADE (STEP 1–3) MASTER PROMPT
+==============================================================
+
+ABSOLUTE RULES (DO NOT BREAK):
+- Additive only. Do NOT rename/remove existing APIs, routes, schemas, UI.
+- Keep all SafeGo core rules: 4 roles (Customer, Driver, Restaurant, Admin),
+  3 services (Ride, Food, Parcel), BD + US country rules.
+- SafePilot already exists. This task is CUSTOMER EXPERIENCE UPGRADE only.
+- Deliver production-ready code, not pseudo code.
+- Complete everything in ONE execution. No follow-up questions.
+
+--------------------------------------------------------------
+GOAL
+--------------------------------------------------------------
+Upgrade CUSTOMER experience so SafePilot becomes the FIRST support layer,
+with context-aware auto help and clear next-action buttons.
+
+Scope = STEP 1, STEP 2, STEP 3 ONLY.
+
+--------------------------------------------------------------
+STEP 1 — PRIMARY SUPPORT ENTRY (CUSTOMER-FIRST)
+--------------------------------------------------------------
+Objective:
+SafePilot must be the FIRST place a customer goes for help,
+before any traditional support page.
+
+Implementation:
+
+A) UI Placement (Customer App)
+- Add SafePilot entry points on:
+  1) Ride screens
+  2) Food order screens
+  3) Parcel screens
+  4) Profile / Verification screen
+- Use an existing floating widget if present; otherwise add a minimal
+  floating button labeled:
+  “Need help? Ask SafePilot”
+
+B) Behavior:
+- Clicking the entry opens SafePilotChat with context injected:
+  {
+    role: "CUSTOMER",
+    service: "RIDE" | "FOOD" | "PARCEL",
+    current_entity_id: ride_id | order_id | delivery_id (if exists)
+  }
+
+C) Restrictions:
+- Customer must NEVER see:
+  - Driver documents
+  - Internal admin data
+  - Other users’ info
+
+Deliverables STEP 1:
+- UI code changes (additive)
+- Context injection confirmed in SafePilotChat call
+- No breaking UI behavior
+
+--------------------------------------------------------------
+STEP 2 — CONTEXT-AWARE AUTO HELP (PROACTIVE)
+--------------------------------------------------------------
+Objective:
+Customer should receive help EVEN WITHOUT ASKING.
+
+Implementation:
+
+A) Auto-Trigger Conditions (Customer-only):
+- Verification pending (BD or US rules)
+- Ride status = cancelled_x
+- Food order delayed (time threshold)
+- Parcel delayed
+- Payment failed or pending
+
+B) Trigger Logic:
+- On screen load OR SafePilot open:
+  - Backend checks relevant status
+  - If a trigger matches, SafePilot auto-sends a message like:
+    “I noticed your verification is pending. I can explain why and help you fix it.”
+
+C) Rules:
+- Trigger message must:
+  - Be polite
+  - Be specific (what + why)
+  - Never blame the customer
+  - Offer help, not commands
+
+D) Logging:
+- Every auto message must be logged in SafePilotAuditLog
+  with metadata.trigger_type
+
+Deliverables STEP 2:
+- Backend trigger checks
+- Auto SafePilotMessage creation
+- Audit log proof
+
+--------------------------------------------------------------
+STEP 3 — CLEAR NEXT-ACTION BUTTONS (RESOLUTION-FOCUSED)
+--------------------------------------------------------------
+Objective:
+SafePilot must NOT end with text only.
+Every major response must offer clear actions.
+
+Implementation:
+
+A) Required Action Buttons (examples):
+- “Upload missing document”
+- “Rebook ride”
+- “Retry payment”
+- “Contact support (with context)”
+
+B) Rules:
+- Buttons must be shown ONLY if the action is valid for the user
+- Clicking a button must:
+  - Navigate to the correct screen OR
+  - Call the correct existing API
+- If escalation is needed:
+  - Create support ticket
+  - Attach full SafePilot context automatically
+
+C) UI:
+- Buttons must appear below the SafePilot message
+- Clean, minimal, mobile-friendly
+
+Deliverables STEP 3:
+- Action button rendering logic
+- Action handlers wired to real flows
+- No dummy buttons
+
+--------------------------------------------------------------
+ACCEPTANCE TESTS (MANDATORY)
+--------------------------------------------------------------
+Provide manual test steps that prove:
+
+1) Customer opens Ride screen → sees SafePilot → gets contextual help
+2) Verification pending user gets auto SafePilot message
+3) Cancelled ride → SafePilot explains + shows “Rebook ride” button
+4) Button click performs real navigation/action
+5) No sensitive data is exposed
+
+--------------------------------------------------------------
+OUTPUT REQUIREMENTS
+--------------------------------------------------------------
+At the end, clearly list:
+1) Files changed / added
+2) What was added for STEP 1, STEP 2, STEP 3
+3) Why the changes are non-breaking (additive proof)
+
+DO NOT:
+- Re-explain architecture
+- Ask what to
