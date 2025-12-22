@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw, Home } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw, Home, Bot } from "lucide-react";
 import { SystemAlert } from "@/components/ui/system-alert";
 import { WelcomeMessage } from "@/components/ui/welcome-message";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
 import { RealTimeAnalytics } from "@/components/admin/RealTimeAnalytics";
+
+const AdminSafePilotPanel = lazy(() => import("@/components/safepilot/admin/AdminSafePilotPanel"));
 
 interface AdminStats {
   totalUsers: number;
@@ -713,6 +715,22 @@ export default function AdminHome() {
                 testId="card-cancelled-parcels"
               />
             </Link>
+          </div>
+        </div>
+
+        {/* Admin SafePilot AI Assistant */}
+        <div>
+          <SectionHeader 
+            title="SafePilot AI Assistant" 
+            icon={Bot}
+            iconColor="text-blue-600"
+            description="Ask questions about platform metrics, risks, and KPIs"
+            testId="section-admin-safepilot"
+          />
+          <div className="h-[500px]">
+            <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+              <AdminSafePilotPanel />
+            </Suspense>
           </div>
         </div>
 
