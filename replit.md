@@ -66,19 +66,20 @@ The platform features two separate RAG-based AI assistants with strict role-base
 
 ### Admin SafePilot (ADMIN role only)
 - **Endpoint**: `/api/admin/safepilot/query`
-- **Component**: `client/src/components/safepilot/admin/AdminSafePilotPanel.tsx`
-- **Theme**: Blue color scheme
-- **Location**: Embedded in admin dashboard home page (`/admin/home`)
+- **Component**: `client/src/components/safepilot/SafePilotButton.tsx` (floating widget)
+- **Theme**: Blue gradient color scheme
+- **Location**: Floating button (bottom-right) visible on ALL admin pages except support-console
 - **Capabilities**: Platform metrics, KPIs, verification queues, risk analysis, revenue data
+- **Features**: Hover tooltip "Open SafePilot AI", alert badge, chat history
 
 ### Support SafePilot (SUPPORT_ADMIN role only)
 - **Endpoint**: `/api/support/safepilot/query`
 - **Component**: `client/src/components/safepilot/support/SupportSafePilotPanel.tsx`
 - **Theme**: Green color scheme
-- **Location**: Embedded in support console page (`/admin/support-console`)
+- **Location**: Embedded panel in support console page (`/admin/support-console`)
 - **Capabilities**: Customer issues, tickets, refunds, disputes, escalation handling
 
 ### Domain Separation
 - Each assistant has dedicated backend endpoints with strict role guards
-- Admin queries redirect to Support if support-related, and vice versa
-- Original floating SafePilotButton disabled on pages with embedded panels
+- Admin SafePilot: floating widget on all admin pages (hidden on support-console)
+- Support SafePilot: embedded panel only on /admin/support-console
