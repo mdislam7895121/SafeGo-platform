@@ -1,0 +1,184 @@
+TASK PROMPT FOR AGENT — SAFEPILOT UPGRADE IN TWO PHASES (STRONG, NON-BREAKING, CODE-LEVEL)
+-----------------------------------------------------------------------------------------
+
+Context:
+SafePilot already exists with:
+- Prisma models: SafePilotKBDocument, SafePilotKBEmbedding, SafePilotConversation, SafePilotMessage, SafePilotAuditLog
+- Server services: server/services/safepilot/{openaiClient, rbac, kbSearch, chatHandler, auditService, tools}.ts
+- Route: server/routes/safepilot-chat.ts
+- Client: SafePilotChat widget + admin/safepilot-kb page
+
+Goal:
+Upgrade SafePilot so it becomes the business-grade AI Operating Layer that:
+- Reduces cost at scale
+- Increases retention (proactive help)
+- Gives Admin intelligence
+- Improves compliance (explainable answers)
+- Enforces brand control (role-based tone)
+WITHOUT breaking anything.
+
+You MUST implement everything below end-to-end with real code changes and local test instructions.
+
+========================================================
+PHASE 1 — HARDEN THE CORE ENGINE (COST + SAFETY + RELIABILITY)
+========================================================
+
+1) Cost-Aware Routing (Mandatory)
+Implement a deterministic router in:
+- server/services/safepilot/chatHandler.ts
+
+Behavior:
+A) If user intent is “status / verification / wallet / order details / ride details / delivery details”
+   → tool-first (no KB-only answers)
+B) If user intent is “policy / how-to / pricing explanation / flows / documents requirements”
+   → KB-first (tools only if explicitly needed)
+C) If user asks for restricted data (per Security rules)
+   → refuse + provide allowed alternative steps
+
+Implementation requirements:
+- Add function classifyIntent(message): "TOOL_FIRST" | "KB_FIRST" | "REFUSE"
+- Use a low-cost classification call OR simple deterministic keyword rules (prefer deterministic first)
+- Log chosen route in SafePilotAuditLog metadata.route
+
+2) Embedding Cache + Chunk Cache (Mandatory)
+Implement caching to cut repeated costs:
+- Add Prisma model SafePilotCache (ADD ONLY)
+Fields:
+- id, cache_key (unique), kind ("EMBEDDING"|"KB_RESULTS"), payload_json, created_at, expires_at
+Rules:
+- Embedding cache TTL: 7 days
+- KB search results TTL: 24 hours
+- Cache key includes: normalized query + country + role + service_context + kb_version
+
+Update:
+- server/services/safepilot/kbSearch.ts to check cache before calling embeddings
+- If cache hit, skip OpenAI embeddings call
+- Log cache hit/miss in audit metadata.cache = {hit:boolean, kind:string}
+
+3) Hard “No Hallucination” Mode (Mandatory)
+In chatHandler:
+- If KB returns 0 relevant chunks AND route is KB_FIRST:
+  - Respond: “I don’t have enough verified info to answer that. Here’s what I can do: …”
+  - Provide next actions: “Ask admin,” “Check in app section,” “Contact support”
+- If route is TOOL_FIRST but tool access denied:
+  - Respond with RBAC-safe denial + explain what user CAN see
+
+4) Tool Loop Reliability (Mandatory)
+In chatHandler tool loop:
+- Enforce max tool iterations = 2
+- Validate tool args using zod schemas per tool
+- If tool throws, return safe error message (no stack traces) and log error code in audit
+
+5) Rate Limits by Role (Mandatory)
+Implement server-side rate limits:
+- Customer: 30 requests / hour
+- Driver: 40 requests / hour
+- Restaurant: 40 requests / hour
+- Admin: 200 requests / hour
+Add new table SafePilotRateLimit (ADD ONLY) or reuse existing rate limiter if present.
+If limit exceeded: return 429 with friendly message.
+Log in audit.
+
+6) Acceptance Tests (Phase 1 must pass)
+Provide a runnable manual test checklist (exact API calls):
+- Customer asks “What is my ride status?” → tool called, no hallucination
+- Driver asks “Show customer NID” → refusal (security enforced)
+- KB question “BD KYC steps” → KB-only, no tool call
+- Repeat same KB question twice → second time hits cache
+- Rate limit hit scenario returns 429
+
+Deliverables Phase 1:
+- Code changes + Prisma schema additions + migration
+- Updated route handler if needed
+- No breaking changes
+
+========================================================
+PHASE 2 — BUSINESS OPERATIONS LAYER (PROACTIVE + ADMIN INTEL + COMPLIANCE + BRAND)
+========================================================
+
+1) Proactive SafePilot Triggers (Mandatory)
+Create a new server module:
+- server/services/safepilot/triggers.ts
+and a scheduler hook (choose what exists: cron, queue, or a simple interval in server startup; additive only).
+
+Triggers (minimum set):
+A) Verification pending > 24h (BD + US rules)
+   - Customer: explain next steps
+   - Driver: explain missing doc types
+   - Restaurant: explain missing verification items
+B) Driver negative balance threshold exceeded
+   - remind weekly settlement rule
+C) Food order delayed (time since placed > X, status not delivered)
+D) Ride cancelled_x
+   - explain reason categories + next action
+
+Implementation:
+- Trigger writes a SafePilotMessage to the user’s conversation
+- Also creates a Notification event (reuse existing notifications system; if none, add safepilot_notifications table additive)
+
+2) Admin Intelligence Tools (Mandatory)
+Extend server/services/safepilot/tools.ts with Admin-only aggregate tools:
+- getTopVerificationRejectionReasons({country, days})
+- getHighCancellationCities({country, days, service})
+- getNegativeBalanceLeaders({country, role, limit})
+These tools MUST:
+- enforce ADMIN role
+- return aggregated, non-sensitive data
+- log audit
+
+3) Explainable Answers Mode (Mandatory)
+Add an optional flag:
+- explain=true
+When explain=true:
+- Response includes a short “Why this answer” section:
+  - KB titles used
+  - tools used (names only)
+  - country rules applied (BD or US)
+Never reveal sensitive data.
+
+Add UI toggle:
+- Admin UI always sees explain=true by default
+- Other roles: explain toggle off by default
+
+4) Brand + Tone Control (Mandatory)
+Implement role-based tone presets in chatHandler system prompt:
+- Customer: calm, helpful, short actionable steps
+- Driver: direct, operational, compliance-aware
+- Restaurant: professional, order-focused
+- Admin: analytical, metrics-first
+
+Add strict wording rules:
+- never promise actions you cannot do
+- always specify next steps
+- never expose restricted fields
+
+5) Acceptance Tests (Phase 2 must pass)
+- Create one pending verification user and confirm trigger message appears
+- Admin asks “Top rejection reasons BD last 7 days” → tool runs, returns aggregated list
+- explain=true shows sources/tools without leaking data
+- Role tone differences are visible in output
+
+Deliverables Phase 2:
+- triggers module + minimal scheduler
+- new admin tools
+- explainable mode + UI toggle
+- no breaking changes
+
+========================================================
+NON-BREAKING GUARANTEE
+========================================================
+- Do not rename/remove any existing SafeGo fields, routes, or schemas
+- Only ADD:
+  - new Prisma models (SafePilotCache, SafePilotRateLimit, optional SafePilotNotification)
+  - new modules (triggers.ts)
+  - additive code in chatHandler/tools
+- Keep all existing behavior intact unless it is a strict improvement that preserves inputs/outputs.
+
+========================================================
+OUTPUT REQUIREMENTS (MANDATORY)
+========================================================
+At the end, provide:
+1) List of changed/added files
+2) Exact commands to migrate DB (Prisma) and run server
+3) Manual test script (curl examples) for Phase 1 and Phase 2
+4) Why changes are guaranteed non-breaking (additive-only proof)
