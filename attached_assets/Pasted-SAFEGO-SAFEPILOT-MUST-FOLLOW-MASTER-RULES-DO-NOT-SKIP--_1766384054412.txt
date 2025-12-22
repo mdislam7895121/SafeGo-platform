@@ -1,0 +1,72 @@
+SAFEGO / SAFEPILOT — MUST-FOLLOW MASTER RULES (DO NOT SKIP)
+-----------------------------------------------------------
+A) ROLES — ALWAYS include all 4 roles (never mix access)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+Each role MUST have: signup requirements, KYC/verification rules, dashboard, permissions, status flows.
+
+B) GLOBAL APP LOGIC — ALWAYS required (all 3 services)
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+Worldwide + country-specific rules.
+
+C) COUNTRY-SPECIFIC KYC (Always Include BD + US branching)
+BD mandatory:
+- father_name, date_of_birth, present_address, permanent_address
+- NID number + front/back images
+- emergency contact details
+- verification_status + is_verified
+US mandatory:
+- date_of_birth, home_address
+- emergency contact details
+- government_id_type, government_id_last4
+- (drivers) driver license + image + expiry
+- (drivers) ssn_last4 optional
+- verification_status + is_verified
+
+D) ADMIN PANEL — ALWAYS REQUIRED
+- verify customers/drivers/restaurants
+- approve/reject KYC + rejection_reason
+- update pricing/fees/commissions
+- block/unblock any user
+- manage payouts
+- view driver negative balance
+- view restaurant negative balance
+
+E) COLLECTIONS — ALWAYS include rides, food_orders, deliveries
+Each must include: identity fields, addresses+geolocation, fees+commission, payment details,
+timestamps, full status flow, rating+feedback.
+
+F) COMMISSION & PAYOUT RULES — ALWAYS enforce
+1) Ride CASH: driver gets full cash; commission becomes negative driver_wallet_balance; settle weekly
+2) Food CASH: restaurant gets cash; commission becomes negative restaurant_wallet_balance
+3) Online: SafeGo keeps commission automatically
+4) Admin can settle balances and mark paid
+
+G) SECURITY RULES — ALWAYS enforce
+- Customers cannot view driver documents (NID, license)
+- Drivers cannot view customer NID/sensitive info
+- Restaurant cannot view other restaurants
+- Only admin can change pricing/commission/verification/blocking
+- Users can update only their own profile
+
+H) STATUS FLOWS — ALWAYS complete
+Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+I) ONBOARDING — ALWAYS multi-step; block until approved
+Basic info → Address → ID/KYC (country-specific) → Emergency contact
+verification_status="pending"; block access until admin approves.
+
+J) NOTIFICATIONS — ALWAYS include
+- New ride alert for driver
+- Order updates
+- Parcel updates
+- Verification approval/rejection
+- Important admin notifications
+
+ABSOLUTE: Additive-only. No renames/removals. Preserve existing APIs/routes/schemas unless explicitly allowed.
