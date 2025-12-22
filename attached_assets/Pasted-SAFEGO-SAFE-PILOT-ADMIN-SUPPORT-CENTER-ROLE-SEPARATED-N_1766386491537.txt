@@ -1,0 +1,358 @@
+SAFEGO — SAFE PILOT ADMIN SUPPORT CENTER (ROLE-SEPARATED, NON-BREAKING, ADDITIVE ONLY)
+====================================================================================
+
+GOAL
+Create an Admin-only “Support Center (SafePilot)” inside the Admin Dashboard that lets Admin view and manage support across:
+1) Customers
+2) Drivers
+3) Restaurants
+While keeping all end-user chat experiences (Customer/Driver/Restaurant) separate and unchanged.
+
+ABSOLUTE RULES (MUST FOLLOW)
+1) Additive only. Do not rename/remove existing files, routes, schemas, or fields.
+2) Do not break existing SafePilot widgets for any role.
+3) Admin can view cross-role support. Non-admin users can ONLY view their own conversations.
+4) RBAC must be enforced on every endpoint:
+   - Customer cannot see any driver documents or KYC.
+   - Driver cannot see customer NID/government ID.
+   - Restaurant cannot see other restaurants.
+   - Only Admin can view other users’ conversations, pricing, commissions, verification, blocking.
+5) Country-aware support must exist for BD vs US.
+6) Must support all 3 services: ride-hailing, food delivery, parcel delivery.
+7) Must keep status flows consistent:
+   - Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x
+   - Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x
+   - Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+8) Must preserve commission rules:
+   - Cash ride: driver keeps cash, SafeGo commission becomes negative driver_wallet_balance, weekly settle.
+   - Cash food: restaurant keeps cash, commission becomes negative restaurant_wallet, weekly settle.
+   - Online: SafeGo keeps commission automatically.
+   - Admin can settle balances and mark paid.
+9) SafePilot must never leak sensitive documents in chat:
+   - No NID images, license images, government id full numbers, SSN. Mask or deny.
+
+SECURITY PHASE DECLARATION (MANDATORY)
+Apply SafeGo Security Roadmap Phase: “Access Control + Audit Logging + Data Minimization” in this prompt.
+
+AFFECTED MODULES CHECK (MUST LIST AND PRESERVE)
+Before changing anything, identify impacted modules and confirm non-breaking:
+- Admin dashboard cards/navigation
+- Driver management (BD + US + NY)
+- Customer management
+- Restaurant management
+- Parcel management
+- Wallet & commission settlement
+- KYC flows and document review
+- Existing SafePilot chat widget and endpoints
+
+DELIVERABLES
+A) Admin Support Center UI (Admin-only)
+B) Admin Support APIs (Admin-only)
+C) Conversation viewer + filters + escalation workflow
+D) Audit log integration
+E) Demo seed data + configurable settings
+
+------------------------------------------------------------------------------------
+A) ADMIN SUPPORT CENTER UI (ADMIN ONLY)
+------------------------------------------------------------------------------------
+
+1) Add a new Admin sidebar nav item:
+   - Label: “Support Center”
+   - Route: /admin/support-center
+
+2) Page layout:
+   - Header: Support Center (SafePilot)
+   - Tabs (role-separated):
+     (i) Customers
+     (ii) Drivers
+     (iii) Restaurants
+     (iv) Escalations
+     (v) Audit
+
+3) Each role tab must show:
+   - Filters:
+     - country: US/BD/ALL
+     - service: ride/food/parcel/ALL
+     - status: open/escalated/resolved/ALL
+     - date range
+     - search (user name/email/phone/conversation id)
+   - List panel (left):
+     - conversation previews (last message snippet, role badge, country badge, service badge, last updated)
+   - Detail panel (right):
+     - full message thread (bubble UI)
+     - entity links (ride_id / food_order_id / delivery_id if present)
+     - “Tools trace” section (collapsible) showing which tools were run (no secrets)
+     - “Actions” section:
+       - Create ticket (manual)
+       - Mark resolved
+       - Assign to agent (admin user selection)
+       - Add internal note (admin-only)
+       - Request follow-up (schedule)
+
+4) Escalations tab:
+   - Table of escalated tickets with SLA timers:
+     - ticket_code, role, user_id, country, service, reason, severity, assigned_to, status, created_at
+   - Actions:
+     - Assign / Reassign
+     - Mark resolved with resolution_reason
+     - Export CSV
+
+5) Audit tab:
+   - Filterable log list:
+     - actor_role=ADMIN, action_type, target_role, target_id, timestamp
+   - Show:
+     - message_id, conversation_id, moderation flags, denial reasons (RBAC/tool-deny), safe_response_mode enabled, etc.
+
+6) UI components:
+   - Use existing UI library in repo (shadcn/ui if present).
+   - Must be responsive and fast: list virtualization for conversation list.
+
+------------------------------------------------------------------------------------
+B) ADMIN SUPPORT APIS (ADMIN ONLY)
+------------------------------------------------------------------------------------
+
+Create new admin-only endpoints (do not modify existing /api/safepilot/chat behavior):
+
+1) GET /api/admin/safepilot/conversations
+   Query params:
+   - role_scope: CUSTOMER|DRIVER|RESTAURANT (required)
+   - country: US|BD|ALL
+   - service: ride|food|parcel|ALL
+   - status: open|escalated|resolved|ALL
+   - q: string search
+   - from, to: ISO dates
+   - cursor/pagination
+
+Return:
+- conversations[] with lastMessage, updatedAt, roleScope, country, service
+- pagination cursor
+
+2) GET /api/admin/safepilot/conversations/:conversationId
+Return:
+- conversation metadata
+- messages[]
+- relatedEntities:
+  - ride_id, food_order_id, delivery_id (if any)
+- toolTrace summary (safe)
+- moderation summary (safe)
+
+3) POST /api/admin/safepilot/tickets
+Body:
+- conversationId
+- roleScope
+- userId
+- country
+- service
+- reason
+- severity (low/med/high)
+Return:
+- ticket_code
+
+4) POST /api/admin/safepilot/tickets/:ticketId/assign
+Body:
+- assigned_to_admin_user_id
+
+5) POST /api/admin/safepilot/tickets/:ticketId/resolve
+Body:
+- resolution_reason (required)
+
+6) POST /api/admin/safepilot/internal-note
+Body:
+- conversationId
+- note
+
+RBAC:
+- All these endpoints require ADMIN role. Hard-deny otherwise.
+- Log every action to audit_logs.
+
+------------------------------------------------------------------------------------
+C) DATA MODEL (PRISMA) — ADDITIVE ONLY
+------------------------------------------------------------------------------------
+
+Do NOT remove existing SafePilot models.
+Add new models ONLY if missing; otherwise extend with new optional fields.
+
+Required models (ensure exist):
+- SafePilotConversation
+- SafePilotMessage
+- SafePilotAuditLog
+- (existing KB tables remain)
+
+Add (if not present) or extend:
+1) SafePilotSupportTicket
+Fields:
+- id (uuid)
+- ticket_code (unique short code)
+- conversation_id (FK)
+- role_scope (enum: CUSTOMER|DRIVER|RESTAURANT)
+- user_id (FK to User)
+- country (US|BD)
+- service (ride|food|parcel)
+- reason (string)
+- severity (low|med|high)
+- status (open|assigned|resolved)
+- assigned_to_admin_user_id (nullable)
+- resolution_reason (nullable)
+- created_at, updated_at
+
+2) SafePilotInternalNote
+Fields:
+- id
+- conversation_id
+- admin_user_id
+- note
+- created_at
+
+Indexes:
+- conversation_id
+- role_scope + country + service + status
+- created_at
+
+------------------------------------------------------------------------------------
+D) COUNTRY-AWARE SUPPORT LOGIC (BD vs US)
+------------------------------------------------------------------------------------
+
+When SafePilot answers in admin context, it must:
+- Show country-specific KYC requirements:
+
+BD:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number + front/back images
+- emergency contact
+- verification_status + is_verified
+
+US:
+- date_of_birth
+- home_address
+- emergency contact
+- government_id_type
+- government_id_last4
+- drivers: driver_license + image + expiry
+- drivers: ssn_last4 optional
+- verification_status + is_verified
+
+In Admin Support Center:
+- Provide a “KYC Checklist” panel that changes based on country + roleScope.
+- Never display raw document images in chat thread view (show “Document on file: Yes/No” only).
+
+------------------------------------------------------------------------------------
+E) INTEGRATION WITH RIDES / FOOD_ORDERS / DELIVERIES (MANDATORY)
+------------------------------------------------------------------------------------
+
+Admin conversation detail must show related entity summaries, without leaking sensitive info:
+1) rides:
+- customer_id, driver_id
+- pickup/dropoff addresses + geo
+- fees + commission
+- payment method + status
+- timestamps
+- full status flow
+- rating/feedback
+
+2) food_orders:
+- customer_id, restaurant_id, driver_id (if delivery)
+- addresses + geo
+- fees + commission
+- payment details
+- timestamps
+- full status flow
+- rating/feedback
+
+3) deliveries:
+- customer_id, driver_id
+- pickup/dropoff + geo
+- fees + commission
+- payment
+- timestamps
+- full status flow
+- rating/feedback
+
+If conversation references an entity id, show a read-only “Entity card” in Admin Support Center.
+
+------------------------------------------------------------------------------------
+F) SAFE PILOT ANSWER QUALITY (ADMIN SUPPORT MODE)
+------------------------------------------------------------------------------------
+
+Add “Admin Support Mode” response guidelines:
+- Provide concise next steps + checklists.
+- Offer an action button list (max 3) that map to admin actions:
+  - Navigate to KYC approval page
+  - Open user profile
+  - Create ticket / assign agent
+- If uncertain, ask for missing identifiers (order id/ride id) without guessing.
+- Never promise refunds. Use safe template: “I can help start a review; final decision depends on policy.”
+
+------------------------------------------------------------------------------------
+G) DEMO-READY REQUIREMENTS
+------------------------------------------------------------------------------------
+
+1) Add sample data seeding (dev only):
+- 2 customers (BD/US)
+- 2 drivers (BD/US)
+- 2 restaurants (BD/US)
+- 6 conversations (2 each roleScope)
+- 3 tickets (one per roleScope)
+- link at least one conversation to each of rides/food_orders/deliveries entity IDs
+
+2) Config settings:
+- SUPPORT_CENTER_ENABLE_TOOL_TRACE (default: true in dev)
+- SUPPORT_CENTER_EXPORT_ENABLED (default: true)
+- SUPPORT_CENTER_MASKING_MODE (default: strict)
+
+------------------------------------------------------------------------------------
+H) TEST PLAN (MUST IMPLEMENT AND DOCUMENT)
+------------------------------------------------------------------------------------
+
+1) RBAC tests:
+- Non-admin cannot call any /api/admin/safepilot/*
+- Admin can list and view conversations
+- Admin cannot see raw docs (NID images/license images)
+
+2) Functional tests:
+- Filters work (country, roleScope, service, status)
+- Conversation detail renders messages
+- Ticket create/assign/resolve works
+- Audit logs created for each admin action
+
+3) UI tests:
+- Sidebar nav loads
+- Tabs switch without losing state
+- Pagination works
+
+------------------------------------------------------------------------------------
+I) FILES / MODULES TO CHANGE (MUST LIST EXACTLY)
+------------------------------------------------------------------------------------
+
+Create / modify these files (names may adapt to repo structure, but keep intent):
+Server:
+- server/routes/admin/safepilotSupportCenter.ts (new)
+- server/services/safepilot/adminSupportService.ts (new)
+- server/services/safepilot/rbac.ts (extend with admin support permissions)
+- server/services/safepilot/auditService.ts (reuse; ensure new actions logged)
+- prisma/schema.prisma (additive models only)
+- prisma/seed.ts (extend seed data)
+
+Client:
+- client/src/pages/admin/support-center.tsx (new)
+- client/src/components/safepilot/AdminSupportCenter.tsx (new)
+- client/src/components/safepilot/ConversationList.tsx (new)
+- client/src/components/safepilot/ConversationDetail.tsx (new)
+- client/src/components/safepilot/TicketsPanel.tsx (new)
+- client/src/components/safepilot/AuditPanel.tsx (new)
+- client/src/lib/api/adminSafepilotApi.ts (new typed client)
+
+------------------------------------------------------------------------------------
+J) NON-BREAKING GUARANTEE (MUST EXPLAIN)
+------------------------------------------------------------------------------------
+
+At the end, provide:
+1) Confirmation no existing API routes were changed (only new admin endpoints added).
+2) Confirmation SafePilot end-user chat UI remains unchanged.
+3) Confirmation database changes are additive only.
+4) A short rollback plan (git checkpoint + revert).
+
+NOW IMPLEMENT EVERYTHING END-TO-END IN ONE PASS.
+No partial work. No placeholders.
