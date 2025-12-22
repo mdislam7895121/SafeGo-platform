@@ -895,7 +895,14 @@ export function SafePilotButton() {
     }
   };
 
+  // Only show on admin pages, but not on admin home (which has embedded AdminSafePilotPanel)
+  // Also don't show on support-console (which has embedded SupportSafePilotPanel)
   if (!location.startsWith('/admin')) {
+    return null;
+  }
+  
+  // Don't show on pages with embedded SafePilot panels
+  if (location === '/admin' || location === '/admin/' || location === '/admin/home' || location === '/admin/support-console') {
     return null;
   }
 
