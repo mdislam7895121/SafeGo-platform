@@ -635,6 +635,21 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     };
   }
 
+  if (role === "CUSTOMER" && !response.escalated) {
+    await logMonitoringEvent({
+      userId,
+      conversationId: conversation.id,
+      eventType: "ai_resolved",
+      emotion: detectedEmotion,
+      resolutionTimeMs: Date.now() - conversation.createdAt.getTime(),
+      metadata: {
+        route: intentResult.route,
+        sourceCount: kbResults.length,
+        toolsUsed,
+      },
+    });
+  }
+
   return response;
 }
 
