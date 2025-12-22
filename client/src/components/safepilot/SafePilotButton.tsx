@@ -388,86 +388,108 @@ interface QuickAction {
   category: 'support' | 'fraud' | 'operations' | 'finance' | 'health';
 }
 
+type SafePilotMode = 'intel' | 'context' | 'chat';
+type SafePilotTier = 'ultra' | 'crisis' | 'survival' | 'history';
+
+const BASE_SYSTEM_INSTRUCTION = `You are Admin SafePilot for SafeGo. You answer ONLY admin/operator questions: metrics, KPIs, platform ops, KYC queues, fraud/risk signals, payouts, disputes, system health, and recommended actions. You must not handle end-user support conversations. If asked to do customer-support agent tasks, respond: 'Use Support SafePilot on /admin/support-console.' Be concise, action-oriented, and provide clear next steps. When you list items, include IDs and timestamps if available.`;
+
+const TIER_PREFIXES: Record<SafePilotTier, string> = {
+  ultra: 'Priority: ULTRA. Be decisive. Provide immediate actions and the shortest path to fix.',
+  crisis: 'Priority: CRISIS. Focus on incident response: impact, scope, mitigation, owner actions, and follow-up.',
+  survival: 'Priority: SURVIVAL. Focus on stabilizing core operations, reducing risk, and preventing recurrence.',
+  history: 'Priority: HISTORY. Provide trends, comparisons, and insights over time.',
+};
+
+const MODE_INSTRUCTIONS: Record<SafePilotMode, string> = {
+  intel: 'Mode: INTEL. Summarize signals, risks, and what to watch. Use bullet points.',
+  context: 'Mode: CONTEXT. Explain what is happening, why, and dependencies. Include assumptions.',
+  chat: 'Mode: CHAT. Answer as a helpful operator assistant and ask one short follow-up only if needed.',
+};
+
+function buildPrompt(mode: SafePilotMode, tier: SafePilotTier, userText: string): string {
+  return `${BASE_SYSTEM_INSTRUCTION}\n\n${TIER_PREFIXES[tier]}\n\n${MODE_INSTRUCTIONS[mode]}\n\nUser Query: ${userText}`;
+}
+
 const QUICK_ACTIONS: QuickAction[] = [
   {
     id: 'support-issues',
     title: 'Support Issues',
-    description: 'Unresolved customer support issues (summary + top 10)',
-    prompt: 'Show me today\'s unresolved customer support issues - provide a summary and list the top 10 most urgent cases with their status and priority.',
+    description: 'Today\'s unresolved tickets by status',
+    prompt: 'Show today\'s unresolved customer support tickets: counts by status, oldest 10, and suggested next actions.',
     icon: <LifeBuoy className="h-4 w-4" />,
     category: 'support',
   },
   {
     id: 'kyc-queue',
-    title: 'KYC Queue Status',
-    description: 'Pending verifications, average age, risky profiles',
-    prompt: 'What is the current KYC queue status? Show pending count, average age of requests, and highlight any risky profiles that need attention.',
+    title: 'KYC Queue',
+    description: 'Pending approvals by age bucket',
+    prompt: 'Show KYC pending approvals by age bucket (0-2h, 2-24h, 1-3d, 3d+) and top risk reasons.',
     icon: <Fingerprint className="h-4 w-4" />,
-    category: 'operations',
+    category: 'support',
   },
   {
     id: 'fraud-signals',
     title: 'Fraud Signals',
-    description: 'Refund abuse, multi-accounting, device/IP clusters',
-    prompt: 'Give me a fraud signals snapshot. Highlight refund abuse patterns, multi-accounting attempts, suspicious device or IP clusters, and any concerning patterns.',
+    description: 'Last 24h suspicious activity',
+    prompt: 'Summarize fraud signals in the last 24h: suspicious devices, repeat payment failures, abnormal refunds.',
     icon: <ShieldAlert className="h-4 w-4" />,
+    category: 'fraud',
+  },
+  {
+    id: 'high-risk-users',
+    title: 'High-Risk Users',
+    description: 'Top 20 with reason codes',
+    prompt: 'List top 20 high-risk users with reason codes, last activity, and recommended actions.',
+    icon: <Shield className="h-4 w-4" />,
     category: 'fraud',
   },
   {
     id: 'driver-violations',
     title: 'Driver Violations',
-    description: 'Top violation categories, repeat offenders',
-    prompt: 'Summarize driver violations. What are the top violation categories, who are repeat offenders, and what actions are recommended?',
+    description: 'Last 7 days violations summary',
+    prompt: 'Show driver violations in last 7 days: types, counts, repeat offenders, suggested enforcement.',
     icon: <AlertTriangle className="h-4 w-4" />,
+    category: 'operations',
+  },
+  {
+    id: 'system-health',
+    title: 'System Health',
+    description: 'Error rates, slow endpoints, warnings',
+    prompt: 'Give system health summary: error rate, slow endpoints, memory/CPU warnings, and top fixes.',
+    icon: <Activity className="h-4 w-4" />,
     category: 'operations',
   },
   {
     id: 'payout-anomalies',
     title: 'Payout Anomalies',
-    description: 'Failed payouts, suspicious spikes',
-    prompt: 'Show payout anomalies. List failed payouts, suspicious earning spikes, and any patterns that need investigation.',
+    description: 'Spikes, duplicates, unusual amounts',
+    prompt: 'Detect payout anomalies: spikes, duplicates, unusual amounts; list top 20 with reasons.',
     icon: <DollarSign className="h-4 w-4" />,
     category: 'finance',
   },
   {
     id: 'earnings-disputes',
     title: 'Earnings Disputes',
-    description: 'Open disputes, median resolution time',
-    prompt: 'Give me an overview of earnings disputes. How many are open, what is the median time to resolve, and which ones are escalating?',
+    description: 'Open vs resolved, resolution time',
+    prompt: 'Summarize earnings disputes: open vs resolved, average resolution time, top dispute causes.',
     icon: <Scale className="h-4 w-4" />,
     category: 'finance',
   },
   {
-    id: 'system-health',
-    title: 'System Health',
-    description: 'API error rates, memory usage, slow endpoints',
-    prompt: 'What is the current system health? Show API error rates, memory usage warnings, slow endpoints, and any infrastructure concerns.',
-    icon: <Activity className="h-4 w-4" />,
-    category: 'health',
-  },
-  {
-    id: 'high-risk-users',
-    title: 'High-Risk Users',
-    description: 'Recent blocks, watchlist, reasons',
-    prompt: 'List high-risk users. Show recent blocks, users on watchlist, and the reasons why they were flagged.',
-    icon: <Shield className="h-4 w-4" />,
-    category: 'fraud',
-  },
-  {
     id: 'platform-kpis',
     title: 'Platform KPIs',
-    description: 'Rides/orders today, conversion, cancellations',
-    prompt: 'What are today\'s platform KPIs? Show total rides and orders, conversion rates, cancellation rates, and how we compare to yesterday.',
+    description: 'Last 24h core metrics and trends',
+    prompt: 'Show core KPIs for last 24h: rides, cancellations, refunds, disputes, KYC throughput, and trend vs prior day.',
     icon: <BarChart3 className="h-4 w-4" />,
-    category: 'operations',
+    category: 'health',
   },
   {
     id: 'recommended-actions',
     title: 'Recommended Actions',
-    description: '3 immediate operational actions to take',
-    prompt: 'Based on current data, what are the top 3 immediate operational actions I should take right now to improve the platform?',
+    description: 'Top 5 actions based on KPIs',
+    prompt: 'Based on KPIs and incidents, recommend the top 5 actions to improve reliability and reduce fraud.',
     icon: <Target className="h-4 w-4" />,
-    category: 'operations',
+    category: 'health',
   },
 ];
 
@@ -498,8 +520,10 @@ export function SafePilotButton() {
     role: string;
   }>({ lastUrl: '', lastStatus: null, lastError: null, role: 'ADMIN' });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [autoSendEnabled, setAutoSendEnabled] = useState(false);
+  const [autoSendEnabled, setAutoSendEnabled] = useState(true);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const [currentMode, setCurrentMode] = useState<SafePilotMode>('intel');
+  const [currentTier, setCurrentTier] = useState<SafePilotTier>('ultra');
   
   const [crisisReport, setCrisisReport] = useState<CrisisReportData | null>(null);
   const [isCrisisLoading, setIsCrisisLoading] = useState(false);
@@ -631,13 +655,16 @@ export function SafePilotButton() {
       const url = '/api/admin/safepilot/query';
       setDebugInfo(prev => ({ ...prev, lastUrl: url, lastStatus: null, lastError: null }));
       
+      const fullPrompt = buildPrompt(currentMode, currentTier, action.prompt);
+      console.log('[SafePilot] Quick Action with mode:', currentMode, 'tier:', currentTier);
+      
       try {
         const res = await fetchWithAuth(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             pageKey,
-            question: action.prompt,
+            question: fullPrompt,
             role: 'ADMIN',
           }),
         });
@@ -734,7 +761,9 @@ export function SafePilotButton() {
     setIsSubmitting(true);
     const url = '/api/admin/safepilot/query';
     setDebugInfo(prev => ({ ...prev, lastUrl: url, lastStatus: null, lastError: null }));
-    console.log('[SafePilot Admin] Submitting question:', { question: userQuestion.slice(0, 50), role: 'ADMIN', pageKey });
+    
+    const fullPrompt = buildPrompt(currentMode, currentTier, userQuestion);
+    console.log('[SafePilot Admin] Submitting question:', { question: userQuestion.slice(0, 50), mode: currentMode, tier: currentTier, role: 'ADMIN', pageKey });
     
     try {
       const res = await fetchWithAuth(url, {
@@ -742,7 +771,7 @@ export function SafePilotButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageKey,
-          question: userQuestion,
+          question: fullPrompt,
           role: 'ADMIN',
         }),
       });
@@ -1212,7 +1241,16 @@ export function SafePilotButton() {
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value);
+            if (value === 'intelligence') setCurrentMode('intel');
+            else if (value === 'context') setCurrentMode('context');
+            else if (value === 'response') setCurrentMode('chat');
+            else if (value === 'ultra') setCurrentTier('ultra');
+            else if (value === 'crisis') setCurrentTier('crisis');
+            else if (value === 'survival') setCurrentTier('survival');
+            else if (value === 'history') setCurrentTier('history');
+          }} className="flex-1 flex flex-col min-h-0">
             <div className="px-4 sm:px-6 mt-3 sm:mt-4 shrink-0">
               <TabsList className="grid grid-cols-3 w-full">
                 <TabsTrigger value="intelligence" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-intelligence">
@@ -2379,6 +2417,22 @@ export function SafePilotButton() {
                 <span className="text-xs text-muted-foreground">{scanData.findings.length} findings</span>
               </div>
             )}
+            <div className="mb-2 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Mode: <span className="font-medium text-foreground uppercase">{currentMode}</span>
+                {' | '}
+                Priority: <span className="font-medium text-foreground uppercase">{currentTier}</span>
+              </span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoSendEnabled}
+                  onChange={(e) => setAutoSendEnabled(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-gray-300"
+                />
+                <span className="text-muted-foreground">Auto-send</span>
+              </label>
+            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
