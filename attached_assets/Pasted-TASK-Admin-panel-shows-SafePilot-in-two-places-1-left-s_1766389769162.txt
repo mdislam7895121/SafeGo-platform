@@ -1,0 +1,33 @@
+TASK: Admin panel shows SafePilot in two places: (1) left sidebar menu item “SafePilot” under Advanced Admin Tools, and (2) floating SafePilot widget bottom-right. Requirement: On ALL /admin pages we must have ONLY ONE SafePilot entry point: the floating widget. Remove/hide the sidebar “SafePilot” menu item entirely for admin pages. Keep support separation: /admin/support-console must keep ONLY the Support SafePilot panel and MUST NOT show the floating admin widget.
+
+WHAT TO DO (A-to-Z):
+1) Locate where the admin sidebar menu items are defined (search for strings: "Advanced Admin Tools", "SafePilot", "Ratings Center").
+   - Find the menu config/component (likely something like client/src/components/layout/*Sidebar*.tsx or client/src/components/admin/*Nav*.tsx).
+2) Remove the “SafePilot” item from the sidebar list OR gate it behind a feature flag so it is hidden when floating widget is enabled.
+   - Target outcome: sidebar shows Ratings Center etc, but NOT SafePilot.
+3) Keep the floating widget as the only admin access:
+   - Ensure SafePilotButton remains mounted across /admin routes (except /admin/support-console).
+   - Confirm singleton guards still prevent duplicate mounts.
+4) Verify route behavior:
+   - /admin/dashboard => floating widget visible; no sidebar SafePilot item.
+   - /admin/users => floating widget visible; no sidebar SafePilot item.
+   - /admin/support-console => Support SafePilot panel visible; floating widget hidden; no sidebar SafePilot item.
+5) Regression test:
+   - Clicking floating widget opens the admin SafePilot modal/chat and responses render visibly.
+   - No duplicate SafePilot UIs appear anywhere.
+6) Document:
+   - Update replit.md with “Admin SafePilot is floating-only; sidebar link removed; Support console uses separate assistant.”
+
+FILES YOU MAY TOUCH:
+- Sidebar/nav component where menu items are defined (search results will reveal exact path)
+- client/src/components/safepilot/SafePilotButton.tsx (only if route-gating needs adjustment; avoid refactor)
+- client/src/pages/admin/home.tsx (should remain without embedded panel; keep removed)
+
+DO NOT:
+- Do not merge Support SafePilot into Admin SafePilot.
+- Do not reintroduce embedded SafePilot panels inside admin pages.
+- Do not change customer-facing SafePilot.
+
+DELIVERABLE:
+- Code change + screenshots (or description) showing only floating widget on admin pages and no sidebar SafePilot.
+- Short verification checklist results.

@@ -42,7 +42,6 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
-import { SafePilotSidebarIcon } from "@/components/safepilot/SafePilotLogo";
 import {
   Sidebar,
   SidebarContent,
@@ -398,12 +397,6 @@ const financeDashboardNavItems: NavItem[] = [
 ];
 
 const phase4NavItems: NavItem[] = [
-  {
-    title: "SafePilot",
-    href: "/admin/safepilot",
-    icon: SafePilotSidebarIcon as unknown as LucideIcon,
-    navKey: "dashboard",
-  },
   {
     title: "Ratings Center",
     href: "/admin/ratings-center",
