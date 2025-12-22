@@ -1,0 +1,56 @@
+Make Admin SafePilot “best-in-class” professional (Stripe/AWS-level) UI + UX.
+
+Non-negotiable UX rules:
+1) Chat-first: Default view must be a clean chat window. No grids, no multi-row tabs.
+2) One primary action: type + send. Everything else is secondary and hidden.
+3) Zero confusion: Remove duplicate controls (Scan/Optimize/Crisis repeated places).
+4) Consistent behavior: Every button must either (a) insert a prompt, or (b) send it. Never “do nothing”.
+
+Layout (must implement):
+A) Header (single row):
+   - SafePilot title + small status dot (Online/Offline)
+   - Close X
+   - Small gear icon for settings (only)
+
+B) Body:
+   - Message list with clear roles (Admin vs SafePilot)
+   - Timestamp subtle, not dominant
+   - Smooth auto-scroll to newest message
+
+C) Composer (bottom):
+   - Text input (multi-line, grows to 3 lines max)
+   - Send button
+   - Above input: one compact pill label, e.g. “Intel · Normal”
+     - Clicking pill opens a small popover to select:
+       * Mode: Intel / Context / Chat
+       * Priority: Normal / Crisis / History
+   - No other visible tabs.
+
+D) Quick Actions:
+   - Collapsed by default as a single “Quick actions” text button.
+   - Clicking opens a list of 8–12 actions grouped (Support, Fraud, Ops, Finance).
+   - Each action must WORK:
+     - Click inserts prompt into input
+     - Shift+Click (or Auto-send ON) sends immediately
+
+E) Settings (gear):
+   - Auto-send toggle
+   - Clear chat button
+   - Export conversation (copy to clipboard)
+   - Model/temperature hidden unless needed; keep minimal.
+
+Quality bar (must pass):
+1) First-time admin can use it without instructions.
+2) No control is duplicated in multiple places.
+3) Mobile + small laptop friendly; no overflow; no tiny unreadable text.
+4) Keyboard-first: Enter to send, Shift+Enter new line, Esc closes popovers.
+5) Accessibility: focus states, aria-labels for icons, contrast safe.
+
+Implementation scope:
+- Only for Admin floating SafePilot widget.
+- Support console SafePilot remains separate and unaffected.
+- Do not break RBAC or existing API calls.
+
+Deliverables:
+- Updated component(s) with clean styling
+- Short verification checklist + screenshots
