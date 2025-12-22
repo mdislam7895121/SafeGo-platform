@@ -41,6 +41,7 @@ interface SafePilotAction {
 
 interface SafePilotQueryResponse {
   mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE';
+  intent?: 'guard' | 'kyc' | 'metrics' | 'operations' | 'finance' | 'drivers' | 'customers' | 'general';
   summary: string[];
   keySignals: string[];
   actions: SafePilotAction[];
@@ -334,20 +335,67 @@ export const safePilotService = {
   },
 
   /**
+   * Detect specific intent category for admin questions
+   * Used to render appropriate response format (not mode headers)
+   */
+  detectIntent(question: string): 'guard' | 'kyc' | 'metrics' | 'operations' | 'finance' | 'drivers' | 'customers' | 'general' {
+    const q = question.toLowerCase();
+    
+    // GUARD: fraud, security, risk, abuse
+    if (['fraud', 'suspicious', 'abuse', 'scam', 'fake', 'security', 'breach', 'hack', 'threat', 'violation', 'ban', 'block', 'blacklist'].some(p => q.includes(p))) {
+      return 'guard';
+    }
+    
+    // KYC: verification, approvals, documents
+    if (['kyc', 'verification', 'approval', 'pending approval', 'document', 'identity', 'background check', 'age bucket'].some(p => q.includes(p))) {
+      return 'kyc';
+    }
+    
+    // METRICS: kpis, performance, analytics
+    if (['metric', 'kpi', 'performance', 'analytics', 'dashboard', 'trend', 'growth', 'conversion'].some(p => q.includes(p))) {
+      return 'metrics';
+    }
+    
+    // OPERATIONS: system health, jobs, queues
+    if (['health', 'system', 'queue', 'job', 'service', 'uptime', 'latency', 'error rate', 'incident'].some(p => q.includes(p))) {
+      return 'operations';
+    }
+    
+    // FINANCE: revenue, payout, earnings
+    if (['revenue', 'payout', 'earning', 'commission', 'payment', 'settlement', 'balance', 'wallet'].some(p => q.includes(p))) {
+      return 'finance';
+    }
+    
+    // DRIVERS
+    if (['driver', 'delivery partner', 'courier'].some(p => q.includes(p))) {
+      return 'drivers';
+    }
+    
+    // CUSTOMERS
+    if (['customer', 'user', 'rider', 'passenger'].some(p => q.includes(p))) {
+      return 'customers';
+    }
+    
+    return 'general';
+  },
+
+  /**
    * Format response in Vision 2030 structured format
-   * GUARANTEED: Never returns empty - always provides structured output
+   * CLEAN OUTPUT: No mode headers, question-specific answers with full structure
    * Returns both formatted text AND structured data for frontend rendering
+   * Intent parameter controls whether monitoring section is shown (guard intent only)
    */
   formatVision2030Response(
     summary: string[],
     keySignals: string[],
     actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK'; permission?: string }>,
     monitoring: string[],
-    mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE'
+    mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE',
+    intent?: 'guard' | 'kyc' | 'metrics' | 'operations' | 'finance' | 'drivers' | 'customers' | 'general'
   ): { text: string; structured: { mode: typeof mode; summary: string[]; keySignals: string[]; actions: SafePilotAction[]; monitor: string[] } } {
     // Ensure no empty arrays - always provide fallback content
     const safeSummary = summary.length > 0 
-      ? summary.slice(0, 3)
+      ? summary.slice(0, 5)
       : ['Analysis in progress. Gathering data from last 24h telemetry.'];
     const safeSignals = keySignals.length > 0 
       ? keySignals 
@@ -359,28 +407,37 @@ export const safePilotService = {
       ? monitoring 
       : ['Watch for changes in key performance indicators'];
 
-    // Build formatted text response
+    // Build clean formatted text response - NO mode headers
     let response = '';
-    response += `**[${mode} MODE]**\n\n`;
-    response += '**Summary:**\n';
+    
+    // Summary section - the main answer
     safeSummary.forEach(s => response += `• ${s}\n`);
-    response += '\n';
-    response += '**Key signals I used:**\n';
-    safeSignals.forEach(s => response += `• ${s}\n`);
-    response += '\n';
-    response += '**Recommended actions:**\n';
-    safeActions.forEach(a => {
-      const riskTag = a.risk === 'SAFE' ? '[SAFE]' : 
-                     a.risk === 'CAUTION' ? '[CAUTION]' : 
-                     '[HIGH RISK – REQUIRE SENIOR APPROVAL]';
-      response += `• ${riskTag} ${a.label}\n`;
-    });
-    response += '\n';
-    response += '**What to monitor next:**\n';
-    safeMonitoring.forEach(m => response += `• ${m}\n`);
+    
+    // Actions section - only show if there are non-default actions
+    const hasRealActions = safeActions.some(a => a.label !== 'Continue monitoring current metrics');
+    if (hasRealActions) {
+      response += '\nRecommended actions:\n';
+      safeActions.forEach(a => {
+        if (a.label === 'Continue monitoring current metrics') return; // Skip default
+        if (a.risk === 'HIGH_RISK') {
+          response += `• ⚠️ ${a.label} (requires approval)\n`;
+        } else if (a.risk === 'CAUTION') {
+          response += `• ⚡ ${a.label}\n`;
+        } else {
+          response += `• ${a.label}\n`;
+        }
+      });
+    }
+    
+    // Monitoring section - ONLY for guard intent (fraud/security questions)
+    const isGuardIntent = intent === 'guard';
+    if (isGuardIntent && safeMonitoring.length > 0) {
+      response += '\nMonitor:\n';
+      safeMonitoring.forEach(m => response += `• ${m}\n`);
+    }
     
     return {
-      text: response,
+      text: response.trim(),
       structured: {
         mode,
         summary: safeSummary,
@@ -393,13 +450,20 @@ export const safePilotService = {
 
   /**
    * Create fallback response when data is unavailable
+   * ONLY triggers for: empty AI response, API error, timeout
+   * NEVER triggers for: schema mismatch, parsing issues, valid text responses
    */
   createFallbackResponse(mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE', error?: string): SafePilotQueryResponse {
+    // Clean fallback with proper structure for frontend
+    const fallbackSummary = error 
+      ? [`I couldn't complete that analysis right now.`, error]
+      : ['I couldn\'t fetch the data you requested. Please try again in a moment.'];
+
     const formatted = this.formatVision2030Response(
-      ['Data unavailable — switching to fallback analysis using last 24h telemetry.'],
-      ['Platform telemetry active', 'Fallback mode engaged'],
-      [{ label: 'Retry data fetch in 60 seconds', risk: 'SAFE' }],
-      ['System recovery status', 'Data pipeline health'],
+      fallbackSummary,
+      ['Data temporarily unavailable', 'Using cached metrics'],
+      [{ label: 'Try again in a moment', risk: 'SAFE' }],
+      ['Service status', 'Data pipeline health'],
       mode
     );
 
@@ -410,19 +474,14 @@ export const safePilotService = {
       actions: formatted.structured.actions,
       monitor: formatted.structured.monitor,
       answerText: formatted.text,
-      insights: [{
-        type: 'performance' as const,
-        title: 'Fallback Mode Active',
-        detail: error || 'Using cached data for analysis',
-        severity: 'MEDIUM' as const,
-      }],
+      insights: [],
       suggestions: [{
         key: 'retry',
-        label: 'Retry Data Fetch',
+        label: 'Retry',
         actionType: 'RUN_REPORT' as const,
         payload: { action: 'retry' },
       }],
-      riskLevel: 'MEDIUM' as const,
+      riskLevel: 'LOW' as const,
     };
   },
 
@@ -485,7 +544,8 @@ export const safePilotService = {
 
   /**
    * Process natural language query from admin
-   * Vision 2030: Enhanced with mode detection, retry logic, and HIGH RISK alerts
+   * Vision 2030: Enhanced with mode detection, intent classification, and HIGH RISK alerts
+   * Intent-based routing ensures guard responses ONLY appear for guard/fraud questions
    */
   async processQuery(
     adminId: string,
@@ -497,38 +557,69 @@ export const safePilotService = {
     const startTime = Date.now();
     const lowercaseQuestion = question.toLowerCase();
     const mode = this.detectMode(question);
+    const intent = this.detectIntent(question);
     
-    // Execute query with retry logic
+    console.log('[SafePilot] Processing query:', { mode, intent, questionPreview: lowercaseQuestion.slice(0, 50) });
+    
+    // Execute query with retry logic - INTENT-BASED HANDLER SELECTION
     const result = await this.executeWithRetry(async () => {
       let response: SafePilotQueryResponse;
 
-      // Pattern matching for common queries with Vision 2030 enhancements
-      if (lowercaseQuestion.includes('high risk') || lowercaseQuestion.includes('risky')) {
-        response = await this.handleRiskQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('fraud') || lowercaseQuestion.includes('suspicious')) {
-        response = await this.handleFraudQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('refund') || lowercaseQuestion.includes('dispute')) {
-        response = await this.handleRefundQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('payout') || lowercaseQuestion.includes('payment')) {
-        response = await this.handlePayoutQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('driver')) {
-        response = await this.handleDriverQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('customer')) {
-        response = await this.handleCustomerQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('restaurant') || lowercaseQuestion.includes('partner')) {
-        response = await this.handleRestaurantQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('kyc') || lowercaseQuestion.includes('verification')) {
-        response = await this.handleKycQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('performance') || lowercaseQuestion.includes('metric')) {
-        response = await this.handlePerformanceQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('cost') || lowercaseQuestion.includes('expense') || lowercaseQuestion.includes('save')) {
-        response = await this.handleCostQuery(lowercaseQuestion, countryCode, mode);
-      } else if (lowercaseQuestion.includes('top 3') || lowercaseQuestion.includes('top risks') || lowercaseQuestion.includes('right now')) {
-        response = await this.handleWatchModeQuery(lowercaseQuestion, countryCode);
-      } else if (lowercaseQuestion.includes('growth') || lowercaseQuestion.includes('opportunit') || lowercaseQuestion.includes('revenue')) {
-        response = await this.handleGrowthQuery(lowercaseQuestion, countryCode, mode);
-      } else {
-        response = await this.handleGeneralQuery(lowercaseQuestion, pageKey, countryCode, mode);
+      // PRIMARY ROUTING: Use detectIntent to select handler
+      // This ensures guard handlers ONLY run for guard intent
+      switch (intent) {
+        case 'guard':
+          // Guard intent: fraud, security, abuse, threats
+          if (lowercaseQuestion.includes('fraud') || lowercaseQuestion.includes('suspicious')) {
+            response = await this.handleFraudQuery(lowercaseQuestion, countryCode, 'GUARD');
+          } else if (lowercaseQuestion.includes('high risk') || lowercaseQuestion.includes('risky')) {
+            response = await this.handleRiskQuery(lowercaseQuestion, countryCode, 'GUARD');
+          } else {
+            response = await this.handleFraudQuery(lowercaseQuestion, countryCode, 'GUARD');
+          }
+          break;
+          
+        case 'kyc':
+          response = await this.handleKycQuery(lowercaseQuestion, countryCode, 'ASK');
+          break;
+          
+        case 'metrics':
+          response = await this.handlePerformanceQuery(lowercaseQuestion, countryCode, 'ASK');
+          break;
+          
+        case 'operations':
+          // System health / operations - use watch mode query
+          response = await this.handleWatchModeQuery(lowercaseQuestion, countryCode);
+          break;
+          
+        case 'finance':
+          if (lowercaseQuestion.includes('payout') || lowercaseQuestion.includes('payment')) {
+            response = await this.handlePayoutQuery(lowercaseQuestion, countryCode, 'ASK');
+          } else if (lowercaseQuestion.includes('cost') || lowercaseQuestion.includes('expense')) {
+            response = await this.handleCostQuery(lowercaseQuestion, countryCode, 'OPTIMIZE');
+          } else {
+            response = await this.handleGrowthQuery(lowercaseQuestion, countryCode, 'ASK');
+          }
+          break;
+          
+        case 'drivers':
+          response = await this.handleDriverQuery(lowercaseQuestion, countryCode, 'ASK');
+          break;
+          
+        case 'customers':
+          response = await this.handleCustomerQuery(lowercaseQuestion, countryCode, 'ASK');
+          break;
+          
+        default:
+          // General intent - fallback routing for specific keywords
+          if (lowercaseQuestion.includes('restaurant') || lowercaseQuestion.includes('partner')) {
+            response = await this.handleRestaurantQuery(lowercaseQuestion, countryCode, 'ASK');
+          } else if (lowercaseQuestion.includes('refund') || lowercaseQuestion.includes('dispute')) {
+            response = await this.handleRefundQuery(lowercaseQuestion, countryCode, 'ASK');
+          } else {
+            response = await this.handleGeneralQuery(lowercaseQuestion, pageKey, countryCode, 'ASK');
+          }
+          break;
       }
 
       return response;
@@ -593,6 +684,34 @@ export const safePilotService = {
     } catch (logError) {
       console.error('[SafePilot] Logging error (non-fatal):', logError);
     }
+
+    // Add intent to response for frontend rendering decisions
+    response.intent = intent;
+    
+    // INTENT-BASED SANITIZATION: Ensure guard-specific content ONLY appears for guard intent
+    if (intent !== 'guard') {
+      // Non-guard intents should NOT have monitoring/guard-style content
+      response.monitor = [];
+      
+      // Override mode if it was set to GUARD for non-guard intent
+      if (response.mode === 'GUARD') {
+        response.mode = 'ASK';
+      }
+    }
+    
+    // Regenerate answerText using intent-aware formatting
+    // This ensures guard-specific formatting ONLY appears for guard intent
+    const reformatted = this.formatVision2030Response(
+      response.summary,
+      response.keySignals,
+      response.actions.map(a => ({ label: a.label, risk: a.risk })),
+      response.monitor,
+      response.mode,
+      intent
+    );
+    response.answerText = reformatted.text;
+    
+    console.log('[SafePilot] Query completed:', { intent, mode: response.mode, summaryCount: response.summary?.length });
 
     return response;
   },
