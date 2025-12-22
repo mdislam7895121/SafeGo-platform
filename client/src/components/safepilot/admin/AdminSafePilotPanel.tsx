@@ -117,15 +117,6 @@ export default function AdminSafePilotPanel() {
     }
   };
   
-  // Don't render if already mounted elsewhere
-  if (window.__ADMIN_SAFEPILOT_MOUNTED__ === true && typeof window !== 'undefined') {
-    // Check if this is the first render
-    const isFirstRender = !window.__ADMIN_SAFEPILOT_MOUNTED__;
-    if (!isFirstRender) {
-      // Already mounted, don't render again
-    }
-  }
-  
   return (
     <Card className="h-full flex flex-col bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950 border-blue-200 dark:border-blue-800">
       <CardHeader className="pb-3 border-b border-blue-100 dark:border-blue-900">
