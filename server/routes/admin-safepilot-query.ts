@@ -108,6 +108,26 @@ function formatEnterpriseResponse(
   return lines.join('\n').trim();
 }
 
+// Extract actual user query from wrapped prompt
+// Frontend wraps user question with system instructions: "You are Admin SafePilot... User Query: {actual question}"
+function extractUserQuery(wrappedQuery: string): string {
+  // Try to extract "User Query: ..." from the wrapped prompt
+  const userQueryMatch = wrappedQuery.match(/User Query:\s*(.+?)$/is);
+  if (userQueryMatch && userQueryMatch[1]) {
+    return userQueryMatch[1].trim();
+  }
+  
+  // If no "User Query:" prefix, use the full query
+  // But strip any system prompt that starts with "You are Admin SafePilot"
+  const cleanedQuery = wrappedQuery
+    .replace(/^You are Admin SafePilot[\s\S]*?(?=Mode:|Priority:|$)/i, '')
+    .replace(/^Mode:\s*\w+\.\s*[^.]+\./gim, '')
+    .replace(/^Priority:\s*\w+\.\s*[^.]+\./gim, '')
+    .trim();
+  
+  return cleanedQuery || wrappedQuery;
+}
+
 // Middleware to require ADMIN role only
 const requireAdmin = async (req: AuthRequest, res: Response, next: any) => {
   if (!req.user) {
@@ -128,14 +148,16 @@ router.post('/query', authenticateToken, requireAdmin, async (req: AuthRequest, 
   const startTime = Date.now();
   
   try {
-    const { query } = req.body;
+    // Support both 'query' and 'question' field names for compatibility
+    const { query, question } = req.body;
+    const inputText = query || question;
     
     // Graceful validation - extract question even if malformed
-    let userQuery = '';
-    if (typeof query === 'string' && query.trim().length > 0) {
-      userQuery = query.trim();
-    } else if (typeof query === 'object' && query?.question) {
-      userQuery = String(query.question).trim();
+    let rawQuery = '';
+    if (typeof inputText === 'string' && inputText.trim().length > 0) {
+      rawQuery = inputText.trim();
+    } else if (typeof inputText === 'object' && inputText?.question) {
+      rawQuery = String(inputText.question).trim();
     } else {
       // Fallback: return help response instead of error
       return res.json({
@@ -150,12 +172,15 @@ router.post('/query', authenticateToken, requireAdmin, async (req: AuthRequest, 
       });
     }
     
+    // CRITICAL: Extract actual user query from wrapped prompt
+    // Frontend wraps with system instructions, we need the real question
+    const userQuery = extractUserQuery(rawQuery);
     const lowerQuery = userQuery.toLowerCase();
     const intent = detectAdminIntent(userQuery);
     const timeVariant = getTimestampVariation();
     const queryTime = new Date().toISOString();
     
-    console.log(`[Admin SafePilot] Processing query: intent=${intent}, time=${timeVariant}`);
+    console.log(`[Admin SafePilot] Processing query: intent=${intent}, userQuery="${userQuery.slice(0, 50)}..."`);
     
     // Check if query belongs to support domain
     const supportKeywords = ['support ticket', 'customer complaint', 'help desk', 'customer service'];
