@@ -1,0 +1,204 @@
+ROLE & SCOPE (MANDATORY)
+
+You are working on SafeGo Platform – SafePilot AI.
+
+Your task is STRICTLY LIMITED to fixing SafePilot behavior.
+Do NOT refactor UI, do NOT change unrelated files, do NOT add new features beyond what is described.
+
+You must analyze the full SafePilot flow end-to-end and fix logic issues only.
+
+1️⃣ CORE PROBLEM (YOU MUST UNDERSTAND THIS FIRST)
+Current broken behavior:
+
+SafePilot returns the same generic response for different questions
+
+Different intents (KYC, payouts, support tickets, fraud, metrics) all produce identical answers
+
+Admin SafePilot behaves like Customer Support SafePilot
+
+Formatting function forces fixed templates (GUARD MODE, SUMMARY, etc.) regardless of question
+
+Question intent is not actually driving response logic
+
+This is NOT acceptable.
+
+2️⃣ REQUIRED ARCHITECTURE (DO NOT DEVIATE)
+There must be TWO COMPLETELY SEPARATE SAFE PILOTS
+A. Admin SafePilot
+
+Location: /admin
+
+Users: ADMIN, SUPER_ADMIN only
+
+Purpose:
+
+Platform metrics
+
+KYC queues
+
+Fraud analysis
+
+Payout anomalies
+
+System health
+
+Risk signals
+
+Must support dynamic, intent-based answers
+
+Must NEVER reuse Customer Support logic
+
+B. Customer Support SafePilot
+
+Location: /admin/support-console
+
+Users: SUPPORT_ADMIN only
+
+Purpose:
+
+Tickets
+
+Refunds
+
+Disputes
+
+User complaints
+
+Must NOT access admin analytics or system metrics
+
+⚠️ These two MUST NOT SHARE:
+
+Prompt templates
+
+Response formatters
+
+Intent routers
+
+Default fallbacks
+
+3️⃣ INTENT-BASED ROUTING (MANDATORY)
+
+You MUST implement real intent detection.
+
+Example intents (Admin):
+
+KYC_QUEUE_STATUS
+
+PAYOUT_ANOMALY_DETECTION
+
+FRAUD_SIGNAL_SUMMARY
+
+PLATFORM_METRICS
+
+DRIVER_RISK_ANALYSIS
+
+CUSTOM_DATE_RANGE_QUERY
+
+Each intent must:
+
+Be detected from the actual question
+
+Trigger a different data path
+
+Produce a different response structure
+
+❌ One template response for all questions is forbidden.
+
+4️⃣ REMOVE BROKEN RESPONSE FORMATTING
+You MUST fix this issue:
+
+formatVision2030Response (or equivalent) is forcing identical headers
+
+GUARD MODE / SUMMARY appears even when not relevant
+
+Required fix:
+
+Response formatting must be:
+
+Intent-specific
+
+Minimal
+
+Professional
+
+Only include sections that are relevant to the detected intent
+
+Example:
+
+Fraud query → Fraud summary only
+
+KYC query → KYC buckets only
+
+Payout query → Payout anomalies only
+
+5️⃣ SAFE PILOT SETTINGS (ADMIN ONLY)
+
+Implement these settings toggles (logic only, UI already exists):
+
+Enable Intent Debug (on/off)
+
+Response Verbosity: Compact / Detailed
+
+Auto-Follow-up Questions (on/off)
+
+Show Data Sources (admin only)
+
+Allow Cross-Module Queries (admin only)
+
+Reset Conversation Context
+
+⚠️ Settings must NOT affect Customer Support SafePilot.
+
+6️⃣ VALIDATION RULES (CRITICAL)
+
+Before finishing, you MUST manually verify:
+
+Ask 3 different admin questions
+
+KYC
+
+Payout
+
+Fraud
+→ Each response must be clearly different
+
+Ask same question twice
+→ Responses must not be copy-pasted templates
+
+Ask admin-level question inside support console
+→ Must be blocked
+
+Ask support question in admin SafePilot
+→ Must redirect or refuse
+
+7️⃣ OUTPUT REQUIREMENTS
+
+When done, you must provide:
+
+✅ List of files changed
+
+✅ What logic was fixed
+
+✅ Proof that responses are intent-based
+
+❌ Do NOT say “looks good” without proof
+
+🚫 ABSOLUTE RULES
+
+Do NOT add demo text
+
+Do NOT fake data
+
+Do NOT simplify logic
+
+Do NOT touch unrelated UI
+
+Do NOT merge admin & support logic
+
+Do NOT leave hardcoded responses
+
+FINAL GOAL (NON-NEGOTIABLE)
+
+SafePilot must behave like a real enterprise AI assistant, not a scripted chatbot.
+
+If different questions still produce the same answer, the task is FAILED.
