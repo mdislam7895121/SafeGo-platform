@@ -1,0 +1,223 @@
+Objective
+
+SafePilot-কে প্রফেশনাল, প্রশ্নভিত্তিক (question-specific), non-repetitive বানাতে হবে।
+একই প্রশ্নে যেন একই generic রিপোর্ট না আসে।
+Admin SafePilot এবং Customer Support SafePilot পুরোপুরি আলাদা থাকতে হবে।
+
+🔒 1. Role Separation (MANDATORY)
+A. Admin SafePilot
+
+শুধু Admin panel থেকে কাজ করবে
+
+Access scope:
+
+Drivers
+
+KYC approvals
+
+Fraud & risk
+
+Payouts
+
+Platform metrics
+
+Security & audit logs
+
+Customer support data একদম ব্যবহার করবে না
+
+B. Customer Support SafePilot
+
+শুধু customer tickets, complaints, refunds, chat history
+
+Admin analytics / fraud / payout প্রশ্নের উত্তর দেবে না
+
+👉 কোডে mode = "admin" | "support" স্পষ্টভাবে enforce করতে হবে
+👉 Wrong mode → hard reject + clear message
+
+🧠 2. Intent-Based Response Engine (CORE FIX)
+
+বর্তমান সমস্যা:
+সব প্রশ্নে একই ধরনের output (morning report, guard mode, security summary)
+
+Fix করতে হবে:
+
+প্রথমে প্রশ্ন থেকে intent detect করতে হবে, তারপর সেই intent অনুযায়ী আলাদা handler call হবে।
+
+Required intents (minimum):
+
+driver_count
+
+driver_pending_kyc
+
+driver_improvement_advice
+
+fraud_status
+
+payout_anomaly
+
+customer_tickets
+
+security_events
+
+platform_health
+
+generic_help
+
+👉 একটি intent = একটি response structure
+👉 কোনো global formatter দিয়ে সব response বানানো যাবে না
+
+🛑 3. STOP Global Formatting Bug
+Current Bug
+
+formatVision2030Response() বা equivalent function:
+
+সব response-এ একই header ঢুকাচ্ছে
+
+[GUARD MODE], Security Status, Morning Report সবখানে দেখাচ্ছে
+
+Fix (MANDATORY):
+
+এই function delete বা split করতে হবে
+
+Per-intent formatter বানাতে হবে, যেমন:
+
+formatDriverStats()
+
+formatFraudSummary()
+
+formatPayoutAnomalies()
+
+এক formatter দিয়ে সব response বানানো পুরোপুরি নিষিদ্ধ
+
+🧾 4. Question → Exact Answer Rule
+Example Rules:
+
+Question: how many drivers are pending
+
+❌ Full driver report
+
+❌ Morning report
+
+✅ Direct answer:
+
+“2 drivers are currently pending verification.”
+
+Question: how do I improve drivers
+
+❌ Driver stats table
+
+❌ Counts
+
+✅ Actionable advice only
+
+👉 Question যদি WHY / HOW হয় → advice
+👉 Question যদি HOW MANY / STATUS হয় → numbers only
+
+🎨 5. Professional UI Output Rules
+Response style:
+
+No emojis
+
+No marketing tone
+
+No repeated sections
+
+Short headings only if needed
+
+Prefer bullet points over paragraphs
+
+One screen = one purpose
+
+Remove permanently:
+
+“Morning report”
+
+“Guard mode”
+
+“Security status” unless explicitly asked
+
+⚙️ 6. SafePilot Settings Button – What It Controls
+
+Settings panel-এ নিচের option গুলো থাকতে হবে (Admin only):
+
+A. Response Behavior
+
+Toggle: Concise mode (short answers)
+
+Toggle: Detailed mode
+
+Toggle: Auto-suggest follow-ups
+
+B. Scope Control
+
+Checkbox:
+
+Drivers
+
+KYC
+
+Fraud
+
+Payouts
+
+Security
+
+Disabled scope → SafePilot সেই বিষয়ে উত্তর দেবে না
+
+C. Data Window
+
+Last 24h
+
+Last 7 days
+
+Custom range
+
+D. Safety & Control
+
+Disable sensitive fields
+
+Mask PII
+
+Read-only mode
+
+🧪 7. Mandatory Testing Checklist
+
+Agent MUST test these exact questions:
+
+how many drivers are pending
+
+how do i improve drivers
+
+show payout anomalies
+
+any fraud alerts today
+
+how many support tickets today
+
+Expected result:
+
+সব প্রশ্নে ভিন্ন output
+
+কোনো duplicate layout না
+
+কোনো unrelated section না
+
+⛔ 8. Hard Rules (Do Not Break)
+
+❌ One formatter for all responses
+
+❌ Admin model answering support questions
+
+❌ Support model answering admin analytics
+
+❌ Same response layout for different questions
+
+✅ Final Deliverable
+
+Agent কাজ শেষ করলে নিশ্চিত করবে:
+
+SafePilot behaves like a real enterprise admin assistant
+
+Same question ≠ same generic report
+
+UI looks clean, calm, executive-ready
