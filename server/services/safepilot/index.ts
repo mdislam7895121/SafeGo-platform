@@ -27,3 +27,5 @@ export { searchKB, getDocumentById, createDocumentWithEmbeddings, reembedDocumen
 export { safepilotChat, getConversationHistory, getUserConversations } from "./chatHandler";
 export type { ChatRequest, ChatResponse } from "./chatHandler";
 export { getAuditLogs, logAdminAction, getAuditStats } from "./auditService";
+export { executeTool, getRideStatus, getOrderStatus, getDeliveryStatus, getVerificationStatus, getWalletBalance } from "./tools";
+export type { ToolContext, ToolResult, ToolName } from "./tools";
