@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
-import safepilotLogoPath from "@assets/safepilot/logo.jpeg";
+import safepilotIconSvg from "@/assets/safepilot/safepilot-icon.svg";
 
 interface SafePilotLogoProps {
   variant?: 'icon' | 'full' | 'app-icon';
@@ -32,7 +32,7 @@ export function SafePilotIcon({
   
   return (
     <img 
-      src={safepilotLogoPath}
+      src={safepilotIconSvg}
       alt="SafePilot"
       width={dimensions}
       height={dimensions}
@@ -58,7 +58,7 @@ export function SafePilotLogoFull({
   return (
     <div className={cn("flex items-center gap-3", className)}>
       <img 
-        src={safepilotLogoPath}
+        src={safepilotIconSvg}
         alt="SafePilot"
         width={iconSize}
         height={iconSize}
@@ -88,7 +88,7 @@ export function SafePilotAppIcon({
       style={{ width: dimensions, height: dimensions }}
     >
       <img 
-        src={safepilotLogoPath}
+        src={safepilotIconSvg}
         alt="SafePilot"
         className="object-contain"
         style={{ width: dimensions * 0.8, height: dimensions * 0.8 }}
@@ -117,7 +117,7 @@ export const SafePilotSidebarIcon = forwardRef<HTMLImageElement, LucideCompatibl
   ({ className, size = 20, ...props }, ref) => (
     <img 
       ref={ref}
-      src={safepilotLogoPath}
+      src={safepilotIconSvg}
       alt="SafePilot"
       className={cn("flex-shrink-0 object-contain", className)}
       style={{ 
