@@ -52,3 +52,67 @@ export async function chatCompletion(
 
   return response.choices[0]?.message?.content || "";
 }
+
+export interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, { type: string; description: string }>;
+      required?: string[];
+    };
+  };
+}
+
+export interface ToolCallResult {
+  finishReason: "stop" | "tool_calls" | "length" | "content_filter";
+  content: string | null;
+  toolCalls: Array<{
+    id: string;
+    name: string;
+    arguments: string;
+  }>;
+}
+
+export async function chatCompletionWithTools(
+  messages: Array<{
+    role: "system" | "user" | "assistant" | "tool";
+    content: string | null;
+    tool_call_id?: string;
+    tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+  }>,
+  tools: ToolDefinition[],
+  options?: { maxTokens?: number }
+): Promise<ToolCallResult> {
+  const response = await openai.chat.completions.create({
+    model: SAFEPILOT_MODEL,
+    messages: messages as any,
+    tools: tools.length > 0 ? tools : undefined,
+    tool_choice: tools.length > 0 ? "auto" : undefined,
+    max_completion_tokens: options?.maxTokens ?? 2048,
+  });
+
+  const choice = response.choices[0];
+  const message = choice.message;
+
+  const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+  if (message.tool_calls) {
+    for (const tc of message.tool_calls) {
+      if ("function" in tc && tc.function) {
+        toolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          arguments: tc.function.arguments,
+        });
+      }
+    }
+  }
+
+  return {
+    finishReason: choice.finish_reason as ToolCallResult["finishReason"],
+    content: message.content,
+    toolCalls,
+  };
+}

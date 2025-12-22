@@ -494,4 +494,188 @@ router.post("/demo/rag-flow", async (req: AuthRequest, res) => {
   }
 });
 
+router.post("/demo/full-execution", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required for execution demo" });
+    }
+
+    const { query, simulateRole, simulateCountry } = req.body;
+    if (!query || typeof query !== "string") {
+      return res.status(400).json({ error: "query string is required" });
+    }
+
+    const testRole = (simulateRole || "DRIVER") as "CUSTOMER" | "DRIVER" | "RESTAURANT" | "ADMIN";
+    const testCountry = (simulateCountry || "BD") as "BD" | "US" | "GLOBAL";
+
+    const executionLog: any = {
+      step1_input: { query, role: testRole, country: testCountry, userId: req.user.id },
+      step2_inputModeration: null,
+      step3_kbSearch: null,
+      step4_toolDefinitions: null,
+      step5_modelCalls: [],
+      step6_toolExecutions: [],
+      step7_finalResponse: null,
+      step8_auditLogs: null,
+      hallucinationPrevention: null,
+    };
+
+    const { moderateText: moderate, chatCompletionWithTools: chatWithTools } = await import("../services/safepilot/openaiClient");
+    const { searchKB: kbSearch } = await import("../services/safepilot/kbSearch");
+    const { getToolPermissions, getCountryRules } = await import("../services/safepilot/rbac");
+    const { executeTool: execTool } = await import("../services/safepilot/tools");
+
+    const inputMod = await moderate(query);
+    executionLog.step2_inputModeration = {
+      flagged: inputMod.flagged,
+      passed: !inputMod.flagged,
+    };
+
+    if (inputMod.flagged) {
+      executionLog.hallucinationPrevention = "Input was flagged by moderation - execution stopped.";
+      return res.json(executionLog);
+    }
+
+    const kbResults = await kbSearch({ query, country: testCountry, role: testRole, service: "ALL", limit: 5 });
+    executionLog.step3_kbSearch = {
+      resultsFound: kbResults.length,
+      kbHasContext: kbResults.length > 0,
+      results: kbResults.map((r) => ({
+        title: r.title,
+        similarity: r.similarity.toFixed(4),
+        preview: r.chunkText.substring(0, 100) + "...",
+      })),
+    };
+
+    executionLog.hallucinationPrevention = kbResults.length > 0
+      ? "KB context found - model will be grounded on this context."
+      : "NO KB context found - system prompt instructs model to NOT make up policies and recommend contacting SafeGo Support.";
+
+    const permissions = getToolPermissions(testRole);
+    const countryRules = getCountryRules(testCountry);
+
+    const tools: any[] = [];
+    if (permissions.allowedTools.includes("read_ride_status")) {
+      tools.push({ type: "function", function: { name: "get_ride_status", description: "Get ride status", parameters: { type: "object", properties: {} } } });
+    }
+    if (permissions.allowedTools.includes("read_verification_status")) {
+      tools.push({ type: "function", function: { name: "get_verification_status", description: "Get verification status", parameters: { type: "object", properties: {} } } });
+    }
+    if (permissions.allowedTools.includes("read_wallet")) {
+      tools.push({ type: "function", function: { name: "get_wallet_balance", description: "Get wallet balance", parameters: { type: "object", properties: {} } } });
+    }
+
+    executionLog.step4_toolDefinitions = {
+      rolePermissions: permissions.allowedTools,
+      toolsRegistered: tools.map((t) => t.function.name),
+      rbacEnforcement: `Role ${testRole} has access to: ${permissions.allowedTools.join(", ")}`,
+    };
+
+    const kbContext = kbResults.length > 0
+      ? kbResults.map((r, i) => `[Source ${i + 1}: ${r.title}]\n${r.chunkText}`).join("\n\n---\n\n")
+      : "";
+
+    const systemPrompt = `You are SafePilot, the in-app AI assistant for SafeGo.
+${kbResults.length === 0 ? "CRITICAL: No knowledge base context available. DO NOT make up policies or procedures. If you don't know, say so and recommend contacting SafeGo Support." : `Knowledge Base Context:\n${kbContext}`}
+Country: ${testCountry}, Currency: ${countryRules.currency}
+User role: ${testRole}
+Use tools to get user's real data when needed.`;
+
+    type MsgType = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_call_id?: string; tool_calls?: any[] };
+    const messages: MsgType[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: query },
+    ];
+
+    let finalAnswer = "";
+    let iteration = 0;
+
+    while (iteration < 3) {
+      iteration++;
+      const result = await chatWithTools(messages, tools, { maxTokens: 1024 });
+
+      executionLog.step5_modelCalls.push({
+        iteration,
+        finishReason: result.finishReason,
+        hasToolCalls: result.toolCalls.length > 0,
+        toolCallsRequested: result.toolCalls.map((tc) => tc.name),
+        contentPreview: result.content?.substring(0, 200) || null,
+      });
+
+      if (result.finishReason === "tool_calls" && result.toolCalls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: result.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: "function",
+            function: { name: tc.name, arguments: tc.arguments },
+          })),
+        });
+
+        for (const tc of result.toolCalls) {
+          const args = JSON.parse(tc.arguments || "{}");
+          const toolResult = await execTool(tc.name as any, { userId: req.user.id, role: testRole, country: testCountry }, args);
+
+          executionLog.step6_toolExecutions.push({
+            tool: tc.name,
+            args,
+            success: toolResult.success,
+            source: toolResult.source,
+            rbacDenied: toolResult.source === "rbac_check" && !toolResult.success,
+            dataPreview: toolResult.success ? JSON.stringify(toolResult.data).substring(0, 200) : toolResult.error,
+          });
+
+          messages.push({
+            role: "tool",
+            content: JSON.stringify(toolResult.success ? toolResult.data : { error: toolResult.error, rbac_denied: true }),
+            tool_call_id: tc.id,
+          });
+
+          await prisma.safePilotAuditLog.create({
+            data: {
+              actorUserId: req.user.id,
+              actorRole: testRole,
+              action: "tool_call",
+              metadata: { tool: tc.name, args, success: toolResult.success, source: toolResult.source, demo: true },
+            },
+          });
+        }
+      } else {
+        finalAnswer = result.content || "Could not generate response.";
+        break;
+      }
+    }
+
+    executionLog.step7_finalResponse = {
+      answer: finalAnswer,
+      wasGrounded: kbResults.length > 0 || executionLog.step6_toolExecutions.length > 0,
+      groundingSources: kbResults.length > 0 ? "KB documents" : executionLog.step6_toolExecutions.length > 0 ? "Tool results" : "None - may contain general knowledge only",
+    };
+
+    const auditCount = await prisma.safePilotAuditLog.count({
+      where: {
+        actorUserId: req.user.id,
+        createdAt: { gte: new Date(Date.now() - 60000) },
+      },
+    });
+
+    executionLog.step8_auditLogs = {
+      logsCreatedInLastMinute: auditCount,
+      auditTableUsed: "safepilot_audit_logs",
+      insertStatement: `prisma.safePilotAuditLog.create({ data: { actorUserId, actorRole, action, metadata } })`,
+    };
+
+    res.json(executionLog);
+  } catch (error) {
+    console.error("[SafePilot] Full execution demo error:", error);
+    res.status(500).json({ error: "Failed to run full execution demo", details: String(error) });
+  }
+});
+
 export default router;
