@@ -1,0 +1,558 @@
+SAFEGO / SAFEPILOT — MASTER PROMPT (COPY-PASTE FOR AGENT)
+Version: Additive-only, non-breaking. Works for BD + US. Covers Ride + Food + Parcel. Includes all 4 roles.
+
+========================================================
+0) ABSOLUTE RULES (DO NOT VIOLATE)
+========================================================
+A) Roles (must include ALL 4, never mix access):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role MUST have:
+- signup requirements
+- KYC/verification rules
+- dashboard
+- permissions
+- status flows
+
+B) Services (must include ALL 3, always):
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+
+C) Country-specific onboarding & KYC (must branch by country):
+Supported countries now: BD, US
+
+BANGLADESH (BD) mandatory KYC fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID (number + front/back images)
+- emergency contact details
+- verification_status + is_verified
+
+UNITED STATES (US) mandatory KYC fields:
+- date_of_birth
+- home_address
+- emergency contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified
+
+D) Admin panel (mandatory capabilities):
+- verify customers/drivers/restaurants
+- approve/reject KYC, store rejection_reason
+- update pricing, fees, commissions
+- block/unblock any user
+- manage payouts
+- view driver negative balance
+- view restaurant negative balance
+
+E) Mandatory collections (must exist and remain compatible):
+1) rides
+2) food_orders
+3) deliveries
+
+Each MUST include:
+- identity fields (customer_id, driver_id, restaurant_id when relevant)
+- addresses + geolocation
+- fees + commission
+- payment details
+- timestamps
+- complete status flow
+- rating + feedback
+
+F) Commission & payout rules (must implement):
+1) If customer pays CASH (ride):
+   - Driver receives full cash
+   - SafeGo commission becomes negative balance in driver_wallet_balance
+   - Driver settles weekly
+2) If food order is CASH:
+   - Restaurant gets all cash
+   - Commission becomes negative balance in restaurant_wallet_balance
+3) If payment is online:
+   - SafeGo keeps commission automatically
+4) Admin can settle balances and mark paid.
+
+G) Security rules (mandatory):
+- Customers cannot view driver documents (NID, license)
+- Drivers cannot view customer NID/sensitive info
+- Restaurant cannot view other restaurants
+- Only admin can change pricing/commission/verification/blocking
+- Users can update only their own profile
+
+H) Status flows (must be complete):
+Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+I) Onboarding (multi-step, must block until approved):
+- Basic info → Address → ID/KYC upload (country-specific) → Emergency contact
+- verification_status="pending"
+- block access until admin approval
+
+J) Notifications (must add):
+- New ride alert for driver
+- Order updates
+- Parcel updates
+- Verification approval/rejection
+- Important admin notifications
+
+========================================================
+1) TASK: BUILD “SAFEPILOT” AI SUPPORT + VERIFICATION SYSTEM (CODE INCLUDED)
+========================================================
+Goal:
+Create a production-grade AI assistant called “SafePilot” that can answer user questions inside the SafeGo app for ALL roles and ALL 3 services, using the best practical stack:
+- RAG (docs + policies + FAQs + status/rules)
+- Tool-based backend access (read-only where appropriate)
+- Mandatory safety + privacy controls
+- Admin-managed knowledge base + audit logs
+- Country-aware responses (BD vs US rules)
+- Role-aware answers (Customer/Driver/Restaurant/Admin)
+- Must not break existing APIs/routes/schemas: ADD ONLY.
+
+Important security:
+- Never expose driver documents to customers
+- Never expose customer NID/government IDs to drivers/restaurants
+- Always enforce RBAC on every tool call
+- Log every AI answer with who/when/what sources were used
+
+Model/API guidance (server-only keys):
+- Use OpenAI API via Bearer key in server env (never in client). (https://platform.openai.com/docs/api-reference/introduction) 
+- Use Moderation endpoint for input/output safety checks. (https://platform.openai.com/docs/guides/moderation)
+- Use Embeddings for vector search. (https://platform.openai.com/docs/api-reference/embeddings)
+
+========================================================
+2) DATA MODEL (ADD NEW TABLES/COLLECTIONS ONLY)
+========================================================
+Add these tables (or Mongo collections), do not alter existing ones.
+
+A) safepilot_kb_documents
+- id (uuid)
+- title (string)
+- body (text)
+- tags (string[])
+- country_scope (enum: "GLOBAL"|"BD"|"US")
+- role_scope (enum: "ALL"|"CUSTOMER"|"DRIVER"|"RESTAURANT"|"ADMIN")
+- service_scope (enum: "ALL"|"RIDE"|"FOOD"|"PARCEL")
+- source (string: "admin_upload"|"policy"|"faq"|"runbook")
+- version (int)
+- is_active (bool)
+- created_by_admin_id (uuid)
+- created_at, updated_at
+
+B) safepilot_kb_embeddings
+- id (uuid)
+- document_id (uuid fk)
+- chunk_index (int)
+- chunk_text (text)
+- embedding (vector)
+- created_at
+
+C) safepilot_conversations
+- id (uuid)
+- user_id (uuid)
+- user_role (enum)
+- country (enum "BD"|"US")
+- last_seen_at
+- created_at
+
+D) safepilot_messages
+- id (uuid)
+- conversation_id (uuid)
+- direction (enum: "user"|"assistant")
+- content (text)
+- moderation_flags (json)
+- sources (json: doc_ids + chunk refs)
+- created_at
+
+E) safepilot_audit_logs
+- id (uuid)
+- actor_user_id (uuid)
+- actor_role (enum)
+- action (string: "ask"|"answer"|"tool_call"|"kb_upload"|"kb_disable"|"kb_reembed")
+- metadata (json)
+- created_at
+
+========================================================
+3) BACKEND APIS (ADD NEW ROUTES ONLY)
+========================================================
+Base path: /api/safepilot
+
+1) POST /api/safepilot/chat
+Request:
+- message (string)
+- country ("BD"|"US")
+- role ("CUSTOMER"|"DRIVER"|"RESTAURANT"|"ADMIN")
+- service_context ("RIDE"|"FOOD"|"PARCEL"|"ALL")
+- conversation_id (optional)
+
+Response:
+- reply (string)
+- conversation_id
+- sources (safe: titles + doc ids, no hidden data)
+- suggested_actions (optional)
+
+2) Admin-only:
+- POST /api/safepilot/kb/upload (title, body, scopes, tags)
+- POST /api/safepilot/kb/reembed (rebuild embeddings)
+- PATCH /api/safepilot/kb/:id (enable/disable, version bump)
+- GET /api/safepilot/kb/list
+- GET /api/safepilot/audit (filters)
+
+3) Notifications:
+- When KYC approved/rejected: send notification + SafePilot “what next” help message pointer.
+
+========================================================
+4) RBAC + PRIVACY FILTER (MANDATORY)
+========================================================
+Before any answer:
+- Determine user_role + country + service_context
+- Filter retrievable documents by:
+  - is_active=true
+  - (country_scope == "GLOBAL" OR == user.country)
+  - (role_scope == "ALL" OR == user.role)
+  - (service_scope == "ALL" OR == service_context)
+- Tool permissions:
+  - Customer: may read own ride/order/delivery status only; never documents
+  - Driver: may read assigned jobs + own wallet; never customer IDs/docs
+  - Restaurant: may read own orders + own wallet; never other restaurants
+  - Admin: may read all + manage KB
+
+========================================================
+5) IMPLEMENTATION (NODE/EXPRESS + POSTGRES EXAMPLE CODE)
+========================================================
+Assume existing Node/Express backend. Add new folder: src/modules/safepilot
+
+5.1) Install deps (server)
+- openai SDK
+- zod
+- pgvector (or equivalent)
+- multer (if admin uploads)
+- uuid
+
+PowerShell:
+npm i openai zod uuid multer
+npm i -D @types/multer
+
+If Postgres + pgvector:
+- ensure pgvector extension enabled:
+CREATE EXTENSION IF NOT EXISTS vector;
+
+5.2) Env vars
+OPENAI_API_KEY=...
+SAFEPILOT_MODEL=gpt-5
+SAFEPILOT_EMBED_MODEL=text-embedding-3-large
+
+(Keep API key server-side only.) (https://platform.openai.com/docs/api-reference/introduction)
+
+5.3) Core code
+
+File: src/modules/safepilot/openaiClient.ts
+------------------------------------------------
+import OpenAI from "openai";
+
+export const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+export const SAFEPILOT_MODEL = process.env.SAFEPILOT_MODEL || "gpt-5";
+export const SAFEPILOT_EMBED_MODEL =
+  process.env.SAFEPILOT_EMBED_MODEL || "text-embedding-3-large";
+
+File: src/modules/safepilot/moderation.ts
+------------------------------------------------
+import { openai } from "./openaiClient";
+
+export async function moderateText(input: string) {
+  const res = await openai.moderations.create({
+    model: "omni-moderation-latest",
+    input,
+  });
+  return res;
+}
+
+File: src/modules/safepilot/rbac.ts
+------------------------------------------------
+export type Role = "CUSTOMER" | "DRIVER" | "RESTAURANT" | "ADMIN";
+export type Country = "BD" | "US";
+export type ServiceScope = "RIDE" | "FOOD" | "PARCEL" | "ALL";
+
+export function canUseAdminKB(role: Role) {
+  return role === "ADMIN";
+}
+
+export function sanitizeSourcesForRole(role: Role, sources: any[]) {
+  // Always safe: titles + doc ids only.
+  return sources.map(s => ({ id: s.id, title: s.title }));
+}
+
+File: src/modules/safepilot/kbSearch.ts
+------------------------------------------------
+import { openai, SAFEPILOT_EMBED_MODEL } from "./openaiClient";
+import { Pool } from "pg";
+import { Country, Role, ServiceScope } from "./rbac";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+export async function embed(text: string) {
+  const r = await openai.embeddings.create({
+    model: SAFEPILOT_EMBED_MODEL,
+    input: text,
+  });
+  return r.data[0].embedding;
+}
+
+// Basic vector search with scope filters
+export async function searchKB(params: {
+  query: string;
+  country: Country;
+  role: Role;
+  service: ServiceScope;
+  limit?: number;
+}) {
+  const qEmbedding = await embed(params.query);
+
+  const limit = params.limit ?? 6;
+
+  // NOTE: requires pgvector and "embedding vector" column
+  const sql = `
+    SELECT d.id, d.title, e.chunk_text
+    FROM safepilot_kb_embeddings e
+    JOIN safepilot_kb_documents d ON d.id = e.document_id
+    WHERE d.is_active = true
+      AND (d.country_scope = 'GLOBAL' OR d.country_scope = $1)
+      AND (d.role_scope = 'ALL' OR d.role_scope = $2)
+      AND (d.service_scope = 'ALL' OR d.service_scope = $3)
+    ORDER BY e.embedding <-> $4
+    LIMIT $5;
+  `;
+
+  const values = [params.country, params.role, params.service, `[${qEmbedding.join(",")}]`, limit];
+  const result = await pool.query(sql, values);
+
+  return result.rows as Array<{ id: string; title: string; chunk_text: string }>;
+}
+
+File: src/modules/safepilot/chatHandler.ts
+------------------------------------------------
+import { openai, SAFEPILOT_MODEL } from "./openaiClient";
+import { moderateText } from "./moderation";
+import { searchKB } from "./kbSearch";
+import { Country, Role, ServiceScope, sanitizeSourcesForRole } from "./rbac";
+import crypto from "crypto";
+
+export async function safepilotChat(input: {
+  message: string;
+  country: Country;
+  role: Role;
+  service: ServiceScope;
+  userId: string;
+}) {
+  // 1) Moderation on user input
+  const modIn = await moderateText(input.message);
+
+  // 2) Retrieve KB context (RAG)
+  const hits = await searchKB({
+    query: input.message,
+    country: input.country,
+    role: input.role,
+    service: input.service,
+    limit: 6,
+  });
+
+  const context = hits
+    .map((h, i) => `Source ${i + 1} (${h.title}):\n${h.chunk_text}`)
+    .join("\n\n");
+
+  // 3) System policy: role + privacy + country rules
+  const system = `
+You are SafePilot, the in-app assistant for SafeGo.
+You MUST follow:
+- Role-based privacy: never reveal driver documents to customers; never reveal customer NID/government IDs to drivers/restaurants; never reveal other restaurants data to a restaurant.
+- Country rules: BD vs US KYC differences; explain steps accordingly.
+- Service scope: Ride/Food/Parcel flows and statuses.
+If the user asks for restricted info, refuse and offer a safe alternative (e.g., how to contact support or where to find allowed info).
+Answer clearly and practically.
+`;
+
+  // 4) Call model (server-side API key; Bearer auth in SDK). (https://platform.openai.com/docs/api-reference/introduction)
+  const safety_identifier = crypto
+    .createHash("sha256")
+    .update(input.userId)
+    .digest("hex"); // recommended stable identifier pattern (https://platform.openai.com/docs/api-reference/responses)
+
+  const resp = await openai.responses.create({
+    model: SAFEPILOT_MODEL,
+    safety_identifier,
+    input: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: `COUNTRY=${input.country}\nROLE=${input.role}\nSERVICE=${input.service}\n\nKB_CONTEXT:\n${context}\n\nUSER_QUESTION:\n${input.message}`,
+      },
+    ],
+  });
+
+  const replyText =
+    resp.output_text || "I couldn't generate a response. Please try again.";
+
+  // 5) Moderation on output (recommended safety layer). (https://platform.openai.com/docs/guides/moderation)
+  const modOut = await moderateText(replyText);
+
+  const safeSources = sanitizeSourcesForRole(input.role, hits);
+
+  return {
+    reply: replyText,
+    moderation: { input: modIn, output: modOut },
+    sources: safeSources,
+  };
+}
+
+File: src/modules/safepilot/routes.ts
+------------------------------------------------
+import { Router } from "express";
+import { z } from "zod";
+import { safepilotChat } from "./chatHandler";
+
+const router = Router();
+
+const ChatSchema = z.object({
+  message: z.string().min(1),
+  country: z.enum(["BD", "US"]),
+  role: z.enum(["CUSTOMER", "DRIVER", "RESTAURANT", "ADMIN"]),
+  service_context: z.enum(["RIDE", "FOOD", "PARCEL", "ALL"]).default("ALL"),
+});
+
+router.post("/chat", async (req, res) => {
+  // Assumes existing auth middleware sets req.user
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const parsed = ChatSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  try {
+    const out = await safepilotChat({
+      message: parsed.data.message,
+      country: parsed.data.country,
+      role: parsed.data.role,
+      service: parsed.data.service_context,
+      userId,
+    });
+
+    return res.json({
+      reply: out.reply,
+      sources: out.sources,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: "SafePilot error", detail: e?.message });
+  }
+});
+
+export default router;
+
+File: src/app.ts (or main router file)
+------------------------------------------------
+import safepilotRoutes from "./modules/safepilot/routes";
+// ...
+app.use("/api/safepilot", safepilotRoutes);
+
+========================================================
+6) FRONTEND (EXPO/REACT NATIVE) — ADD A “SAFEPILOT” HELP ENTRY FOR ALL ROLES
+========================================================
+- Customer: Help tab or button on Ride/Food/Parcel screens
+- Driver: Help in driver dashboard
+- Restaurant: Help in merchant dashboard
+- Admin: Help + KB management UI (web/admin)
+
+Example (React Native) screen:
+File: app/safepilot/index.tsx
+------------------------------------------------
+import React, { useState } from "react";
+import { SafeAreaView, TextInput, Pressable, Text, View, ScrollView } from "react-native";
+
+export default function SafePilotScreen() {
+  const [q, setQ] = useState("");
+  const [a, setA] = useState("");
+
+  async function ask() {
+    const r = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/safepilot/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        message: q,
+        country: "US",
+        role: "CUSTOMER",
+        service_context: "ALL",
+      }),
+    });
+    const j = await r.json();
+    setA(j.reply || JSON.stringify(j));
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1, padding: 16 }}>
+      <Text style={{ fontSize: 20, fontWeight: "600" }}>SafePilot</Text>
+
+      <TextInput
+        value={q}
+        onChangeText={setQ}
+        placeholder="Ask anything about rides, orders, deliveries, verification…"
+        style={{ borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 }}
+      />
+
+      <Pressable onPress={ask} style={{ padding: 12, borderRadius: 12, borderWidth: 1, marginTop: 12 }}>
+        <Text style={{ textAlign: "center", fontWeight: "600" }}>Ask</Text>
+      </Pressable>
+
+      <ScrollView style={{ marginTop: 12 }}>
+        <Text style={{ fontSize: 16, lineHeight: 22 }}>{a}</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+========================================================
+7) ADMIN KB MANAGEMENT (MINIMUM DEMO-READY)
+========================================================
+- Admin can upload a document (title/body/scopes/tags)
+- System chunks + embeds text
+- Admin can disable docs and re-embed
+- Show audit logs
+
+========================================================
+8) DEMO DATA (MUST INCLUDE)
+========================================================
+Seed KB docs:
+- Ride status flow explanation
+- Food status flow explanation
+- Parcel status flow explanation
+- Commission rules (cash vs online)
+- BD KYC step-by-step
+- US KYC step-by-step
+- Privacy rules (what cannot be shared)
+- Admin verification workflow
+
+========================================================
+9) NON-BREAKING GUARANTEE (MANDATORY)
+========================================================
+- Do NOT rename/remove any existing fields, APIs, routes, or UI screens
+- Only ADD new tables/collections and new routes under /api/safepilot
+- Any UI changes are additive: new SafePilot screen + new navigation link only
+
+Deliverables:
+- Backend routes + services + moderation + embeddings
+- DB migrations (add new tables only)
+- Admin KB minimal UI or endpoints
+- Expo screen + navigation entry
+- Seed script for demo KB
+- Audit logging on every ask/answer
+
+END OF PROMPT
