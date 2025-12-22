@@ -59,3 +59,26 @@ The customer ride booking flow uses Google Maps for crisp map tiles and route vi
 - Dual-stroke route polyline (7px white outline, 4px #1DA1F2 blue)
 - Green pickup marker, red dropoff marker
 - Auto-fits bounds to include markers and route
+
+## SafePilot AI Assistants
+
+The platform features two separate RAG-based AI assistants with strict role-based access control:
+
+### Admin SafePilot (ADMIN role only)
+- **Endpoint**: `/api/admin/safepilot/query`
+- **Component**: `client/src/components/safepilot/admin/AdminSafePilotPanel.tsx`
+- **Theme**: Blue color scheme
+- **Location**: Embedded in admin dashboard home page (`/admin/home`)
+- **Capabilities**: Platform metrics, KPIs, verification queues, risk analysis, revenue data
+
+### Support SafePilot (SUPPORT_ADMIN role only)
+- **Endpoint**: `/api/support/safepilot/query`
+- **Component**: `client/src/components/safepilot/support/SupportSafePilotPanel.tsx`
+- **Theme**: Green color scheme
+- **Location**: Embedded in support console page (`/admin/support-console`)
+- **Capabilities**: Customer issues, tickets, refunds, disputes, escalation handling
+
+### Domain Separation
+- Each assistant has dedicated backend endpoints with strict role guards
+- Admin queries redirect to Support if support-related, and vice versa
+- Original floating SafePilotButton disabled on pages with embedded panels
