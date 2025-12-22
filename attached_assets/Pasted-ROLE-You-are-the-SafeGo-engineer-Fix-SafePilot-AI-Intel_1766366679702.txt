@@ -1,0 +1,67 @@
+ROLE: You are the SafeGo engineer. Fix SafePilot (AI Intelligence Engine) so Intel/Context/Chat/Optimize all work, not just Scan.
+
+GOAL (WHAT’S BROKEN):
+- SafePilot modal opens but Intel/Context/Chat tabs show blank.
+- Only pressing “Scan” changes UI (e.g., Health 50%, 1 findings).
+- Optimize does not show actionable items.
+- Tabs likely not connected to backend routes / websocket / state management.
+
+REQUIREMENTS:
+1) Make SafePilot fully functional end-to-end:
+   - Intel: show security intel summary (fraud, KYC risk, driver anomalies, device signals). 
+   - Context: show current platform context (country, active modules, recent alerts, system health).
+   - Chat: user can ask questions; show assistant responses with citations from internal data (not web).
+   - Scan: runs a scan and returns findings; show severity, recommendation, and “Apply fix” (if admin action exists).
+   - Optimize: show prioritized improvements (performance/security/config) based on scan + context.
+
+2) Strong UX:
+   - Each tab must show loading state, empty state, and error state.
+   - If API fails, show clear error + “Retry”.
+   - Preserve current UI layout; don’t refactor unrelated parts.
+
+3) Backend + API:
+   - Create/verify these endpoints (or equivalent):
+     GET  /api/safepilot/context
+     GET  /api/safepilot/intel
+     POST /api/safepilot/scan
+     POST /api/safepilot/optimize
+     POST /api/safepilot/chat
+   - Return consistent JSON shape:
+     { ok: true, data: ..., meta: { generatedAt, requestId } }
+     On error: { ok:false, error:{ code, message } }
+
+4) Frontend wiring:
+   - On tab click, fetch corresponding endpoint.
+   - Cache responses per tab in state to avoid repeated calls.
+   - “Scan” button calls /scan and updates:
+     - healthScore (0–100)
+     - findings[] (id, title, severity, evidence, fix)
+   - “Optimize” uses scan+context and returns actionable items.
+
+5) Fix “reconnecting” / stuck loading:
+   - Check browser devtools console + network:
+     - Any 401/403 (auth), 404 (missing routes), 500 (server crash), CORS blocked.
+   - If websocket is used, ensure correct WS URL and fallback to HTTP polling.
+
+6) SafePilot logo bug:
+   - The icon has a black square background.
+   - Make it transparent:
+     - Replace asset with transparent PNG/SVG OR
+     - CSS: background: transparent; remove any wrapper background color.
+   - Ensure it looks clean on light/dark themes.
+
+DELIVERABLES:
+A) Working SafePilot modal where all tabs show real data.
+B) Backend routes added + tested (include curl examples).
+C) UI shows “Health %, Findings count” after scan AND list findings.
+D) A short “How to verify” checklist:
+   - Open Admin > SafePilot
+   - Click Intel/Context/Chat/Optimize
+   - Run Scan
+   - Confirm network responses 200 and UI renders.
+E) Commit message.
+
+DO NOT:
+- Do not change unrelated ride/landing pages.
+- Do not remove existing admin features.
+- Keep changes minimal and non-breaking.

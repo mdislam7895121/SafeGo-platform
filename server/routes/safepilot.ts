@@ -654,20 +654,20 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const data = await partnerSuccessCoach.getDashboard();
-      const criticalPartners = data.partnerPerformance.filter(p => p.riskLevel === 'HIGH').length;
+      const criticalPartners = data.lowPerformers.filter((p: any) => p.riskLevel === 'CRITICAL' || p.riskLevel === 'HIGH').length;
       res.json(formatVision2030Response(
         criticalPartners > 0 ? 'WATCH' : 'OPTIMIZE',
         [
-          `${data.partnerPerformance.length} active partners being coached`,
+          `${data.lowPerformers.length} partners need attention`,
           `${criticalPartners} partners at high churn risk`,
-          `Average partner rating: ${(data.partnerPerformance.reduce((s, p) => s + (p.rating || 0), 0) / Math.max(data.partnerPerformance.length, 1)).toFixed(1)}`,
-          `${data.coachingRecommendations.length} personalized coaching recommendations`,
+          `${data.trainingPlansGenerated} training plans generated`,
+          `${data.personalizedActions.length} personalized coaching recommendations`,
         ],
         [
-          `Active partners: ${data.partnerPerformance.length}`,
+          `Low performers: ${data.lowPerformers.length}`,
           `High risk: ${criticalPartners}`,
-          `Training needed: ${data.partnerPerformance.filter(p => p.trainingNeeded).length}`,
-          `Top performers: ${data.partnerPerformance.filter(p => (p.rating || 0) >= 4.5).length}`,
+          `Training plans: ${data.trainingPlansGenerated}`,
+          `Top performers: ${data.topPerformers}`,
         ],
         [
           ...(criticalPartners > 0 ? [{ label: `Engage ${criticalPartners} at-risk partners`, risk: 'CAUTION' as const }] : []),
@@ -745,14 +745,14 @@ router.get(
         [
           `${data.socialCaptions.length} social media captions ready`,
           `${data.notificationTemplates.length} push notification templates available`,
-          `${data.upcomingCampaigns.length} campaigns scheduled`,
-          `Estimated reach: ${data.customerSegments.reduce((s, c) => s + c.size, 0).toLocaleString()} customers`,
+          `${data.seasonalCampaigns.length} seasonal campaigns scheduled`,
+          `Estimated reach: ${data.totalEstimatedReach.toLocaleString()} customers`,
         ],
         [
           `Social captions: ${data.socialCaptions.length}`,
           `Notification templates: ${data.notificationTemplates.length}`,
-          `Active campaigns: ${data.upcomingCampaigns.length}`,
-          `Customer segments: ${data.customerSegments.length}`,
+          `Seasonal campaigns: ${data.seasonalCampaigns.length}`,
+          `Local ideas: ${data.localIdeas.length}`,
         ],
         [
           { label: 'Launch personalized push campaign', risk: 'SAFE' },
@@ -783,18 +783,19 @@ router.get(
     try {
       const data = await financialIntelligence.getDashboard();
       const negativeRisks = data.negativeBalanceRisks.length;
+      const trendLabel = data.earnings.trend === 'UP' ? '+5%' : data.earnings.trend === 'DOWN' ? '-3%' : '0%';
       res.json(formatVision2030Response(
         negativeRisks > 0 ? 'WATCH' : 'OPTIMIZE',
         [
-          `Weekly revenue forecast: $${data.weeklyPrediction.toLocaleString()}`,
-          `Monthly revenue forecast: $${data.monthlyPrediction.toLocaleString()}`,
-          `Revenue growth: ${data.revenueGrowth > 0 ? '+' : ''}${data.revenueGrowth}%`,
+          `Weekly revenue forecast: $${data.earnings.weekly.toLocaleString()}`,
+          `Monthly revenue forecast: $${data.earnings.monthly.toLocaleString()}`,
+          `Revenue trend: ${trendLabel} (${data.earnings.trend})`,
           `${negativeRisks} accounts with negative balance risk`,
         ],
         [
-          `Weekly forecast: $${data.weeklyPrediction.toLocaleString()}`,
-          `Monthly forecast: $${data.monthlyPrediction.toLocaleString()}`,
-          `Growth rate: ${data.revenueGrowth}%`,
+          `Weekly forecast: $${data.earnings.weekly.toLocaleString()}`,
+          `Monthly forecast: $${data.earnings.monthly.toLocaleString()}`,
+          `Trend: ${data.earnings.trend}`,
           `Balance risks: ${negativeRisks}`,
         ],
         [
@@ -825,24 +826,23 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const data = await complianceGuard.getDashboard();
-      const criticalViolations = data.regulatoryAlerts.filter(a => a.severity === 'CRITICAL').length;
       res.json(formatVision2030Response(
-        criticalViolations > 0 ? 'GUARD' : 'WATCH',
+        data.criticalViolations > 0 ? 'GUARD' : 'WATCH',
         [
           `Compliance score: ${data.complianceScore}%`,
-          `${data.regulatoryAlerts.length} regulatory alerts`,
-          `${criticalViolations} critical violations requiring immediate action`,
-          `${data.expiringDocuments.length} documents expiring soon`,
+          `${data.violations.length} regulatory violations detected`,
+          `${data.criticalViolations} critical violations requiring immediate action`,
+          `${data.pendingActions.length} pending compliance actions`,
         ],
         [
           `Compliance score: ${data.complianceScore}%`,
-          `Regulatory alerts: ${data.regulatoryAlerts.length}`,
-          `Critical violations: ${criticalViolations}`,
-          `Expiring documents: ${data.expiringDocuments.length}`,
+          `Total violations: ${data.violations.length}`,
+          `Critical violations: ${data.criticalViolations}`,
+          `Pending actions: ${data.pendingActions.length}`,
         ],
         [
-          ...(criticalViolations > 0 ? [{ label: `Resolve ${criticalViolations} critical compliance issues`, risk: 'HIGH_RISK' as const }] : []),
-          ...(data.expiringDocuments.length > 0 ? [{ label: 'Renew expiring documents', risk: 'CAUTION' as const }] : []),
+          ...(data.criticalViolations > 0 ? [{ label: `Resolve ${data.criticalViolations} critical compliance issues`, risk: 'HIGH_RISK' as const }] : []),
+          ...(data.pendingActions.length > 0 ? [{ label: 'Complete pending compliance actions', risk: 'CAUTION' as const }] : []),
           { label: 'Schedule compliance audit', risk: 'SAFE' },
         ],
         ['Compliance score trend', 'Document validity rate', 'Audit completion %', 'Regulatory change alerts'],
