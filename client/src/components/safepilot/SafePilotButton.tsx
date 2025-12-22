@@ -1246,10 +1246,6 @@ export function SafePilotButton() {
             if (value === 'intelligence') setCurrentMode('intel');
             else if (value === 'context') setCurrentMode('context');
             else if (value === 'response') setCurrentMode('chat');
-            else if (value === 'ultra') setCurrentTier('ultra');
-            else if (value === 'crisis') setCurrentTier('crisis');
-            else if (value === 'survival') setCurrentTier('survival');
-            else if (value === 'history') setCurrentTier('history');
           }} className="flex-1 flex flex-col min-h-0">
             <div className="px-4 sm:px-6 mt-3 sm:mt-4 shrink-0">
               <TabsList className="grid grid-cols-3 w-full">
@@ -1266,24 +1262,52 @@ export function SafePilotButton() {
                   <span className="truncate">Chat</span>
                 </TabsTrigger>
               </TabsList>
-              <TabsList className="grid grid-cols-4 w-full mt-1">
-                <TabsTrigger value="ultra" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-ultra">
-                  <Zap className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0 text-yellow-500" />
+              <div className="grid grid-cols-4 w-full mt-1 gap-1">
+                <Button
+                  type="button"
+                  variant={currentTier === 'ultra' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentTier('ultra')}
+                  className={`text-[10px] sm:text-xs px-1 sm:px-2 min-h-[36px] sm:min-h-9 ${currentTier === 'ultra' ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
+                  data-testid="tier-ultra"
+                >
+                  <Zap className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">Ultra</span>
-                </TabsTrigger>
-                <TabsTrigger value="crisis" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-crisis">
+                </Button>
+                <Button
+                  type="button"
+                  variant={currentTier === 'crisis' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentTier('crisis')}
+                  className={`text-[10px] sm:text-xs px-1 sm:px-2 min-h-[36px] sm:min-h-9 ${currentTier === 'crisis' ? 'bg-red-500 hover:bg-red-600 text-white' : ''}`}
+                  data-testid="tier-crisis"
+                >
                   <AlertTriangle className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">Crisis</span>
-                </TabsTrigger>
-                <TabsTrigger value="survival" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-survival">
+                </Button>
+                <Button
+                  type="button"
+                  variant={currentTier === 'survival' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentTier('survival')}
+                  className={`text-[10px] sm:text-xs px-1 sm:px-2 min-h-[36px] sm:min-h-9 ${currentTier === 'survival' ? 'bg-blue-500 hover:bg-blue-600 text-white' : ''}`}
+                  data-testid="tier-survival"
+                >
                   <LifeBuoy className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">Survival</span>
-                </TabsTrigger>
-                <TabsTrigger value="history" className="text-[10px] sm:text-xs px-1 sm:px-2 min-h-[40px] sm:min-h-9" data-testid="tab-safepilot-history">
+                </Button>
+                <Button
+                  type="button"
+                  variant={currentTier === 'history' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentTier('history')}
+                  className={`text-[10px] sm:text-xs px-1 sm:px-2 min-h-[36px] sm:min-h-9 ${currentTier === 'history' ? 'bg-purple-500 hover:bg-purple-600 text-white' : ''}`}
+                  data-testid="tier-history"
+                >
                   <History className="h-3.5 w-3.5 mr-0.5 sm:mr-1.5 shrink-0" />
                   <span className="truncate">History</span>
-                </TabsTrigger>
-              </TabsList>
+                </Button>
+              </div>
             </div>
 
             <TabsContent value="intelligence" className="flex-1 flex flex-col mt-0 min-h-0">
