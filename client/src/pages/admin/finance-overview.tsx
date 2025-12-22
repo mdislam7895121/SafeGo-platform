@@ -62,16 +62,16 @@ function StatCard({
   };
 
   return (
-    <Card>
+    <Card className="bg-white dark:bg-slate-900 border-[#E5E7EB] dark:border-slate-700">
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-lg ${bgClasses[color]}`}>
             <Icon className={`h-5 w-5 ${colorClasses[color]}`} />
           </div>
           <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">{title}</p>
+            <p className="text-sm text-[#475569] dark:text-slate-400">{title}</p>
             <p className={`text-2xl font-bold ${colorClasses[color]}`}>{value}</p>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-[#475569] dark:text-slate-400">{subtitle}</p>}
           </div>
         </div>
       </CardContent>
@@ -113,16 +113,16 @@ export default function FinanceOverviewPage() {
   const usCashCommission = data?.totalCashCommissionByCountry.find((r) => r.countryCode === "US")?.totalCommission || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <PageHeader
         title="Finance Overview"
         description="Revenue analytics, negative balances, and commission tracking"
         icon={DollarSign}
       />
 
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border-[#E5E7EB] dark:border-slate-700">
         <CardHeader>
-          <CardTitle className="text-base">Filters</CardTitle>
+          <CardTitle className="text-base text-[#0F172A] dark:text-white">Filters</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">

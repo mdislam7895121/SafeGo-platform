@@ -47,9 +47,9 @@ export function PageHeader({
 
   return (
     <div className={cn(
-      "border-b border-black/[0.06] dark:border-white/[0.06]",
-      "bg-gradient-to-r from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent",
-      "sticky top-0 z-10 backdrop-blur-sm",
+      "border-b border-[#E5E7EB] dark:border-slate-700",
+      "bg-[#F1F5F9] dark:bg-slate-800",
+      "sticky top-0 z-10",
       className
     )}>
       <div className="px-4 sm:px-6 py-3">
@@ -98,11 +98,11 @@ export function PageHeader({
               </div>
             )}
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate" data-testid="page-title">
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate text-[#0F172A] dark:text-white" data-testid="page-title">
                 {title}
               </h1>
               {description && (
-                <p className="text-[11px] text-muted-foreground truncate" data-testid="page-description">
+                <p className="text-[11px] text-[#475569] dark:text-slate-400 truncate" data-testid="page-description">
                   {description}
                 </p>
               )}
