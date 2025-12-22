@@ -68,18 +68,14 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
   } as React.CSSProperties;
 
   return (
-    <SidebarProvider style={sidebarStyle}>
-      {/* Admin Layout Container - Fixed height, no body scroll */}
-      <div className="flex h-screen w-full overflow-hidden">
-        {/* Sidebar - Sticky, never scrolls with page */}
-        <aside className="h-screen sticky top-0 flex-shrink-0 overflow-y-auto">
-          <AdminSidebar />
-        </aside>
-        
-        {/* Content Area - Only this scrolls */}
-        <SidebarInset className="flex flex-col flex-1 h-screen overflow-hidden">
-          {/* Header - Fixed at top of content area */}
-          <header className="sticky top-0 z-[100] flex h-14 sm:h-16 items-center gap-2 sm:gap-4 border-b bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 shadow-sm px-3 sm:px-4 md:px-6 flex-shrink-0">
+    <SidebarProvider style={sidebarStyle} className="!min-h-screen !h-screen overflow-hidden">
+      {/* Sidebar - Uses shadcn fixed positioning internally */}
+      <AdminSidebar />
+      
+      {/* Content Area - Only this scrolls */}
+      <SidebarInset className="flex flex-col h-screen overflow-hidden">
+        {/* Header - Fixed at top of content area */}
+        <header className="sticky top-0 z-[100] flex h-14 sm:h-16 items-center gap-2 sm:gap-4 border-b bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 shadow-sm px-3 sm:px-4 md:px-6 flex-shrink-0">
             {/* Sidebar Toggle - 44px minimum tap target */}
             <SidebarTrigger className="-ml-1 min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9" data-testid="button-sidebar-toggle">
               <PanelLeft className="h-5 w-5" />
@@ -204,7 +200,6 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
             {children}
           </main>
         </SidebarInset>
-      </div>
       <AdminTutorial />
     </SidebarProvider>
   );
