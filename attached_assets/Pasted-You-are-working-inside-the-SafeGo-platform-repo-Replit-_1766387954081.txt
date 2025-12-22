@@ -1,0 +1,83 @@
+You are working inside the SafeGo-platform repo (Replit). Implement TWO completely separate SafePilot experiences:
+
+GOAL
+A) Admin SafePilot (ADMIN ONLY) — visible ONLY on /admin dashboard pages. It must NEVER call support endpoints.
+B) Support SafePilot (SUPPORT_ADMIN ONLY) — visible ONLY on /support admin pages (or support console). It must NEVER be visible in the main admin dashboard.
+
+HARD RULES
+1) Separate UI components, separate API clients, separate endpoints.
+2) Strict role gating on both frontend AND backend.
+3) No duplicate widgets: only ONE SafePilot instance can mount on a page at a time.
+4) If API returns 403/401, show a visible error message in the UI (do not silently fail).
+5) Stop any polling/intervals on 403/401 to prevent memory leaks.
+6) Render responses inside the page (not only console logs). The user must always see either:
+   - AI answer bubble, OR
+   - error bubble with details
+
+BACKEND CHANGES (Node/Express)
+1) Create/confirm two endpoints:
+   - POST /api/admin/safepilot/query   (ADMIN only)
+   - POST /api/support/safepilot/query (SUPPORT_ADMIN only)
+2) Add middleware guards:
+   - requireRole('ADMIN') for admin endpoint
+   - requireRole('SUPPORT_ADMIN') for support endpoint
+3) Ensure each endpoint uses the correct data sources:
+   - Admin SafePilot can access admin metrics, KPIs, payouts, KYC approvals, platform risks.
+   - Support SafePilot can access tickets, conversations, unresolved issues, refunds, disputes (support domain only).
+4) Response format must be consistent:
+   Return JSON: { reply: string, meta?: object }
+   Never return an empty reply. If no data, reply must say “No data found for this query.”
+
+FRONTEND CHANGES (client/src)
+1) Create new components:
+   - client/src/components/safepilot/admin/AdminSafePilotPanel.tsx
+   - client/src/components/safepilot/support/SupportSafePilotPanel.tsx
+2) Create separate API clients:
+   - client/src/components/safepilot/admin/adminSafePilotApi.ts
+   - client/src/components/safepilot/support/supportSafePilotApi.ts
+Each client calls ONLY its matching backend endpoint.
+
+3) Mounting rules:
+   - AdminSafePilotPanel renders ONLY inside admin layout/pages (e.g., /admin/dashboard).
+   - SupportSafePilotPanel renders ONLY inside support layout/pages (e.g., /support/admin).
+   - Do NOT render either in a global wrapper that affects all roles.
+
+4) UI behavior:
+   - A textarea/input + send button
+   - show message immediately (optimistic)
+   - show loading indicator
+   - show assistant response bubble after success
+   - show red error bubble on error with HTTP status + endpoint
+
+5) Duplicate guard:
+   Implement a single mount guard per panel:
+   window.__ADMIN_SAFEPILOT_MOUNTED__ and window.__SUPPORT_SAFEPILOT_MOUNTED__
+   If already mounted, return null and log a warning.
+
+6) Fix “answer কোথায় দেখাবে”:
+   Render responses inside the panel directly under the input. Ensure the scroll view shows latest message.
+
+ROUTING / PAGES
+1) Find the admin dashboard page file and place AdminSafePilotPanel in the admin dashboard content area.
+2) Find the support admin page (support console) and place SupportSafePilotPanel there.
+3) Ensure the existing old SafePilot bubble/widget is removed or disabled so it doesn’t appear on both pages.
+
+TEST PLAN (must pass)
+1) Login as ADMIN:
+   - /admin dashboard shows AdminSafePilotPanel
+   - Asking “top platform risks” returns answer
+   - Asking “unresolved customer support issues” should respond with a safe message like:
+     “This question belongs to Support SafePilot. Please use Support console.”
+   - No calls to /api/support/* from admin page (verify network tab)
+2) Login as SUPPORT_ADMIN:
+   - /support admin shows SupportSafePilotPanel
+   - Asking “unresolved customer support issues” returns answer
+   - No calls to /api/admin/* from support page
+3) Any 401/403 shows visible error bubble and stops retries/polling.
+4) Memory usage should stop growing from repeated failing requests.
+
+DELIVERABLES
+1) List files changed with exact paths.
+2) Paste the final code for each created/modified file.
+3) Briefly explain where the answer renders in UI for both panels.
+4) Confirm no duplicates and show how to verify via console logs.
