@@ -1,0 +1,91 @@
+ROLE: You are the Replit coding agent working inside the SafeGo-platform repo.
+
+GOAL (PRO VERSION):
+Move the useful “SafePilot menu options” into the Floating SafePilot widget as built-in Quick Actions, and remove the duplicate sidebar SafePilot entry point on admin. Keep Support SafePilot separate.
+
+NON-NEGOTIABLE RULES:
+1) Admin has ONE SafePilot entry point: Floating widget (bottom-right) across all /admin pages.
+2) Support console keeps its own Support SafePilot panel, and the floating admin widget must be hidden on /admin/support-console.
+3) No duplicate SafePilot UI on the same page. Preserve/keep the singleton guard working.
+4) Everything must remain role-gated. Admin widget only for ADMIN roles. Support assistant only for SUPPORT_ADMIN role.
+5) The user must be able to clearly SEE the answers (fix blank/hidden rendering, scrolling, and contrast issues).
+
+WHAT TO BUILD:
+A) Floating SafePilot widget opens a modal/panel that contains:
+   - Header: “SafePilot” + small subtitle “Admin Intelligence Engine”
+   - Tabs (top): Intel | Context | Chat
+   - Modes (secondary row): Ultra | Crisis | Survival | History
+   - Quick Actions section (visible in Intel tab by default)
+   - Chat composer and chat history (Chat tab)
+
+B) Quick Actions (inside the floating modal):
+   Provide 8–12 action buttons. Each button should:
+   - Insert a prewritten prompt into the input box
+   - Optionally auto-send (add a small toggle: “Auto-send” default OFF)
+   - Show a small one-line description under each action
+
+Recommended Quick Actions (Admin):
+1) Today’s unresolved customer support issues (summary + top 10)
+2) KYC queue status (pending, average age, risky profiles)
+3) Fraud signals snapshot (refund abuse, multi-accounting, device/IP clusters)
+4) Driver violations summary (top categories, repeat offenders)
+5) Payout anomalies (failed payouts, suspicious spikes)
+6) Earnings disputes overview (open disputes, median time to resolve)
+7) System health (API error rates, memory usage warnings, slow endpoints)
+8) High-risk users (recent blocks, watchlist, reasons)
+9) Platform KPIs (rides/orders today, conversion, cancellations)
+10) Recommended actions (3 immediate operational actions)
+
+C) Fix “I can’t see anything / answer কোথায়?” issue:
+Make sure responses are always visible:
+- Chat history must have a real height and scroll.
+- New assistant messages must render with readable color/contrast.
+- Auto-scroll to latest message.
+- If response is empty, show a visible error bubble (already started) and keep it in the transcript.
+- Ensure the modal content isn’t hidden behind overflow/positioning.
+
+D) Remove duplicate entry points:
+- Remove/disable “SafePilot” from the left sidebar under ADVANCED ADMIN TOOLS (or change it to non-clickable label if you must keep the name for future, but NO navigation).
+- Keep floating widget as the only access on admin pages.
+
+FILES TO TOUCH (likely):
+- client/src/components/safepilot/SafePilotButton.tsx   (floating button + open modal)
+- client/src/components/safepilot/*                    (modal UI, tabs, quick actions)
+- client/src/pages/admin/home.tsx                      (ensure no embedded admin SafePilot panel)
+- client/src/layouts/admin/* or sidebar component file (remove sidebar SafePilot link item)
+- client/src/components/safepilot/chatApi.ts           (reuse existing normalize + logging; no breaking changes)
+- Any route guard / role check file used for admin/support access
+
+IMPLEMENTATION DETAILS:
+1) Add a QuickActions component:
+   - Data-driven list of actions (id, title, description, prompt, optional mode)
+   - On click: setInput(prompt) then if autoSend ON, trigger send handler.
+2) Tabs:
+   - Intel tab shows QuickActions + a short “Summary” area (can be placeholders if data isn’t available)
+   - Context tab shows key signals / last actions (can reuse existing structured details area)
+   - Chat tab shows full chat conversation + composer
+3) UI/UX:
+   - Modal width responsive (max-width 720px) and height 80vh
+   - Chat history area flex: 1 with overflow-y: auto
+   - Composer pinned at bottom inside modal
+   - Keep the existing “loading dots” behavior
+4) Routing logic:
+   - Floating widget visible on all /admin routes EXCEPT /admin/support-console
+   - Support console page uses Support SafePilot only
+5) Sidebar:
+   - Remove SafePilot navigation item OR hide it when floating widget is enabled
+   - Confirm there is no second SafePilot page link that confuses users
+
+ACCEPTANCE CHECKLIST (must pass):
+1) Visit /admin/dashboard: only floating SafePilot button exists; no embedded panel; sidebar has no SafePilot link.
+2) Click floating button: modal opens; Quick Actions visible; Chat works.
+3) Press a Quick Action: input fills; send works; response appears in chat area; user can scroll and read.
+4) Visit /admin/users, /admin/drivers: floating button still present and works.
+5) Visit /admin/support-console: NO floating admin widget; support assistant panel present and works.
+6) Console: no repeated mount loops; singleton guards do not block the one intended instance.
+7) “Answer কোথায়” issue is gone: messages always visible with correct scroll.
+
+DELIVERABLE:
+- Implement changes with clean code.
+- Provide a short “What changed” summary and exact files modified.
+- Include screenshots or a short verification note for the 6 acceptance checks above.

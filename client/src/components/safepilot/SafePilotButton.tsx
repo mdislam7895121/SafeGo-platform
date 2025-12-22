@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
@@ -379,6 +379,109 @@ interface ChatMessage {
   isError?: boolean;
 }
 
+interface QuickAction {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  icon: React.ReactNode;
+  category: 'support' | 'fraud' | 'operations' | 'finance' | 'health';
+}
+
+const QUICK_ACTIONS: QuickAction[] = [
+  {
+    id: 'support-issues',
+    title: 'Support Issues',
+    description: 'Unresolved customer support issues (summary + top 10)',
+    prompt: 'Show me today\'s unresolved customer support issues - provide a summary and list the top 10 most urgent cases with their status and priority.',
+    icon: <LifeBuoy className="h-4 w-4" />,
+    category: 'support',
+  },
+  {
+    id: 'kyc-queue',
+    title: 'KYC Queue Status',
+    description: 'Pending verifications, average age, risky profiles',
+    prompt: 'What is the current KYC queue status? Show pending count, average age of requests, and highlight any risky profiles that need attention.',
+    icon: <Fingerprint className="h-4 w-4" />,
+    category: 'operations',
+  },
+  {
+    id: 'fraud-signals',
+    title: 'Fraud Signals',
+    description: 'Refund abuse, multi-accounting, device/IP clusters',
+    prompt: 'Give me a fraud signals snapshot. Highlight refund abuse patterns, multi-accounting attempts, suspicious device or IP clusters, and any concerning patterns.',
+    icon: <ShieldAlert className="h-4 w-4" />,
+    category: 'fraud',
+  },
+  {
+    id: 'driver-violations',
+    title: 'Driver Violations',
+    description: 'Top violation categories, repeat offenders',
+    prompt: 'Summarize driver violations. What are the top violation categories, who are repeat offenders, and what actions are recommended?',
+    icon: <AlertTriangle className="h-4 w-4" />,
+    category: 'operations',
+  },
+  {
+    id: 'payout-anomalies',
+    title: 'Payout Anomalies',
+    description: 'Failed payouts, suspicious spikes',
+    prompt: 'Show payout anomalies. List failed payouts, suspicious earning spikes, and any patterns that need investigation.',
+    icon: <DollarSign className="h-4 w-4" />,
+    category: 'finance',
+  },
+  {
+    id: 'earnings-disputes',
+    title: 'Earnings Disputes',
+    description: 'Open disputes, median resolution time',
+    prompt: 'Give me an overview of earnings disputes. How many are open, what is the median time to resolve, and which ones are escalating?',
+    icon: <Scale className="h-4 w-4" />,
+    category: 'finance',
+  },
+  {
+    id: 'system-health',
+    title: 'System Health',
+    description: 'API error rates, memory usage, slow endpoints',
+    prompt: 'What is the current system health? Show API error rates, memory usage warnings, slow endpoints, and any infrastructure concerns.',
+    icon: <Activity className="h-4 w-4" />,
+    category: 'health',
+  },
+  {
+    id: 'high-risk-users',
+    title: 'High-Risk Users',
+    description: 'Recent blocks, watchlist, reasons',
+    prompt: 'List high-risk users. Show recent blocks, users on watchlist, and the reasons why they were flagged.',
+    icon: <Shield className="h-4 w-4" />,
+    category: 'fraud',
+  },
+  {
+    id: 'platform-kpis',
+    title: 'Platform KPIs',
+    description: 'Rides/orders today, conversion, cancellations',
+    prompt: 'What are today\'s platform KPIs? Show total rides and orders, conversion rates, cancellation rates, and how we compare to yesterday.',
+    icon: <BarChart3 className="h-4 w-4" />,
+    category: 'operations',
+  },
+  {
+    id: 'recommended-actions',
+    title: 'Recommended Actions',
+    description: '3 immediate operational actions to take',
+    prompt: 'Based on current data, what are the top 3 immediate operational actions I should take right now to improve the platform?',
+    icon: <Target className="h-4 w-4" />,
+    category: 'operations',
+  },
+];
+
+const getCategoryColor = (category: QuickAction['category']) => {
+  switch (category) {
+    case 'support': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+    case 'fraud': return 'bg-red-500/10 text-red-600 border-red-500/20';
+    case 'operations': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+    case 'finance': return 'bg-green-500/10 text-green-600 border-green-500/20';
+    case 'health': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
+    default: return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
+  }
+};
+
 export function SafePilotButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -395,6 +498,8 @@ export function SafePilotButton() {
     role: string;
   }>({ lastUrl: '', lastStatus: null, lastError: null, role: 'ADMIN' });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [autoSendEnabled, setAutoSendEnabled] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   
   const [crisisReport, setCrisisReport] = useState<CrisisReportData | null>(null);
   const [isCrisisLoading, setIsCrisisLoading] = useState(false);
@@ -496,6 +601,108 @@ export function SafePilotButton() {
       setActiveTab('context');
     }
   }, [pageKey, isOpen]);
+
+  useEffect(() => {
+    if (chatScrollRef.current && chatMessages.length > 0) {
+      setTimeout(() => {
+        chatScrollRef.current?.scrollTo({
+          top: chatScrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 100);
+    }
+  }, [chatMessages, isSubmitting]);
+
+  const handleQuickAction = async (action: QuickAction) => {
+    setQuestion(action.prompt);
+    setActiveTab('response');
+    
+    if (autoSendEnabled) {
+      const userMessageId = `user-${Date.now()}`;
+      setChatMessages(prev => [...prev, {
+        id: userMessageId,
+        role: 'user',
+        content: action.prompt,
+        timestamp: new Date(),
+      }]);
+      setQuestion('');
+      
+      setIsSubmitting(true);
+      const url = '/api/admin/safepilot/query';
+      setDebugInfo(prev => ({ ...prev, lastUrl: url, lastStatus: null, lastError: null }));
+      
+      try {
+        const res = await fetchWithAuth(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pageKey,
+            question: action.prompt,
+            role: 'ADMIN',
+          }),
+        });
+        
+        setDebugInfo(prev => ({ ...prev, lastStatus: res.status }));
+        
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseError) {
+          data = null;
+        }
+        
+        const normalizedReply = normalizeSafePilotReply(data);
+        const isEmptyResponse = !normalizedReply || normalizedReply.trim().length === 0;
+        const displayContent = isEmptyResponse 
+          ? "SafePilot returned no response. Please try again."
+          : normalizedReply;
+        
+        setChatMessages(prev => [...prev, {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: displayContent,
+          timestamp: new Date(),
+          isError: !res.ok || isEmptyResponse,
+        }]);
+        
+        if (data) {
+          setQueryResponse({
+            mode: data.mode || 'ASK',
+            summary: data.summary?.length > 0 ? data.summary : [],
+            keySignals: data.keySignals || [],
+            actions: data.actions || [],
+            monitor: data.monitor || [],
+            answerText: displayContent,
+            insights: data.insights || [],
+            suggestions: data.suggestions || [],
+            riskLevel: data.riskLevel || 'LOW',
+            error: !res.ok || isEmptyResponse ? (data.error || `HTTP ${res.status}`) : undefined,
+          });
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        setDebugInfo(prev => ({ ...prev, lastError: errorMsg }));
+        
+        setChatMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: `Error: ${errorMsg}. Please try again.`,
+          timestamp: new Date(),
+          isError: true,
+        }]);
+        
+        toast({
+          title: 'Connection Issue',
+          description: 'Please check your network and try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
 
   const handleSubmitQuestion = async (retryCount = 0) => {
     if (!question.trim() || isSubmitting) return;
@@ -1045,6 +1252,45 @@ export function SafePilotButton() {
               <ScrollArea className="flex-1 p-4 sm:p-6">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Quick Actions</h3>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={autoSendEnabled}
+                          onChange={(e) => setAutoSendEnabled(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-gray-300"
+                        />
+                        Auto-send
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {QUICK_ACTIONS.map((action) => (
+                      <Card 
+                        key={action.id}
+                        className={`p-3 cursor-pointer transition-all hover:shadow-md border ${getCategoryColor(action.category)}`}
+                        onClick={() => handleQuickAction(action)}
+                        data-testid={`quick-action-${action.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${getCategoryColor(action.category)}`}>
+                            {action.icon}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm text-foreground">{action.title}</div>
+                            <div className="text-xs text-muted-foreground truncate">{action.description}</div>
+                          </div>
+                          <Send className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="flex items-center justify-between">
                     <h3 className="font-semibold">Intelligence Modules</h3>
                     <Button
                       variant="ghost"
@@ -1327,7 +1573,11 @@ export function SafePilotButton() {
             </TabsContent>
 
             <TabsContent value="response" className="flex-1 flex flex-col mt-0 min-h-0">
-              <ScrollArea className="flex-1 p-4 sm:p-6">
+              <div 
+                ref={chatScrollRef} 
+                className="flex-1 p-4 sm:p-6 overflow-y-auto"
+                style={{ maxHeight: 'calc(100vh - 320px)', minHeight: '300px' }}
+              >
                 {/* Chat Message Bubbles */}
                 {chatMessages.length > 0 ? (
                   <div className="space-y-4 mb-4">
@@ -1500,7 +1750,7 @@ export function SafePilotButton() {
                     )}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </TabsContent>
 
             <TabsContent value="ultra" className="flex-1 flex flex-col mt-0 min-h-0">
