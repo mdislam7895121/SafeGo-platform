@@ -97,7 +97,7 @@ router.post("/chat", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Invalid request", details: parsed.error.errors });
     }
 
-    const { message, country, role, service, conversationId } = parsed.data;
+    const { message, country, role, service, conversationId, explain } = parsed.data;
     
     const effectiveRole = getUserRole(req);
     const effectiveCountry = country !== "GLOBAL" ? country : getUserCountry(req);
@@ -109,6 +109,7 @@ router.post("/chat", async (req: AuthRequest, res) => {
       service,
       userId: req.user.id,
       conversationId,
+      explain,
     });
 
     res.json(response);

@@ -113,8 +113,8 @@ export async function searchKB(params: {
   service: ServiceScope;
   limit?: number;
 }): Promise<KBSearchResult[]> {
-  const { metadata } = await searchKBWithMetadata(params);
-  return (await searchKBWithMetadata(params)).results;
+  const { results } = await searchKBWithMetadata(params);
+  return results;
 }
 
 export async function searchKBWithMetadata(params: {
