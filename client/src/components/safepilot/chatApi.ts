@@ -100,18 +100,27 @@ export async function postSafePilotChat(
 export type AnyJson = any;
 
 export function normalizeSafePilotReply(payload: AnyJson): string {
-  if (!payload) return "No payload returned.";
+  if (!payload) return "No response received from SafePilot.";
 
-  // Common direct fields
+  // Log for debugging
+  console.log('[normalizeSafePilotReply] Input payload keys:', payload ? Object.keys(payload) : 'null');
+
+  // Common direct fields - check ALL possible response shapes
   const direct =
     payload.reply ??
     payload.response ??
     payload.message ??
     payload.text ??
     payload.answer ??
-    payload.answerText;
+    payload.answerText ??
+    payload.result ??
+    payload.content ??
+    payload.output;
 
-  if (typeof direct === "string" && direct.trim()) return direct;
+  if (typeof direct === "string" && direct.trim()) {
+    console.log('[normalizeSafePilotReply] Found direct field');
+    return direct;
+  }
 
   // Mode-based responses (e.g., mode: "ASK")
   const mode = payload.mode ?? payload.data?.mode;
@@ -132,23 +141,46 @@ export function normalizeSafePilotReply(payload: AnyJson): string {
     return "I need more details to answer. Please provide the missing info.";
   }
 
-  // Summary field (string or array)
+  // Summary field (string or array) - common in admin responses
   const summary =
     payload.summary ??
     payload.result?.summary ??
     payload.data?.summary;
 
-  if (typeof summary === "string" && summary.trim()) return summary;
+  if (typeof summary === "string" && summary.trim()) {
+    console.log('[normalizeSafePilotReply] Using summary string');
+    return summary;
+  }
   if (Array.isArray(summary) && summary.length > 0) {
+    console.log('[normalizeSafePilotReply] Using summary array:', summary.length, 'items');
     return summary.join("\n");
   }
 
-  // Key signals fallback
+  // Key signals fallback - admin intelligence mode
   if (Array.isArray(payload.keySignals) && payload.keySignals.length > 0) {
+    console.log('[normalizeSafePilotReply] Using keySignals fallback');
     return "Key Signals:\n" + payload.keySignals.map((s: string) => `• ${s}`).join("\n");
   }
 
+  // Actions fallback - admin mode might only have actions
+  if (Array.isArray(payload.actions) && payload.actions.length > 0) {
+    console.log('[normalizeSafePilotReply] Using actions fallback');
+    const actionLabels = payload.actions
+      .map((a: any) => typeof a === 'string' ? a : a.label || a.action || JSON.stringify(a))
+      .filter(Boolean);
+    if (actionLabels.length > 0) {
+      return "Recommended Actions:\n" + actionLabels.map((a: string) => `• ${a}`).join("\n");
+    }
+  }
+
+  // Monitor fallback - admin watchlist items
+  if (Array.isArray(payload.monitor) && payload.monitor.length > 0) {
+    console.log('[normalizeSafePilotReply] Using monitor fallback');
+    return "Items to Monitor:\n" + payload.monitor.map((m: string) => `• ${m}`).join("\n");
+  }
+
   // Last resort: show raw JSON so nothing is blank
+  console.warn('[normalizeSafePilotReply] No known fields found, showing raw JSON');
   try {
     const raw = JSON.stringify(payload, null, 2);
     return "Response:\n" + raw.slice(0, 2000) + (raw.length > 2000 ? "\n...[truncated]" : "");
