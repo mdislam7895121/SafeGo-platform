@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { MessageCircle, X, Send, Loader2, Bot, User as UserIcon, RefreshCw, Trash2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Singleton guard to prevent duplicate mounts
+let __SAFEPILOT_CHAT_MOUNTED__ = false;
+
+// Routes handled by other SafePilot components
+const ADMIN_ROUTES = ['/admin'];
+const CUSTOMER_ROUTES = ['/customer', '/ride', '/eats', '/parcel', '/booking'];
+const DRIVER_ROUTES = ['/driver'];
+const RESTAURANT_ROUTES = ['/restaurant'];
 
 interface ChatMessage {
   id: string;
@@ -55,7 +65,53 @@ export function SafePilotChat() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const [location] = useLocation();
   const isAuthenticated = !!user;
+  
+  // Singleton guard effect
+  useEffect(() => {
+    if (__SAFEPILOT_CHAT_MOUNTED__) {
+      console.warn('[SafePilotChat] Duplicate mount prevented');
+      return;
+    }
+    __SAFEPILOT_CHAT_MOUNTED__ = true;
+    console.log('[SafePilotChat] Mounted');
+    
+    return () => {
+      __SAFEPILOT_CHAT_MOUNTED__ = false;
+      console.log('[SafePilotChat] Unmounted');
+    };
+  }, []);
+  
+  // Determine if this component should render based on route
+  const shouldRenderForRoute = useCallback(() => {
+    const path = location.toLowerCase();
+    
+    // Admin routes are handled by SafePilotButton
+    if (ADMIN_ROUTES.some(r => path.startsWith(r))) {
+      return false;
+    }
+    
+    // Customer routes are handled by CustomerSafePilotWrapper
+    if (CUSTOMER_ROUTES.some(r => path.startsWith(r))) {
+      return false;
+    }
+    
+    // Driver routes - only show if user is a driver
+    if (DRIVER_ROUTES.some(r => path.startsWith(r))) {
+      const role = user?.role?.toLowerCase();
+      return role === 'driver' || role === 'pending_driver';
+    }
+    
+    // Restaurant routes - only show if user is a restaurant
+    if (RESTAURANT_ROUTES.some(r => path.startsWith(r))) {
+      const role = user?.role?.toLowerCase();
+      return role === 'restaurant' || role === 'pending_restaurant';
+    }
+    
+    // Default: show for authenticated users on uncovered routes
+    return true;
+  }, [location, user?.role]);
 
   const getRole = (): 'CUSTOMER' | 'DRIVER' | 'RESTAURANT' | 'ADMIN' => {
     const role = user?.role?.toUpperCase();
@@ -237,7 +293,8 @@ export function SafePilotChat() {
 
   const conversations: Conversation[] = conversationsData?.conversations || [];
 
-  if (!isAuthenticated) {
+  // Don't render if not authenticated or route is handled by other component
+  if (!isAuthenticated || !shouldRenderForRoute()) {
     return null;
   }
 

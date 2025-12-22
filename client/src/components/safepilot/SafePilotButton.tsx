@@ -68,6 +68,9 @@ import { apiRequest, queryClient, fetchWithAuth } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { normalizeSafePilotReply } from './chatApi';
 
+// Singleton guard to prevent duplicate mounts
+let __SAFEPILOT_BUTTON_MOUNTED__ = false;
+
 interface SafePilotSuggestion {
   key: string;
   label: string;
@@ -409,6 +412,21 @@ export function SafePilotButton() {
   const [ultraCorrelationData, setUltraCorrelationData] = useState<UltraCorrelationData | null>(null);
   const [isCorrelationLoading, setIsCorrelationLoading] = useState(false);
   const [voiceCommand, setVoiceCommand] = useState('');
+
+  // Singleton guard effect
+  useEffect(() => {
+    if (__SAFEPILOT_BUTTON_MOUNTED__) {
+      console.warn('[SafePilotButton] Duplicate mount prevented');
+      return;
+    }
+    __SAFEPILOT_BUTTON_MOUNTED__ = true;
+    console.log('[SafePilotButton] Mounted');
+    
+    return () => {
+      __SAFEPILOT_BUTTON_MOUNTED__ = false;
+      console.log('[SafePilotButton] Unmounted');
+    };
+  }, []);
 
   const pageKey = getPageKeyFromPath(location);
 

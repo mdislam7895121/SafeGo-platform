@@ -1,0 +1,86 @@
+SAFEGO / SAFEPILOT — DUPLICATE WIDGET INSTANCE FIX (CODE REQUIRED)
+===============================================================
+
+SAFEGO MASTER RULES (MUST KEEP)
+A) ROLES — ALWAYS include all 4 roles: Customer, Driver, Restaurant, Admin
+- Separate signup requirements, KYC rules (BD/US), dashboards, permissions, status flows. Never mix role access.
+
+B) GLOBAL LOGIC — 3 services always: Ride-hailing, Food delivery, Parcel delivery
+- Worldwide + country-specific rules.
+
+C) BD vs US KYC branching mandatory:
+BD: father_name, date_of_birth, present_address, permanent_address, NID number + front/back, emergency contact, verification_status + is_verified
+US: date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, (drivers) license+image+expiry, (drivers) ssn_last4 optional, verification_status + is_verified
+
+D) Admin panel required: verify all, approve/reject KYC with rejection_reason, update pricing/fees/commissions, block/unblock, payouts, view negative balances.
+
+E) Collections required: rides, food_orders, deliveries (IDs, geo, fees/commission, payments, timestamps, status flow, rating/feedback)
+
+F) Commission rules required (cash creates negative balance; online auto; admin can settle)
+
+G) Security rules required (no doc leaks; only admin can change pricing/verification/blocking)
+
+H) Status flows required (ride/food/parcel exact sequences)
+
+I) Onboarding multi-step + pending verification + blocked until admin approval
+
+J) Notifications required
+
+NON-BREAKING RULE:
+- Additive only. Do not rename/remove existing routes/APIs/schemas. Only add guards/refs.
+
+===============================================================
+PROBLEM
+- SafePilot appears twice (a second instance below the first).
+- This indicates SafePilotWidget (or portal container) is mounted in 2+ places.
+
+GOAL
+- There must be exactly ONE SafePilotWidget mounted globally.
+- The widget should show role-aware UI inside (Customer/Admin/Driver/Restaurant), but the container must be single.
+- Add clear debugging to prove only one instance exists.
+
+STEP 1 — FIND ALL MOUNTS (DO NOT GUESS)
+Search repo for:
+- <SafePilotChat
+- <SafePilotWidget
+- <SafePilotButton
+- "safepilot" in layout files
+List every file that mounts it.
+
+STEP 2 — KEEP ONLY ONE GLOBAL MOUNT
+Choose ONE place only (preferred: global root layout, e.g. client root layout / App / main Layout).
+Remove/disable other mounts WITHOUT deleting code:
+- Convert secondary mounts into NO-OP that returns null when global is already mounted
+- Or wrap secondary mounts with a global singleton guard (see Step 3)
+No breaking UI changes.
+
+STEP 3 — ADD SINGLETON GUARD (HARD GUARANTEE)
+In the widget component file (e.g. client/src/components/safepilot/SafePilotWidget.tsx),
+add a module-level singleton flag.
+
+Example:
+
+```ts
+let __SAFE_PILOT_MOUNTED__ = false;
+
+export function SafePilotWidget(props: Props) {
+  if (__SAFE_PILOT_MOUNTED__) {
+    console.warn("[SafePilot] Duplicate mount prevented");
+    return null;
+  }
+  __SAFE_PILOT_MOUNTED__ = true;
+
+  React.useEffect(() => {
+    console.count("[SafePilot] Mounted count");
+    return () => {
+      __SAFE_PILOT_MOUNTED__ = false;
+      console.log("[SafePilot] Unmounted");
+    };
+  }, []);
+
+  return (
+    <div data-testid="safepilot-root">
+      {/* existing UI */}
+    </div>
+  );
+}
