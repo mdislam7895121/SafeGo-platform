@@ -293,16 +293,23 @@ router.post(
             payload: a.payload || {},
           }))
         : [{ label: 'View dashboard for more details', risk: 'SAFE' as const, actionType: 'NAVIGATE' as const, payload: {} }];
-      const monitor = response.monitor && response.monitor.length > 0 
-        ? response.monitor 
-        : ['Continue monitoring platform metrics'];
+      // INTENT-BASED MONITOR: Only provide monitor items for guard intent
+      // Non-guard intents should have empty monitor array (no default fallback)
+      const intent = response.intent || 'general';
+      let monitor: string[] = [];
+      if (intent === 'guard') {
+        monitor = response.monitor && response.monitor.length > 0 
+          ? response.monitor 
+          : ['Continue monitoring platform metrics'];
+      }
 
       const elapsed = Date.now() - startTime;
-      console.log('[SafePilot] Query completed successfully in', elapsed, 'ms');
+      console.log('[SafePilot] Query completed successfully in', elapsed, 'ms, intent:', intent);
 
-      // Return Vision 2030 format - ALWAYS valid
+      // Return Vision 2030 format with intent for frontend rendering
       res.json({
         mode,
+        intent,
         summary,
         keySignals,
         actions,

@@ -1,0 +1,142 @@
+You are working on the SafeGo Platform.
+Your ONLY task is to FIX SafePilot behavior.
+Do NOT redesign UI. Do NOT add features. Do NOT refactor unrelated code.
+
+==============================
+CORE PROBLEM (READ CAREFULLY)
+==============================
+SafePilot is currently returning the SAME response (GUARD MODE summary)
+for every question, regardless of what is asked.
+
+This is NOT acceptable.
+
+Root cause:
+- Admin SafePilot and Customer Support SafePilot are sharing logic
+- Guard Mode response is being reused as a default
+- Intent routing and response rendering are broken
+
+==============================
+MANDATORY GOALS (NON-NEGOTIABLE)
+==============================
+
+1. Admin SafePilot MUST give DIFFERENT answers for different questions
+2. Guard Mode response must ONLY appear for guard/fraud questions
+3. Admin SafePilot and Customer Support SafePilot MUST be isolated
+4. Customer Support logic must NEVER affect Admin SafePilot
+5. Fallback response must NEVER override valid AI answers
+
+==============================
+STEP 1 — STRICT MODEL SEPARATION
+==============================
+
+Enforce model isolation:
+
+- Admin SafePilot MUST use:
+  model: "admin-ai"
+
+- Customer Support SafePilot MUST use:
+  model: "support-ai"
+
+No shared model calls.
+No shared response pipeline.
+No shared fallback handler.
+
+==============================
+STEP 2 — INTENT DETECTION (REQUIRED)
+==============================
+
+For EVERY Admin question, detect intent:
+
+- "guard"      → fraud alerts, risk, abuse, security
+- "kyc"        → approvals, age buckets, verification
+- "metrics"    → drivers, revenue, KPIs, performance
+- "operations"→ system health, jobs, queues
+- "general"    → normal admin questions
+
+Guard intent MUST NOT be default.
+
+==============================
+STEP 3 — RESPONSE RENDERING FIX
+==============================
+
+STOP rendering the same Guard UI for all responses.
+
+Implement logic equivalent to:
+
+if intent === "guard":
+  renderGuardSummary()
+else if intent === "kyc":
+  renderKYCResponse()
+else if intent === "metrics":
+  renderMetricsResponse()
+else:
+  renderNormalChatResponse()
+
+Under NO condition should guard text appear for non-guard questions.
+
+==============================
+STEP 4 — FALLBACK RULES (CRITICAL)
+==============================
+
+Fallback response may trigger ONLY if:
+- AI response is empty
+- API error
+- Timeout
+
+Fallback MUST NOT trigger for:
+- Schema mismatch
+- Parsing issues
+- Valid text responses
+
+If AI returns text → SHOW IT.
+
+==============================
+STEP 5 — ADMIN UI SANITIZATION
+==============================
+
+Remove from Admin SafePilot responses:
+- "**[GUARD MODE]**" headers
+- "Key signals I used"
+- Repeated static summaries
+- Raw AI reasoning blocks
+
+Admin responses must be:
+- Clean
+- Question-specific
+- Dynamic
+
+==============================
+STEP 6 — CUSTOMER SUPPORT ISOLATION
+==============================
+
+Customer Support SafePilot:
+- Works ONLY inside Support Console
+- Uses ONLY support-ai
+- Has its OWN renderer and fallback
+- Must NOT affect Admin SafePilot in any way
+
+==============================
+STEP 7 — REQUIRED TESTS
+==============================
+
+These 5 questions MUST produce DIFFERENT answers:
+
+1. Show KYC pending approvals by age bucket
+2. Any high-risk drivers today?
+3. Platform revenue last 7 days
+4. System health summary
+5. List unresolved fraud alerts
+
+If any two answers look the same → FAIL.
+
+==============================
+DELIVERABLES
+==============================
+
+After fixing, clearly report:
+- Which files were changed
+- How intent routing works now
+- Proof that guard response is no longer reused
+
+Final confirmation message MUST be:
+"Admin SafePilot responses are now intent-based and dynamic."
