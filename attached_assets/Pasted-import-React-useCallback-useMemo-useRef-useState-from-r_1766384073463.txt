@@ -1,0 +1,114 @@
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { postSafePilotChat, SafePilotRole, SafePilotService } from "./chatApi";
+
+type ChatMsg = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  ts: number;
+};
+
+function uid() {
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+export default function SafePilotChat(props: {
+  role: SafePilotRole;
+  country?: "US" | "BD";
+  service?: SafePilotService;
+  current_entity_id?: string | null;
+  explain?: boolean;
+}) {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+
+  const canSend = useMemo(() => inputText.trim().length > 0 && !isSending, [inputText, isSending]);
+
+  const handleSend = useCallback(async () => {
+    const text = inputText.trim();
+    if (!text || isSending) return;
+
+    setErrorText(null);
+    setIsSending(true);
+
+    // Optimistic user message
+    const userMsg: ChatMsg = { id: uid(), role: "user", text, ts: Date.now() };
+    setMessages((prev) => [...prev, userMsg]);
+
+    // Clear input immediately (proves click/enter is wired)
+    setInputText("");
+
+    // DEV DEBUG (keep lightweight)
+    console.log("[SafePilot] send clicked:", { text, role: props.role, country: props.country, service: props.service });
+
+    try {
+      const data = await postSafePilotChat({
+        message: text,
+        role: props.role,
+        country: props.country,
+        service: props.service,
+        current_entity_id: props.current_entity_id ?? null,
+        explain: props.explain ?? false,
+      });
+
+      console.log("[SafePilot] response:", data);
+
+      const aiMsg: ChatMsg = { id: uid(), role: "assistant", text: data.reply || "No response.", ts: Date.now() };
+      setMessages((prev) => [...prev, aiMsg]);
+
+    } catch (err: any) {
+      console.error("[SafePilot] send error:", err);
+      setErrorText(err?.message || "Failed to send. Please try again.");
+      // Optional: mark the last user message as failed (do not remove it)
+    } finally {
+      setIsSending(false);
+    }
+  }, [inputText, isSending, props.role, props.country, props.service, props.current_entity_id, props.explain]);
+
+  // Bind Enter key if using <input>. If using React Native TextInput, bind onSubmitEditing.
+  const onKeyDown = (e: any) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault?.();
+      handleSend();
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Keep existing header/tabs UI above; do not remove */}
+      
+      <div style={{ flex: 1, overflow: "auto", padding: 12 }}>
+        {messages.length === 0 ? (
+          <div style={{ opacity: 0.7 }}>Ask about rides, orders, deliveries, verification, payments.</div>
+        ) : (
+          messages.map((m) => (
+            <div key={m.id} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                {m.role === "user" ? "You" : "SafePilot"}
+              </div>
+              <div style={{ whiteSpace: "pre-wrap" }}>{m.text}</div>
+            </div>
+          ))
+        )}
+
+        {isSending ? <div style={{ opacity: 0.7 }}>Sending...</div> : null}
+        {errorText ? <div style={{ color: "#b00020" }}>{errorText}</div> : null}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, padding: 12, borderTop: "1px solid rgba(0,0,0,0.1)" }}>
+        <input
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder='Type your question…'
+          style={{ flex: 1, padding: 10 }}
+        />
+        <button onClick={handleSend} disabled={!canSend} aria-label="Send" style={{ padding: "10px 14px" }}>
+          Send
+        </button>
+      </div>
+    </div>
+  );
+}
