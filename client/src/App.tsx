@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 const SafePilotButton = lazy(() => import("@/components/safepilot/SafePilotButton").then(m => ({ default: m.SafePilotButton })));
 const SafePilotChat = lazy(() => import("@/components/safepilot/SafePilotChat").then(m => ({ default: m.SafePilotChat })));
+const CustomerSafePilotWrapper = lazy(() => import("@/components/safepilot/CustomerSafePilotWrapper").then(m => ({ default: m.CustomerSafePilotWrapper })));
 import { NotificationSoundProvider } from "@/contexts/NotificationSoundContext";
 import { EatsCartProvider } from "@/contexts/EatsCartContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -661,6 +662,9 @@ export default function App() {
                   </Suspense>
                   <Suspense fallback={null}>
                     <SafePilotChat />
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <CustomerSafePilotWrapper />
                   </Suspense>
                 </TooltipProvider>
               </EatsCartProvider>

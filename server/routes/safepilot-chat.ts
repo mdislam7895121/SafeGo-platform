@@ -680,6 +680,149 @@ Use tools to get user's real data when needed.`;
   }
 });
 
+router.get("/customer/triggers", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required", triggers: [] });
+    }
+
+    const service = (req.query.service as string) || "ALL";
+    const entityId = req.query.entityId as string;
+    const entityType = req.query.entityType as string;
+    const userId = req.user.id;
+
+    const triggers: Array<{
+      id: string;
+      triggerType: string;
+      message: string;
+      actions: Array<{ id: string; label: string; actionType: string; route?: string; icon?: string }>;
+      priority: string;
+    }> = [];
+
+    const customer = await prisma.customerProfile.findFirst({
+      where: { userId },
+      select: { id: true, verificationStatus: true, rejectionReason: true },
+    });
+
+    if (customer?.verificationStatus === "pending" || customer?.verificationStatus === "resubmit_required") {
+      triggers.push({
+        id: "verification_pending",
+        triggerType: "verification_pending",
+        message: customer.verificationStatus === "resubmit_required"
+          ? `I noticed your verification needs attention. ${customer.rejectionReason || "Some documents need to be resubmitted."} I can help you understand what's needed.`
+          : "I noticed your account verification is still pending. Would you like me to explain what's needed to complete it?",
+        actions: [
+          { id: "upload_docs", label: "Upload Documents", actionType: "navigate", route: "/profile/verification", icon: "upload" },
+          { id: "explain_process", label: "Explain Process", actionType: "api_call", icon: "navigate" },
+        ],
+        priority: "high",
+      });
+    }
+
+    if (service === "RIDE" || service === "ALL") {
+      const recentCancelledRide = await prisma.ride.findFirst({
+        where: {
+          customerId: userId,
+          status: { in: ["cancelled_by_driver", "cancelled_by_system", "cancelled_no_drivers"] },
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, status: true, pickupAddress: true },
+      });
+
+      if (recentCancelledRide) {
+        const statusMessages: Record<string, string> = {
+          cancelled_by_driver: "I see your recent ride was cancelled by the driver. This can happen due to emergencies or navigation issues. Would you like to rebook?",
+          cancelled_by_system: "Your ride was cancelled by the system. This usually happens when no drivers are available. Let me help you try again.",
+          cancelled_no_drivers: "Unfortunately, no drivers were available for your last ride request. Would you like to try booking again?",
+        };
+        triggers.push({
+          id: `ride_cancelled_${recentCancelledRide.id}`,
+          triggerType: "ride_cancelled",
+          message: statusMessages[recentCancelledRide.status] || "Your recent ride was cancelled. Would you like to rebook?",
+          actions: [
+            { id: "rebook_ride", label: "Rebook Ride", actionType: "navigate", route: "/ride/book", icon: "ride" },
+            { id: "contact_support", label: "Contact Support", actionType: "escalate", icon: "escalate" },
+          ],
+          priority: "medium",
+        });
+      }
+    }
+
+    if (service === "FOOD" || service === "ALL") {
+      const activeOrder = await prisma.foodOrder.findFirst({
+        where: {
+          customerId: userId,
+          status: { in: ["preparing", "ready_for_pickup", "picked_up", "on_the_way"] },
+          createdAt: { gte: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, status: true, createdAt: true },
+      });
+
+      if (activeOrder && (Date.now() - new Date(activeOrder.createdAt).getTime()) > 45 * 60 * 1000) {
+        triggers.push({
+          id: `order_delayed_${activeOrder.id}`,
+          triggerType: "order_delayed",
+          message: "I noticed your food order is taking longer than expected. I'm sorry for the wait. Would you like me to check on the status?",
+          actions: [
+            { id: "track_order", label: "Track Order", actionType: "navigate", route: "/orders", icon: "food" },
+            { id: "contact_support", label: "Contact Support", actionType: "escalate", icon: "escalate" },
+          ],
+          priority: "high",
+        });
+      }
+    }
+
+    if (service === "PARCEL" || service === "ALL") {
+      const failedDelivery = await prisma.delivery.findFirst({
+        where: {
+          customerId: userId,
+          status: { in: ["failed", "cancelled"] },
+          updatedAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+        },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, status: true },
+      });
+
+      if (failedDelivery) {
+        triggers.push({
+          id: `delivery_failed_${failedDelivery.id}`,
+          triggerType: "delivery_failed",
+          message: "Your recent delivery couldn't be completed. The recipient may have been unavailable. Would you like to reschedule?",
+          actions: [
+            { id: "reschedule", label: "Reschedule Delivery", actionType: "navigate", route: "/deliveries", icon: "parcel" },
+            { id: "contact_support", label: "Contact Support", actionType: "escalate", icon: "escalate" },
+          ],
+          priority: "medium",
+        });
+      }
+    }
+
+    if (triggers.length > 0) {
+      await prisma.safePilotAuditLog.create({
+        data: {
+          actorUserId: userId,
+          actorRole: "CUSTOMER",
+          action: "ask",
+          metadata: {
+            type: "proactive_trigger",
+            triggersShown: triggers.map(t => t.triggerType),
+            service,
+            entityId,
+            entityType,
+          },
+        },
+      });
+    }
+
+    res.json({ triggers });
+  } catch (error) {
+    console.error("[SafePilot] Customer triggers error:", error);
+    res.json({ triggers: [] });
+  }
+});
+
 router.get("/rate-limit/status", async (req: AuthRequest, res) => {
   try {
     if (!req.user?.id) {
