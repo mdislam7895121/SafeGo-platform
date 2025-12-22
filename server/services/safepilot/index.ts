@@ -24,9 +24,16 @@ export { openai, SAFEPILOT_MODEL, SAFEPILOT_EMBED_MODEL, generateEmbedding, mode
 export type { ToolDefinition, ToolCallResult } from "./openaiClient";
 export { canUseAdminKB, canAccessDocument, sanitizeSourcesForRole, getToolPermissions, getCountryRules, validatePrivacyRequest } from "./rbac";
 export type { Role, Country, ServiceScope } from "./rbac";
-export { searchKB, getDocumentById, createDocumentWithEmbeddings, reembedDocument, updateDocumentStatus, listDocuments } from "./kbSearch";
+export { searchKB, searchKBWithMetadata, getDocumentById, createDocumentWithEmbeddings, reembedDocument, updateDocumentStatus, listDocuments } from "./kbSearch";
+export type { KBSearchResult, KBSearchMetadata } from "./kbSearch";
 export { safepilotChat, getConversationHistory, getUserConversations } from "./chatHandler";
 export type { ChatRequest, ChatResponse } from "./chatHandler";
 export { getAuditLogs, logAdminAction, getAuditStats } from "./auditService";
-export { executeTool, getRideStatus, getOrderStatus, getDeliveryStatus, getVerificationStatus, getWalletBalance } from "./tools";
+export { executeTool, getRideStatus, getOrderStatus, getDeliveryStatus, getVerificationStatus, getWalletBalance, getTopVerificationRejectionReasons, getHighCancellationCities, getNegativeBalanceLeaders } from "./tools";
 export type { ToolContext, ToolResult, ToolName } from "./tools";
+
+// Phase 1 & 2 additions
+export { classifyIntent, getRefusalResponse, getNextActionsForNoKB } from "./intentRouter";
+export type { IntentRoute } from "./intentRouter";
+export { checkRateLimit, incrementRateLimit, getRateLimitStatus, cleanupOldRateLimits } from "./rateLimit";
+export { processTriggers, getUserNotifications, markNotificationRead, checkVerificationPendingTriggers, checkNegativeBalanceTriggers, checkDelayedOrderTriggers, checkCancelledRideTriggers } from "./triggers";

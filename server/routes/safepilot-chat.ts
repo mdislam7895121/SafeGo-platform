@@ -28,6 +28,7 @@ const chatRequestSchema = z.object({
   role: z.enum(["CUSTOMER", "DRIVER", "RESTAURANT", "ADMIN"]),
   service: z.enum(["RIDE", "FOOD", "PARCEL", "ALL"]).default("ALL"),
   conversationId: z.string().uuid().optional(),
+  explain: z.boolean().optional().default(false),
 });
 
 const kbUploadSchema = z.object({
@@ -675,6 +676,142 @@ Use tools to get user's real data when needed.`;
   } catch (error) {
     console.error("[SafePilot] Full execution demo error:", error);
     res.status(500).json({ error: "Failed to run full execution demo", details: String(error) });
+  }
+});
+
+router.get("/rate-limit/status", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const { getRateLimitStatus } = await import("../services/safepilot/rateLimit");
+    const role = getUserRole(req);
+    const status = await getRateLimitStatus(req.user.id, role);
+
+    res.json(status);
+  } catch (error) {
+    console.error("[SafePilot] Rate limit status error:", error);
+    res.status(500).json({ error: "Failed to get rate limit status" });
+  }
+});
+
+router.get("/notifications", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const { getUserNotifications } = await import("../services/safepilot/triggers");
+    const limit = parseInt(req.query.limit as string) || 20;
+    const notifications = await getUserNotifications(req.user.id, limit);
+
+    res.json({ notifications });
+  } catch (error) {
+    console.error("[SafePilot] Notifications error:", error);
+    res.status(500).json({ error: "Failed to get notifications" });
+  }
+});
+
+router.post("/notifications/:id/read", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const { markNotificationRead } = await import("../services/safepilot/triggers");
+    const success = await markNotificationRead(req.params.id, req.user.id);
+
+    res.json({ success });
+  } catch (error) {
+    console.error("[SafePilot] Mark notification read error:", error);
+    res.status(500).json({ error: "Failed to mark notification as read" });
+  }
+});
+
+router.post("/admin/triggers/run", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { processTriggers } = await import("../services/safepilot/triggers");
+    const result = await processTriggers();
+
+    res.json({
+      message: "Triggers processed successfully",
+      processed: result.processed,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error("[SafePilot] Triggers run error:", error);
+    res.status(500).json({ error: "Failed to run triggers" });
+  }
+});
+
+router.get("/admin/cache/stats", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const stats = await prisma.$queryRaw<Array<{ kind: string; count: bigint; oldest: Date; newest: Date }>>`
+      SELECT kind, COUNT(*) as count, MIN(created_at) as oldest, MAX(created_at) as newest
+      FROM safepilot_cache
+      WHERE expires_at > NOW()
+      GROUP BY kind
+    `;
+
+    res.json({
+      cacheStats: stats.map(s => ({
+        kind: s.kind,
+        count: Number(s.count),
+        oldest: s.oldest,
+        newest: s.newest,
+      })),
+    });
+  } catch (error) {
+    console.error("[SafePilot] Cache stats error:", error);
+    res.status(500).json({ error: "Failed to get cache stats" });
+  }
+});
+
+router.delete("/admin/cache/clear", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const kind = req.query.kind as string;
+    
+    let deleted: number;
+    if (kind === "EMBEDDING" || kind === "KB_RESULTS") {
+      const result = await prisma.$executeRaw`DELETE FROM safepilot_cache WHERE kind = ${kind}`;
+      deleted = result;
+    } else {
+      const result = await prisma.$executeRaw`DELETE FROM safepilot_cache WHERE expires_at < NOW()`;
+      deleted = result;
+    }
+
+    res.json({ message: "Cache cleared", deleted });
+  } catch (error) {
+    console.error("[SafePilot] Cache clear error:", error);
+    res.status(500).json({ error: "Failed to clear cache" });
   }
 });
 

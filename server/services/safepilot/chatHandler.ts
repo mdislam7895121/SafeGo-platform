@@ -1,8 +1,11 @@
 import { prisma } from "../../lib/prisma";
 import { chatCompletionWithTools, moderateText, ToolDefinition } from "./openaiClient";
-import { searchKB } from "./kbSearch";
+import { searchKBWithMetadata, KBSearchResult } from "./kbSearch";
 import { Role, Country, ServiceScope, sanitizeSourcesForRole, getCountryRules, getToolPermissions } from "./rbac";
 import { executeTool, ToolName } from "./tools";
+import { classifyIntent, getRefusalResponse, getNextActionsForNoKB, IntentRoute } from "./intentRouter";
+import { checkRateLimit, incrementRateLimit } from "./rateLimit";
+import { z } from "zod";
 
 export interface ChatRequest {
   message: string;
@@ -11,6 +14,7 @@ export interface ChatRequest {
   service: ServiceScope;
   userId: string;
   conversationId?: string;
+  explain?: boolean;
 }
 
 export interface ChatResponse {
@@ -23,6 +27,45 @@ export interface ChatResponse {
     inputFlagged: boolean;
     outputFlagged: boolean;
   };
+  rateLimitInfo?: {
+    remaining: number;
+    resetAt: Date;
+  };
+  explanation?: {
+    route: IntentRoute;
+    kbTitlesUsed: string[];
+    toolsExecuted: string[];
+    countryRulesApplied: string;
+    cacheHit: boolean;
+  };
+}
+
+const TOOL_ARG_SCHEMAS: Record<string, z.ZodSchema> = {
+  get_ride_status: z.object({ rideId: z.string().optional() }),
+  get_order_status: z.object({ orderId: z.string().optional() }),
+  get_delivery_status: z.object({ deliveryId: z.string().optional() }),
+  get_verification_status: z.object({}),
+  get_wallet_balance: z.object({}),
+  get_top_rejection_reasons: z.object({ country: z.string().optional(), days: z.number().optional() }),
+  get_high_cancellation_cities: z.object({ country: z.string().optional(), days: z.number().optional(), service: z.string().optional() }),
+  get_negative_balance_leaders: z.object({ country: z.string().optional(), role: z.string().optional(), limit: z.number().optional() }),
+};
+
+const MAX_TOOL_ITERATIONS = 2;
+
+function getRoleTonePreset(role: Role): string {
+  switch (role) {
+    case "CUSTOMER":
+      return `Tone: Calm, helpful, and reassuring. Use simple everyday language. Provide short, actionable steps. Always express empathy when there are issues. Never use technical jargon.`;
+    case "DRIVER":
+      return `Tone: Direct and operational. Be compliance-aware and practical. Focus on what they need to do next. Mention earnings, ratings, and performance impacts when relevant. Use clear, no-nonsense language.`;
+    case "RESTAURANT":
+      return `Tone: Professional and order-focused. Emphasize efficiency and business impact. Discuss commission, payout timing, and operational matters clearly. Be respectful of their time.`;
+    case "ADMIN":
+      return `Tone: Analytical and metrics-first. Provide data-driven insights. Be comprehensive but organized. Include relevant statistics and trends when available. Support decision-making with facts.`;
+    default:
+      return `Tone: Helpful and professional.`;
+  }
 }
 
 function buildToolDefinitions(role: Role): ToolDefinition[] {
@@ -35,12 +78,7 @@ function buildToolDefinitions(role: Role): ToolDefinition[] {
       function: {
         name: "get_ride_status",
         description: "Get the status of the user's ride bookings. Returns recent rides with their current status, pickup/dropoff addresses, and fares.",
-        parameters: {
-          type: "object",
-          properties: {
-            rideId: { type: "string", description: "Optional specific ride ID to look up" },
-          },
-        },
+        parameters: { type: "object", properties: { rideId: { type: "string", description: "Optional specific ride ID to look up" } } },
       },
     });
   }
@@ -51,12 +89,7 @@ function buildToolDefinitions(role: Role): ToolDefinition[] {
       function: {
         name: "get_order_status",
         description: "Get the status of food orders. Returns recent orders with their current status, subtotal, delivery fee, and total amount.",
-        parameters: {
-          type: "object",
-          properties: {
-            orderId: { type: "string", description: "Optional specific order ID to look up" },
-          },
-        },
+        parameters: { type: "object", properties: { orderId: { type: "string", description: "Optional specific order ID to look up" } } },
       },
     });
   }
@@ -67,12 +100,7 @@ function buildToolDefinitions(role: Role): ToolDefinition[] {
       function: {
         name: "get_delivery_status",
         description: "Get the status of parcel deliveries. Returns recent deliveries with their current status and addresses.",
-        parameters: {
-          type: "object",
-          properties: {
-            deliveryId: { type: "string", description: "Optional specific delivery ID to look up" },
-          },
-        },
+        parameters: { type: "object", properties: { deliveryId: { type: "string", description: "Optional specific delivery ID to look up" } } },
       },
     });
   }
@@ -83,10 +111,7 @@ function buildToolDefinitions(role: Role): ToolDefinition[] {
       function: {
         name: "get_verification_status",
         description: "Get the user's account verification status and any rejection reasons if applicable.",
-        parameters: {
-          type: "object",
-          properties: {},
-        },
+        parameters: { type: "object", properties: {} },
       },
     });
   }
@@ -97,28 +122,99 @@ function buildToolDefinitions(role: Role): ToolDefinition[] {
       function: {
         name: "get_wallet_balance",
         description: "Get the user's wallet balance, including any negative balance and available payment methods.",
-        parameters: {
-          type: "object",
-          properties: {},
-        },
+        parameters: { type: "object", properties: {} },
       },
     });
+  }
+
+  if (role === "ADMIN") {
+    tools.push(
+      {
+        type: "function",
+        function: {
+          name: "get_top_rejection_reasons",
+          description: "Get aggregated top verification rejection reasons for a country over a time period.",
+          parameters: {
+            type: "object",
+            properties: {
+              country: { type: "string", description: "Country code (BD, US, or GLOBAL)" },
+              days: { type: "number", description: "Number of days to analyze (default 30)" },
+            },
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_high_cancellation_cities",
+          description: "Get cities with the highest cancellation rates for rides or food orders.",
+          parameters: {
+            type: "object",
+            properties: {
+              country: { type: "string", description: "Country code" },
+              days: { type: "number", description: "Number of days to analyze" },
+              service: { type: "string", description: "Service type: ride, food, or all" },
+            },
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_negative_balance_leaders",
+          description: "Get drivers or restaurants with the highest negative wallet balances.",
+          parameters: {
+            type: "object",
+            properties: {
+              country: { type: "string", description: "Country code" },
+              role: { type: "string", description: "DRIVER, RESTAURANT, or ALL" },
+              limit: { type: "number", description: "Max results to return" },
+            },
+          },
+        },
+      }
+    );
   }
 
   return tools;
 }
 
-function buildSystemPrompt(role: Role, country: Country, service: ServiceScope, kbContext: string, kbHasResults: boolean): string {
+function buildSystemPrompt(
+  role: Role,
+  country: Country,
+  service: ServiceScope,
+  kbContext: string,
+  kbHasResults: boolean,
+  route: IntentRoute
+): string {
   const countryRules = getCountryRules(country);
   const permissions = getToolPermissions(role);
+  const tonePreset = getRoleTonePreset(role);
   
   const privacyRules = permissions.restrictedFields.length > 0
     ? `You must NEVER reveal or discuss these restricted data types: ${permissions.restrictedFields.join(", ")}.`
     : "You have access to all data types.";
 
-  const hallucinationPrevention = kbHasResults
-    ? `You have been provided context from the SafeGo knowledge base. Base your answer on this context. If the context doesn't fully answer the question, say so and suggest contacting SafeGo Support.`
-    : `No relevant documents were found in the SafeGo knowledge base for this query. If you don't have specific information about SafeGo policies or procedures, clearly state that you don't have that information and recommend the user contact SafeGo Support. DO NOT make up policies or procedures.`;
+  let hallucinationPrevention: string;
+  if (route === "KB_FIRST" && !kbHasResults) {
+    hallucinationPrevention = `CRITICAL: No relevant documents were found in the SafeGo knowledge base. You MUST NOT make up any policies, procedures, or specific information about SafeGo. Instead:
+1. Clearly state: "I don't have verified information about that topic."
+2. Suggest checking the Help section in the app
+3. Recommend contacting SafeGo Support for accurate information
+4. DO NOT fabricate answers.`;
+  } else if (kbHasResults) {
+    hallucinationPrevention = `You have been provided context from the SafeGo knowledge base. Base your answer on this context. If the context doesn't fully answer the question, acknowledge what you know and suggest contacting SafeGo Support for complete information.`;
+  } else {
+    hallucinationPrevention = `Use the tools provided to get the user's real data. If tools don't return the needed information, be honest about what you couldn't find.`;
+  }
+
+  const brandRules = `
+## Brand & Response Rules
+${tonePreset}
+- Never promise actions you cannot perform
+- Always specify clear next steps
+- Never expose restricted fields or other users' data
+- If uncertain, recommend contacting SafeGo Support`;
 
   return `You are SafePilot, the in-app AI assistant for SafeGo - a super-app offering ride-hailing, food delivery, and parcel delivery services.
 
@@ -138,6 +234,7 @@ ${privacyRules}
 - Currency: ${countryRules.currency}
 - Available payment methods: ${countryRules.paymentMethods.join(", ")}
 - KYC requirements: ${countryRules.kycFields.join(", ")}
+${brandRules}
 
 ## Service Status Flows
 ### Ride-hailing
@@ -149,22 +246,40 @@ placed → accepted → preparing → ready_for_pickup → picked_up → on_the_
 ### Parcel Delivery
 requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled
 
-## Tool Usage
-You have access to tools to look up the user's real data. Use these tools to provide accurate, personalized information rather than generic responses. When a user asks about their rides, orders, deliveries, verification status, or wallet balance, USE THE APPROPRIATE TOOL to get their actual data.
-
-## Guidelines
-1. Be concise but complete in your answers.
-2. If you don't know something, say so and suggest contacting SafeGo Support.
-3. Always prioritize user safety and data privacy.
-4. Use simple, everyday language.
-
 ${kbContext ? `## Knowledge Base Context\n${kbContext}` : ""}
 
 Answer the user's question based on the provided context, tool results, and your knowledge of SafeGo operations.`;
 }
 
 export async function safepilotChat(request: ChatRequest): Promise<ChatResponse> {
-  const { message, country, role, service, userId, conversationId } = request;
+  const { message, country, role, service, userId, conversationId, explain = false } = request;
+
+  const rateLimitCheck = await checkRateLimit(userId, role);
+  if (!rateLimitCheck.allowed) {
+    return {
+      reply: "You've reached your message limit for this hour. Please try again later, or contact SafeGo Support if you need immediate assistance.",
+      conversationId: conversationId || "",
+      sources: [],
+      rateLimitInfo: { remaining: 0, resetAt: rateLimitCheck.resetAt },
+    };
+  }
+
+  const intentResult = classifyIntent(message, role);
+  
+  if (intentResult.route === "REFUSE") {
+    await logAuditEvent(userId, role, "ask", {
+      message,
+      route: "REFUSE",
+      reason: intentResult.reason,
+    });
+    
+    return {
+      reply: getRefusalResponse(intentResult.reason),
+      conversationId: conversationId || "",
+      sources: [],
+      suggestedActions: ["Contact SafeGo Support"],
+    };
+  }
 
   const inputModeration = await moderateText(message);
   
@@ -183,7 +298,7 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     };
   }
 
-  const kbResults = await searchKB({ query: message, country, role, service, limit: 6 });
+  const { results: kbResults, metadata: kbMetadata } = await searchKBWithMetadata({ query: message, country, role, service, limit: 6 });
   const kbHasResults = kbResults.length > 0;
 
   const kbContext = kbHasResults
@@ -191,7 +306,7 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     : "";
 
   const tools = buildToolDefinitions(role);
-  const systemPrompt = buildSystemPrompt(role, country, service, kbContext, kbHasResults);
+  const systemPrompt = buildSystemPrompt(role, country, service, kbContext, kbHasResults, intentResult.route);
 
   let conversation = conversationId
     ? await prisma.safePilotConversation.findUnique({
@@ -230,9 +345,8 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
   const toolsUsed: string[] = [];
   let finalReply = "";
   let iterations = 0;
-  const maxIterations = 3;
 
-  while (iterations < maxIterations) {
+  while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
 
     const result = await chatCompletionWithTools(messages, tools, { maxTokens: 2048 });
@@ -253,13 +367,25 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
         let toolResult: string;
         
         try {
-          const args = JSON.parse(toolCall.arguments || "{}");
+          const rawArgs = JSON.parse(toolCall.arguments || "{}");
+          
+          const schema = TOOL_ARG_SCHEMAS[toolCall.name];
+          let validatedArgs = rawArgs;
+          if (schema) {
+            const parseResult = schema.safeParse(rawArgs);
+            if (!parseResult.success) {
+              toolResult = JSON.stringify({ error: "Invalid tool arguments", details: parseResult.error.format() });
+              messages.push({ role: "tool", content: toolResult, tool_call_id: toolCall.id });
+              continue;
+            }
+            validatedArgs = parseResult.data;
+          }
           
           const toolResponse = await executeTool(toolCall.name as ToolName, {
             userId,
             role,
             country,
-          }, args);
+          }, validatedArgs);
 
           if (!toolResponse.success) {
             toolResult = JSON.stringify({
@@ -274,13 +400,20 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
 
           await logAuditEvent(userId, role, "tool_call", {
             tool: toolCall.name,
-            args,
+            args: validatedArgs,
             success: toolResponse.success,
             source: toolResponse.source,
           });
 
         } catch (error) {
-          toolResult = JSON.stringify({ error: "Tool execution failed" });
+          console.error(`[SafePilot] Tool ${toolCall.name} error:`, error);
+          toolResult = JSON.stringify({ error: "Tool execution failed. Please try again." });
+          
+          await logAuditEvent(userId, role, "tool_call", {
+            tool: toolCall.name,
+            error: "execution_failed",
+            errorCode: "TOOL_ERROR",
+          });
         }
 
         messages.push({
@@ -290,13 +423,22 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
         });
       }
     } else {
-      finalReply = result.content || "I apologize, but I couldn't generate a response. Please contact SafeGo Support.";
+      finalReply = result.content || "";
       break;
     }
   }
 
+  if (!finalReply && iterations >= MAX_TOOL_ITERATIONS) {
+    finalReply = "I apologize, but I couldn't complete your request in the allowed number of steps. Please try rephrasing your question or contact SafeGo Support for assistance.";
+  }
+
   if (!finalReply) {
-    finalReply = "I apologize, but I couldn't complete your request. Please contact SafeGo Support for assistance.";
+    if (intentResult.route === "KB_FIRST" && !kbHasResults) {
+      const nextActions = getNextActionsForNoKB();
+      finalReply = `I don't have enough verified information to answer that question. Here's what you can do:\n\n${nextActions.map((a, i) => `${i + 1}. ${a}`).join("\n")}`;
+    } else {
+      finalReply = "I apologize, but I couldn't generate a response. Please contact SafeGo Support.";
+    }
   }
 
   const outputModeration = await moderateText(finalReply);
@@ -343,16 +485,20 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
     data: { lastSeenAt: new Date() },
   });
 
+  const rateResult = await incrementRateLimit(userId, role);
+
   await logAuditEvent(userId, role, "answer", {
     query: message,
+    route: intentResult.route,
     sourceCount: kbResults.length,
     toolsUsed,
     conversationId: conversation.id,
+    cache: { hit: kbMetadata.cacheHit, kind: kbMetadata.cacheKind },
   });
 
-  const suggestedActions = generateSuggestedActions(message, role);
+  const suggestedActions = generateSuggestedActions(message, role, intentResult.route);
 
-  return {
+  const response: ChatResponse = {
     reply: finalReply,
     conversationId: conversation.id,
     sources: sanitizedSources,
@@ -362,10 +508,26 @@ export async function safepilotChat(request: ChatRequest): Promise<ChatResponse>
       inputFlagged: inputModeration.flagged,
       outputFlagged: outputModeration.flagged,
     },
+    rateLimitInfo: {
+      remaining: rateResult.remaining,
+      resetAt: rateResult.resetAt,
+    },
   };
+
+  if (explain || role === "ADMIN") {
+    response.explanation = {
+      route: intentResult.route,
+      kbTitlesUsed: kbResults.map(r => r.title),
+      toolsExecuted: toolsUsed,
+      countryRulesApplied: country,
+      cacheHit: kbMetadata.cacheHit,
+    };
+  }
+
+  return response;
 }
 
-function generateSuggestedActions(query: string, role: Role): string[] {
+function generateSuggestedActions(query: string, role: Role, route: IntentRoute): string[] {
   const actions: string[] = [];
   const lowerQuery = query.toLowerCase();
 
@@ -387,6 +549,10 @@ function generateSuggestedActions(query: string, role: Role): string[] {
   
   if (lowerQuery.includes("support") || lowerQuery.includes("help") || lowerQuery.includes("contact")) {
     actions.push("Contact SafeGo Support");
+  }
+
+  if (route === "KB_FIRST" && actions.length === 0) {
+    actions.push("Check Help Center for guides");
   }
 
   return actions.slice(0, 3);

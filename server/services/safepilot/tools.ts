@@ -452,17 +452,229 @@ export async function getWalletBalance(
   }
 }
 
+export async function getTopVerificationRejectionReasons(
+  ctx: ToolContext,
+  params: { country?: string; days?: number }
+): Promise<ToolResult> {
+  if (ctx.role !== "ADMIN") {
+    return {
+      success: false,
+      error: "This tool is only available to administrators.",
+      source: "rbac_check",
+    };
+  }
+
+  try {
+    const daysAgo = params.days || 30;
+    const cutoff = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+    const country = params.country || ctx.country;
+
+    const customerRejections = await prisma.customer.findMany({
+      where: {
+        verificationStatus: "rejected",
+        updatedAt: { gte: cutoff },
+        ...(country !== "GLOBAL" && { country }),
+      },
+      select: { rejectionReason: true },
+    });
+
+    const driverRejections = await prisma.driverProfile.findMany({
+      where: {
+        verificationStatus: "rejected",
+        updatedAt: { gte: cutoff },
+        ...(country !== "GLOBAL" && { country }),
+      },
+      select: { rejectionReason: true },
+    });
+
+    const allReasons = [...customerRejections, ...driverRejections]
+      .map(r => r.rejectionReason || "No reason specified")
+      .reduce((acc, reason) => {
+        acc[reason] = (acc[reason] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+    const sorted = Object.entries(allReasons)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([reason, count]) => ({ reason, count }));
+
+    return {
+      success: true,
+      data: {
+        country,
+        daysAnalyzed: daysAgo,
+        totalRejections: customerRejections.length + driverRejections.length,
+        topReasons: sorted,
+      },
+      source: "admin_analytics",
+    };
+  } catch (error) {
+    console.error("[SafePilot Tools] getTopVerificationRejectionReasons error:", error);
+    return { success: false, error: "Failed to retrieve rejection reasons.", source: "database_error" };
+  }
+}
+
+export async function getHighCancellationCities(
+  ctx: ToolContext,
+  params: { country?: string; days?: number; service?: string }
+): Promise<ToolResult> {
+  if (ctx.role !== "ADMIN") {
+    return {
+      success: false,
+      error: "This tool is only available to administrators.",
+      source: "rbac_check",
+    };
+  }
+
+  try {
+    const daysAgo = params.days || 30;
+    const cutoff = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+    const country = params.country || ctx.country;
+    const service = params.service || "ride";
+
+    let cancelledCount: Record<string, number> = {};
+    let totalCount: Record<string, number> = {};
+
+    if (service === "ride" || service === "all") {
+      const rides = await prisma.ride.findMany({
+        where: {
+          createdAt: { gte: cutoff },
+          ...(country !== "GLOBAL" && { country }),
+        },
+        select: { pickupCity: true, status: true },
+      });
+
+      for (const ride of rides) {
+        const city = ride.pickupCity || "Unknown";
+        totalCount[city] = (totalCount[city] || 0) + 1;
+        if (ride.status?.startsWith("cancelled")) {
+          cancelledCount[city] = (cancelledCount[city] || 0) + 1;
+        }
+      }
+    }
+
+    const cityStats = Object.keys(totalCount)
+      .map(city => ({
+        city,
+        totalTrips: totalCount[city],
+        cancelledTrips: cancelledCount[city] || 0,
+        cancellationRate: ((cancelledCount[city] || 0) / totalCount[city] * 100).toFixed(1) + "%",
+      }))
+      .filter(c => c.totalTrips >= 10)
+      .sort((a, b) => b.cancelledTrips - a.cancelledTrips)
+      .slice(0, 10);
+
+    return {
+      success: true,
+      data: {
+        country,
+        service,
+        daysAnalyzed: daysAgo,
+        highCancellationCities: cityStats,
+      },
+      source: "admin_analytics",
+    };
+  } catch (error) {
+    console.error("[SafePilot Tools] getHighCancellationCities error:", error);
+    return { success: false, error: "Failed to retrieve cancellation data.", source: "database_error" };
+  }
+}
+
+export async function getNegativeBalanceLeaders(
+  ctx: ToolContext,
+  params: { country?: string; role?: string; limit?: number }
+): Promise<ToolResult> {
+  if (ctx.role !== "ADMIN") {
+    return {
+      success: false,
+      error: "This tool is only available to administrators.",
+      source: "rbac_check",
+    };
+  }
+
+  try {
+    const country = params.country || ctx.country;
+    const targetRole = params.role || "DRIVER";
+    const limit = params.limit || 20;
+
+    const results: Array<{ userId: string; balance: string; name?: string }> = [];
+
+    if (targetRole === "DRIVER" || targetRole === "ALL") {
+      const drivers = await prisma.driverProfile.findMany({
+        where: {
+          walletBalance: { lt: 0 },
+          ...(country !== "GLOBAL" && { country }),
+        },
+        orderBy: { walletBalance: "asc" },
+        take: limit,
+        select: {
+          userId: true,
+          walletBalance: true,
+          user: { select: { fullName: true } },
+        },
+      });
+
+      for (const d of drivers) {
+        results.push({
+          userId: d.userId.slice(0, 8) + "...",
+          balance: d.walletBalance?.toString() || "0",
+          name: d.user?.fullName?.slice(0, 15) + "..." || "N/A",
+        });
+      }
+    }
+
+    if (targetRole === "RESTAURANT" || targetRole === "ALL") {
+      const restaurants = await prisma.restaurantWallet.findMany({
+        where: {
+          negativeBalance: { gt: 0 },
+        },
+        orderBy: { negativeBalance: "desc" },
+        take: limit,
+        select: {
+          restaurantId: true,
+          negativeBalance: true,
+        },
+      });
+
+      for (const r of restaurants) {
+        results.push({
+          userId: r.restaurantId.slice(0, 8) + "...",
+          balance: "-" + (r.negativeBalance?.toString() || "0"),
+        });
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        country,
+        role: targetRole,
+        negativeBalanceAccounts: results.slice(0, limit),
+        totalFound: results.length,
+      },
+      source: "admin_analytics",
+    };
+  } catch (error) {
+    console.error("[SafePilot Tools] getNegativeBalanceLeaders error:", error);
+    return { success: false, error: "Failed to retrieve negative balance data.", source: "database_error" };
+  }
+}
+
 export type ToolName = 
   | "get_ride_status"
   | "get_order_status"
   | "get_delivery_status"
   | "get_verification_status"
-  | "get_wallet_balance";
+  | "get_wallet_balance"
+  | "get_top_rejection_reasons"
+  | "get_high_cancellation_cities"
+  | "get_negative_balance_leaders";
 
 export async function executeTool(
   toolName: ToolName,
   ctx: ToolContext,
-  params?: Record<string, string>
+  params?: Record<string, any>
 ): Promise<ToolResult> {
   switch (toolName) {
     case "get_ride_status":
@@ -475,6 +687,12 @@ export async function executeTool(
       return getVerificationStatus(ctx);
     case "get_wallet_balance":
       return getWalletBalance(ctx);
+    case "get_top_rejection_reasons":
+      return getTopVerificationRejectionReasons(ctx, params || {});
+    case "get_high_cancellation_cities":
+      return getHighCancellationCities(ctx, params || {});
+    case "get_negative_balance_leaders":
+      return getNegativeBalanceLeaders(ctx, params || {});
     default:
       return {
         success: false,
