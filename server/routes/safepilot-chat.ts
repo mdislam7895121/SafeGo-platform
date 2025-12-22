@@ -13,7 +13,11 @@ import {
   getAuditStats,
   logAdminAction,
   canUseAdminKB,
+  executeTool,
+  generateEmbedding,
+  searchKB,
 } from "../services/safepilot";
+import type { ToolName } from "../services/safepilot";
 import { prisma } from "../lib/prisma";
 
 const router = Router();
@@ -374,6 +378,119 @@ router.get("/audit/stats", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("[SafePilot] Audit stats error:", error);
     res.status(500).json({ error: "Failed to get audit stats" });
+  }
+});
+
+const toolRequestSchema = z.object({
+  tool: z.enum([
+    "get_ride_status",
+    "get_order_status",
+    "get_delivery_status",
+    "get_verification_status",
+    "get_wallet_balance",
+  ]),
+  params: z.record(z.string()).optional(),
+});
+
+router.post("/tools/execute", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const parsed = toolRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request", details: parsed.error.errors });
+    }
+
+    const { tool, params } = parsed.data;
+    const userRole = getUserRole(req);
+    const userCountry = getUserCountry(req);
+
+    const result = await executeTool(tool as ToolName, {
+      userId: req.user.id,
+      role: userRole,
+      country: userCountry,
+    }, params);
+
+    await prisma.safePilotAuditLog.create({
+      data: {
+        actorUserId: req.user.id,
+        actorRole: userRole,
+        action: "tool_call",
+        metadata: {
+          tool,
+          params,
+          success: result.success,
+          source: result.source,
+        },
+      },
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("[SafePilot] Tool execution error:", error);
+    res.status(500).json({ error: "Failed to execute tool" });
+  }
+});
+
+router.post("/demo/rag-flow", async (req: AuthRequest, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const userRole = getUserRole(req);
+    if (!canUseAdminKB(userRole)) {
+      return res.status(403).json({ error: "Admin access required for RAG demo" });
+    }
+
+    const { query } = req.body;
+    if (!query || typeof query !== "string") {
+      return res.status(400).json({ error: "query string is required" });
+    }
+
+    const startTime = Date.now();
+
+    const embedding = await generateEmbedding(query);
+    const embeddingTime = Date.now() - startTime;
+
+    const searchStart = Date.now();
+    const searchResults = await searchKB({
+      query,
+      country: getUserCountry(req),
+      role: userRole,
+      service: "ALL",
+      limit: 5,
+    });
+    const searchTime = Date.now() - searchStart;
+
+    res.json({
+      step1_query: query,
+      step2_embedding: {
+        model: "text-embedding-3-large",
+        dimensions: embedding.length,
+        first10Values: embedding.slice(0, 10),
+        timeMs: embeddingTime,
+      },
+      step3_vectorSearch: {
+        resultsFound: searchResults.length,
+        timeMs: searchTime,
+        results: searchResults.map((r) => ({
+          documentId: r.documentId,
+          title: r.title,
+          similarity: r.similarity.toFixed(4),
+          chunkPreview: r.chunkText.substring(0, 200) + (r.chunkText.length > 200 ? "..." : ""),
+        })),
+      },
+      step4_context: searchResults.length > 0
+        ? `Context from ${searchResults.length} documents would be passed to GPT for grounded answer.`
+        : "No matching documents found - GPT would answer from general knowledge.",
+      totalTimeMs: Date.now() - startTime,
+    });
+  } catch (error) {
+    console.error("[SafePilot] RAG demo error:", error);
+    res.status(500).json({ error: "Failed to run RAG demo" });
   }
 });
 

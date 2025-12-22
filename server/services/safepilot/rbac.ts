@@ -40,6 +40,7 @@ export function getToolPermissions(role: Role): {
   canManageKB: boolean;
   canViewDocuments: boolean;
   restrictedFields: string[];
+  allowedTools: string[];
 } {
   switch (role) {
     case "ADMIN":
@@ -49,6 +50,15 @@ export function getToolPermissions(role: Role): {
         canManageKB: true,
         canViewDocuments: true,
         restrictedFields: [],
+        allowedTools: [
+          "read_ride_status",
+          "read_order_status",
+          "read_delivery_status",
+          "read_verification_status",
+          "read_wallet",
+          "read_all_users",
+          "read_platform_metrics",
+        ],
       };
     case "CUSTOMER":
       return {
@@ -57,6 +67,12 @@ export function getToolPermissions(role: Role): {
         canManageKB: false,
         canViewDocuments: false,
         restrictedFields: ["driverNid", "driverLicense", "restaurantDocuments"],
+        allowedTools: [
+          "read_ride_status",
+          "read_order_status",
+          "read_delivery_status",
+          "read_verification_status",
+        ],
       };
     case "DRIVER":
       return {
@@ -65,6 +81,13 @@ export function getToolPermissions(role: Role): {
         canManageKB: false,
         canViewDocuments: false,
         restrictedFields: ["customerNid", "customerGovernmentId", "restaurantDocuments"],
+        allowedTools: [
+          "read_ride_status",
+          "read_order_status",
+          "read_delivery_status",
+          "read_verification_status",
+          "read_wallet",
+        ],
       };
     case "RESTAURANT":
       return {
@@ -73,6 +96,11 @@ export function getToolPermissions(role: Role): {
         canManageKB: false,
         canViewDocuments: false,
         restrictedFields: ["customerNid", "driverNid", "otherRestaurantData"],
+        allowedTools: [
+          "read_order_status",
+          "read_verification_status",
+          "read_wallet",
+        ],
       };
     default:
       return {
@@ -81,6 +109,7 @@ export function getToolPermissions(role: Role): {
         canManageKB: false,
         canViewDocuments: false,
         restrictedFields: ["*"],
+        allowedTools: [],
       };
   }
 }
