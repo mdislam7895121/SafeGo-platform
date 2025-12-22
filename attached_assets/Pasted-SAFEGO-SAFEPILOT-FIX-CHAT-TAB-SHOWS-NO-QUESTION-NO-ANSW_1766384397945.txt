@@ -1,0 +1,74 @@
+SAFEGO / SAFEPILOT — FIX: CHAT TAB SHOWS NO QUESTION + NO ANSWER
+===============================================================
+
+ABSOLUTE RULES:
+- Additive only. Do NOT rename/remove existing APIs, routes, schemas, UI.
+- Keep SafeGo rules: 4 roles, 3 services, BD/US country logic, RBAC.
+- Goal: make the chat visibly send, visibly fail, or visibly respond. No silent failures.
+
+Observed:
+- SafePilot modal opens. Chat tab selected. No user message shows, no assistant answer shows.
+- Therefore we must add: (1) optimistic message rendering, (2) network status debug, (3) error UI.
+
+PRIMARY TASK:
+1) Ensure Chat tab actually renders a message list area.
+2) Ensure send button triggers handleSend().
+3) Ensure POST /api/safepilot/chat is called and its status is visible in UI.
+4) If request fails (401/403/404/500), show the error to the user inside the widget.
+
+FILES:
+- client/src/components/safepilot/SafePilotChat.tsx (or current safe pilot widget file)
+- If there is a tab wrapper component: client/src/components/safepilot/SafePilotWidget.tsx (or similar)
+Additive new helper allowed:
+- client/src/components/safepilot/chatApi.ts
+
+---------------------------------------------------------------
+STEP 1 — FORCE CHAT TAB TO RENDER THE CHAT COMPONENT
+---------------------------------------------------------------
+If there is a tabs UI (Intel/Context/Chat):
+- Confirm that when "Chat" is active, it renders <SafePilotChatPanel /> or similar.
+- If Chat tab currently shows empty container, fix the conditional render.
+- Default active tab should be "Chat" (only if current default causes blank screen).
+Do not remove other tabs.
+
+---------------------------------------------------------------
+STEP 2 — ADD “DEBUG STRIP” INSIDE CHAT (SO WE CAN SEE WHAT’S WRONG)
+---------------------------------------------------------------
+In the chat panel area, add a small debug strip (dev-only but safe if shipped):
+- Last request URL
+- Last HTTP status
+- Last error message
+- Last response preview (first 120 chars)
+
+This must be visible even if the chat list is empty.
+
+---------------------------------------------------------------
+STEP 3 — IMPLEMENT OPTIMISTIC MESSAGES + ERROR UI + REAL API CALL
+---------------------------------------------------------------
+
+Create (additive) helper:
+client/src/components/safepilot/chatApi.ts
+
+```ts
+export async function safePilotChatFetch(url: string, body: any) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    const text = await res.text().catch(() => "");
+    let json: any = null;
+    try { json = text ? JSON.parse(text) : null; } catch {}
+
+    return { ok: res.ok, status: res.status, text, json };
+  } finally {
+    clearTimeout(t);
+  }
+}
