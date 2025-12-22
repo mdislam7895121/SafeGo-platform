@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import { generateEmbedding } from "./openaiClient";
 import { Role, Country, ServiceScope, canAccessDocument } from "./rbac";
+import crypto from "crypto";
 
 export interface KBSearchResult {
   id: string;
@@ -8,6 +9,84 @@ export interface KBSearchResult {
   title: string;
   chunkText: string;
   similarity: number;
+}
+
+export interface KBSearchMetadata {
+  cacheHit: boolean;
+  cacheKind?: "EMBEDDING" | "KB_RESULTS";
+  embeddingTimeMs?: number;
+  searchTimeMs?: number;
+}
+
+const EMBEDDING_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const KB_RESULTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function generateCacheKey(prefix: string, ...parts: string[]): string {
+  const normalized = parts.map(p => (p || "").toLowerCase().trim().replace(/\s+/g, " ")).join("|");
+  const hash = crypto.createHash("sha256").update(normalized).digest("hex");
+  return `${prefix}:${hash}`;
+}
+
+async function getEmbeddingFromCache(query: string): Promise<number[] | null> {
+  const cacheKey = generateCacheKey("EMB", query);
+  try {
+    const cached = await prisma.$queryRaw<Array<{ payload_json: any; expires_at: Date }>>`
+      SELECT payload_json, expires_at FROM safepilot_cache 
+      WHERE cache_key = ${cacheKey} AND kind = 'EMBEDDING' AND expires_at > NOW()
+      LIMIT 1
+    `;
+    if (cached.length > 0 && cached[0].payload_json) {
+      return cached[0].payload_json as number[];
+    }
+  } catch (e) {
+    console.error("[SafePilot Cache] Embedding get error:", e);
+  }
+  return null;
+}
+
+async function setEmbeddingCache(query: string, embedding: number[]): Promise<void> {
+  const cacheKey = generateCacheKey("EMB", query);
+  const expiresAt = new Date(Date.now() + EMBEDDING_CACHE_TTL_MS);
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO safepilot_cache (id, cache_key, kind, payload_json, created_at, expires_at)
+      VALUES (gen_random_uuid(), ${cacheKey}, 'EMBEDDING', ${JSON.stringify(embedding)}::jsonb, NOW(), ${expiresAt})
+      ON CONFLICT (cache_key) DO UPDATE SET payload_json = ${JSON.stringify(embedding)}::jsonb, expires_at = ${expiresAt}, created_at = NOW()
+    `;
+  } catch (e) {
+    console.error("[SafePilot Cache] Embedding set error:", e);
+  }
+}
+
+async function getKBResultsFromCache(query: string, country: string, role: string, service: string): Promise<KBSearchResult[] | null> {
+  const cacheKey = generateCacheKey("KB", query, country, role, service);
+  try {
+    const cached = await prisma.$queryRaw<Array<{ payload_json: any; expires_at: Date }>>`
+      SELECT payload_json, expires_at FROM safepilot_cache 
+      WHERE cache_key = ${cacheKey} AND kind = 'KB_RESULTS' AND expires_at > NOW()
+      LIMIT 1
+    `;
+    if (cached.length > 0 && cached[0].payload_json) {
+      return cached[0].payload_json as KBSearchResult[];
+    }
+  } catch (e) {
+    console.error("[SafePilot Cache] KB results get error:", e);
+  }
+  return null;
+}
+
+async function setKBResultsCache(query: string, country: string, role: string, service: string, results: KBSearchResult[]): Promise<void> {
+  const cacheKey = generateCacheKey("KB", query, country, role, service);
+  const expiresAt = new Date(Date.now() + KB_RESULTS_CACHE_TTL_MS);
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO safepilot_cache (id, cache_key, kind, payload_json, created_at, expires_at)
+      VALUES (gen_random_uuid(), ${cacheKey}, 'KB_RESULTS', ${JSON.stringify(results)}::jsonb, NOW(), ${expiresAt})
+      ON CONFLICT (cache_key) DO UPDATE SET payload_json = ${JSON.stringify(results)}::jsonb, expires_at = ${expiresAt}, created_at = NOW()
+    `;
+  } catch (e) {
+    console.error("[SafePilot Cache] KB results set error:", e);
+  }
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -34,11 +113,41 @@ export async function searchKB(params: {
   service: ServiceScope;
   limit?: number;
 }): Promise<KBSearchResult[]> {
+  const { metadata } = await searchKBWithMetadata(params);
+  return (await searchKBWithMetadata(params)).results;
+}
+
+export async function searchKBWithMetadata(params: {
+  query: string;
+  country: Country;
+  role: Role;
+  service: ServiceScope;
+  limit?: number;
+}): Promise<{ results: KBSearchResult[]; metadata: KBSearchMetadata }> {
   const { query, country, role, service, limit = 6 } = params;
+  const metadata: KBSearchMetadata = { cacheHit: false };
 
   try {
-    const queryEmbedding = await generateEmbedding(query);
+    const cachedResults = await getKBResultsFromCache(query, country, role, service);
+    if (cachedResults) {
+      metadata.cacheHit = true;
+      metadata.cacheKind = "KB_RESULTS";
+      return { results: cachedResults.slice(0, limit), metadata };
+    }
 
+    const embeddingStart = Date.now();
+    let queryEmbedding = await getEmbeddingFromCache(query);
+    
+    if (queryEmbedding) {
+      metadata.cacheHit = true;
+      metadata.cacheKind = "EMBEDDING";
+    } else {
+      queryEmbedding = await generateEmbedding(query);
+      await setEmbeddingCache(query, queryEmbedding);
+    }
+    metadata.embeddingTimeMs = Date.now() - embeddingStart;
+
+    const searchStart = Date.now();
     const documents = await prisma.safePilotKBDocument.findMany({
       where: {
         isActive: true,
@@ -79,11 +188,15 @@ export async function searchKB(params: {
     }
 
     results.sort((a, b) => b.similarity - a.similarity);
+    const finalResults = results.slice(0, limit);
+    metadata.searchTimeMs = Date.now() - searchStart;
 
-    return results.slice(0, limit);
+    await setKBResultsCache(query, country, role, service, finalResults);
+
+    return { results: finalResults, metadata };
   } catch (error) {
     console.error("[SafePilot] KB search error:", error);
-    return [];
+    return { results: [], metadata };
   }
 }
 
