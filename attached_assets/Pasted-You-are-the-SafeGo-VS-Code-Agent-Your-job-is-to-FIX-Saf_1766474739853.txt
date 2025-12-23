@@ -1,0 +1,71 @@
+You are the SafeGo VS Code Agent. Your job is to FIX SafePilot so Intel / Context / Chat / Crisis / Scan all work (not UI-only). Do a complete, production-ready implementation with real code, not pseudo-code. Do everything end-to-end in one pass.
+
+NON-NEGOTIABLE RULES
+1) SafePilot must answer any admin question using the best practical tech: OpenAI Chat Completions + optional embeddings later.
+2) All SafePilot modes must call a real backend endpoint and return a real response.
+3) Admin SafePilot must stay admin-only. Customer support SafePilot must stay customer-support-only. Never mix roles.
+4) Add audit logs for every SafePilot request (who asked, mode, prompt, response metadata).
+5) Do not break existing working features. Make incremental safe changes.
+6) Add a minimal UI integration: button -> API -> render response.
+7) If OPENAI_API_KEY is missing, show a clear error in UI and return a safe error JSON.
+8) After coding, run typecheck/build/tests and provide commands used + results.
+
+GOAL
+- Fix the current bug: only Scan changes state; other tabs do nothing.
+- Implement the full SafePilot backend pipeline and wire UI tabs to it.
+
+STEP-BY-STEP TASKS (DO ALL)
+A) Backend: create SafePilot service + router
+1) Add dependency: openai (official), zod, and ensure express/next server route exists in this repo.
+2) Create: services/safepilot/aiEngine.ts
+   - Uses OpenAI API key from env
+   - Exports runSafePilot({ mode, question, context, userId })
+   - Model: choose a strong default (gpt-4.1-mini or best available in this codebase)
+   - temperature 0.2
+   - Includes a strict system prompt: “You are SafePilot for SafeGo Admin…”
+3) Create: services/safepilot/modeRouter.ts
+   - handleSafePilotRequest({ mode, question, userId })
+   - mode enum: intel, context, chat, crisis, scan
+   - Each mode sets a specialized instruction block (intel=fraud/KYC/risk, context=explain using platform data, chat=general assistant, crisis=emergency steps, scan=audit checklist)
+4) Create: routes (or API handler) POST /api/safepilot
+   - Request: { mode, question, userId }
+   - Response: { success, answer, traceId }
+   - Validate with zod; reject invalid mode
+   - If OPENAI_API_KEY missing: return 500 with { success:false, error:"OPENAI_API_KEY missing" }
+5) Create DB logging (Prisma)
+   - Add Prisma model SafePilotLog:
+     - id, createdAt, userId, role, mode, question, answer, model, tokensIn, tokensOut, traceId, ip, userAgent
+   - Migrate
+   - Log every request (even failures with error field)
+6) Security:
+   - Require admin auth/session; if not admin return 403
+   - Do NOT expose OpenAI key to client
+   - Rate limit basic: per-admin per-minute (simple in-memory ok)
+
+B) Frontend: wire SafePilot modal tabs to backend
+1) Locate the SafePilot modal component used in Admin Panel (the UI in screenshots).
+2) Ensure each tab (Intel/Context/Chat) sets `mode` in state.
+3) On Send button:
+   - call POST /api/safepilot with selected mode + input text
+   - show loading indicator
+   - render answer text in the main panel
+4) Add minimal error UI:
+   - show “Missing OpenAI API key” or server error
+5) Confirm Scan button still works but now uses same API route with mode=scan.
+
+C) Verify and deliver
+1) Add a small “Self test” block in code:
+   - Example admin questions for each mode and expected behaviors
+2) Run:
+   - npm install
+   - prisma generate + migrate
+   - typecheck/build (tsc or repo standard)
+3) Provide a short report: files changed, how to set OPENAI_API_KEY in Replit Secrets, and how to test each tab.
+
+DELIVERABLES
+- All code changes committed-ready
+- List of files created/modified with paths
+- Exact commands to run in terminal
+- Confirmation that Intel/Context/Chat/Crisis/Scan all return responses and are logged
+
+Proceed now. Do not ask me questions unless you absolutely cannot proceed without a specific missing repo detail. Use best judgement and implement.

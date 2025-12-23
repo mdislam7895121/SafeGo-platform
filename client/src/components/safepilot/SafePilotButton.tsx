@@ -230,13 +230,20 @@ export function SafePilotButton() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetchWithAuth('/api/admin/safepilot/query', {
+      // Map priority to mode for AI endpoint - crisis is its own mode
+      let aiMode: string = currentMode;
+      if (currentPriority === 'crisis') {
+        aiMode = 'crisis';
+      }
+      
+      // Use AI endpoint for full OpenAI-powered responses
+      const res = await fetchWithAuth('/api/admin/safepilot/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pageKey,
-          question: buildPrompt(currentMode, currentPriority, userQuestion),
-          role: 'ADMIN',
+          mode: aiMode,
+          question: userQuestion,
+          pageContext: pageKey,
           settings: {
             responseMode: safepilotSettings.responseMode,
             dataWindow: safepilotSettings.dataWindow,
@@ -257,18 +264,30 @@ export function SafePilotButton() {
       let data;
       try { data = await res.json(); } catch { data = null; }
 
-      const normalizedReply = normalizeSafePilotReply(data);
-      const displayContent = normalizedReply?.trim() || 'No response received. Please try again.';
+      // Handle missing API key error specifically
+      if (data?.error?.includes('OPENAI_API_KEY')) {
+        setChatMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: 'OpenAI API key is not configured. Please add OPENAI_API_KEY to your Replit Secrets to enable AI responses.',
+          timestamp: new Date(),
+          isError: true,
+        }]);
+        setIsOnline(false);
+        return;
+      }
+
+      const displayContent = data?.answer || data?.reply || data?.error || 'No response received. Please try again.';
 
       setChatMessages(prev => [...prev, {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: displayContent,
         timestamp: new Date(),
-        isError: !res.ok,
+        isError: !res.ok || !!data?.error,
       }]);
 
-      setIsOnline(true);
+      setIsOnline(res.ok);
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     } catch (error) {
       setChatMessages(prev => [...prev, {

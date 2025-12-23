@@ -1,8 +1,32 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticateToken } from '../middleware/auth';
 import { prisma } from '../db';
+import { handleSafePilotRequest, isValidMode } from '../services/safepilot/modeRouter';
+import type { SafePilotMode } from '../services/safepilot/aiEngine';
 
 const router = Router();
+
+// In-memory rate limiter for SafePilot AI requests
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 30; // requests per minute
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(userId);
+  
+  if (!entry || now > entry.resetTime) {
+    rateLimitStore.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  
+  entry.count++;
+  return true;
+}
 
 // ============================================================================
 // ADMIN SAFEPILOT - Enterprise-Grade Admin AI Assistant
@@ -649,6 +673,169 @@ What would you like to know?`;
       error: 'Internal Server Error', 
       reply: 'Query processing failed. Try: "how many drivers pending" or "payout status"',
       meta: { type: 'error' }
+    });
+  }
+});
+
+// ============================================================================
+// AI-POWERED SAFEPILOT ENDPOINT (OpenAI Integration)
+// Supports all modes: intel, context, chat, crisis, scan
+// ============================================================================
+
+router.post('/ai', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  const startTime = Date.now();
+  
+  try {
+    const { mode, question, pageContext, settings } = req.body;
+    const userId = req.user!.userId;
+    const ipAddress = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    // Parse settings with defaults
+    const userSettings: SafePilotSettings = {
+      responseMode: settings?.responseMode || 'concise',
+      dataWindow: settings?.dataWindow || '24h',
+      maskPii: settings?.maskPii || false,
+      autoSuggestFollowups: settings?.autoSuggestFollowups || false,
+      readOnlyMode: settings?.readOnlyMode || false,
+      scopes: {
+        drivers: settings?.scopes?.drivers !== false,
+        kyc: settings?.scopes?.kyc !== false,
+        fraud: settings?.scopes?.fraud !== false,
+        payouts: settings?.scopes?.payouts !== false,
+        security: settings?.scopes?.security !== false,
+      },
+    };
+    
+    // Validate input
+    if (!question || typeof question !== 'string' || question.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Question is required',
+        traceId: `sp-error-${Date.now()}`,
+      });
+    }
+    
+    // Validate mode
+    const requestMode = mode || 'chat';
+    if (!isValidMode(requestMode)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid mode: ${requestMode}. Valid modes are: intel, context, chat, crisis, scan`,
+        traceId: `sp-error-${Date.now()}`,
+      });
+    }
+    
+    // Check OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('[SafePilot AI] OPENAI_API_KEY is not configured');
+      return res.status(500).json({
+        success: false,
+        error: 'OPENAI_API_KEY is not configured. Please add it to your environment secrets.',
+        traceId: `sp-error-${Date.now()}`,
+      });
+    }
+    
+    // Rate limiting
+    if (!checkRateLimit(userId)) {
+      return res.status(429).json({
+        success: false,
+        error: 'Rate limit exceeded. Please wait a moment before trying again.',
+        traceId: `sp-ratelimit-${Date.now()}`,
+      });
+    }
+    
+    console.log(`[SafePilot AI] Request: mode=${requestMode}, userId=${userId}, question=${question.slice(0, 50)}...`);
+    
+    // Build enhanced question with settings context
+    let enhancedQuestion = question.trim();
+    if (userSettings.responseMode === 'detailed') {
+      enhancedQuestion = `[Detailed Response Mode] ${enhancedQuestion}`;
+    }
+    if (userSettings.readOnlyMode) {
+      enhancedQuestion = `[Read-Only Mode - No action recommendations] ${enhancedQuestion}`;
+    }
+    
+    // Call AI service - scope enforcement happens in modeRouter
+    const result = await handleSafePilotRequest({
+      mode: requestMode,
+      question: enhancedQuestion,
+      userId,
+      userRole: 'ADMIN',
+      pageContext,
+      settings: userSettings,
+      ipAddress,
+      userAgent,
+    });
+    
+    console.log(`[SafePilot AI] Completed: mode=${requestMode}, success=${result.success}, time=${Date.now() - startTime}ms`);
+    
+    // Handle scope blocking from modeRouter
+    if (!result.success && !result.error) {
+      return res.json({
+        success: false,
+        answer: result.answer,
+        traceId: result.traceId,
+        mode: result.mode,
+      });
+    }
+    
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'AI processing failed',
+        traceId: result.traceId,
+      });
+    }
+    
+    // Apply settings to response
+    let finalAnswer = result.answer;
+    
+    // Apply read-only mode banner
+    if (userSettings.readOnlyMode) {
+      finalAnswer = `[Read-Only Mode]\n\n${finalAnswer}`;
+    }
+    
+    // Apply auto-suggest followups
+    if (userSettings.autoSuggestFollowups) {
+      const modeFollowups: Record<string, string[]> = {
+        'intel': ['Try: "fraud signals today"', 'Try: "high-risk users"'],
+        'context': ['Try: "explain platform health"', 'Try: "why are payouts delayed"'],
+        'chat': ['Try: "driver statistics"', 'Try: "KYC queue status"'],
+        'crisis': ['Try: "active incidents"', 'Try: "escalation steps"'],
+        'scan': ['Try: "compliance audit"', 'Try: "security checklist"'],
+      };
+      const suggestions = modeFollowups[requestMode] || [];
+      if (suggestions.length > 0) {
+        finalAnswer += `\n\nFollow-up: ${suggestions.join(' | ')}`;
+      }
+    }
+    
+    res.json({
+      success: true,
+      answer: finalAnswer,
+      reply: finalAnswer, // For backward compatibility
+      traceId: result.traceId,
+      mode: result.mode,
+      meta: {
+        model: result.model,
+        tokensIn: result.tokensIn,
+        tokensOut: result.tokensOut,
+        processingTime: Date.now() - startTime,
+        settings: {
+          responseMode: userSettings.responseMode,
+          readOnlyMode: userSettings.readOnlyMode,
+          autoSuggestFollowups: userSettings.autoSuggestFollowups,
+        },
+      },
+    });
+    
+  } catch (error: any) {
+    console.error('[SafePilot AI] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error?.message || 'Internal server error',
+      traceId: `sp-error-${Date.now()}`,
     });
   }
 });
