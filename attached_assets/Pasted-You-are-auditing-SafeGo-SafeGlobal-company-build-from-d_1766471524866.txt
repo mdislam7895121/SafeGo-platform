@@ -1,0 +1,115 @@
+You are auditing SafeGo/SafeGlobal company build from day 1 to now. Produce a single, complete “Company Build Report” where NOTHING is omitted. The report must be evidence-based, derived from the repo + Replit project structure + env configs + deployed URLs + admin panel + customer app. Do not guess. If something is unknown, mark it as “Unknown (needs confirmation)” and list exactly what file/log is missing.
+
+OUTPUT REQUIREMENT:
+- One report with numbered sections and a master index.
+- Include “Inventory Tables” for every module and every route/page/service.
+- Include “Evidence” for each item: file path(s), route name(s), API endpoint(s), DB models, and screenshots/log references if available.
+- Include a “What works now vs broken now” matrix.
+- Include “Next steps” and “Owner/Role” for each gap.
+
+SCOPE (must cover ALL):
+1) Company Overview
+- Legal/brand names used (SafeGo, SafeGlobal, SafePilot)
+- Regions: USA + Bangladesh rules differences
+- Services: Ride, Food, Parcel, Shop (BD), Tickets (BD)
+- Current live URLs (safegoglobal.com, Replit deployments)
+
+2) Architecture Inventory (end-to-end)
+- Frontend(s): Customer app (Expo/React Native), Web admin, Support console (if any)
+- Backend: Node/Express routes count, folder structure, middleware, auth, payments, notifications
+- Database: SQL/ORM models, enums, migrations
+- External integrations: Maps/Places, Payment gateways (Stripe/SSLCommerz etc), SMS/Email, Push notifications
+
+3) Repo Inventory (MANDATORY)
+- Print full tree summary:
+  - /server (services, routes, controllers, middleware)
+  - /app or /mobile (Expo routes, screens)
+  - /admin (dashboard, pages)
+  - /components (shared)
+  - /src/lib (helpers)
+- List all key config files: package.json, tsconfig, env, build configs
+- List all scripts and CI (if exists)
+
+4) Features Built (Module by Module) with evidence
+A) Customer App
+- Onboarding/auth flows (customer-only signup rule respected)
+- Landing/Home (/ride is landing experience)
+- Ride flow: location search, map, choose ride, pricing/ETA from backend, payment UI, order/booking status
+- Food flow: browse, cart, checkout, order tracking
+- Parcel flow: create delivery, pricing, tracking
+- Shop (BD): catalog, checkout, order
+- Tickets (BD): ticket browse, booking
+- Notifications and receipts
+For each: list routes/screens + API dependencies + current status (Working/Partial/Broken/Stub)
+
+B) Admin Panel (Enterprise)
+- Dashboard, People & KYC, Users, Drivers, Restaurants, Parcels
+- Management: KYC approvals, Wallets, Payouts
+- Analytics & reports
+- RBAC/roles, audit logs
+For each: pages + APIs + DB models + status
+
+C) Support Console (if separate)
+- Ticketing, macros, customer lookup, refunds/disputes, SLA
+- SafePilot support-only scope
+Evidence + status
+
+D) Backend APIs
+- Auth, user/driver/restaurant management
+- KYC workflow (BD + US rules)
+- Pricing engine (shared backend, not duplicated in frontend)
+- Dispatch/status engine (rides/food/parcel)
+- Payments + payouts + wallet
+- Fraud/security signals
+For each: route files list + endpoints + request/response contracts + status
+
+E) SafePilot AI System
+- Admin SafePilot: intents, scopes, handlers, settings UI, logging, read-only mode
+- Support SafePilot: support-only intents and data access
+- Separation proof: endpoints or source flags, different prompts/models, scope enforcement
+- Known issues: “same answer” bug, formatting functions, routing
+Evidence: file paths, functions, settings schema
+
+5) Security & Compliance Inventory (must be explicit)
+- Auth security (JWT/session), password policy
+- RBAC, admin protection, rate limits
+- Data protection, PII handling/redaction
+- Audit logging
+- Country-specific KYC compliance (BD vs US)
+- Threat model: top risks + current mitigations + gaps
+
+6) Operations & Reliability
+- Error handling, monitoring/logging
+- Background jobs/queues
+- Performance hotspots
+- Backup/restore strategy
+
+7) Test & Release Readiness
+- Unit tests, integration tests, e2e (what exists, what missing)
+- Build pipeline (Expo/EAS, Replit deploy)
+- App Store/TestFlight status (if applicable)
+- Release checklist
+
+8) Single Source of Truth Tables (NO OMISSIONS)
+- Table 1: All frontend routes/screens with status
+- Table 2: All admin pages with status
+- Table 3: All backend endpoints with status
+- Table 4: All DB models/enums with owners and usage
+- Table 5: All third-party integrations with keys/env dependencies
+- Table 6: All AI intents/domains/handlers + settings toggles + expected outputs
+- Table 7: Known bugs/issues list with severity + fix plan
+
+9) Final Summary
+- What is production-ready today
+- What blocks launch
+- Next 30/60/90 day plan (prioritized)
+- Ownership roles (admin ops, support ops, engineering)
+
+PROCESS (how to build the report):
+- First: scan repo tree and list everything.
+- Second: map routes/pages/endpoints/models.
+- Third: open key files to verify behavior (no guesses).
+- Fourth: run minimal smoke checks (if possible) or state exactly which checks cannot be run.
+- Fifth: write the report with evidence references.
+
+Start now. Produce the report in English with clear headings and numbered sections. No marketing fluff.
