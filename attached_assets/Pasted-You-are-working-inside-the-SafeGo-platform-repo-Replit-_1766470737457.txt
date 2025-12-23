@@ -1,0 +1,22 @@
+You are working inside the SafeGo-platform repo (Replit). Task: Fix SafePilot so it answers different questions with different answers, and ensure Admin SafePilot uses the Admin model/logic while Customer Support SafePilot uses Support model/logic only. Do NOT refactor unrelated UI. Make minimal, safe, targeted changes. Add tests and clear logs. Preserve existing styling as much as possible.
+
+CONTEXT / SYMPTOMS (confirmed by screenshots):
+- The floating SafePilot widget shows different tabs/modes (Intel/Context/Chat, Ultra/Crisis/Survival/History etc.), but clicking or asking different questions often returns the same “morning report/guard mode” style output.
+- Example: “how do i improve drivers” and “how many drivers is pending” return the same Driver Operations (morning report) block.
+- Example: payout anomalies/support tickets questions still return the same generic security/guard summary.
+- Admin SafePilot must answer admin operations questions (drivers, KYC, payouts, fraud, platform KPIs, restaurants, parcels, wallets, disputes, refunds, etc.) using the ADMIN data + ADMIN prompt/model.
+- Customer Support SafePilot must remain limited to support workflows and must NOT leak into admin workflows.
+
+HIGH-LEVEL GOAL:
+1) Implement reliable INTENT + QUESTION-TYPE detection so SafePilot routes to the correct handler and returns different answers.
+2) Enforce strict separation:
+   - Admin SafePilot widget -> uses AdminSafePilot pipeline (admin model/prompt/data).
+   - Support console SafePilot -> uses SupportSafePilot pipeline (support model/prompt/data).
+3) Make responses professional: clean, concise by default, no forced “[MODE]” headers, no repetitive “morning report” unless explicitly requested.
+4) Add a Settings modal for SafePilot (gear icon) with an exact list below. Settings must actually affect behavior.
+
+ACCEPTANCE CRITERIA (must verify in Preview):
+A. Question routing:
+- “how many drivers is pending” -> returns ONLY the number + short label (concise): e.g., “2 drivers are pending verification.”
+- “how do i improve drivers” -> returns recommendations only (no stats dump) unless user asks “show driver status”.
+- “
