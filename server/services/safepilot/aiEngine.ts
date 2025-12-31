@@ -179,7 +179,7 @@ async function logSafePilotRequest(entry: LogEntry & { ipAddress?: string; userA
     await prisma.safePilotAuditLog.create({
       data: {
         actorUserId: entry.userId,
-        actorRole: entry.userRole === 'SUPPORT' ? 'SUPPORT' : 'ADMIN',
+        actorRole: 'ADMIN',
         action: 'ask',
         metadata: {
           traceId: entry.traceId,
