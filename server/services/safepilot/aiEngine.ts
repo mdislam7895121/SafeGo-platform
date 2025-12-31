@@ -1,7 +1,5 @@
-import OpenAI from 'openai';
 import { prisma } from '../../db';
-
-const SAFEPILOT_MODEL = process.env.SAFEPILOT_MODEL || 'gpt-5';
+import { getOpenAIClient, SAFEPILOT_MODEL } from './openaiClient';
 
 export type SafePilotMode = 'intel' | 'context' | 'chat' | 'crisis' | 'scan';
 
@@ -75,7 +73,8 @@ Prioritize: Critical compliance items first.`
 export async function runSafePilot(request: SafePilotRequest): Promise<SafePilotResponse> {
   const traceId = `sp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   
-  if (!process.env.OPENAI_API_KEY) {
+  const openai = getOpenAIClient();
+  if (!openai) {
     return {
       success: false,
       answer: '',
@@ -85,10 +84,6 @@ export async function runSafePilot(request: SafePilotRequest): Promise<SafePilot
       error: 'OPENAI_API_KEY is not configured. Please add it to your environment secrets.',
     };
   }
-
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
 
   const systemPrompt = `${ADMIN_SYSTEM_PROMPT}\n${MODE_SYSTEM_ADDITIONS[request.mode]}`;
   
