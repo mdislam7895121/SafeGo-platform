@@ -1,15 +1,54 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
 export const SAFEPILOT_MODEL = process.env.SAFEPILOT_MODEL || "gpt-5";
 export const SAFEPILOT_EMBED_MODEL = process.env.SAFEPILOT_EMBED_MODEL || "text-embedding-3-large";
 
+// Optional OpenAI client - only initialized if API key is present
+let _openai: OpenAI | null = null;
+
+export function getOpenAIClient(): OpenAI | null {
+  if (!process.env.OPENAI_API_KEY) {
+    return null;
+  }
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return _openai;
+}
+
+// Legacy export for backward compatibility - use getOpenAIClient() instead
+export const openai = {
+  get embeddings() {
+    const client = getOpenAIClient();
+    if (!client) throw new Error('OPENAI_API_KEY is not configured');
+    return client.embeddings;
+  },
+  get moderations() {
+    const client = getOpenAIClient();
+    if (!client) throw new Error('OPENAI_API_KEY is not configured');
+    return client.moderations;
+  },
+  get chat() {
+    const client = getOpenAIClient();
+    if (!client) throw new Error('OPENAI_API_KEY is not configured');
+    return client.chat;
+  },
+};
+
+export function isOpenAIConfigured(): boolean {
+  return !!process.env.OPENAI_API_KEY;
+}
+
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
+  const client = getOpenAIClient();
+  if (!client) {
+    console.warn('[SafePilot] OpenAI not configured, returning empty embedding');
+    return [];
+  }
+  const response = await client.embeddings.create({
     model: SAFEPILOT_EMBED_MODEL,
     input: text,
   });
@@ -21,7 +60,16 @@ export async function moderateText(input: string): Promise<{
   categories: Record<string, boolean>;
   categoryScores: Record<string, number>;
 }> {
-  const response = await openai.moderations.create({
+  const client = getOpenAIClient();
+  if (!client) {
+    console.warn('[SafePilot] OpenAI not configured, skipping moderation');
+    return {
+      flagged: false,
+      categories: {},
+      categoryScores: {},
+    };
+  }
+  const response = await client.moderations.create({
     model: "omni-moderation-latest",
     input,
   });
@@ -41,7 +89,12 @@ export async function chatCompletion(
     responseFormat?: "text" | "json";
   }
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
+  const client = getOpenAIClient();
+  if (!client) {
+    console.warn('[SafePilot] OpenAI not configured, returning empty response');
+    return '';
+  }
+  const response = await client.chat.completions.create({
     model: SAFEPILOT_MODEL,
     messages,
     max_completion_tokens: options?.maxTokens ?? 2048,
@@ -86,7 +139,16 @@ export async function chatCompletionWithTools(
   tools: ToolDefinition[],
   options?: { maxTokens?: number }
 ): Promise<ToolCallResult> {
-  const response = await openai.chat.completions.create({
+  const client = getOpenAIClient();
+  if (!client) {
+    console.warn('[SafePilot] OpenAI not configured, returning empty tool result');
+    return {
+      finishReason: 'stop',
+      content: null,
+      toolCalls: [],
+    };
+  }
+  const response = await client.chat.completions.create({
     model: SAFEPILOT_MODEL,
     messages: messages as any,
     tools: tools.length > 0 ? tools : undefined,
