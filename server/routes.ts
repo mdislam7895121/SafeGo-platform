@@ -397,6 +397,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Legal pages - public (no auth required) for App Store / Play Store submission
+  app.get("/privacy", (_req: Request, res: Response) => {
+    res.sendFile("privacy.html", { root: "./client/public" });
+  });
+  app.get("/terms", (_req: Request, res: Response) => {
+    res.sendFile("terms.html", { root: "./client/public" });
+  });
+
   // Register all API routes
   app.use("/api/auth", authRoutes);
   app.use("/api/driver", driverRoutes);
