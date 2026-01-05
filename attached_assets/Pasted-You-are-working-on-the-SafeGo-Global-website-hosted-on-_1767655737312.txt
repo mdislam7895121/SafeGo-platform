@@ -1,0 +1,111 @@
+You are working on the SafeGo Global website hosted on Replit.
+Domain: https://safegoglobal.com
+
+Goal:
+Make the following URLs LIVE and publicly accessible for App Store / Play Store submission:
+1) https://safegoglobal.com/privacy
+2) https://safegoglobal.com/terms
+
+These pages must render clean HTML content and must NOT require login.
+
+Content source (already written, do NOT edit meaning):
+- docs/PRIVACY_POLICY_FINAL.md
+- docs/TERMS_OF_SERVICE_FINAL.md
+
+========================
+STEP 1 — DETECT SITE TYPE
+========================
+First, inspect the Replit project structure and determine:
+- Is this a static site (index.html)?
+- Or a Node/Express app (server.js / index.js / app.js)?
+
+Report which one is used and proceed accordingly.
+
+========================
+STEP 2 — CREATE HTML FILES
+========================
+Create two new files at project root:
+
+1) privacy.html
+2) terms.html
+
+========================
+STEP 3 — INSERT CONTENT
+========================
+
+For privacy.html:
+- Use a simple, clean HTML structure.
+- Paste the FULL content of docs/PRIVACY_POLICY_FINAL.md into the <body>.
+- Do NOT summarize or shorten.
+- Preserve headings and paragraphs.
+
+Template to use:
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Privacy Policy | SafeGo</title>
+  <meta charset="utf-8" />
+</head>
+<body style="max-width:800px;margin:auto;font-family:Arial,sans-serif;line-height:1.6">
+  <h1>Privacy Policy</h1>
+
+  <!-- PASTE FULL CONTENT FROM docs/PRIVACY_POLICY_FINAL.md HERE -->
+
+</body>
+</html>
+
+For terms.html:
+- Same structure.
+- Paste FULL content of docs/TERMS_OF_SERVICE_FINAL.md.
+
+========================
+STEP 4 — ROUTE MAPPING
+========================
+
+If the site is STATIC:
+- Ensure privacy.html is accessible at /privacy
+- Ensure terms.html is accessible at /terms
+- Configure Replit static routing if needed.
+
+If the site uses Node/Express:
+- Add routes:
+
+app.get("/privacy", (req, res) => {
+  res.sendFile(__dirname + "/privacy.html");
+});
+
+app.get("/terms", (req, res) => {
+  res.sendFile(__dirname + "/terms.html");
+});
+
+========================
+STEP 5 — RUN & VERIFY
+========================
+- Click RUN in Replit.
+- Open browser preview and verify:
+  - /privacy loads full Privacy Policy
+  - /terms loads full Terms of Service
+
+========================
+STEP 6 — FINAL LIVE CHECK
+========================
+Verify publicly in browser (not Replit preview):
+
+✅ https://safegoglobal.com/privacy
+✅ https://safegoglobal.com/terms
+
+Both pages must load without error.
+
+========================
+DELIVERABLE
+========================
+Reply with:
+1) Confirmation that both URLs are live
+2) File paths used
+3) Whether static or Express routing was used
+
+Do NOT change any other website content.
+Do NOT add authentication.
+Do NOT add analytics.
+Just make these two legal pages live and accessible.
