@@ -2,7 +2,7 @@ import { Response, NextFunction } from "express";
 import { prisma } from "../db";
 import { AuthRequest } from "./auth";
 
-export async function requireTripOwnership(
+export async function requireRideOwnership(
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -15,16 +15,16 @@ export async function requireTripOwnership(
     return;
   }
 
-  const tripId = req.params.tripId || req.params.id || req.body?.tripId;
+  const rideId = req.params.rideId || req.params.id || req.body?.rideId;
   
-  if (!tripId) {
-    res.status(400).json({ error: "Trip ID required" });
+  if (!rideId) {
+    res.status(400).json({ error: "Ride ID required" });
     return;
   }
 
   try {
-    const trip = await prisma.trip.findUnique({
-      where: { id: tripId },
+    const ride = await prisma.ride.findUnique({
+      where: { id: rideId },
       select: { 
         driverId: true, 
         customerId: true,
@@ -32,33 +32,33 @@ export async function requireTripOwnership(
       },
     });
 
-    if (!trip) {
-      res.status(404).json({ error: "Trip not found" });
+    if (!ride) {
+      res.status(404).json({ error: "Ride not found" });
       return;
     }
 
-    const isDriver = trip.driverId === userId;
-    const isCustomer = trip.customerId === userId;
+    const isDriver = ride.driverId === userId;
+    const isCustomer = ride.customerId === userId;
     const isAdmin = userRole === "admin";
 
     if (!isDriver && !isCustomer && !isAdmin) {
-      console.warn(`[OwnershipCheck] Access denied: User ${userId} attempted to access trip ${tripId}`);
-      res.status(403).json({ error: "Access denied. You do not own this trip." });
+      console.warn(`[OwnershipCheck] Access denied: User ${userId} attempted to access ride ${rideId}`);
+      res.status(403).json({ error: "Access denied. You do not own this ride." });
       return;
     }
 
-    (req as any).trip = trip;
+    (req as any).ride = ride;
     (req as any).isOwner = isDriver;
     (req as any).isCustomer = isCustomer;
     
     next();
   } catch (error) {
-    console.error("[OwnershipCheck] Error checking trip ownership:", error);
-    res.status(500).json({ error: "Failed to verify trip ownership" });
+    console.error("[OwnershipCheck] Error checking ride ownership:", error);
+    res.status(500).json({ error: "Failed to verify ride ownership" });
   }
 }
 
-export async function requireDriverTripOwnership(
+export async function requireDriverRideOwnership(
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -76,35 +76,35 @@ export async function requireDriverTripOwnership(
     return;
   }
 
-  const tripId = req.params.tripId || req.params.id || req.body?.tripId;
+  const rideId = req.params.rideId || req.params.id || req.body?.rideId;
   
-  if (!tripId) {
-    res.status(400).json({ error: "Trip ID required" });
+  if (!rideId) {
+    res.status(400).json({ error: "Ride ID required" });
     return;
   }
 
   try {
-    const trip = await prisma.trip.findUnique({
-      where: { id: tripId },
+    const ride = await prisma.ride.findUnique({
+      where: { id: rideId },
       select: { driverId: true, status: true },
     });
 
-    if (!trip) {
-      res.status(404).json({ error: "Trip not found" });
+    if (!ride) {
+      res.status(404).json({ error: "Ride not found" });
       return;
     }
 
-    if (trip.driverId !== userId && userRole !== "admin") {
-      console.warn(`[OwnershipCheck] Driver ${userId} attempted to access trip ${tripId} owned by ${trip.driverId}`);
-      res.status(403).json({ error: "Access denied. This trip is not assigned to you." });
+    if (ride.driverId !== userId && userRole !== "admin") {
+      console.warn(`[OwnershipCheck] Driver ${userId} attempted to access ride ${rideId} owned by ${ride.driverId}`);
+      res.status(403).json({ error: "Access denied. This ride is not assigned to you." });
       return;
     }
 
-    (req as any).trip = trip;
+    (req as any).ride = ride;
     next();
   } catch (error) {
-    console.error("[OwnershipCheck] Error checking driver trip ownership:", error);
-    res.status(500).json({ error: "Failed to verify trip ownership" });
+    console.error("[OwnershipCheck] Error checking driver ride ownership:", error);
+    res.status(500).json({ error: "Failed to verify ride ownership" });
   }
 }
 
@@ -121,34 +121,34 @@ export async function requireChatOwnership(
     return;
   }
 
-  const tripId = req.params.tripId || req.body?.tripId;
+  const rideId = req.params.rideId || req.body?.rideId;
   
-  if (!tripId) {
-    res.status(400).json({ error: "Trip ID required for chat access" });
+  if (!rideId) {
+    res.status(400).json({ error: "Ride ID required for chat access" });
     return;
   }
 
   try {
-    const trip = await prisma.trip.findUnique({
-      where: { id: tripId },
+    const ride = await prisma.ride.findUnique({
+      where: { id: rideId },
       select: { driverId: true, customerId: true },
     });
 
-    if (!trip) {
-      res.status(404).json({ error: "Trip not found" });
+    if (!ride) {
+      res.status(404).json({ error: "Ride not found" });
       return;
     }
 
-    const isParticipant = trip.driverId === userId || trip.customerId === userId;
+    const isParticipant = ride.driverId === userId || ride.customerId === userId;
     const isAdmin = userRole === "admin" || userRole === "support_admin";
 
     if (!isParticipant && !isAdmin) {
-      console.warn(`[OwnershipCheck] User ${userId} attempted chat access for trip ${tripId}`);
-      res.status(403).json({ error: "Access denied. You are not a participant in this trip." });
+      console.warn(`[OwnershipCheck] User ${userId} attempted chat access for ride ${rideId}`);
+      res.status(403).json({ error: "Access denied. You are not a participant in this ride." });
       return;
     }
 
-    (req as any).chatTrip = trip;
+    (req as any).chatRide = ride;
     next();
   } catch (error) {
     console.error("[OwnershipCheck] Error checking chat ownership:", error);
@@ -156,7 +156,7 @@ export async function requireChatOwnership(
   }
 }
 
-export async function requireStripeAccountOwnership(
+export async function requirePayoutOwnership(
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -174,34 +174,34 @@ export async function requireStripeAccountOwnership(
     return;
   }
 
-  const accountId = req.params.accountId || req.body?.stripeAccountId;
+  const payoutId = req.params.payoutId || req.body?.payoutId;
 
-  if (!accountId) {
+  if (!payoutId) {
     next();
     return;
   }
 
   try {
-    const account = await prisma.stripeConnectAccount.findUnique({
-      where: { stripeAccountId: accountId },
-      select: { userId: true },
+    const payout = await prisma.payout.findUnique({
+      where: { id: payoutId },
+      select: { ownerId: true, ownerType: true },
     });
 
-    if (!account) {
-      res.status(404).json({ error: "Stripe account not found" });
+    if (!payout) {
+      res.status(404).json({ error: "Payout not found" });
       return;
     }
 
-    if (account.userId !== userId) {
-      console.warn(`[OwnershipCheck] User ${userId} attempted to access Stripe account owned by ${account.userId}`);
-      res.status(403).json({ error: "Access denied. This is not your payout account." });
+    if (payout.ownerId !== userId) {
+      console.warn(`[OwnershipCheck] User ${userId} attempted to access payout owned by ${payout.ownerId}`);
+      res.status(403).json({ error: "Access denied. This is not your payout." });
       return;
     }
 
     next();
   } catch (error) {
-    console.error("[OwnershipCheck] Error checking Stripe account ownership:", error);
-    res.status(500).json({ error: "Failed to verify account ownership" });
+    console.error("[OwnershipCheck] Error checking payout ownership:", error);
+    res.status(500).json({ error: "Failed to verify payout ownership" });
   }
 }
 
@@ -247,11 +247,11 @@ export async function requireFoodOrderOwnership(
     
     let isRestaurantOwner = false;
     if (userRole === "restaurant" && order.restaurantId) {
-      const restaurant = await prisma.restaurant.findUnique({
+      const restaurant = await prisma.restaurantProfile.findUnique({
         where: { id: order.restaurantId },
-        select: { ownerId: true },
+        select: { userId: true },
       });
-      isRestaurantOwner = restaurant?.ownerId === userId;
+      isRestaurantOwner = restaurant?.userId === userId;
     }
 
     if (!isCustomer && !isDriver && !isRestaurantOwner && !isAdmin) {
