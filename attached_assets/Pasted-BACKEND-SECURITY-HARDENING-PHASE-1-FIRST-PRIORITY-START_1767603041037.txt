@@ -1,0 +1,209 @@
+BACKEND SECURITY HARDENING — PHASE 1 (FIRST PRIORITY) — START NOW (WORK ONLY)
+
+GOAL
+Production-ready security baseline implement করতে হবে Express + TypeScript backend-এ, existing APIs না ভেঙে:
+1) Global request validation (write endpoints)
+2) Rate limiting (OTP/login/trip actions/chat/webhook)
+3) Auth token hygiene (refresh rotation + revoke + hashed refresh token)
+4) Authorization (ownership enforcement: driver নিজের resource ছাড়া কিছু দেখতে/চেঞ্জ করতে পারবে না)
+5) Stripe webhook hardening (signature verify + event replay dedupe)
+6) Secure headers + CORS hardening
+7) Log redaction (token/otp/secrets never logged)
+
+HARD RULES
+- No refactor. Additive only.
+- Do NOT change business logic.
+- Keep existing routes working.
+- No TODOs. Complete end-to-end changes.
+- Provide exact file paths + full code + PowerShell commands.
+
+=====================================================
+STEP 0 — DISCOVERY (MANDATORY, NO GUESSING)
+=====================================================
+Scan repo and PRINT exact paths for:
+A) App entry (app.ts/server.ts/index.ts)
+B) Auth middleware (verify token)
+C) Trip routes/controllers
+D) OTP/login routes/controllers
+E) Chat routes/controllers
+F) Stripe webhook route/controller
+G) Drizzle schema folder + migrations folder
+H) Existing logger utility (if any)
+
+Search strings:
+- "express()", "app.use", "router"
+- "auth", "jwt", "verifyToken", "Authorization"
+- "otp", "login", "verify"
+- "trips", "accept", "start", "complete", "cancel", "no_show"
+- "chat_messages"
+- "/api/stripe/webhook", "stripe.webhooks.constructEvent"
+- "drizzle", "schema", "migrations"
+
+If any of these are missing, still continue with the security middleware layer and apply where possible.
+
+=====================================================
+STEP 1 — SECURITY HEADERS + CORS (GLOBAL)
+=====================================================
+Install and configure:
+- helmet
+- cors
+
+Create: src/middleware/securityHeaders.ts
+- helmet() with sensible defaults
+- disable x-powered-by
+- CORS allowlist from env:
+  ALLOWED_ORIGINS="https://safegoglobal.com,http://localhost:3000"
+- Allow Authorization header
+- Reject unknown origins (except in dev)
+
+Wire in app entry BEFORE routes.
+
+=====================================================
+STEP 2 — RATE LIMITING (GLOBAL + ROUTE-SPECIFIC)
+=====================================================
+Install:
+- express-rate-limit
+- (optional) rate-limit store (memory ok for phase 1)
+
+Create: src/middleware/rateLimiters.ts
+Define limiters:
+A) authLimiter (OTP/login/verify)
+- window 15 min
+- max 20 per IP
+- extra: per identifier (phone/email) max 5 per 15 min (implement simple in-memory map)
+
+B) tripActionLimiter
+- max 120 per 5 min per driverId
+
+C) chatLimiter
+- max 60 messages per 1 min per driverId
+
+D) webhookLimiter
+- max 120 per 1 min per IP (but signature verify is real guard)
+
+Apply:
+- auth routes: authLimiter
+- trip action routes: tripActionLimiter
+- chat: chatLimiter
+- stripe webhook route: webhookLimiter
+
+=====================================================
+STEP 3 — INPUT VALIDATION (WRITE ENDPOINTS)
+=====================================================
+Install:
+- zod
+
+Create: src/middleware/validate.ts
+- validateBody(schema) middleware
+- returns 400 with { error: { code:"VALIDATION_ERROR", message, issues } }
+
+Apply to critical write endpoints:
+- OTP request/verify
+- login
+- trip actions (accept/start/complete/cancel/no_show)
+- chat send
+- stripe connect onboarding-link request body
+
+No breaking: only validate required fields that already exist.
+
+=====================================================
+STEP 4 — AUTH SESSION HYGIENE (REFRESH TOKEN ROTATION)
+=====================================================
+If refresh tokens already exist:
+- upgrade them safely
+If not present:
+- implement minimal refresh token system without changing access token use.
+
+DB TABLE (Drizzle):
+Create table: auth_refresh_tokens
+Columns:
+- id uuid pk
+- driver_id uuid fk
+- token_hash text
+- created_at timestamp
+- expires_at timestamp
+- revoked_at timestamp nullable
+- replaced_by_token_id uuid nullable
+- device_id text nullable
+- ip text nullable
+- user_agent text nullable
+
+Implement:
+- issueRefreshToken(driverId, meta) -> stores hash only
+- rotateRefreshToken(oldToken) -> revoke old, issue new, link replaced_by
+- reuse detection:
+  if old token already revoked but presented again -> revoke all tokens for driver (global logout)
+
+Hashing:
+- sha256(token + SERVER_PEPPER) OR bcrypt/scrypt (prefer sha256 + pepper for speed)
+Add env:
+- REFRESH_TOKEN_PEPPER (server-only)
+
+Update endpoints:
+- POST /auth/refresh (or existing) to use rotation
+- POST /auth/logout revoke current refresh token(s)
+
+If repo has no refresh endpoints, implement them in an additive /api/auth/* namespace and do NOT change existing login; just enable better session security for production.
+
+=====================================================
+STEP 5 — AUTHORIZATION (OWNERSHIP ENFORCEMENT)
+=====================================================
+Create: src/middleware/requireOwnership.ts
+Helpers:
+- requireDriverAuth (existing token middleware)
+- requireTripOwnership: loads trip by tripId and checks trip.driver_id == token.sub
+- requireChatOwnership: ensures tripId belongs to driver before listing/sending messages
+
+Apply to:
+- any route that takes tripId
+- payouts routes (/api/stripe/connect/*) must only use driver’s own stripe_connect_accounts record
+
+=====================================================
+STEP 6 — STRIPE WEBHOOK HARDENING (REPLAY DEDUPE)
+=====================================================
+DB TABLE:
+Create: stripe_webhook_events
+Columns:
+- id uuid pk
+- stripe_event_id text unique
+- type text
+- created_at timestamp
+
+In webhook handler:
+- Verify signature (already)
+- BEFORE processing: insert stripe_event_id
+  - if unique violation -> return 200 immediately (duplicate)
+- Process event -> update stripe_connect_accounts flags
+
+Also ensure:
+- raw body parser ONLY for webhook route
+- never log full event payload
+
+=====================================================
+STEP 7 — LOG REDACTION
+=====================================================
+Create: src/middleware/redactLogs.ts
+- Wrap request logging (if any) to redact:
+  Authorization header, tokens, otp, secret fields
+- Ensure error handler never returns stack in production:
+  NODE_ENV=production -> message only
+
+=====================================================
+STEP 8 — SECURITY SELF-TEST
+=====================================================
+Add script: scripts/security-selftest.md
+Manual checks:
+- OTP rate limit hits 429
+- trip action spam hits 429
+- invalid body hits 400 validation
+- driver cannot access other driver trip
+- webhook duplicate event returns 200 and does not reprocess
+
+OUTPUT REQUIRED
+1) List all created/modified files with paths
+2) Full code for each created/modified file
+3) Drizzle schema + migration files
+4) PowerShell commands to apply
+5) Short test checklist with curl examples
+
+START NOW. DO NOT ASK QUESTIONS.
