@@ -15356,16 +15356,3 @@ model SafePilotInternalNote {
 
 // ===== STRIPE WEBHOOK DEDUPLICATION =====
 // Prevents duplicate webhook event processing
-model StripeWebhookEvent {
-  id              String   @id @default(uuid())
-  stripeEventId   String   @unique  // Stripe event ID (evt_...)
-  eventType       String             // payment_intent.succeeded, etc.
-  processedAt     DateTime @default(now())
-  status          String   @default("processed") // processed, failed
-  errorMessage    String?  @db.Text
-  
-  @@index([stripeEventId])
-  @@index([eventType])
-  @@index([processedAt])
-  @@map("stripe_webhook_events")
-}

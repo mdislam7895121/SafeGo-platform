@@ -1,0 +1,79 @@
+SERIAL 1 — ORM CONSISTENCY FIX (DRIZZLE ONLY) — START NOW (WORK ONLY)
+
+CONTEXT
+Backend stack must be single-ORM. Current repo is PostgreSQL + Drizzle ORM, but Stripe webhook dedup was implemented using a Prisma model/table reference. This must be fixed immediately to avoid audit ambiguity and runtime inconsistency.
+
+GOAL
+1) Remove Prisma usage for Stripe webhook dedup completely.
+2) Re-implement Stripe webhook event dedup using Drizzle schema + migration.
+3) Ensure webhook handler uses Drizzle to insert/check unique event id, and immediately returns 200 on duplicates.
+4) No other refactors. Additive/surgical edits only. Keep all existing endpoints working.
+
+HARD RULES
+- Do NOT change business logic of trips/auth/payments.
+- Do NOT introduce Prisma anywhere.
+- If Prisma dependency exists, remove it only if it is not used elsewhere. If it is used elsewhere, do NOT remove globally; only remove Prisma from Stripe webhook dedup path and convert that path to Drizzle.
+- No TODOs. Provide complete code.
+- Provide exact file paths + full code + copy-paste PowerShell commands.
+
+STEP 1 — DISCOVERY (MANDATORY)
+Search and output exact file paths for:
+A) Stripe webhook route/controller (look for "/api/stripe/webhook", "constructEvent")
+B) Current dedup implementation (look for "StripeWebhookEvent", "prisma", "event.id")
+C) Drizzle db client and schema location
+D) Migration system location (Drizzle migrations)
+
+STEP 2 — DRIZZLE SCHEMA + MIGRATION
+Create Drizzle schema file:
+- src/db/schema/stripeWebhookEvents.ts  (or the repo’s schema path)
+Table: stripe_webhook_events
+Columns:
+- id (uuid pk default)
+- stripe_event_id (text unique, not null)
+- type (text not null)
+- created_at (timestamp default now)
+
+Add migration file to create this table with unique index on stripe_event_id.
+
+STEP 3 — DRIZZLE REPO / SERVICE
+Create:
+- src/services/stripeWebhookDedup.ts
+
+Export:
+- async function recordStripeEventOnce(stripeEventId: string, type: string): Promise<{ isDuplicate: boolean }>
+Implementation:
+- Try insert (stripe_event_id, type)
+- If unique violation -> isDuplicate true
+- Otherwise false
+
+STEP 4 — WEBHOOK HANDLER PATCH (MINIMAL)
+In the existing webhook controller:
+- Verify signature (keep existing)
+- Call recordStripeEventOnce(event.id, event.type)
+- If isDuplicate:
+  - return res.status(200).json({ received: true, duplicate: true })
+- Else:
+  - proceed with existing processing (account.updated etc)
+  - return 200
+
+Do NOT log event payload. Only log: event.id + type + duplicate flag (dev only if logger supports).
+
+STEP 5 — PRISMA REMOVAL (STRICTLY LIMITED)
+- Remove Prisma import/use from webhook path.
+- If Prisma is only used for this StripeWebhookEvent, remove Prisma dependency and any prisma folder/config.
+- If Prisma is used elsewhere, leave it, but keep Stripe webhook dedup strictly Drizzle.
+
+STEP 6 — SELF-TEST
+Update scripts/security-selftest.md to add:
+- Send same Stripe event twice -> second returns duplicate true and does not reprocess.
+- Confirm table stripe_webhook_events contains one row per event id.
+
+OUTPUT REQUIRED
+1) Exact file paths discovered
+2) Files created/modified list
+3) Full code for all changed/new files
+4) Migration contents
+5) Copy-paste PowerShell commands to apply
+6) Quick manual verification steps (curl + Stripe dashboard test)
+
+START NOW. DO NOT ASK QUESTIONS.

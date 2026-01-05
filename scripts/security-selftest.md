@@ -88,28 +88,49 @@ curl -X GET http://localhost:5000/api/food-orders/<other_user_order_id> \
 ```
 **Expected**: 403 access denied
 
-## 4. Webhook Deduplication Tests
+## 4. Webhook Deduplication Tests (Drizzle ORM)
+
+The webhook deduplication is implemented using Drizzle ORM with the `stripe_webhook_events` table.
 
 ### 4.1 Duplicate Webhook Event
 ```bash
 # Send same Stripe event ID twice
-EVENT_ID="evt_test_12345"
+EVENT_ID="evt_test_$(date +%s)"
 
-# First request
-curl -X POST http://localhost:5000/api/webhooks/stripe \
+# First request - should insert and process
+curl -X POST http://localhost:5000/api/payment-webhooks/stripe \
   -H "Content-Type: application/json" \
-  -H "Stripe-Signature: <valid_signature>" \
-  -d '{"id": "'$EVENT_ID'", "type": "payment_intent.succeeded", ...}' \
+  -H "Stripe-Signature: test_sig" \
+  -d '{"id": "'$EVENT_ID'", "type": "payment_intent.succeeded"}' \
   -w "\nStatus: %{http_code}\n"
 
-# Second request (duplicate)
-curl -X POST http://localhost:5000/api/webhooks/stripe \
+# Second request (duplicate) - should return duplicate:true immediately
+curl -X POST http://localhost:5000/api/payment-webhooks/stripe \
   -H "Content-Type: application/json" \
-  -H "Stripe-Signature: <valid_signature>" \
-  -d '{"id": "'$EVENT_ID'", "type": "payment_intent.succeeded", ...}' \
+  -H "Stripe-Signature: test_sig" \
+  -d '{"id": "'$EVENT_ID'", "type": "payment_intent.succeeded"}' \
   -w "\nStatus: %{http_code}\n"
 ```
-**Expected**: First returns 200 with processing, second returns 200 immediately (idempotent)
+**Expected**: 
+- First returns 200 with `{"received": true}` (or 400 if signature validation fails in prod)
+- Second returns 200 with `{"received": true, "duplicate": true}` immediately
+
+### 4.2 Verify Database Deduplication Table
+```sql
+-- Check the stripe_webhook_events table contains one row per event id
+SELECT id, "stripeEventId", "eventType", status, "processedAt" 
+FROM stripe_webhook_events 
+ORDER BY "processedAt" DESC 
+LIMIT 10;
+```
+**Expected**: One row per unique Stripe event ID with status "processed" or "failed"
+
+### 4.3 Console Log Verification (Development)
+In development mode, check server logs for:
+```
+[WebhookDedupe] New event recorded: evt_xxx (payment_intent.succeeded)
+[WebhookDedupe] Duplicate event detected: evt_xxx (payment_intent.succeeded)
+```
 
 ## 5. Security Headers Tests
 
