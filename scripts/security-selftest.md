@@ -205,6 +205,91 @@ curl -X GET http://localhost:5000/api/user/profile \
 ```
 **Expected**: 401 "Access token required"
 
+## 8. Refresh Token Rotation & Reuse Detection Tests
+
+The refresh token system implements database-backed token rotation with reuse detection.
+Table: `auth_refresh_tokens` (Drizzle ORM)
+
+### 8.1 Normal Token Rotation
+```bash
+# Login to get initial tokens
+LOGIN_RESP=$(curl -s -c cookies.txt -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "TestPass123!"}')
+ACCESS_TOKEN=$(echo $LOGIN_RESP | jq -r '.token')
+
+# First refresh - should succeed and rotate token
+curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:5000/api/auth/refresh \
+  -w "\nStatus: %{http_code}\n"
+```
+**Expected**: 200 with new access token, cookie updated with rotated refresh token
+
+### 8.2 Reuse Detection (Security Critical)
+```bash
+# Step 1: Login
+curl -s -c cookies1.txt -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "TestPass123!"}'
+
+# Step 2: Copy cookie for "attacker" simulation
+cp cookies1.txt cookies_attacker.txt
+
+# Step 3: Legitimate user refreshes (rotates token)
+curl -s -b cookies1.txt -c cookies1.txt -X POST http://localhost:5000/api/auth/refresh
+echo "First refresh: Success (token rotated)"
+
+# Step 4: Attacker tries to use OLD token (should trigger reuse detection)
+curl -s -b cookies_attacker.txt -X POST http://localhost:5000/api/auth/refresh \
+  -w "\nStatus: %{http_code}\n"
+```
+**Expected**: 
+- Step 3: 200 success
+- Step 4: 401 with `{"error": "Session invalidated for security...", "code": "TOKEN_REUSE_DETECTED"}`
+- All user sessions are revoked (global logout)
+
+### 8.3 Logout Revocation
+```bash
+# Login
+curl -s -c cookies.txt -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "TestPass123!"}'
+ACCESS_TOKEN=$(curl -s -b cookies.txt -X POST http://localhost:5000/api/auth/refresh | jq -r '.token')
+
+# Logout (revokes refresh token in database)
+curl -s -b cookies.txt -X POST http://localhost:5000/api/auth/logout \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# Try to refresh after logout (should fail)
+curl -s -b cookies.txt -X POST http://localhost:5000/api/auth/refresh \
+  -w "\nStatus: %{http_code}\n"
+```
+**Expected**: 401 "Token not found" or "Token revoked"
+
+### 8.4 Verify Database Token Storage
+```sql
+-- Check refresh tokens table (token_hash is hashed, never plaintext)
+SELECT id, user_id, 
+       LEFT(token_hash, 16) || '...' as token_hash_preview,
+       created_at, expires_at, revoked_at, replaced_by_token_id
+FROM auth_refresh_tokens 
+ORDER BY created_at DESC 
+LIMIT 10;
+```
+**Expected**: 
+- `token_hash` contains SHA-256 hash (not plaintext)
+- `revoked_at` is set for used/revoked tokens
+- `replaced_by_token_id` links to new token after rotation
+
+### 8.5 Console Log Verification (Development)
+Check server logs for:
+```
+[RefreshToken] Issued token for user abc12345...
+[RefreshToken] Rotated token for user abc12345...
+[RefreshToken] REUSE DETECTED for user abc12345... - revoking all tokens
+[RefreshToken] Revoked 3 tokens for user abc12345...
+```
+**Note**: Token values are NEVER logged
+
 ## Test Results Summary
 
 | Test Category | Test Name | Expected | Actual | Pass/Fail |
@@ -216,6 +301,9 @@ curl -X GET http://localhost:5000/api/user/profile \
 | Webhook | Duplicate dedupe | 200 idempotent | | |
 | Headers | X-Frame-Options | DENY | | |
 | Auth | Expired token | 403 | | |
+| Refresh Token | Normal rotation | 200 + new token | | |
+| Refresh Token | Reuse detection | 401 + global logout | | |
+| Refresh Token | Logout revocation | 401 after logout | | |
 
 ## Notes
 

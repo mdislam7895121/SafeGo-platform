@@ -1,0 +1,92 @@
+SERIAL 2 — REFRESH TOKEN ROTATION + REUSE DETECTION — START NOW (WORK ONLY)
+
+GOAL
+Upgrade authentication security to production-grade by implementing:
+1) Refresh token rotation
+2) Refresh token reuse detection
+3) Hashed refresh token storage
+4) Global session revoke on reuse
+5) Logout revocation
+
+Do NOT change existing access token logic.
+Additive changes only.
+
+=====================================================
+STEP 1 — DB TABLE (DRIZZLE)
+=====================================================
+Create table: auth_refresh_tokens
+
+Columns:
+- id uuid primary key default gen_random_uuid()
+- driver_id uuid not null
+- token_hash text not null
+- created_at timestamp default now()
+- expires_at timestamp not null
+- revoked_at timestamp nullable
+- replaced_by_token_id uuid nullable
+- device_id text nullable
+- ip text nullable
+- user_agent text nullable
+
+Indexes:
+- unique(token_hash)
+- index(driver_id)
+
+=====================================================
+STEP 2 — TOKEN HASHING
+=====================================================
+- Never store refresh token plaintext
+- Hash using: sha256(token + REFRESH_TOKEN_PEPPER)
+- Add env: REFRESH_TOKEN_PEPPER (server only)
+
+=====================================================
+STEP 3 — SERVICE LAYER
+=====================================================
+Create: src/services/refreshTokenService.ts
+
+Functions:
+- issueRefreshToken(driverId, meta)
+- rotateRefreshToken(oldToken, meta)
+- revokeRefreshToken(token)
+- revokeAllDriverTokens(driverId)
+
+Logic:
+- On refresh:
+  - hash incoming token
+  - if token revoked -> REUSE DETECTED -> revokeAllDriverTokens(driverId) -> 401
+  - else revoke old token, issue new token, link replaced_by_token_id
+
+=====================================================
+STEP 4 — AUTH ENDPOINTS
+=====================================================
+- POST /api/auth/refresh
+  - uses rotateRefreshToken
+- POST /api/auth/logout
+  - revoke current refresh token
+
+Access token stays unchanged.
+
+=====================================================
+STEP 5 — SECURITY RULES
+=====================================================
+- Refresh token expiry enforced
+- One refresh token usable once
+- Reuse = global logout
+- No logs of token values
+
+=====================================================
+STEP 6 — SELF TEST
+=====================================================
+Update scripts/security-selftest.md:
+- Refresh twice with same token → second fails + all sessions revoked
+- Logout → refresh fails
+- Old refresh token after rotation → rejected
+
+OUTPUT REQUIRED
+1) Files created/modified list
+2) Drizzle schema + migration
+3) Full code
+4) PowerShell commands
+5) Manual verification steps
+
+START NOW. DO NOT ASK QUESTIONS.

@@ -8,6 +8,12 @@ import { getAdminCapabilities } from "../utils/permissions";
 import { loadAdminProfile, AuthRequest, authenticateToken, JWTPayload } from "../middleware/auth";
 import { rateLimitAdminLogin, resetLoginAttempts } from "../middleware/rateLimit";
 import { isTwoFactorEnabled, verifyTwoFactorToken, getTwoFactorSecret } from "../services/twoFactorService";
+import { 
+  issueRefreshToken, 
+  rotateRefreshToken, 
+  revokeRefreshToken,
+  revokeAllUserTokens 
+} from "../services/refreshTokenService";
 
 const router = Router();
 
@@ -473,16 +479,21 @@ router.post("/login", async (req, res, next) => {
       }
     }
 
-    // Generate tokens - short-lived access token + long-lived refresh token
+    // Generate tokens - short-lived access token + long-lived database-backed refresh token
     const accessToken = generateAccessToken({
       userId: user.id,
       role: user.role,
       countryCode: user.countryCode,
     });
-    const refreshToken = generateRefreshToken(user.id);
+    
+    // Issue database-backed refresh token with rotation support
+    const refreshTokenResult = await issueRefreshToken(user.id, {
+      ip: getClientIp(req) || undefined,
+      userAgent: req.headers['user-agent'] || undefined,
+    });
 
     // Set refresh token in HTTP-only cookie
-    setRefreshTokenCookie(res, refreshToken);
+    setRefreshTokenCookie(res, refreshTokenResult.token);
 
     // Log successful login (audit - especially important for admin users)
     await logAuditEvent({
@@ -554,32 +565,52 @@ router.post("/login", async (req, res, next) => {
 // ====================================================
 // POST /api/auth/refresh
 // Refresh access token using refresh token from cookie
+// Implements token rotation with reuse detection
 // ====================================================
 router.post("/refresh", async (req, res) => {
   try {
-    const refreshToken = req.cookies?.safego_refresh_token;
+    const oldRefreshToken = req.cookies?.safego_refresh_token;
 
-    if (!refreshToken) {
+    if (!oldRefreshToken) {
       return res.status(401).json({ error: "No refresh token provided" });
     }
 
-    // Verify refresh token
-    let decoded: { userId: string; type: string };
-    try {
-      decoded = jwt.verify(refreshToken, REFRESH_SECRET) as { userId: string; type: string };
-    } catch (err) {
+    // Rotate refresh token using database-backed service
+    // This implements reuse detection - if token already used, all sessions revoked
+    const rotateResult = await rotateRefreshToken(oldRefreshToken, {
+      ip: getClientIp(req) || undefined,
+      userAgent: req.headers['user-agent'] || undefined,
+    });
+
+    // SECURITY: Reuse detection - token was already used (stolen token replay attack)
+    if (rotateResult.reuseDetected) {
       clearRefreshTokenCookie(res);
-      return res.status(401).json({ error: "Invalid or expired refresh token" });
+      
+      // Log security incident
+      await logAuditEvent({
+        actorRole: "unknown",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.LOGIN_FAILED,
+        entityType: EntityType.AUTH,
+        description: "Refresh token reuse detected - all sessions revoked",
+        metadata: { securityIncident: "TOKEN_REUSE_DETECTED" },
+        success: false,
+      });
+      
+      return res.status(401).json({ 
+        error: "Session invalidated for security. Please log in again.",
+        code: "TOKEN_REUSE_DETECTED"
+      });
     }
 
-    if (decoded.type !== 'refresh') {
+    if (!rotateResult.success || !rotateResult.token || !rotateResult.userId) {
       clearRefreshTokenCookie(res);
-      return res.status(401).json({ error: "Invalid token type" });
+      return res.status(401).json({ error: rotateResult.error || "Invalid or expired refresh token" });
     }
 
-    // Get user from database
+    // Get user from database to verify account status
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: rotateResult.userId },
       select: { id: true, email: true, role: true, countryCode: true, isBlocked: true },
     });
 
@@ -589,6 +620,8 @@ router.post("/refresh", async (req, res) => {
     }
 
     if (user.isBlocked) {
+      // Revoke all tokens for blocked user
+      await revokeAllUserTokens(user.id);
       clearRefreshTokenCookie(res);
       return res.status(403).json({ error: "Account is blocked" });
     }
@@ -600,9 +633,8 @@ router.post("/refresh", async (req, res) => {
       countryCode: user.countryCode,
     });
 
-    // Optionally rotate refresh token for added security
-    const newRefreshToken = generateRefreshToken(user.id);
-    setRefreshTokenCookie(res, newRefreshToken);
+    // Set rotated refresh token in cookie
+    setRefreshTokenCookie(res, rotateResult.token);
 
     res.json({ token: newAccessToken });
   } catch (error) {
@@ -614,12 +646,18 @@ router.post("/refresh", async (req, res) => {
 
 // ====================================================
 // POST /api/auth/logout
-// Log user logout event for audit trail (Security Phase 3)
+// Revoke refresh token and log user logout event
 // ====================================================
 router.post("/logout", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     const role = req.user?.role;
+    
+    // Revoke the refresh token in database before clearing cookie
+    const refreshToken = req.cookies?.safego_refresh_token;
+    if (refreshToken) {
+      await revokeRefreshToken(refreshToken);
+    }
     
     // Clear refresh token cookie
     clearRefreshTokenCookie(res);
@@ -640,13 +678,13 @@ router.post("/logout", authenticateToken, async (req: AuthRequest, res) => {
       entityType: EntityType.AUTH,
       entityId: userId,
       description: `User ${user?.email || 'unknown'} (${role || 'unknown'}) logged out`,
-      metadata: { role, logoutType: 'user_initiated' },
+      metadata: { role, logoutType: 'user_initiated', tokenRevoked: !!refreshToken },
       success: true,
     });
     
-    res.json({ message: "Logout recorded successfully" });
+    res.json({ message: "Logout successful" });
   } catch (error) {
-    console.error("Logout audit error:", error);
+    console.error("Logout error:", error);
     // Still return success - don't block logout even if audit fails
     clearRefreshTokenCookie(res);
     res.json({ message: "Logout recorded" });
