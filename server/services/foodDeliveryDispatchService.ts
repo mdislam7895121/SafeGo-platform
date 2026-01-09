@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { randomUUID } from "crypto";
+import { safeAuditLogCreate } from "../utils/audit";
 
 type DriverAssignmentStatus = "none" | "searching_driver" | "driver_assigned" | "driver_rejected" | "no_driver_found";
 type DeliveryServiceType = "ride" | "food" | "parcel";
@@ -549,7 +550,7 @@ export async function handleDriverReject(
     include: { user: true },
   });
 
-  await prisma.auditLog.create({
+  await safeAuditLogCreate({
     data: {
       actorId: driver?.userId || driverId,
       actorEmail: driver?.user.email || "driver",

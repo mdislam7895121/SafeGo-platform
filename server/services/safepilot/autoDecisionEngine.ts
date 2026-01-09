@@ -1,4 +1,5 @@
 import { prisma } from '../../db';
+import { safeAuditLogCreate } from '../../utils/audit';
 
 interface AutoBlockSuggestion {
   entityType: 'DRIVER' | 'CUSTOMER' | 'RESTAURANT';
@@ -324,7 +325,7 @@ export const autoDecisionEngine = {
         data: { isBlocked: true },
       });
 
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'users',
           recordId: entityId,
@@ -348,7 +349,7 @@ export const autoDecisionEngine = {
     adminId: string
   ): Promise<{ success: boolean; message: string }> {
     try {
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'users',
           recordId: entityId,
@@ -372,7 +373,7 @@ export const autoDecisionEngine = {
     adminId: string
   ): Promise<{ success: boolean; message: string }> {
     try {
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'users',
           recordId: entityId,
@@ -394,7 +395,7 @@ export const autoDecisionEngine = {
     adminId: string
   ): Promise<{ success: boolean; message: string }> {
     try {
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'auto_decisions',
           recordId: decisionId,
@@ -412,7 +413,7 @@ export const autoDecisionEngine = {
 
   async toggleRule(ruleId: string, enabled: boolean, adminId: string): Promise<{ success: boolean }> {
     try {
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'decision_rules',
           recordId: ruleId,

@@ -97,5 +97,5 @@ The platform features two separate RAG-based AI assistants with strict role-base
 - **Safe Wrapper**: `safeAuditLogCreate()` in `server/utils/audit.ts` wraps all audit log writes
 - **Emergency Toggle**: Set `DISABLE_AUDIT=true` to bypass audit logging entirely during outages
 - **Fail-Safe**: Audit failures log warnings but never crash the server or return 500 errors
-- **Coverage**: ALL 17 route files now use the safe wrapper (complete coverage)
+- **Coverage**: ALL route files (17) AND ALL service files (8) now use the safe wrapper (complete coverage)
 - **Purpose**: Prevents 502/500 errors if audit_logs table is missing or database issues occur

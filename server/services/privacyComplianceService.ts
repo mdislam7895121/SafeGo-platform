@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { PrivacyRequestType, PrivacyRequestStatus } from '@prisma/client';
+import { safeAuditLogCreate } from '../utils/audit';
 
 export interface DataExportResult {
   requestId: string;
@@ -459,7 +460,7 @@ export class PrivacyComplianceService {
     categories: string[],
     deletedCount: number
   ): Promise<void> {
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         userId,
         action: 'privacy_deletion',

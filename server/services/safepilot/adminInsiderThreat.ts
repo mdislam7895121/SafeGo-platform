@@ -1,4 +1,5 @@
 import { prisma } from '../../db';
+import { safeAuditLogCreate } from '../../utils/audit';
 
 interface SuspiciousAdminActivity {
   adminId: string;
@@ -264,7 +265,7 @@ export const adminInsiderThreat = {
 
   async flagAdmin(adminId: string, reason: string, flaggedBy: string): Promise<{ success: boolean }> {
     try {
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'users',
           recordId: adminId,
@@ -286,7 +287,7 @@ export const adminInsiderThreat = {
         data: { isBlocked: true },
       });
 
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'users',
           recordId: adminId,

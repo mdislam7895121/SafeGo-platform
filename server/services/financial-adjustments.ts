@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { Prisma } from "@prisma/client";
+import { safeAuditLogCreate } from "../utils/audit";
 
 /**
  * Financial Adjustments Service for Support Ticket Refunds
@@ -193,7 +194,7 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
     }
 
     // Create audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: adminId,
         actorEmail: adminEmail,
@@ -229,7 +230,7 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
     console.error("[Financial Adjustments] Failed to process refund:", error);
     
     // Log failure
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: adminId,
         actorEmail: adminEmail,
