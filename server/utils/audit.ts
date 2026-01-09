@@ -1,5 +1,29 @@
 import { prisma } from "../lib/prisma";
 
+/**
+ * PRODUCTION SAFETY: Check if audit logging is disabled via environment variable.
+ * Set DISABLE_AUDIT=true to skip all audit writes (emergency bypass for DB issues).
+ */
+const isAuditDisabled = (): boolean => {
+  return process.env.DISABLE_AUDIT === "true";
+};
+
+/**
+ * Safe wrapper for direct prisma.auditLog operations.
+ * Use this when you need to call prisma.auditLog directly outside the helper.
+ * Catches all errors and logs warnings instead of crashing.
+ */
+export async function safeAuditLogCreate(data: Parameters<typeof prisma.auditLog.create>[0]): Promise<void> {
+  if (isAuditDisabled()) {
+    return;
+  }
+  try {
+    await prisma.auditLog.create(data);
+  } catch (error: any) {
+    console.warn("[AuditLog] Write failed (non-fatal):", error?.message || error);
+  }
+}
+
 // Action type constants for type safety and consistency
 export const ActionType = {
   // Authentication
@@ -246,6 +270,11 @@ function sanitizeMetadata(metadata?: Record<string, any> | null): Record<string,
  * @param params - Audit log parameters
  */
 export async function logAuditEvent(params: AuditLogParams): Promise<void> {
+  // PRODUCTION SAFETY: Skip audit logging if disabled via env var
+  if (isAuditDisabled()) {
+    return;
+  }
+  
   try {
     const {
       actorId = null,
@@ -284,9 +313,10 @@ export async function logAuditEvent(params: AuditLogParams): Promise<void> {
         environment,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     // Log error but don't throw - audit logging should never break the main flow
-    console.error("Failed to log audit event:", error);
+    // PRODUCTION SAFETY: This catch prevents audit DB issues from crashing requests
+    console.warn("[AuditLog] Write failed (non-fatal):", error?.message || error);
   }
 }
 
