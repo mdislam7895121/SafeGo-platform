@@ -1,0 +1,77 @@
+You are working on a production Node.js backend deployed on Railway.
+
+CRITICAL PRODUCTION ISSUE:
+Even after setting environment variables:
+- DISABLE_WEBSOCKETS=true
+- DISABLE_OBSERVABILITY=true
+- DISABLE_AUDIT=true
+
+the application is still initializing:
+- WebSocket servers
+- Observability / monitoring services
+- Audit systems
+
+This causes memory usage to exceed 95% and triggers Railway Stability Guard CRITICAL errors.
+
+This is NOT an environment issue.
+This is a CODE-LEVEL INITIALIZATION PROBLEM.
+
+================================
+MANDATORY FIX REQUIREMENTS
+================================
+
+1. WebSockets
+- WebSocket servers MUST NOT initialize when DISABLE_WEBSOCKETS === "true"
+- Absolutely NO top-level imports of WebSocket modules
+- Use lazy imports ONLY inside guarded blocks:
+  if (process.env.DISABLE_WEBSOCKETS !== "true") { ... }
+
+2. Observability / Metrics / Monitoring
+- Must NOT initialize when DISABLE_OBSERVABILITY === "true"
+- Remove all top-level imports that auto-register collectors
+- No background intervals, metrics exporters, or monitoring hooks in disabled mode
+
+3. Audit System
+- Must NOT initialize at all when DISABLE_AUDIT === "true"
+- No audit logs, no hashing, no background workers
+
+4. Production Mode Behavior
+When all DISABLE_* flags are true, the app must run as:
+- Express HTTP only
+- No WebSockets
+- No observability
+- No audit
+- No cron jobs
+- No background workers
+
+5. Memory Safety
+- Ensure no module allocates memory at import time
+- App must stay under 70% memory usage after 5+ minutes idle
+
+================================
+VERIFICATION (REQUIRED)
+================================
+
+After changes, deployment logs MUST:
+- NOT contain:
+  "WebSocket server initialized"
+  "Observability initialized"
+  "Audit log initialized"
+- Show only Express HTTP startup
+- Memory must remain stable
+
+================================
+GIT & DEPLOYMENT (MANDATORY)
+================================
+
+1. Apply fixes directly to the existing codebase
+2. Commit with message:
+   "fix: prevent websocket, observability, and audit init when disabled"
+3. Push to the connected GitHub repository (main / production branch)
+4. Ensure Railway auto-redeploys from this push
+
+Do NOT refactor unrelated code.
+Do NOT add new features.
+Focus ONLY on stability and memory safety.
+
+This is a blocking production issue.

@@ -118,8 +118,13 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  // Start memory monitoring with 30-second intervals
-  startMemoryMonitor(30000, { warningPercent: 70, criticalPercent: 85 });
+  
+  // PRODUCTION SAFETY: Only start memory monitoring when observability is enabled
+  if (process.env.DISABLE_OBSERVABILITY !== "true") {
+    startMemoryMonitor(30000, { warningPercent: 70, criticalPercent: 85 });
+  } else {
+    console.log("[MemoryMonitor] DISABLED via DISABLE_OBSERVABILITY=true");
+  }
 
   server.listen({
     port,

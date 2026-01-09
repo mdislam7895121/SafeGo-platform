@@ -40,6 +40,8 @@ class TelemetryService {
   private snapshots: PerformanceSnapshot[] = [];
   private readonly maxSnapshots = 100; // Keep last 100 snapshots
   private readonly samplingRate = 0.1; // Sample 10% of requests for detailed metrics
+  private rotationInterval: NodeJS.Timeout | null = null;
+  private rotationStarted = false;
   
   private currentSnapshot: PerformanceSnapshot = {
     requestCount: 0,
@@ -52,7 +54,12 @@ class TelemetryService {
   };
 
   private constructor() {
-    this.startSnapshotRotation();
+    // PRODUCTION SAFETY: Do NOT auto-start telemetry rotation when disabled
+    if (process.env.DISABLE_OBSERVABILITY !== "true") {
+      this.startSnapshotRotation();
+    } else {
+      console.log("[TelemetryService] DISABLED via DISABLE_OBSERVABILITY=true");
+    }
   }
 
   static getInstance(): TelemetryService {
@@ -63,10 +70,15 @@ class TelemetryService {
   }
 
   /**
-   * Rotate snapshots every minute
+   * Rotate snapshots every minute (only when not disabled)
    */
   private startSnapshotRotation() {
-    setInterval(() => {
+    if (this.rotationStarted || process.env.DISABLE_OBSERVABILITY === "true") {
+      return;
+    }
+    this.rotationStarted = true;
+    console.log("[TelemetryService] Starting snapshot rotation (60s interval)");
+    this.rotationInterval = setInterval(() => {
       this.snapshots.push({ ...this.currentSnapshot });
       if (this.snapshots.length > this.maxSnapshots) {
         this.snapshots.shift();
@@ -202,4 +214,45 @@ class TelemetryService {
   }
 }
 
-export const telemetryService = TelemetryService.getInstance();
+// PRODUCTION SAFETY: No-op stub for when observability is disabled
+const noOpTelemetryStub = {
+  recordRequest: () => {},
+  recordQuery: () => {},
+  getCurrentMetrics: async () => ({ 
+    timestamp: new Date(), 
+    requests: { total: 0, successful: 0, failed: 0, avgResponseTime: 0 },
+    database: { activeConnections: 0, avgQueryTime: 0, slowQueries: 0 },
+    system: { memoryUsage: 0, cpuUsage: 0, uptime: 0 }
+  }),
+  getTrafficOverview: async () => ({ 
+    totalRequests: 0, successfulRequests: 0, failedRequests: 0, 
+    errorRate: "0.00", avgResponseTime: 0, timeRange: "24h" 
+  }),
+  getDatabaseStats: async () => ({ 
+    totalQueries: 0, avgQueryTime: 0, slowQueries: 0, 
+    slowQueryRate: "0.00", estimatedConnections: 0 
+  }),
+} as unknown as TelemetryService;
+
+// PRODUCTION SAFETY: Lazy instantiation using getter to prevent auto-initialization
+// The getter only creates the real instance when DISABLE_OBSERVABILITY is NOT set
+let _cachedTelemetryService: TelemetryService | null = null;
+
+function getTelemetryServiceInternal(): TelemetryService {
+  if (process.env.DISABLE_OBSERVABILITY === "true") {
+    return noOpTelemetryStub;
+  }
+  if (!_cachedTelemetryService) {
+    _cachedTelemetryService = TelemetryService.getInstance();
+  }
+  return _cachedTelemetryService;
+}
+
+// Use Proxy to defer instantiation until first property access
+export const telemetryService = new Proxy({} as TelemetryService, {
+  get(_target, prop) {
+    const service = getTelemetryServiceInternal();
+    const value = (service as any)[prop];
+    return typeof value === 'function' ? value.bind(service) : value;
+  }
+});

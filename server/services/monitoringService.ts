@@ -310,18 +310,23 @@ export async function recordDeploymentCheck(
   }
 }
 
-setInterval(async () => {
-  try {
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    
-    await prisma.systemHealthMetric.deleteMany({
-      where: { timestamp: { lt: cutoff } }
-    });
-    
-    await prisma.slowQueryLog.deleteMany({
-      where: { timestamp: { lt: cutoff } }
-    });
-  } catch (error) {
-    console.error('[MonitoringService] Cleanup failed:', error);
-  }
-}, 24 * 60 * 60 * 1000);
+// PRODUCTION SAFETY: Only start cleanup interval when observability is enabled
+if (process.env.DISABLE_OBSERVABILITY !== "true") {
+  setInterval(async () => {
+    try {
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      
+      await prisma.systemHealthMetric.deleteMany({
+        where: { timestamp: { lt: cutoff } }
+      });
+      
+      await prisma.slowQueryLog.deleteMany({
+        where: { timestamp: { lt: cutoff } }
+      });
+    } catch (error) {
+      console.error('[MonitoringService] Cleanup failed:', error);
+    }
+  }, 24 * 60 * 60 * 1000);
+} else {
+  console.log("[MonitoringService] Cleanup interval DISABLED via DISABLE_OBSERVABILITY=true");
+}

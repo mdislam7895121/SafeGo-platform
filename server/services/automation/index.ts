@@ -80,6 +80,13 @@ export interface AutomationSystemStatus {
 }
 
 export async function initializeAutomationSystems(): Promise<void> {
+  // PRODUCTION SAFETY: Do not start automation systems when observability is disabled
+  // This prevents memory-intensive background processes from running
+  if (process.env.DISABLE_OBSERVABILITY === "true") {
+    console.log('[Automation] DISABLED via DISABLE_OBSERVABILITY=true - skipping all automation systems');
+    return;
+  }
+
   console.log('[Automation] Initializing automation systems...');
 
   surgePricingAutomation.start();

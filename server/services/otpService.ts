@@ -264,16 +264,20 @@ export function hasActiveOtp(userId: string, purpose: OtpPurpose): boolean {
   return !!storedOtp && storedOtp.expiresAt > new Date();
 }
 
-setInterval(() => {
-  const now = new Date();
-  Array.from(otpStore.entries()).forEach(([key, value]) => {
-    if (value.expiresAt < now) {
-      otpStore.delete(key);
-    }
-  });
-  Array.from(cooldownStore.entries()).forEach(([key, value]) => {
-    if (value < now) {
-      cooldownStore.delete(key);
-    }
-  });
-}, 60 * 1000);
+// PRODUCTION SAFETY: Only start OTP cleanup interval when observability is enabled
+// OTP cleanup is lightweight but still represents a background process
+if (process.env.DISABLE_OBSERVABILITY !== "true") {
+  setInterval(() => {
+    const now = new Date();
+    Array.from(otpStore.entries()).forEach(([key, value]) => {
+      if (value.expiresAt < now) {
+        otpStore.delete(key);
+      }
+    });
+    Array.from(cooldownStore.entries()).forEach(([key, value]) => {
+      if (value < now) {
+        cooldownStore.delete(key);
+      }
+    });
+  }, 60 * 1000);
+}
