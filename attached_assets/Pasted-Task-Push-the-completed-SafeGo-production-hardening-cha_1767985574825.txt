@@ -1,0 +1,58 @@
+Task: Push the completed SafeGo production hardening changes to GitHub safely, with proof and a non-breaking deployment.
+
+Rules:
+- Do NOT remove/rename existing APIs, routes, or fields.
+- Only additive/minimal changes already made (health endpoints, DB error handler, audit wrapper).
+- No destructive Prisma actions (no reset, no drop).
+- Keep existing repo structure.
+
+1) PRE-PUSH CHECKS (must run and share outputs)
+- Ensure working tree is clean and only intended files changed:
+  git status
+  git diff --stat
+
+- Confirm no remaining direct audit log writes:
+  grep -R "prisma\.auditLog\.create" -n server || true
+
+- Confirm health endpoints exist:
+  grep -R "api/health" -n server/routes server/index.ts server || true
+  grep -R "api/health/db" -n server/routes server/index.ts server || true
+
+2) COMMIT (single clean commit)
+- Create a new branch:
+  git checkout -b prod-hardening-railway
+
+- Stage only intended files:
+  git add server/utils/audit.ts
+  git add server/index.ts server/app.ts server/middleware/* server/routes/*
+  git add docs/RAILWAY_PRODUCTION_HARDENING.md
+  (Adjust paths to match actual changes; do not add secrets)
+
+- Commit message (exact):
+  git commit -m "Prod hardening: audit-safe logging, DB error handling, health/db endpoint"
+
+3) PUSH TO GITHUB
+- Push branch:
+  git push -u origin prod-hardening-railway
+
+4) PR / MERGE
+- Open a PR into main (or your production branch).
+- Include in PR description:
+  - What changed (audit wrapper, DB error handler, /api/health, /api/health/db)
+  - Why non-breaking
+  - How to verify (curl commands)
+  - Env var notes (DISABLE_AUDIT toggle)
+
+5) RAILWAY REDEPLOY (after merge)
+- Redeploy from the merged commit.
+- Provide proof:
+  curl -i https://safego-platform-production.up.railway.app/api/health
+  curl -i https://safego-platform-production.up.railway.app/api/health/db
+  and a screenshot of Railway deployment logs showing server started + port.
+
+Deliverables back to me:
+- GitHub branch name + PR link
+- Output of git diff --stat
+- Output of grep auditLog command (should be empty)
+- curl outputs (health + health/db)
+- Screenshot of Railway deploy logs

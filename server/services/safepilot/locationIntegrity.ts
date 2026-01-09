@@ -1,4 +1,5 @@
 import { prisma } from '../../db';
+import { safeAuditLogCreate } from '../../utils/audit';
 
 interface GPSSpoofingAlert {
   driverId: string;
@@ -309,7 +310,7 @@ export const locationIntegrity = {
 
   async flagDriver(driverId: string, reason: string, adminId: string): Promise<{ success: boolean }> {
     try {
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           tableName: 'driver_profiles',
           recordId: driverId,

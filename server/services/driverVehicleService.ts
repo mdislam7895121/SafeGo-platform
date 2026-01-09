@@ -14,6 +14,7 @@
 
 import { prisma } from '../db';
 import { DocumentStatus } from '@prisma/client';
+import { safeAuditLogCreate } from '../utils/audit';
 import {
   VehicleCategoryId,
   VehicleBodyType,
@@ -864,7 +865,7 @@ export class DriverVehicleService {
       });
 
       // Create audit log entry
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           id: crypto.randomUUID(),
           actorId: adminUserId,

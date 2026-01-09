@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import crypto from "crypto";
+import { safeAuditLogCreate } from "../utils/audit";
 
 export enum ComplianceExportStatus {
   QUEUED = "QUEUED",
@@ -111,7 +112,7 @@ export async function createExport(
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: requestedBy,
         actorEmail: requestedByEmail,
@@ -717,26 +718,27 @@ export async function downloadExport(
           userAgent: userAgent || null,
         },
       }),
-      prisma.auditLog.create({
-        data: {
-          actorId: downloadedBy,
-          actorEmail: downloadedByEmail,
-          actorRole: "ADMIN",
-          ipAddress: ipAddress || null,
-          userAgent: userAgent || null,
-          actionType: "DOWNLOAD_COMPLIANCE_EXPORT",
-          entityType: "ComplianceDataExport",
-          entityId: exportId,
-          description: `Downloaded compliance export: ${exportRecord.title}`,
-          metadata: {
-            category: exportRecord.category,
-            scope: exportRecord.scope,
-            fileSize: exportRecord.fileSize,
-          },
-          success: true,
-        },
-      }),
     ]);
+
+    await safeAuditLogCreate({
+      data: {
+        actorId: downloadedBy,
+        actorEmail: downloadedByEmail,
+        actorRole: "ADMIN",
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+        actionType: "DOWNLOAD_COMPLIANCE_EXPORT",
+        entityType: "ComplianceDataExport",
+        entityId: exportId,
+        description: `Downloaded compliance export: ${exportRecord.title}`,
+        metadata: {
+          category: exportRecord.category,
+          scope: exportRecord.scope,
+          fileSize: exportRecord.fileSize,
+        },
+        success: true,
+      },
+    });
 
     return { success: true, data: { manifest, data: exportData } };
   } catch (error: any) {
@@ -763,24 +765,23 @@ export async function cancelExport(
       return { success: false, error: "Only queued exports can be cancelled" };
     }
 
-    await prisma.$transaction([
-      prisma.complianceDataExport.update({
-        where: { id: exportId },
-        data: { status: ComplianceExportStatus.CANCELLED },
-      }),
-      prisma.auditLog.create({
-        data: {
-          actorId: cancelledBy,
-          actorEmail: cancelledByEmail,
-          actorRole: "ADMIN",
-          actionType: "CANCEL_COMPLIANCE_EXPORT",
-          entityType: "ComplianceDataExport",
-          entityId: exportId,
-          description: `Cancelled compliance export: ${exportRecord.title}`,
-          success: true,
-        },
-      }),
-    ]);
+    await prisma.complianceDataExport.update({
+      where: { id: exportId },
+      data: { status: ComplianceExportStatus.CANCELLED },
+    });
+
+    await safeAuditLogCreate({
+      data: {
+        actorId: cancelledBy,
+        actorEmail: cancelledByEmail,
+        actorRole: "ADMIN",
+        actionType: "CANCEL_COMPLIANCE_EXPORT",
+        entityType: "ComplianceDataExport",
+        entityId: exportId,
+        description: `Cancelled compliance export: ${exportRecord.title}`,
+        success: true,
+      },
+    });
 
     return { success: true };
   } catch (error: any) {
@@ -874,7 +875,7 @@ export async function upsertRetentionPolicy(
     }
   }
 
-  await prisma.auditLog.create({
+  await safeAuditLogCreate({
     data: {
       actorId: updatedBy,
       actorEmail: updatedByEmail || "unknown",
