@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { rateLimitPayout, rateLimitSupport, rateLimitSensitive } from "./middleware/rateLimit";
 import { authenticateToken, AuthRequest } from "./middleware/auth";
 import { prisma } from "./db";
+import { getPaymentGatewayStatus } from "./utils/environmentGuard";
 import { initStripe } from "./services/stripeInit";
 import { StripeWebhookHandler } from "./services/stripeWebhookHandler";
 import authRoutes from "./routes/auth";
@@ -135,22 +136,39 @@ type DriverPublicProfile = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Health endpoint - returns 200 with basic status
+  // Health endpoint - returns 200 with basic status (fast, non-blocking)
+  // Always returns 200 OK - payment gateway status is informational only
   app.get('/health', (_req: Request, res: Response) => {
+    const paymentStatus = getPaymentGatewayStatus();
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
+      payments_configured: paymentStatus.configured,
+      payments: {
+        stripe: paymentStatus.providers.stripe,
+        sslcommerz: paymentStatus.providers.sslcommerz,
+        bkash: paymentStatus.providers.bkash,
+        nagad: paymentStatus.providers.nagad,
+      },
     });
   });
 
   app.get('/api/health', (_req: Request, res: Response) => {
+    const paymentStatus = getPaymentGatewayStatus();
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
+      payments_configured: paymentStatus.configured,
+      payments: {
+        stripe: paymentStatus.providers.stripe,
+        sslcommerz: paymentStatus.providers.sslcommerz,
+        bkash: paymentStatus.providers.bkash,
+        nagad: paymentStatus.providers.nagad,
+      },
     });
   });
 
