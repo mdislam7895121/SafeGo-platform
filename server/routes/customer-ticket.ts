@@ -3,6 +3,7 @@ import { prisma } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -444,7 +445,8 @@ router.post("/book", async (req: AuthRequest, res: Response) => {
       return newBooking;
     });
 
-    await prisma.auditLog.create({
+    // Safe audit log - won't crash on failure
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
