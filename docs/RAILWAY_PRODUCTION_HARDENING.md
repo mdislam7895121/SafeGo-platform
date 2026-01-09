@@ -160,25 +160,41 @@ All route files in `server/routes/` now use the safe wrapper:
 ## 6. PRISMA MIGRATIONS - PRODUCTION SAFE PLAN
 
 ### Current State
-The database schema is managed via `prisma db push` - no migration history.
+The database schema is managed via `prisma db push` for development only.
 
-### Safe Deployment Steps
+### Development Environment (Replit)
+```bash
+# Safe for development only - syncs schema without migration files
+npm run db:push
+```
+
+### Production Environment (Railway)
+
+**IMPORTANT**: For production with existing data, use only safe migration commands:
 
 ```bash
-# 1. Verify schema is synced
-npx prisma db push --accept-data-loss
+# 1. Generate migration from schema changes (run locally first)
+npx prisma migrate dev --name descriptive_name
 
-# 2. If P3005 error (schema not empty), use:
-npx prisma db push --force-reset  # WARNING: Drops all data!
+# 2. Deploy migrations to production
+npx prisma migrate deploy
 
-# 3. For production with existing data, use migration:
+# 3. If schema drift exists, baseline the database
 npx prisma migrate resolve --applied "0001_initial"
 ```
 
 ### NEVER DO THESE IN PRODUCTION
-- `npx prisma migrate reset` - Drops all data
-- `npx prisma db push --force-reset` - Drops all data
-- Direct SQL `DROP TABLE` commands
+- `npx prisma db push --accept-data-loss` - May drop columns/data
+- `npx prisma db push --force-reset` - Drops ALL data
+- `npx prisma migrate reset` - Drops ALL data
+- Direct SQL `DROP TABLE` or `ALTER TABLE DROP COLUMN` commands
+- Any command that includes "reset", "force", or "drop"
+
+### Pre-Deployment Checklist
+1. Test migrations locally first
+2. Back up production database
+3. Review migration SQL in `prisma/migrations/`
+4. Confirm no destructive operations
 
 ---
 
