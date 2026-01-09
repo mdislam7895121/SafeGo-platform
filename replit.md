@@ -87,9 +87,15 @@ The platform features two separate RAG-based AI assistants with strict role-base
 
 ## Operational Safety Features
 
+### Production Hardening (January 2026)
+- **Documentation**: See `docs/RAILWAY_PRODUCTION_HARDENING.md` for complete Railway deployment guide
+- **Health Endpoints**: `/api/health` (always 200), `/api/health/db` (503 if DB down, server stays alive)
+- **Global Error Handler**: Catches all Prisma/DB errors and returns 503 instead of crashing
+- **Environment Guard**: `server/utils/environmentGuard.ts` validates critical env vars at startup
+
 ### Audit Logging Safety (January 2026)
 - **Safe Wrapper**: `safeAuditLogCreate()` in `server/utils/audit.ts` wraps all audit log writes
 - **Emergency Toggle**: Set `DISABLE_AUDIT=true` to bypass audit logging entirely during outages
 - **Fail-Safe**: Audit failures log warnings but never crash the server or return 500 errors
-- **Coverage**: Critical routes (admin-bd-expansion, customer, customer-ticket) use the safe wrapper
+- **Coverage**: ALL 17 route files now use the safe wrapper (complete coverage)
 - **Purpose**: Prevents 502/500 errors if audit_logs table is missing or database issues occur
