@@ -7,6 +7,7 @@ import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth"
 import { z } from "zod";
 import { validatePromotionForOrder, validateCouponCode } from "../promotions/validationUtils";
 import { encrypt } from "../utils/encryption";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -2555,8 +2556,8 @@ router.post("/partner/initialize", async (req: AuthRequest, res) => {
       });
     }
 
-    // Create audit log for partner initialization attempt
-    await prisma.auditLog.create({
+    // Create audit log for partner initialization attempt (safe - won't crash on failure)
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email || "unknown",

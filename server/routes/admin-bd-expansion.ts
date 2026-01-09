@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../db";
 import { z } from "zod";
 import { PartnerStatus } from "@prisma/client";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -896,7 +897,7 @@ router.patch("/shop-partners/:id/approve-kyc", async (req: Request, res: Respons
     });
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -983,7 +984,7 @@ router.patch("/shop-partners/:id/go-live", async (req: Request, res: Response) =
     ]);
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1060,7 +1061,7 @@ router.patch("/shop-partners/:id/reject", async (req: Request, res: Response) =>
     });
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1136,7 +1137,7 @@ router.patch("/ticket-operators/:id/approve-kyc", async (req: Request, res: Resp
     });
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1223,7 +1224,7 @@ router.patch("/ticket-operators/:id/go-live", async (req: Request, res: Response
     ]);
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1303,7 +1304,7 @@ router.patch("/ticket-operators/:id/reject", async (req: Request, res: Response)
     });
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1493,7 +1494,7 @@ router.post("/shop-partners/:id/kyc-approve", async (req: Request, res: Response
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1558,7 +1559,7 @@ router.post("/shop-partners/:id/kyc-reject", async (req: Request, res: Response)
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1616,7 +1617,7 @@ router.post("/shop-partners/:id/setup-return", async (req: Request, res: Respons
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1680,7 +1681,7 @@ router.post("/shop-partners/:id/final-approve", async (req: Request, res: Respon
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1745,7 +1746,7 @@ router.post("/shop-partners/:id/final-reject", async (req: Request, res: Respons
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1806,7 +1807,7 @@ router.post("/ticket-operators/:id/kyc-approve", async (req: Request, res: Respo
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1871,7 +1872,7 @@ router.post("/ticket-operators/:id/kyc-reject", async (req: Request, res: Respon
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1929,7 +1930,7 @@ router.post("/ticket-operators/:id/setup-return", async (req: Request, res: Resp
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1993,7 +1994,7 @@ router.post("/ticket-operators/:id/final-approve", async (req: Request, res: Res
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -2058,7 +2059,7 @@ router.post("/ticket-operators/:id/final-reject", async (req: Request, res: Resp
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
