@@ -47,10 +47,13 @@ expertMode = true
 
 [userenv.shared]
 FEATURE_BD_ONLINE_PAYMENTS_ENABLED = "true"
-SSLCOMMERZ_SANDBOX_ENABLED_BD = "true"
 SSLCOMMERZ_SUCCESS_URL_BD = "/api/payments/sslcommerz/success"
 SSLCOMMERZ_FAIL_URL_BD = "/api/payments/sslcommerz/fail"
 SSLCOMMERZ_CANCEL_URL_BD = "/api/payments/sslcommerz/cancel"
 FEATURE_US_ONLINE_PAYMENTS_ENABLED = "true"
 
 [userenv.production]
+SSLCOMMERZ_SANDBOX_ENABLED_BD = "false"
+
+[userenv.development]
+SSLCOMMERZ_SANDBOX_ENABLED_BD = "true"
