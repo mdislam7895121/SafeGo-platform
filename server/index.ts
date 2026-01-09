@@ -1,9 +1,8 @@
 // CRITICAL: Validate security configuration FIRST before ANY imports
 // Must be the FIRST import and call to ensure no other modules load insecure defaults
-import { guardEnvironment, logProductionStartupBanner, assertDemoModeDisabled, assertPaymentProvidersConfigured } from "./utils/environmentGuard";
+import { guardEnvironment, logProductionStartupBanner, assertDemoModeDisabled, logPaymentGatewayStatus } from "./utils/environmentGuard";
 guardEnvironment();
 assertDemoModeDisabled();
-assertPaymentProvidersConfigured();
 logProductionStartupBanner();
 
 // Now safe to import other modules (they will throw if secrets missing, but guard already validated)
@@ -128,5 +127,7 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    // Log payment gateway status AFTER server is listening (non-blocking)
+    logPaymentGatewayStatus();
   });
 })();

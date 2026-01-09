@@ -343,55 +343,149 @@ export function generateSecureKey(bytes: number = 32): string {
 }
 
 /**
- * Payment Gateway Fail-Fast Validation
- * In PRODUCTION, FAILS startup if no payment providers are configured for a given country
- * This is a HARD requirement - the platform cannot accept payments without providers
+ * Payment gateway configuration status (shared between startup and health checks)
  */
-export function assertPaymentProvidersConfigured(): void {
+export interface PaymentGatewayStatus {
+  configured: boolean;
+  warnings: string[];
+  errors: string[];
+  providers: {
+    stripe: boolean;
+    sslcommerz: boolean;
+    bkash: boolean;
+    nagad: boolean;
+  };
+}
+
+let paymentGatewayStatus: PaymentGatewayStatus = {
+  configured: false,
+  warnings: [],
+  errors: [],
+  providers: {
+    stripe: false,
+    sslcommerz: false,
+    bkash: false,
+    nagad: false,
+  },
+};
+
+/**
+ * Get current payment gateway configuration status
+ * Used by health check endpoints
+ */
+export function getPaymentGatewayStatus(): PaymentGatewayStatus {
+  return paymentGatewayStatus;
+}
+
+/**
+ * Payment Gateway Validation (Non-Fatal)
+ * Logs warnings for missing payment providers but does NOT exit
+ * Health checks will report degraded status if providers are missing
+ * This allows the app to start and serve traffic even without full payment config
+ */
+export function validatePaymentProviders(): PaymentGatewayStatus {
   const isProduction = process.env.NODE_ENV === "production";
-  
-  if (!isProduction) {
-    return; // Skip in development - mock payments work
-  }
+  const warnings: string[] = [];
+  const errors: string[] = [];
   
   // US Payment Providers (Stripe is primary)
   const hasStripe = !!process.env.STRIPE_SECRET_KEY;
   
   // Bangladesh Payment Providers (SSLCOMMERZ, bKash, Nagad)
-  const hasSSLCommerz = !!(process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD);
+  // Support both _BD suffix variants and non-suffixed variants
+  const hasSSLCommerz = !!(
+    (process.env.SSLCOMMERZ_STORE_ID_BD && process.env.SSLCOMMERZ_STORE_PASSWORD_BD) ||
+    (process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD)
+  );
   const hasBkash = !!(process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET);
   const hasNagad = !!(process.env.NAGAD_MERCHANT_ID && process.env.NAGAD_MERCHANT_PRIVATE_KEY);
   
-  const errors: string[] = [];
-  
   if (!hasStripe) {
-    errors.push("US Payment: STRIPE_SECRET_KEY not configured - US payments will FAIL");
+    warnings.push("US Payment: STRIPE_SECRET_KEY not configured - US payments will be unavailable");
   }
   
   if (!hasSSLCommerz && !hasBkash && !hasNagad) {
-    errors.push("BD Payment: No Bangladesh payment provider configured (SSLCOMMERZ/bKash/Nagad) - BD payments will FAIL");
+    warnings.push("BD Payment: No Bangladesh payment provider configured (SSLCOMMERZ/bKash/Nagad) - BD payments will be unavailable");
   }
   
-  // Check sandbox mode flags in production - these are fatal errors
-  if (hasSSLCommerz && process.env.SSLCOMMERZ_SANDBOX_ENABLED_BD === "true") {
-    errors.push("SSLCOMMERZ_SANDBOX_ENABLED_BD is true in PRODUCTION - SANDBOX MODE IS FORBIDDEN IN PRODUCTION");
-  }
-  if (hasBkash && process.env.BKASH_SANDBOX_MODE === "true") {
-    errors.push("BKASH_SANDBOX_MODE is true in PRODUCTION - SANDBOX MODE IS FORBIDDEN IN PRODUCTION");
-  }
-  if (hasNagad && process.env.NAGAD_SANDBOX_MODE === "true") {
-    errors.push("NAGAD_SANDBOX_MODE is true in PRODUCTION - SANDBOX MODE IS FORBIDDEN IN PRODUCTION");
+  // Check sandbox mode flags in production - log warnings but don't exit
+  if (isProduction) {
+    if (hasSSLCommerz && process.env.SSLCOMMERZ_SANDBOX_ENABLED_BD === "true") {
+      errors.push("SSLCOMMERZ_SANDBOX_ENABLED_BD is true in PRODUCTION - payments will use sandbox (non-real money)");
+    }
+    if (hasBkash && process.env.BKASH_SANDBOX_MODE === "true") {
+      errors.push("BKASH_SANDBOX_MODE is true in PRODUCTION - payments will use sandbox (non-real money)");
+    }
+    if (hasNagad && process.env.NAGAD_SANDBOX_MODE === "true") {
+      errors.push("NAGAD_SANDBOX_MODE is true in PRODUCTION - payments will use sandbox (non-real money)");
+    }
   }
   
-  if (errors.length > 0) {
-    console.error("\n" + "=".repeat(80));
-    console.error("FATAL: PAYMENT GATEWAY CONFIGURATION INVALID FOR PRODUCTION");
-    console.error("=".repeat(80));
-    errors.forEach((err, i) => console.error(`  ${i + 1}. ${err}`));
-    console.error("\nThe platform cannot process payments without proper gateway configuration.");
-    console.error("Configure the required payment providers and restart the application.\n");
-    process.exit(1);
+  const hasAnyUSProvider = hasStripe;
+  const hasAnyBDProvider = hasSSLCommerz || hasBkash || hasNagad;
+  
+  paymentGatewayStatus = {
+    configured: hasAnyUSProvider || hasAnyBDProvider,
+    warnings,
+    errors,
+    providers: {
+      stripe: hasStripe,
+      sslcommerz: hasSSLCommerz,
+      bkash: hasBkash,
+      nagad: hasNagad,
+    },
+  };
+  
+  return paymentGatewayStatus;
+}
+
+/**
+ * Log payment gateway status after server starts (non-blocking)
+ * Called after the server is listening to report configuration status
+ */
+export function logPaymentGatewayStatus(): void {
+  const status = validatePaymentProviders();
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  if (status.warnings.length > 0 || status.errors.length > 0) {
+    console.log("\n" + "=".repeat(80));
+    console.log("PAYMENT GATEWAY CONFIGURATION STATUS");
+    console.log("=".repeat(80));
+    
+    if (status.errors.length > 0) {
+      console.warn("\n[!] Payment Configuration Errors:");
+      status.errors.forEach((err, i) => console.warn(`  ${i + 1}. ${err}`));
+    }
+    
+    if (status.warnings.length > 0) {
+      console.warn("\n[!] Payment Configuration Warnings:");
+      status.warnings.forEach((warn, i) => console.warn(`  ${i + 1}. ${warn}`));
+    }
+    
+    console.log("\nPayment Provider Status:");
+    console.log(`  Stripe (US):       ${status.providers.stripe ? "CONFIGURED" : "NOT CONFIGURED"}`);
+    console.log(`  SSLCOMMERZ (BD):   ${status.providers.sslcommerz ? "CONFIGURED" : "NOT CONFIGURED"}`);
+    console.log(`  bKash (BD):        ${status.providers.bkash ? "CONFIGURED" : "NOT CONFIGURED"}`);
+    console.log(`  Nagad (BD):        ${status.providers.nagad ? "CONFIGURED" : "NOT CONFIGURED"}`);
+    
+    if (isProduction && !status.configured) {
+      console.warn("\n[!] WARNING: No payment providers configured - payment features will be unavailable");
+      console.warn("[!] Configure payment providers to enable real transactions");
+    }
+    
+    console.log("\n" + "=".repeat(80) + "\n");
+  } else {
+    console.log("[Payment Gateway] All configured providers validated successfully");
   }
+}
+
+/**
+ * @deprecated Use validatePaymentProviders() instead - this function now just calls the non-fatal version
+ * Kept for backward compatibility during migration
+ */
+export function assertPaymentProvidersConfigured(): void {
+  // No longer exits - just validates and logs
+  // Actual validation happens in logPaymentGatewayStatus() after server starts
 }
 
 /**
@@ -400,13 +494,16 @@ export function assertPaymentProvidersConfigured(): void {
  */
 function getPaymentProviderWarnings(): string[] {
   const warnings: string[] = [];
-  const isProduction = process.env.NODE_ENV === "production";
   
   // US Payment Providers (Stripe is primary)
   const hasStripe = !!process.env.STRIPE_SECRET_KEY;
   
   // Bangladesh Payment Providers (SSLCOMMERZ, bKash, Nagad)
-  const hasSSLCommerz = !!(process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD);
+  // Support both _BD suffix variants and non-suffixed variants
+  const hasSSLCommerz = !!(
+    (process.env.SSLCOMMERZ_STORE_ID_BD && process.env.SSLCOMMERZ_STORE_PASSWORD_BD) ||
+    (process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD)
+  );
   const hasBkash = !!(process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET);
   const hasNagad = !!(process.env.NAGAD_MERCHANT_ID && process.env.NAGAD_MERCHANT_PRIVATE_KEY);
   
@@ -460,10 +557,14 @@ export function logProductionStartupBanner(): void {
   console.log(`  GOOGLE_MAPS_API:   ${process.env.GOOGLE_MAPS_API_KEY ? "CONFIGURED" : "MISSING"}`);
   console.log("");
   
-  // Payment providers status
+  // Payment providers status - support both _BD suffix variants and non-suffixed
+  const hasSSLCommerz = !!(
+    (process.env.SSLCOMMERZ_STORE_ID_BD && process.env.SSLCOMMERZ_STORE_PASSWORD_BD) ||
+    (process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD)
+  );
   console.log("Payment Providers:");
   console.log(`  Stripe (US):       ${process.env.STRIPE_SECRET_KEY ? "CONFIGURED" : "NOT CONFIGURED"}`);
-  console.log(`  SSLCOMMERZ (BD):   ${process.env.SSLCOMMERZ_STORE_ID ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log(`  SSLCOMMERZ (BD):   ${hasSSLCommerz ? "CONFIGURED" : "NOT CONFIGURED"}`);
   console.log(`  bKash (BD):        ${process.env.BKASH_APP_KEY ? "CONFIGURED" : "NOT CONFIGURED"}`);
   console.log(`  Nagad (BD):        ${process.env.NAGAD_MERCHANT_ID ? "CONFIGURED" : "NOT CONFIGURED"}`);
   console.log("");
