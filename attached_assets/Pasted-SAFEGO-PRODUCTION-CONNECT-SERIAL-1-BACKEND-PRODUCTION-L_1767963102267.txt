@@ -1,0 +1,200 @@
+SAFEGO PRODUCTION CONNECT — SERIAL 1 (BACKEND PRODUCTION LOCK & VERIFY)
+Agent Role: Senior Full-Stack Engineer + Release Engineer
+Scope: ONLY backend production readiness verification + locks. NO UI redesign. NO schema breaking. Additive changes only.
+Goal: Confirm production backend is locked, demo/test paths removed, payment gateways set to LIVE, admin controls verified, and provide a one-page proof report.
+Countries: BD + US must both be supported with country-specific KYC rules preserved.
+Services: Ride-hailing + Food delivery + Parcel delivery must all be verified.
+Roles: Customer + Driver + Restaurant + Admin must all be verified.
+Mandatory collections: rides, food_orders, deliveries must be verified with full status flows.
+
+========================================================
+0) NON-BREAKING GUARANTEE (DO NOT VIOLATE)
+========================================================
+- Do NOT rename/remove any existing fields, routes, APIs, DB tables/collections.
+- Do NOT refactor working modules.
+- Only ADD missing safeguards, config checks, logs, and docs.
+- Preserve all current routes, APIs, and DB schemas.
+- If something is wrong, fix by configuration or additive wrappers only.
+
+========================================================
+1) INVENTORY AFFECTED MODULES (MUST LIST BEFORE CHANGES)
+========================================================
+Identify modules that could be affected by config changes:
+1) server/config (env, secrets loader)
+2) server/routes (auth, rides, food_orders, deliveries, payments, admin)
+3) payments integrations (Stripe, SSLCOMMERZ, bKash, Nagad)
+4) middleware (auth, rate limit, validation, ownership checks)
+5) notifications (push/email/sms)
+6) admin verification flows (customer/driver/restaurant KYC review)
+7) wallet/commission settlement logic (cash vs online rules)
+8) legal static routes (/privacy, /terms)
+
+Agent must write down the exact files found and touched.
+
+========================================================
+2) SERIAL 1 — BACKEND PRODUCTION LOCK & VERIFY
+========================================================
+
+2.1) Create a Production Readiness Checklist File (Additive)
+- Create docs/PRODUCTION_READINESS_SERIAL_1.md
+- Include a table with: Item, Status (PASS/FAIL), Evidence (file path + line numbers), Notes.
+
+2.2) Hard Verify Environment Is Truly Production
+- Locate env loader (e.g., server/config/env.* or similar).
+- Confirm NODE_ENV is enforced as "production" in deployed environment.
+- Confirm PROD database URL is being used (no staging/demo DB).
+- Add a startup log line (non-sensitive) that prints:
+  - NODE_ENV
+  - DB host (redacted)
+  - APP_REGION/country mode (if applicable)
+  - build/version string
+  Ensure logs do NOT print secrets.
+
+2.3) Confirm Demo/Test Data Logic Is Fully Disabled
+- Search entire repo for:
+  - "@demo.com"
+  - "isDemo"
+  - "demo"
+  - "seed"
+  - "mock"
+  - "fake"
+  - "testdata"
+- For each hit:
+  - If it is documentation only: mark OK.
+  - If it is runtime code affecting production: gate it behind NODE_ENV !== "production" OR remove the callable path.
+  - Do NOT delete any existing API fields; only disable demo seed endpoints in production.
+
+2.4) Payment Gateways — Production Lock (Blocker Prevention)
+SSLCOMMERZ:
+- Locate SSLCommerz config and confirm:
+  - sandbox flag is FALSE when NODE_ENV=production
+  - sandbox may only be TRUE in dev/test
+- Add a runtime assertion:
+  - If NODE_ENV=production AND sandbox=true => throw startup error (fail fast)
+
+Stripe:
+- Confirm Stripe secret key is LIVE in production.
+- Add a sanity check:
+  - If production and key starts with "sk_test_" => fail fast
+
+bKash/Nagad:
+- Confirm live credentials in production.
+- Add fail-fast checks similar to Stripe if there are recognizable test patterns or a dedicated env flag.
+
+2.5) CORS + Security Headers
+- Confirm CORS allows only approved production client origins (customer/driver/restaurant/admin).
+- Ensure /privacy and /terms are public (no auth required) and served as static HTML from client/public or equivalent.
+- Add/confirm basic security headers (non-breaking):
+  - X-Content-Type-Options
+  - Referrer-Policy
+  - Strict-Transport-Security (if HTTPS termination supports it)
+Do not break existing deployments.
+
+2.6) Verify All 4 Roles + BD/US KYC Branching Still Works (Backend)
+Customer:
+- Ensure customer-only signup remains the only signup entry point.
+- Ensure KYC fields exist and are country-specific:
+  BD: father_name, date_of_birth, present_address, permanent_address, NID number + front/back images, emergency_contact, verification_status, is_verified
+  US: date_of_birth, home_address, emergency_contact, government_id_type, government_id_last4, verification_status, is_verified
+
+Driver:
+- Confirm driver onboarding requires country-specific docs:
+  BD: NID, etc.
+  US: driver_license + image + expiry, government_id_type + last4, ssn_last4 optional, verification_status, is_verified
+- Ensure customers cannot access driver docs; drivers cannot access customer sensitive docs.
+
+Restaurant:
+- Confirm restaurant verification and onboarding flows exist and are admin-approved.
+
+Admin:
+- Confirm admin can:
+  - approve/reject KYC with rejection_reason
+  - block/unblock users
+  - update pricing/fees/commissions
+  - manage payouts
+  - view driver negative balance
+  - view restaurant negative balance
+
+2.7) Verify Mandatory Collections + Status Flows (NO CHANGES, JUST VERIFY)
+Collections:
+- rides: identity fields, addresses+geolocation, fees+commission, payments, timestamps, rating/feedback, full ride status flow:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+- food_orders: identity fields, addresses+geolocation, fees+commission, payments, timestamps, rating/feedback, full food status flow:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+- deliveries: identity fields, addresses+geolocation, fees+commission, payments, timestamps, rating/feedback, full parcel status flow:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+Agent must provide evidence in the report (routes + model references).
+
+2.8) Verify Commission & Payout Rules (Cash vs Online) Still Enforced
+Mandatory rules:
+1) If customer pays CASH (ride):
+   - Driver receives full cash
+   - SafeGo commission becomes negative in driver_wallet_balance
+   - Driver must settle weekly
+2) If food order is CASH:
+   - Restaurant keeps cash
+   - Commission becomes negative in restaurant_wallet
+3) If payment is online:
+   - SafeGo keeps commission automatically
+4) Admin can settle balances and mark paid
+
+Agent must:
+- Identify where this logic lives (file path)
+- Confirm it is executed in production paths
+- Add a minimal log (non-sensitive) on settlement events and cash negative balance creation (do not log PII).
+
+2.9) Production Health Endpoints + Smoke Tests (Additive)
+- Add or confirm GET /health returns:
+  - ok
+  - db_connected true/false
+  - payments_config_ok true/false (no secrets)
+  - build/version
+- Add or confirm GET /readyz for deeper checks (optional).
+- Provide a minimal script or curl commands in the report to test:
+  - auth route reachable
+  - rides route reachable
+  - food_orders route reachable
+  - deliveries route reachable
+  - admin route reachable
+No destructive actions; read-only tests only.
+
+2.10) Deliverables Required From Agent (MUST PROVIDE)
+A) docs/PRODUCTION_READINESS_SERIAL_1.md completed with PASS/FAIL + evidence.
+B) A short “Production Lock Summary” section:
+   - What was changed
+   - Why it’s non-breaking
+   - How it prevents sandbox/test leakage
+C) List of touched files/modules:
+   - exact file paths
+   - guarantee non-breaking rationale for each
+
+========================================================
+3) ACCEPTANCE CRITERIA (MUST ALL BE TRUE)
+========================================================
+- No demo seed routes callable in production.
+- Sandbox/test payment configs cannot run in production (fail-fast).
+- CORS restricted to production origins.
+- Public legal pages accessible without auth.
+- Admin can verify/block/settle balances.
+- rides/food_orders/deliveries status flows intact.
+- Cash vs online commission logic verified.
+- Report file exists with evidence.
+
+========================================================
+4) FILES/MODULES THAT MAY CHANGE (ADD ONLY)
+========================================================
+- docs/PRODUCTION_READINESS_SERIAL_1.md (new)
+- server/config/* (add checks/logging only)
+- server/middleware/* (headers/cors additive only)
+- server/payments/* (fail-fast asserts only)
+- server/routes/health.* (new endpoint if missing)
+
+Why non-breaking:
+- Only adds validations, logs, and guards in production.
+- Does not alter existing API contracts or DB schemas.
+- Prevents misconfiguration from reaching runtime.
+
+END OF PROMPT
