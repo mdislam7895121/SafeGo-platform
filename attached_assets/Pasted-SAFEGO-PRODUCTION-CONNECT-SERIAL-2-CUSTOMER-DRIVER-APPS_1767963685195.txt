@@ -1,0 +1,141 @@
+SAFEGO PRODUCTION CONNECT — SERIAL 2 (CUSTOMER + DRIVER APPS → PRODUCTION BACKEND)
+Agent Role: Mobile Release Engineer (Expo/React Native) + Backend Integrator
+Scope: Connect existing Customer app and Driver app to production backend. No redesign. No refactor. Non-breaking only.
+Goal: Both apps run against PRODUCTION base URL, use production keys, and pass end-to-end smoke tests.
+
+========================================================
+0) NON-BREAKING RULES
+========================================================
+- Do NOT refactor existing UI/flows.
+- Do NOT rename/remove any existing API routes or payload fields.
+- Only add/adjust configuration, environment handling, and integration wiring.
+- Keep existing app behavior; only swap dev/staging endpoints to production.
+
+========================================================
+1) PRE-FLIGHT: IDENTIFY CURRENT APP STACK + FILE LOCATIONS
+========================================================
+For EACH app (Customer + Driver), report:
+- Is it Expo (EAS) or React Native CLI?
+- Where env/config lives:
+  - app config file (app.json/app.config.js), env.ts, constants.ts, api.ts, or similar
+- Where API client is defined (axios/fetch wrapper)
+- Where push notification setup lives
+- Where maps key is configured
+Deliverable: docs/PRODUCTION_CONNECT_SERIAL_2_SUMMARY.md listing exact paths.
+
+========================================================
+2) PRODUCTION ENDPOINT WIRING (MANDATORY)
+========================================================
+2.1 Base URL
+- Ensure a single source of truth for API_BASE_URL per app.
+- Must support: development, staging (if exists), production.
+- In release builds, API_BASE_URL MUST be production and immutable.
+
+2.2 Safety Guard
+- Add a runtime check (non-breaking) that logs clearly:
+  - selected environment (prod/dev)
+  - API_BASE_URL host (no secrets)
+- If release build points to localhost or staging, fail fast with a clear error screen.
+
+2.3 CORS / Allowed Origins (backend already hardened)
+- Ensure the mobile apps use correct production domain and no web-only origins are required.
+
+========================================================
+3) AUTH + TOKENS
+========================================================
+- Verify login/signup hits production.
+- Verify token storage is secure (SecureStore/Keychain/Keystore where applicable).
+- Verify token refresh / session expiry handling is not broken by production domain.
+
+========================================================
+4) MAPS (CUSTOMER + DRIVER)
+========================================================
+- Ensure production GOOGLE_MAPS_API_KEY is supplied correctly for each platform:
+  - iOS bundle identifier restrictions
+  - Android package name + SHA-1 restrictions
+- Confirm directions/polyline render works in production:
+  - pickup → dropoff route draws
+  - ETA + distance appear
+Deliverable: screenshot evidence (route line visible) for each app.
+
+========================================================
+5) PUSH NOTIFICATIONS (CUSTOMER + DRIVER)
+========================================================
+- Confirm production push setup:
+  If Expo:
+    - Use correct EAS project
+    - FCM/APNs configured
+    - push tokens registered to backend
+  If RN CLI:
+    - FCM/APNs native setup verified
+- Backend endpoints for token registration must be production.
+- Validate flows:
+  - Driver receives new ride alert
+  - Customer receives status updates (accepted, arriving, completed)
+Deliverable: one real notification captured per app.
+
+========================================================
+6) CORE SERVICES SMOKE TESTS (PRODUCTION)
+========================================================
+6.1 Customer app test
+- Create a real customer (or use an approved one).
+- Request a ride:
+  requested → searching_driver
+- Confirm backend returns vehicle options/fare/ETA from production.
+
+6.2 Driver app test
+- Login as a verified driver (approved by admin).
+- Go Online.
+- Receive the ride request.
+- Accept:
+  accepted → driver_arriving → in_progress → completed
+- Confirm customer sees live status changes.
+
+6.3 Wallet/Commission test
+- Do ONE cash ride:
+  - Driver cash collected = full fare
+  - SafeGo commission creates negative driver wallet balance
+  - Admin can settle it
+- Do ONE online payment ride (Stripe for US or BD provider for BD):
+  - SafeGo keeps commission automatically
+Deliverable: backend record IDs and screenshots of wallet states (no PII).
+
+========================================================
+7) RESTAURANT FLOW (OPTIONAL IN SERIAL 2, REQUIRED IF APP EXISTS)
+========================================================
+If a restaurant app/panel exists and is already built:
+- Place a food order in production
+- Merchant accepts and progresses status:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+Deliverable: status timeline screenshot.
+
+========================================================
+8) APP STORE / PLAY STORE RELEASE CONFIG (NO SUBMISSION YET)
+========================================================
+- Ensure release build configs are ready:
+  - correct bundle id / package name
+  - versionCode/buildNumber increments
+  - permissions strings (location, background location, notifications)
+- Confirm no dev menus or debug banners in release builds.
+Deliverable: release checklist in docs/RELEASE_READY_SERIAL_2.md
+
+========================================================
+9) DELIVERABLES REQUIRED
+========================================================
+A) docs/PRODUCTION_CONNECT_SERIAL_2_SUMMARY.md
+- per app: stack, file paths, what changed, why non-breaking
+B) docs/RELEASE_READY_SERIAL_2.md
+- release config checklist + what remains
+C) Evidence pack
+- screenshots: route line, push notification, ride status progression, wallet negative balance for cash
+
+========================================================
+10) FILES/MODULES THAT MAY CHANGE (ADD/CONFIG ONLY)
+========================================================
+Customer app:
+- config/env files, api client, push registration module, maps config
+Driver app:
+- config/env files, api client, push registration module, maps config
+No UI refactors.
+
+END OF PROMPT
