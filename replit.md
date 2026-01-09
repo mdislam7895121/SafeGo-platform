@@ -84,3 +84,12 @@ The platform features two separate RAG-based AI assistants with strict role-base
 - Admin SafePilot: floating widget on all admin pages (hidden on support-console)
 - Support SafePilot: embedded panel only on /admin/support-console
 - Sidebar link removed: Admin SafePilot is floating-only; no sidebar menu item
+
+## Operational Safety Features
+
+### Audit Logging Safety (January 2026)
+- **Safe Wrapper**: `safeAuditLogCreate()` in `server/utils/audit.ts` wraps all audit log writes
+- **Emergency Toggle**: Set `DISABLE_AUDIT=true` to bypass audit logging entirely during outages
+- **Fail-Safe**: Audit failures log warnings but never crash the server or return 500 errors
+- **Coverage**: Critical routes (admin-bd-expansion, customer, customer-ticket) use the safe wrapper
+- **Purpose**: Prevents 502/500 errors if audit_logs table is missing or database issues occur
