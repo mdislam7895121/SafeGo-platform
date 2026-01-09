@@ -1,0 +1,69 @@
+You are fixing SafeGo-platform backend deployment (Railway) currently returning 502 on /api/health.
+
+Observed facts from logs/screens:
+- Prisma migration deploy completed with “No pending migrations to apply”
+- Still 502 on https://safego-platform-production.up.railway.app/api/health
+- Deploy logs show Prisma errors around audit logging:
+  - “Invalid prisma.auditLog.create() invocation”
+  - “The table public.audit_logs does not exist in the current database”
+So the app is crashing on request because audit logging is required but the audit_logs table is missing (or model mismatch).
+
+Goal:
+1) Make the service respond (no 502) immediately.
+2) Fix Prisma schema + DB so audit logging works without crashing.
+3) Keep changes minimal and production-safe.
+
+Do the following EXACT steps:
+
+A) Confirm schema contains AuditLog model
+- Open prisma/schema.prisma
+- Verify there is a model named AuditLog (or the model used by prisma.auditLog)
+- If the model name is different, identify the exact prisma client call used in code (e.g., prisma.auditLog.create) and ensure a matching model exists.
+
+B) Fix the database by creating the missing table via Prisma migration
+- If AuditLog model exists but DB table missing:
+  1) Create a new migration that adds the audit_logs table (or correct mapped name) using Prisma Migrate.
+  2) Ensure the table name matches what Prisma expects. If the model uses @@map("audit_logs") or @map, keep it consistent.
+  3) Deploy migration to Railway DB.
+
+Commands (run in project root):
+- npx prisma generate
+- npx prisma migrate dev --name add_audit_logs_table  (if dev command is allowed in this environment)
+  If dev is not allowed, then:
+- npx prisma migrate diff --from-schema-datamodel prisma/schema.prisma --to-schema-datasource prisma/schema.prisma --script > prisma/migrations/manual_add_audit_logs.sql
+- Apply SQL safely to the Railway Postgres (use Railway SQL console) and then mark migration as applied with:
+  - npx prisma migrate resolve --applied <MIGRATION_FOLDER_NAME>
+
+Important:
+- Do NOT drop existing data.
+- Do NOT reset or wipe the database.
+- If database already contains a similar table, align schema to it instead of recreating.
+
+C) Add a production safety guard so missing audit table can’t crash the app again
+- In the audit logging helper (where prisma.auditLog.create is called), wrap with try/catch:
+  - If audit insert fails, log a warning and continue.
+  - This must not crash the request.
+Example:
+  try { await prisma.auditLog.create({ data: ... }) }
+  catch (e) { console.warn("AuditLog write failed", e?.message || e) }
+
+Also allow an env toggle:
+- If process.env.DISABLE_AUDIT === "true", skip audit writes entirely.
+
+D) Set Railway env vars correctly
+- Ensure DATABASE_URL is the Railway Postgres URL (NOT localhost).
+- Ensure ENCRYPTION_KEY is valid (32 bytes UTF-8 or 64 hex). If needed, generate 64-hex:
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+- Ensure JWT_SECRET exists.
+- Add DISABLE_AUDIT=false (or omit). If still unstable, set true temporarily to unblock.
+
+E) Redeploy and verify
+- Redeploy Railway service.
+- Verify:
+  - curl https://safego-platform-production.up.railway.app/api/health returns 200
+  - No Prisma auditLog errors in deploy logs.
+
+Deliverables:
+- The exact files changed (paths + diffs)
+- The exact migration folder name created
+- Confirmation of health endpoint response after redeploy
