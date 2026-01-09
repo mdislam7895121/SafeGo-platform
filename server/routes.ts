@@ -198,6 +198,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.get('/api/health/db', async (_req: Request, res: Response) => {
+    const startTime = Date.now();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      const latencyMs = Date.now() - startTime;
+      res.status(200).json({
+        status: 'ok',
+        database: 'connected',
+        latencyMs,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      const latencyMs = Date.now() - startTime;
+      console.error('[Health/DB] Database connection failed:', error.message);
+      res.status(503).json({
+        status: 'degraded',
+        database: 'disconnected',
+        error: 'Database connection failed',
+        latencyMs,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  app.get('/health/db', async (_req: Request, res: Response) => {
+    const startTime = Date.now();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      const latencyMs = Date.now() - startTime;
+      res.status(200).json({
+        status: 'ok',
+        database: 'connected',
+        latencyMs,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      const latencyMs = Date.now() - startTime;
+      console.error('[Health/DB] Database connection failed:', error.message);
+      res.status(503).json({
+        status: 'degraded',
+        database: 'disconnected',
+        error: 'Database connection failed',
+        latencyMs,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // Initialize Stripe integration (creates schema, webhooks, syncs data)
   const stripeInit = await initStripe();
   if (stripeInit.success && stripeInit.webhookUuid) {

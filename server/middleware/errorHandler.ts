@@ -65,12 +65,35 @@ export function getErrorLogs(limit = 100): ErrorLogEntry[] {
   }));
 }
 
+function isPrismaError(err: any): boolean {
+  if (!err) return false;
+  const prismaErrorCodes = ['P1001', 'P1002', 'P1003', 'P1008', 'P1009', 'P1010', 'P1011', 'P1017', 'P2000', 'P2001', 'P2002', 'P2003', 'P2010', 'P2024', 'P2025'];
+  return err.code && prismaErrorCodes.some(code => err.code.startsWith(code.substring(0, 2))) ||
+         err.name === 'PrismaClientKnownRequestError' ||
+         err.name === 'PrismaClientUnknownRequestError' ||
+         err.name === 'PrismaClientInitializationError' ||
+         err.name === 'PrismaClientRustPanicError' ||
+         (err.message && (err.message.includes('prisma') || err.message.includes('database') || err.message.includes('connection')));
+}
+
+function getDatabaseErrorStatus(err: any): number {
+  if (err.code?.startsWith('P1') || err.name === 'PrismaClientInitializationError') {
+    return 503;
+  }
+  if (err.code?.startsWith('P2') && (err.code === 'P2024' || err.code === 'P2010')) {
+    return 503;
+  }
+  return 500;
+}
+
 export function secureErrorHandler(err: any, req: Request, res: Response, _next: NextFunction): void {
   const errorId = generateErrorId();
-  const statusCode = err.status || err.statusCode || 500;
   const ip = getClientIp(req);
   const userAgent = req.headers['user-agent'] || '';
   const userId = (req as any).user?.id;
+
+  const isDatabaseError = isPrismaError(err);
+  const statusCode = isDatabaseError ? getDatabaseErrorStatus(err) : (err.status || err.statusCode || 500);
 
   const logEntry: ErrorLogEntry = {
     timestamp: new Date().toISOString(),
@@ -87,6 +110,10 @@ export function secureErrorHandler(err: any, req: Request, res: Response, _next:
 
   logError(logEntry);
 
+  if (isDatabaseError) {
+    console.error(`[DatabaseError] ${errorId} | ${err.code || 'UNKNOWN'} | ${req.path} | Database operation failed`);
+  }
+
   if (res.headersSent) {
     return;
   }
@@ -97,8 +124,14 @@ export function secureErrorHandler(err: any, req: Request, res: Response, _next:
     const response: Record<string, unknown> = {
       error: true,
       errorId,
-      message: isProduction ? getPublicErrorMessage(statusCode) : sanitizeErrorMessage(err.message)
+      message: isProduction 
+        ? (isDatabaseError ? 'Service temporarily unavailable' : getPublicErrorMessage(statusCode)) 
+        : sanitizeErrorMessage(err.message)
     };
+
+    if (isDatabaseError) {
+      response.retryable = true;
+    }
 
     if (!isProduction && err.stack) {
       response.stack = sanitizeErrorMessage(err.stack);

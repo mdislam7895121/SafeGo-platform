@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db";
 import { authenticateToken, type AuthRequest } from "../middleware/auth";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -175,7 +176,7 @@ router.post(
       });
 
       // Log audit trail
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           adminUserId,
           targetUserId: restaurant.userId,

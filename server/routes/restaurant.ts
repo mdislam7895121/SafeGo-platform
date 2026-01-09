@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import { validateRestaurantKYC } from "../utils/kyc-validator";
 import { notifyFoodOrderStatusChange, notifyRestaurantIssueEscalated } from "../utils/notifications";
 import { prisma } from "../db";
-import { auditMenuAction, getClientIp, EntityType, logAuditEvent, ActionType } from "../utils/audit";
+import { auditMenuAction, getClientIp, EntityType, logAuditEvent, ActionType, safeAuditLogCreate } from "../utils/audit";
 import { uploadMenuItemImage, uploadRestaurantImage, getFileUrl, deleteFile } from "../middleware/upload";
 import {
   isRestaurantOwner,
@@ -1844,7 +1844,7 @@ router.post("/orders/:id/issue", requireKYCCompletion, async (req: AuthRequest, 
     }
 
     // Create audit log for issue report
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: restaurantProfile.user.email,

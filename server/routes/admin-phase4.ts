@@ -5,6 +5,7 @@ import { requireAdmin } from "../middleware/authz";
 import { Permission } from "../utils/permissions";
 import { z } from "zod";
 import crypto from "crypto";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -2204,7 +2205,7 @@ router.patch("/ratings/:id", checkPermission(Permission.MANAGE_REPORTS), async (
       });
 
       // Audit log
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           action: `rating_${action}`,
           entityType: "review",
@@ -2224,7 +2225,7 @@ router.patch("/ratings/:id", checkPermission(Permission.MANAGE_REPORTS), async (
     const ride = await prisma.ride.findUnique({ where: { id } });
     if (ride) {
       // Audit log for ride rating action
-      await prisma.auditLog.create({
+      await safeAuditLogCreate({
         data: {
           action: `rating_${action}`,
           entityType: "ride_rating",
@@ -2471,7 +2472,7 @@ router.patch("/ratings/disputes/:id", checkPermission(Permission.MANAGE_COMPLAIN
     });
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         action: `rating_dispute_${action}`,
         entityType: "complaint",
@@ -2693,7 +2694,7 @@ router.patch("/violations-center/:id", checkPermission(Permission.MANAGE_VIOLATI
     const adminId = req.user!.id;
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         action: `violation_${data.action}`,
         entityType: "violation",
@@ -2744,7 +2745,7 @@ router.post("/violations-center", checkPermission(Permission.MANAGE_VIOLATIONS),
     };
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         action: "violation_created",
         entityType: "violation",
@@ -2920,7 +2921,7 @@ router.patch("/earnings-disputes/:id", checkPermission(Permission.MANAGE_EARNING
     const adminId = req.user!.id;
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         action: `dispute_${data.decision}`,
         entityType: "earnings_dispute",
@@ -3182,7 +3183,7 @@ router.post("/notification-rules", checkPermission(Permission.MANAGE_NOTIFICATIO
       createdBy: adminId,
     };
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         action: "notification_rule_created",
         entityType: "notification_rule",
@@ -3207,7 +3208,7 @@ router.patch("/notification-rules/:id", checkPermission(Permission.MANAGE_NOTIFI
     const { isActive, ...updates } = req.body;
     const adminId = req.user!.id;
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         action: isActive !== undefined ? `notification_rule_${isActive ? "enabled" : "disabled"}` : "notification_rule_updated",
         entityType: "notification_rule",

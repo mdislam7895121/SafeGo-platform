@@ -1,0 +1,68 @@
+You are the production hardening agent. Goal: “tie the knot” — make the backend permanently stable on Railway, eliminate 502, lock ports, lock env vars, and prevent Prisma/audit/migration issues from crashing production. Do NOT refactor unrelated code. Only make minimal, safe, additive changes. Output: exact steps + exact file changes + exact Railway settings to apply.
+
+Context observed:
+- Railway domain sometimes returns 502 “Application failed to respond”.
+- Logs previously showed: ENCRYPTION_KEY format issue, DATABASE_URL set to localhost, missing audit_logs table causing Prisma errors.
+- We already implemented safeAuditLogCreate() wrapper and DISABLE_AUDIT toggle, but we must harden and verify end-to-end.
+- Current Prisma migration behavior caused P3005 (schema not empty).
+- Need a stable, repeatable deploy process.
+
+Tasks (must do in this order):
+
+1) PORT AND NETWORKING LOCK
+- Determine which port the app actually listens on in production.
+- Enforce one canonical port:
+  - In server entry (dist/index.js source), ensure it uses process.env.PORT with fallback 8080 (Railway friendly).
+  - Ensure logs print the chosen port at startup.
+- Provide exact Railway Settings → Networking target port that matches the app port.
+- Confirm the public domain routes to that port.
+
+2) ENV VARS VALIDATION + SAFE DEFAULTS
+- Provide a definitive list of required production env vars with formats:
+  - DATABASE_URL must be Railway Postgres URL (never localhost).
+  - JWT_SECRET required.
+  - ENCRYPTION_KEY must be either 32-byte UTF-8 string or 64 hex chars.
+  - NODE_ENV=production.
+  - Optional: DISABLE_AUDIT=true during incidents; default false in normal ops.
+- Add startup validation that:
+  - Fails fast ONLY for truly critical vars (DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY).
+  - Does NOT crash due to missing optional services (Stripe/FCM etc) — only warn.
+- Ensure error messages clearly say what variable is wrong and what format is required.
+
+3) PRISMA + DATABASE “NO MORE 502” HARDENING
+- Ensure Prisma connection errors do not crash the HTTP server during requests.
+- Add a global error handler middleware for Express that converts DB errors into 503 JSON responses (never kill process).
+- Add a “db readiness” check:
+  - /api/health should check basic app is up.
+  - /api/health/db should attempt a light Prisma query (SELECT 1) and return ok/failed without crashing.
+
+4) AUDIT LOGGING PERMANENT SAFETY
+- Search entire codebase for prisma.auditLog.create or audit_logs direct writes.
+- Replace all of them with safeAuditLogCreate() wrapper.
+- Ensure safeAuditLogCreate:
+  - Catches Prisma “table missing” and connection errors.
+  - Logs warning with minimal detail (no secrets).
+  - Never throws.
+- Ensure DISABLE_AUDIT=true bypasses logging cleanly.
+
+5) MIGRATIONS: PRODUCTION SAFE PLAN (NO P3005 LOOP)
+- Do NOT run prisma migrate deploy blindly on production if schema is not empty.
+- Provide a safe baseline plan:
+  - Option A: Use prisma migrate resolve with the correct existing migration name (must match prisma/migrations folder names).
+  - Option B: If DB already has tables but migrations history is missing, create a baseline migration and mark as applied.
+- Provide the exact commands to run in Replit Shell, and explain which option applies based on current state.
+- Confirm no destructive reset (no migrate reset, no dropping production schema).
+
+6) DEPLOY VERIFICATION CHECKLIST
+- Provide exact steps to verify:
+  - Railway deploy logs show “serving on port X”.
+  - Public domain /api/health returns 200.
+  - /api/health/db returns 200 when DB OK, 503 when DB broken, but server stays alive.
+  - At least one real route returns 200 without 502.
+- Include a rollback plan: identify commit/tag and how to redeploy previous stable version.
+
+Deliverables:
+- Exact file diffs/patches (or file paths + updated contents) for any code changes.
+- Exact Railway settings (Networking target port, Variables list).
+- Exact Replit Shell commands in correct order.
+- Keep changes minimal and safe; do not redesign architecture.
