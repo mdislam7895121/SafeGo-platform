@@ -341,3 +341,128 @@ export function generateSecureKey(bytes: number = 32): string {
   const crypto = require("crypto");
   return crypto.randomBytes(bytes).toString("hex");
 }
+
+/**
+ * Payment Gateway Fail-Fast Validation
+ * In PRODUCTION, warns if no payment providers are configured for a given country
+ * Does NOT block startup, but logs CRITICAL warnings
+ */
+function validatePaymentProviders(): string[] {
+  const warnings: string[] = [];
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  // US Payment Providers (Stripe is primary)
+  const hasStripe = !!process.env.STRIPE_SECRET_KEY;
+  
+  // Bangladesh Payment Providers (SSLCOMMERZ, bKash, Nagad)
+  const hasSSLCommerz = !!(process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD);
+  const hasBkash = !!(process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET);
+  const hasNagad = !!(process.env.NAGAD_MERCHANT_ID && process.env.NAGAD_MERCHANT_PRIVATE_KEY);
+  
+  if (isProduction) {
+    if (!hasStripe) {
+      warnings.push("[CRITICAL] US Payment: STRIPE_SECRET_KEY not configured - US payments will FAIL");
+    }
+    
+    if (!hasSSLCommerz && !hasBkash && !hasNagad) {
+      warnings.push("[CRITICAL] BD Payment: No Bangladesh payment provider configured (SSLCOMMERZ/bKash/Nagad) - BD payments will FAIL");
+    }
+    
+    // Check sandbox mode flags in production
+    if (process.env.SSLCOMMERZ_SANDBOX_ENABLED_BD === "true") {
+      warnings.push("[WARNING] SSLCOMMERZ_SANDBOX_ENABLED_BD is true in PRODUCTION - payments will use sandbox");
+    }
+    if (process.env.BKASH_SANDBOX_MODE === "true") {
+      warnings.push("[WARNING] BKASH_SANDBOX_MODE is true in PRODUCTION - payments will use sandbox");
+    }
+    if (process.env.NAGAD_SANDBOX_MODE === "true") {
+      warnings.push("[WARNING] NAGAD_SANDBOX_MODE is true in PRODUCTION - payments will use sandbox");
+    }
+  }
+  
+  return warnings;
+}
+
+/**
+ * Log production startup banner with environment details
+ * Redacts sensitive values, shows only configuration status
+ */
+export function logProductionStartupBanner(): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  const nodeEnv = process.env.NODE_ENV || "development";
+  const port = process.env.PORT || "5000";
+  
+  // Extract host from DATABASE_URL (redacted)
+  let dbHost = "not-configured";
+  if (process.env.DATABASE_URL) {
+    const match = process.env.DATABASE_URL.match(/@([^:/]+)/);
+    if (match) {
+      dbHost = match[1].substring(0, 10) + "..."; // Show first 10 chars only
+    }
+  }
+  
+  const buildVersion = process.env.BUILD_VERSION || process.env.REPL_SLUG || "dev";
+  const buildTime = new Date().toISOString();
+  
+  console.log("\n" + "=".repeat(80));
+  console.log("SafeGo Platform - Production Startup");
+  console.log("=".repeat(80));
+  console.log(`  Environment:    ${nodeEnv.toUpperCase()}`);
+  console.log(`  Port:           ${port}`);
+  console.log(`  DB Host:        ${dbHost}`);
+  console.log(`  Build Version:  ${buildVersion}`);
+  console.log(`  Start Time:     ${buildTime}`);
+  console.log("");
+  
+  // Security configuration status
+  console.log("Security Configuration:");
+  console.log(`  JWT_SECRET:        ${process.env.JWT_SECRET ? "CONFIGURED" : "MISSING"}`);
+  console.log(`  ENCRYPTION_KEY:    ${process.env.ENCRYPTION_KEY ? "CONFIGURED" : "MISSING"}`);
+  console.log(`  SESSION_SECRET:    ${process.env.SESSION_SECRET ? "CONFIGURED" : "MISSING"}`);
+  console.log(`  GOOGLE_MAPS_API:   ${process.env.GOOGLE_MAPS_API_KEY ? "CONFIGURED" : "MISSING"}`);
+  console.log("");
+  
+  // Payment providers status
+  console.log("Payment Providers:");
+  console.log(`  Stripe (US):       ${process.env.STRIPE_SECRET_KEY ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log(`  SSLCOMMERZ (BD):   ${process.env.SSLCOMMERZ_STORE_ID ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log(`  bKash (BD):        ${process.env.BKASH_APP_KEY ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log(`  Nagad (BD):        ${process.env.NAGAD_MERCHANT_ID ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log("");
+  
+  // External services status
+  console.log("External Services:");
+  console.log(`  Twilio SMS:        ${process.env.TWILIO_ACCOUNT_SID ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log(`  Email Service:     ${process.env.SMTP_HOST || process.env.AGENTMAIL_API_KEY ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log(`  OpenAI:            ${process.env.OPENAI_API_KEY ? "CONFIGURED" : "NOT CONFIGURED"}`);
+  console.log(`  Redis:             ${process.env.REDIS_URL ? "CONFIGURED" : "IN-MEMORY CACHE"}`);
+  console.log("");
+  
+  // Payment provider validation warnings
+  const paymentWarnings = validatePaymentProviders();
+  if (paymentWarnings.length > 0) {
+    console.log("Payment Provider Warnings:");
+    paymentWarnings.forEach(w => console.log(`  ${w}`));
+    console.log("");
+  }
+  
+  console.log("=".repeat(80) + "\n");
+}
+
+/**
+ * Production environment assertion
+ * Validates that demo mode is disabled in production
+ */
+export function assertDemoModeDisabled(): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  const demoModeEnabled = process.env.DEMO_MODE_ENABLED === "true";
+  
+  if (isProduction && demoModeEnabled) {
+    console.error("\n" + "=".repeat(80));
+    console.error("FATAL: DEMO_MODE_ENABLED=true in PRODUCTION");
+    console.error("=".repeat(80));
+    console.error("\nDemo mode MUST be disabled in production to prevent test data creation.");
+    console.error("Set DEMO_MODE_ENABLED=false or remove the environment variable.\n");
+    process.exit(1);
+  }
+}
