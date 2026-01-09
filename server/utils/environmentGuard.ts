@@ -344,10 +344,61 @@ export function generateSecureKey(bytes: number = 32): string {
 
 /**
  * Payment Gateway Fail-Fast Validation
- * In PRODUCTION, warns if no payment providers are configured for a given country
- * Does NOT block startup, but logs CRITICAL warnings
+ * In PRODUCTION, FAILS startup if no payment providers are configured for a given country
+ * This is a HARD requirement - the platform cannot accept payments without providers
  */
-function validatePaymentProviders(): string[] {
+export function assertPaymentProvidersConfigured(): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  if (!isProduction) {
+    return; // Skip in development - mock payments work
+  }
+  
+  // US Payment Providers (Stripe is primary)
+  const hasStripe = !!process.env.STRIPE_SECRET_KEY;
+  
+  // Bangladesh Payment Providers (SSLCOMMERZ, bKash, Nagad)
+  const hasSSLCommerz = !!(process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD);
+  const hasBkash = !!(process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET);
+  const hasNagad = !!(process.env.NAGAD_MERCHANT_ID && process.env.NAGAD_MERCHANT_PRIVATE_KEY);
+  
+  const errors: string[] = [];
+  
+  if (!hasStripe) {
+    errors.push("US Payment: STRIPE_SECRET_KEY not configured - US payments will FAIL");
+  }
+  
+  if (!hasSSLCommerz && !hasBkash && !hasNagad) {
+    errors.push("BD Payment: No Bangladesh payment provider configured (SSLCOMMERZ/bKash/Nagad) - BD payments will FAIL");
+  }
+  
+  // Check sandbox mode flags in production - these are fatal errors
+  if (hasSSLCommerz && process.env.SSLCOMMERZ_SANDBOX_ENABLED_BD === "true") {
+    errors.push("SSLCOMMERZ_SANDBOX_ENABLED_BD is true in PRODUCTION - SANDBOX MODE IS FORBIDDEN IN PRODUCTION");
+  }
+  if (hasBkash && process.env.BKASH_SANDBOX_MODE === "true") {
+    errors.push("BKASH_SANDBOX_MODE is true in PRODUCTION - SANDBOX MODE IS FORBIDDEN IN PRODUCTION");
+  }
+  if (hasNagad && process.env.NAGAD_SANDBOX_MODE === "true") {
+    errors.push("NAGAD_SANDBOX_MODE is true in PRODUCTION - SANDBOX MODE IS FORBIDDEN IN PRODUCTION");
+  }
+  
+  if (errors.length > 0) {
+    console.error("\n" + "=".repeat(80));
+    console.error("FATAL: PAYMENT GATEWAY CONFIGURATION INVALID FOR PRODUCTION");
+    console.error("=".repeat(80));
+    errors.forEach((err, i) => console.error(`  ${i + 1}. ${err}`));
+    console.error("\nThe platform cannot process payments without proper gateway configuration.");
+    console.error("Configure the required payment providers and restart the application.\n");
+    process.exit(1);
+  }
+}
+
+/**
+ * Get payment provider warnings for logging (non-fatal)
+ * Used in startup banner to show configuration status
+ */
+function getPaymentProviderWarnings(): string[] {
   const warnings: string[] = [];
   const isProduction = process.env.NODE_ENV === "production";
   
@@ -359,25 +410,12 @@ function validatePaymentProviders(): string[] {
   const hasBkash = !!(process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET);
   const hasNagad = !!(process.env.NAGAD_MERCHANT_ID && process.env.NAGAD_MERCHANT_PRIVATE_KEY);
   
-  if (isProduction) {
-    if (!hasStripe) {
-      warnings.push("[CRITICAL] US Payment: STRIPE_SECRET_KEY not configured - US payments will FAIL");
-    }
-    
-    if (!hasSSLCommerz && !hasBkash && !hasNagad) {
-      warnings.push("[CRITICAL] BD Payment: No Bangladesh payment provider configured (SSLCOMMERZ/bKash/Nagad) - BD payments will FAIL");
-    }
-    
-    // Check sandbox mode flags in production
-    if (process.env.SSLCOMMERZ_SANDBOX_ENABLED_BD === "true") {
-      warnings.push("[WARNING] SSLCOMMERZ_SANDBOX_ENABLED_BD is true in PRODUCTION - payments will use sandbox");
-    }
-    if (process.env.BKASH_SANDBOX_MODE === "true") {
-      warnings.push("[WARNING] BKASH_SANDBOX_MODE is true in PRODUCTION - payments will use sandbox");
-    }
-    if (process.env.NAGAD_SANDBOX_MODE === "true") {
-      warnings.push("[WARNING] NAGAD_SANDBOX_MODE is true in PRODUCTION - payments will use sandbox");
-    }
+  if (!hasStripe) {
+    warnings.push("[INFO] US Payment: Stripe not configured - using mock payments");
+  }
+  
+  if (!hasSSLCommerz && !hasBkash && !hasNagad) {
+    warnings.push("[INFO] BD Payment: No provider configured - using mock payments");
   }
   
   return warnings;
@@ -438,10 +476,10 @@ export function logProductionStartupBanner(): void {
   console.log(`  Redis:             ${process.env.REDIS_URL ? "CONFIGURED" : "IN-MEMORY CACHE"}`);
   console.log("");
   
-  // Payment provider validation warnings
-  const paymentWarnings = validatePaymentProviders();
-  if (paymentWarnings.length > 0) {
-    console.log("Payment Provider Warnings:");
+  // Payment provider informational notices (non-fatal)
+  const paymentWarnings = getPaymentProviderWarnings();
+  if (paymentWarnings.length > 0 && !isProduction) {
+    console.log("Payment Provider Notices (Development):");
     paymentWarnings.forEach(w => console.log(`  ${w}`));
     console.log("");
   }

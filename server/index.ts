@@ -1,8 +1,9 @@
 // CRITICAL: Validate security configuration FIRST before ANY imports
 // Must be the FIRST import and call to ensure no other modules load insecure defaults
-import { guardEnvironment, logProductionStartupBanner, assertDemoModeDisabled } from "./utils/environmentGuard";
+import { guardEnvironment, logProductionStartupBanner, assertDemoModeDisabled, assertPaymentProvidersConfigured } from "./utils/environmentGuard";
 guardEnvironment();
 assertDemoModeDisabled();
+assertPaymentProvidersConfigured();
 logProductionStartupBanner();
 
 // Now safe to import other modules (they will throw if secrets missing, but guard already validated)
