@@ -6,6 +6,7 @@ import { driverLiveChatService } from "../services/GenericLiveChatService";
 import { driverCallbackService } from "../services/GenericSupportCallbackService";
 import { supportArticleService } from "../services/SupportArticleService";
 import { DriverSupportCategory } from "@prisma/client";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -284,7 +285,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
       return newTicket;
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,

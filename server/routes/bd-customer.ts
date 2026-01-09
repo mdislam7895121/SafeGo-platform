@@ -3,6 +3,7 @@ import { prisma } from "../db";
 import { authenticateToken, optionalAuth, AuthRequest } from "../middleware/auth";
 import { randomUUID } from "crypto";
 import { RentalVehicleType, ShopType } from "@prisma/client";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -2155,7 +2156,7 @@ router.post("/partner/start", async (req: AuthRequest, res: Response) => {
     }
 
     // Log the onboarding start
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,

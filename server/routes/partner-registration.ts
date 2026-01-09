@@ -4,6 +4,7 @@ import { prisma } from '../db';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { uploadOnboardingDocument, getFileUrl } from '../middleware/upload';
 import { calculateAge } from '@shared/dateUtils';
+import { safeAuditLogCreate } from '../utils/audit';
 
 const router = Router();
 
@@ -499,7 +500,7 @@ router.post('/partner-driver/registration/submit', authenticateToken, async (req
       return { driverProfile, driverType };
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: userId,
@@ -753,7 +754,7 @@ router.post('/restaurant/registration/submit', authenticateToken, async (req: Au
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: userId,
@@ -848,7 +849,7 @@ router.post('/partner/delivery-driver/init', authenticateToken, async (req: Auth
       });
     }
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: userId,
@@ -938,7 +939,7 @@ router.post('/partner/delivery-driver/onboarding/init', authenticateToken, async
       });
     }
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: userId,
@@ -1336,7 +1337,7 @@ router.post('/partner/delivery-driver/onboarding/submit', authenticateToken, asy
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: userId,
@@ -1507,7 +1508,7 @@ router.post('/admin/delivery-drivers/:id/approve', authenticateToken, async (req
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: adminUser.id,
@@ -1562,7 +1563,7 @@ router.post('/admin/delivery-drivers/:id/reject', authenticateToken, async (req:
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: adminUser.id,
@@ -1615,7 +1616,7 @@ router.post('/admin/delivery-drivers/:id/block', authenticateToken, async (req: 
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: adminUser.id,
@@ -1663,7 +1664,7 @@ router.post('/admin/delivery-drivers/:id/unblock', authenticateToken, async (req
       },
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: crypto.randomUUID(),
         actorId: adminUser.id,

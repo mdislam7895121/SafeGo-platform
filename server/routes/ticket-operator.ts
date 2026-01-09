@@ -4,6 +4,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { uploadShopImage, getFileUrl } from "../middleware/upload";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -1378,7 +1379,7 @@ router.post("/stages/1", async (req: AuthRequest, res: Response) => {
     }
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1468,7 +1469,7 @@ router.post("/stages/2", async (req: AuthRequest, res: Response) => {
 
     // Audit log
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -1562,7 +1563,7 @@ router.post("/stages/3", async (req: AuthRequest, res: Response) => {
 
     // Audit log
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -2018,7 +2019,7 @@ router.post("/payouts/request", async (req: AuthRequest, res: Response) => {
     });
 
     // Audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,

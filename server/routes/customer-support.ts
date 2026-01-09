@@ -6,6 +6,7 @@ import { customerSupportService } from "../services/GenericSupportService";
 import { customerLiveChatService } from "../services/GenericLiveChatService";
 import { customerCallbackService } from "../services/GenericSupportCallbackService";
 import { supportArticleService } from "../services/SupportArticleService";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
       attachmentUrls
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,

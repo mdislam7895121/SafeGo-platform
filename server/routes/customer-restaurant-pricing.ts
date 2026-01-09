@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db";
 import { authenticateToken } from "../middleware/auth";
 import type { AuthRequest } from "../middleware/auth";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -274,7 +275,7 @@ router.get("/:id/pricing", authenticateToken, async (req: AuthRequest, res) => {
     };
 
     // Audit log for pricing view
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: customer.id,
         actorEmail: customer.user.email,

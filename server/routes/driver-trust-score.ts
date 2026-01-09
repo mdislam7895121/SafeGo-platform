@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { randomUUID } from "crypto";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -299,7 +300,7 @@ router.post("/recalculate-all", async (req: AuthRequest, res: Response) => {
       updated++;
     }
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,
@@ -371,7 +372,7 @@ router.post("/recalculate", async (req: AuthRequest, res: Response) => {
       }
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         id: randomUUID(),
         actorId: userId,

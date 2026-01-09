@@ -2,6 +2,7 @@ import { Router, type Response } from "express";
 import { prisma } from "../db";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
 import { notifyTicketReply, notifyTicketStatusChange } from "../services/support-notifications";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -200,7 +201,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
       attachmentUrls
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,
@@ -289,7 +290,7 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
       attachmentUrls
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,
@@ -378,7 +379,7 @@ router.post("/support-center/live-chat/start", async (req: AuthRequest, res: Res
 
     const session = await restaurantLiveChatService.createSession(restaurantProfile.id);
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,
@@ -511,7 +512,7 @@ router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthReq
       attachmentUrls
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,
@@ -654,7 +655,7 @@ router.post("/support-center/callbacks", async (req: AuthRequest, res: Response)
       reason
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,

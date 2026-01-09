@@ -6,6 +6,7 @@ import { adminSupportService } from "../services/GenericSupportService";
 import { adminLiveChatService } from "../services/GenericLiveChatService";
 import { adminCallbackService } from "../services/GenericSupportCallbackService";
 import { supportArticleService } from "../services/SupportArticleService";
+import { safeAuditLogCreate } from "../utils/audit";
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
       attachmentUrls
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user.email,
@@ -539,7 +540,7 @@ router.patch("/support-center/driver-tickets/:id/status", async (req: AuthReques
     });
 
     // Create audit log
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user?.email || "",
@@ -595,7 +596,7 @@ router.patch("/support-center/driver-tickets/:id/admin-notes", async (req: AuthR
       select: { email: true }
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user?.email || "",
@@ -662,7 +663,7 @@ router.patch("/support-center/driver-tickets/:id/assign", async (req: AuthReques
       select: { email: true }
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user?.email || "",
@@ -734,7 +735,7 @@ router.post("/support-center/driver-tickets/:id/messages", async (req: AuthReque
       data: { updatedAt: new Date() }
     });
 
-    await prisma.auditLog.create({
+    await safeAuditLogCreate({
       data: {
         actorId: userId,
         actorEmail: user?.email || "",
