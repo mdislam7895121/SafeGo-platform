@@ -1,0 +1,79 @@
+SAFEGO — SERIAL 3A: MIGRATE BACKEND FROM REPLIT TO RAILWAY (NO SCHEMA CHANGES)
+
+Role: Backend Release Engineer
+Goal: Make SafeGo API publicly accessible for mobile apps by deploying to Railway.
+Constraints:
+- Do NOT rename/remove any routes, fields, or DB schema.
+- Keep Neon Postgres (DATABASE_URL) unchanged for now.
+- Additive config only.
+- Preserve all roles (Customer/Driver/Restaurant/Admin) and services (rides/food_orders/deliveries).
+- Preserve BD vs US KYC branching and commission logic.
+- WebSockets must remain enabled.
+
+A) PREPARE RAILWAY DEPLOY
+1) Create new Railway project: "safego-platform-api"
+2) Connect repository/source (same backend codebase).
+3) Set Node runtime to 20.
+4) Set build/start commands:
+   - Build: npm install && npx prisma generate && npm run build
+   - Start: npm run start
+5) Ensure Railway uses PORT from environment (do not hardcode). App must listen on process.env.PORT.
+
+B) ENVIRONMENT VARIABLES (CRITICAL)
+Set these in Railway Variables (copy from Replit production secrets):
+- DATABASE_URL (Neon)
+- JWT_SECRET
+- ENCRYPTION_KEY
+- SESSION_SECRET
+- GOOGLE_MAPS_API_KEY
+Payments:
+- STRIPE_SECRET_KEY
+- STRIPE_PUBLISHABLE_KEY
+- SSLCOMMERZ_STORE_ID_BD
+- SSLCOMMERZ_STORE_PASSWORD_BD
+- BKASH_APP_KEY
+- BKASH_APP_SECRET
+- NAGAD_MERCHANT_ID
+- NAGAD_MERCHANT_PRIVATE_KEY
+AI:
+- OPENAI_API_KEY
+Optional:
+- TWILIO_ACCOUNT_SID
+- TWILIO_AUTH_TOKEN
+
+Also set:
+- NODE_ENV=production
+
+C) HEALTH CHECK + PUBLIC URL
+1) Deploy and obtain Railway public URL.
+2) Verify from outside Railway:
+   - GET /api/health returns 200 JSON
+   - No redirects to login/shield
+3) Verify core groups respond correctly (auth errors acceptable):
+   - /api/rides
+   - /api/food_orders
+   - /api/deliveries
+   - /api/admin
+
+D) WEBSOCKET CHECK
+Confirm WebSocket endpoint(s) work on Railway:
+- Provide exact ws URL(s)
+- Confirm connection handshake success
+
+E) DOCUMENTATION
+Create: docs/RAILWAY_MIGRATION_SERIAL_3A.md containing:
+- Railway project name
+- Public base URL (redact if needed but include format)
+- Build/start commands used
+- Health check evidence
+- Notes on WebSocket validation
+- Clear statement: "Mobile apps can now access public API without Replit shield."
+
+FILES CHANGED
+- docs/RAILWAY_MIGRATION_SERIAL_3A.md only (no code changes unless PORT binding is broken; if broken, add minimal fix only)
+
+If PORT binding fix is needed:
+- Only modify server startup to listen on process.env.PORT and keep fallback 5000 for local dev.
+- Document the exact file + diff.
+
+END
