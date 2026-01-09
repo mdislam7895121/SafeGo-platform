@@ -172,31 +172,34 @@ export async function onSuspiciousLogin(
   console.log(`[SessionSecurity] Reasons: ${reasons.join(', ')}`);
 }
 
-setInterval(() => {
-  const now = new Date();
-  
-  Array.from(sessionsStore.entries()).forEach(([sessionId, session]) => {
-    if (session.expiresAt < now || (!session.isActive && session.revokedAt)) {
-      const retentionEnd = session.revokedAt 
-        ? new Date(session.revokedAt.getTime() + 24 * 60 * 60 * 1000)
-        : now;
-      
-      if (retentionEnd < now) {
-        sessionsStore.delete(sessionId);
-        const userSessions = userSessionsIndex.get(session.userId);
-        if (userSessions) {
-          userSessions.delete(sessionId);
-          if (userSessions.size === 0) {
-            userSessionsIndex.delete(session.userId);
+// PRODUCTION SAFETY: Only start session cleanup interval when observability is enabled
+if (process.env.DISABLE_OBSERVABILITY !== "true") {
+  setInterval(() => {
+    const now = new Date();
+    
+    Array.from(sessionsStore.entries()).forEach(([sessionId, session]) => {
+      if (session.expiresAt < now || (!session.isActive && session.revokedAt)) {
+        const retentionEnd = session.revokedAt 
+          ? new Date(session.revokedAt.getTime() + 24 * 60 * 60 * 1000)
+          : now;
+        
+        if (retentionEnd < now) {
+          sessionsStore.delete(sessionId);
+          const userSessions = userSessionsIndex.get(session.userId);
+          if (userSessions) {
+            userSessions.delete(sessionId);
+            if (userSessions.size === 0) {
+              userSessionsIndex.delete(session.userId);
+            }
           }
         }
       }
-    }
-  });
+    });
 
-  Array.from(revokedTokensStore.entries()).forEach(([token, expiresAt]) => {
-    if (expiresAt < now) {
-      revokedTokensStore.delete(token);
-    }
-  });
-}, 60 * 60 * 1000);
+    Array.from(revokedTokensStore.entries()).forEach(([token, expiresAt]) => {
+      if (expiresAt < now) {
+        revokedTokensStore.delete(token);
+      }
+    });
+  }, 60 * 60 * 1000);
+}

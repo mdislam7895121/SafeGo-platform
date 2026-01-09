@@ -27,6 +27,8 @@ class StabilityGuard {
   private static instance: StabilityGuard;
   private alerts: StabilityAlert[] = [];
   private readonly maxAlerts = 50;
+  private monitoringEnabled = false;
+  private monitoringInterval: NodeJS.Timeout | null = null;
   
   // Default thresholds (configurable)
   private thresholds: StabilityThresholds = {
@@ -37,7 +39,13 @@ class StabilityGuard {
   };
 
   private constructor() {
-    this.startMonitoring();
+    // PRODUCTION SAFETY: Do NOT auto-start monitoring
+    // Call startMonitoring() explicitly only when observability is enabled
+    if (process.env.DISABLE_OBSERVABILITY !== "true") {
+      this.startMonitoring();
+    } else {
+      console.log("[StabilityGuard] DISABLED via DISABLE_OBSERVABILITY=true");
+    }
   }
 
   static getInstance(): StabilityGuard {
@@ -48,11 +56,16 @@ class StabilityGuard {
   }
 
   /**
-   * Start continuous monitoring
+   * Start continuous monitoring (only when not disabled)
    */
   private startMonitoring() {
+    if (this.monitoringEnabled || process.env.DISABLE_OBSERVABILITY === "true") {
+      return;
+    }
+    this.monitoringEnabled = true;
+    console.log("[StabilityGuard] Starting continuous monitoring (30s interval)");
     // Check stability every 30 seconds
-    setInterval(async () => {
+    this.monitoringInterval = setInterval(async () => {
       await this.checkStability();
     }, 30000);
   }
@@ -183,4 +196,32 @@ class StabilityGuard {
   }
 }
 
-export const stabilityGuard = StabilityGuard.getInstance();
+// PRODUCTION SAFETY: No-op stub for when observability is disabled
+const noOpStabilityStub = {
+  getRecentAlerts: () => [],
+  getThresholds: () => ({ errorRatePercent: 5, dbLatencyMs: 500, memoryUsagePercent: 85, slowQueryCount: 10 }),
+  updateThresholds: () => ({ errorRatePercent: 5, dbLatencyMs: 500, memoryUsagePercent: 85, slowQueryCount: 10 }),
+  clearAlerts: () => {},
+} as unknown as StabilityGuard;
+
+// PRODUCTION SAFETY: Lazy instantiation using getter to prevent auto-initialization
+let _cachedStabilityGuard: StabilityGuard | null = null;
+
+function getStabilityGuardInternal(): StabilityGuard {
+  if (process.env.DISABLE_OBSERVABILITY === "true") {
+    return noOpStabilityStub;
+  }
+  if (!_cachedStabilityGuard) {
+    _cachedStabilityGuard = StabilityGuard.getInstance();
+  }
+  return _cachedStabilityGuard;
+}
+
+// Use Proxy to defer instantiation until first property access
+export const stabilityGuard = new Proxy({} as StabilityGuard, {
+  get(_target, prop) {
+    const service = getStabilityGuardInternal();
+    const value = (service as any)[prop];
+    return typeof value === 'function' ? value.bind(service) : value;
+  }
+});

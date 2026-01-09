@@ -109,13 +109,44 @@ import contactSubmissionsRoutes from "./routes/contact-submissions"; // Public C
 import partnerOnboardingRoutes from "./routes/partner-onboarding"; // Partner Onboarding Applications
 import cmsRoutes from "./routes/cms"; // CMS Pages for Company/Legal/Support content
 import landingCmsRoutes from "./routes/landing-cms"; // Landing Page CMS
-import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
-import { setupRideChatWebSocket } from "./websocket/rideChatWs";
-import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
-import { setupDispatchWebSocket } from "./websocket/dispatchWs";
-import { setupAdminNotificationsWebSocket } from "./websocket/adminNotificationsWs";
-import { setupObservabilityWebSocket } from "./websocket/observabilityWs";
 import { db } from "./db";
+
+// PRODUCTION SAFETY: WebSocket modules are loaded lazily to prevent memory allocation
+// when DISABLE_WEBSOCKETS=true is set. This is critical for Railway stability.
+type WebSocketSetupFn = (server: import("http").Server) => void;
+let wsModulesLoaded = false;
+let setupSupportChatWebSocket: WebSocketSetupFn | null = null;
+let setupRideChatWebSocket: WebSocketSetupFn | null = null;
+let setupFoodOrderNotificationsWebSocket: WebSocketSetupFn | null = null;
+let setupDispatchWebSocket: WebSocketSetupFn | null = null;
+let setupAdminNotificationsWebSocket: WebSocketSetupFn | null = null;
+let setupObservabilityWebSocket: WebSocketSetupFn | null = null;
+
+async function loadWebSocketModules(): Promise<void> {
+  if (wsModulesLoaded) return;
+  if (process.env.DISABLE_WEBSOCKETS === "true") {
+    console.log("[WebSocket] DISABLED via DISABLE_WEBSOCKETS=true");
+    return;
+  }
+  
+  const [supportChat, rideChat, foodNotif, dispatch, adminNotif, obsWs] = await Promise.all([
+    import("./websocket/supportChatWs"),
+    import("./websocket/rideChatWs"),
+    import("./websocket/foodOrderNotificationsWs"),
+    import("./websocket/dispatchWs"),
+    import("./websocket/adminNotificationsWs"),
+    import("./websocket/observabilityWs"),
+  ]);
+  
+  setupSupportChatWebSocket = supportChat.setupSupportChatWebSocket;
+  setupRideChatWebSocket = rideChat.setupRideChatWebSocket;
+  setupFoodOrderNotificationsWebSocket = foodNotif.setupFoodOrderNotificationsWebSocket;
+  setupDispatchWebSocket = dispatch.setupDispatchWebSocket;
+  setupAdminNotificationsWebSocket = adminNotif.setupAdminNotificationsWebSocket;
+  setupObservabilityWebSocket = obsWs.setupObservabilityWebSocket;
+  wsModulesLoaded = true;
+  console.log("[WebSocket] All modules loaded successfully");
+}
 
 // Public Driver Profile Summary Type (D2 Spec)
 type DriverPublicProfile = {
@@ -702,12 +733,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   
-  setupSupportChatWebSocket(httpServer);
-  setupRideChatWebSocket(httpServer);
-  setupFoodOrderNotificationsWebSocket(httpServer);
-  setupDispatchWebSocket(httpServer);
-  setupAdminNotificationsWebSocket(httpServer);
-  setupObservabilityWebSocket(httpServer);
+  // PRODUCTION SAFETY: Only initialize WebSockets if not disabled
+  if (process.env.DISABLE_WEBSOCKETS !== "true") {
+    await loadWebSocketModules();
+    if (setupSupportChatWebSocket) setupSupportChatWebSocket(httpServer);
+    if (setupRideChatWebSocket) setupRideChatWebSocket(httpServer);
+    if (setupFoodOrderNotificationsWebSocket) setupFoodOrderNotificationsWebSocket(httpServer);
+    if (setupDispatchWebSocket) setupDispatchWebSocket(httpServer);
+    if (setupAdminNotificationsWebSocket) setupAdminNotificationsWebSocket(httpServer);
+    if (setupObservabilityWebSocket) setupObservabilityWebSocket(httpServer);
+  } else {
+    console.log("[WebSocket] Skipping WebSocket initialization (DISABLE_WEBSOCKETS=true)");
+  }
 
   return httpServer;
 }

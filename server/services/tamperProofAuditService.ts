@@ -41,6 +41,12 @@ let lastHash = 'GENESIS_BLOCK';
 const GENESIS_HASH = crypto.createHash('sha256').update('SAFEGO_AUDIT_GENESIS').digest('hex');
 
 function initializeAuditLog(): void {
+  // PRODUCTION SAFETY: Skip initialization when audit is disabled
+  if (process.env.DISABLE_AUDIT === "true") {
+    console.log('[TamperProofAudit] DISABLED via DISABLE_AUDIT=true');
+    return;
+  }
+  
   lastHash = GENESIS_HASH;
   currentSequence = 0;
   
@@ -85,6 +91,29 @@ export function appendAuditEntry(params: {
   description: string;
   metadata?: Record<string, any>;
 }): TamperProofAuditEntry {
+  // PRODUCTION SAFETY: Return stub entry when audit is disabled
+  if (process.env.DISABLE_AUDIT === "true") {
+    return {
+      id: '',
+      sequence: 0,
+      timestamp: new Date(),
+      category: params.category,
+      severity: params.severity,
+      actorId: null,
+      actorEmail: null,
+      actorRole: 'DISABLED',
+      ipAddress: '',
+      userAgent: '',
+      action: params.action,
+      entityType: params.entityType,
+      entityId: null,
+      description: 'Audit disabled',
+      metadata: {},
+      previousHash: '',
+      hash: '',
+    };
+  }
+  
   currentSequence++;
 
   const entryWithoutHash: Omit<TamperProofAuditEntry, 'hash'> = {

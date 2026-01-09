@@ -225,13 +225,16 @@ export function clearFailedLogins(ipAddress: string): void {
   suspiciousIpStore.delete(ipAddress);
 }
 
-setInterval(() => {
-  const now = Date.now();
-  const hourAgo = now - 60 * 60 * 1000;
-  
-  Array.from(suspiciousIpStore.entries()).forEach(([key, value]) => {
-    if (value.lastAttempt.getTime() < hourAgo) {
-      suspiciousIpStore.delete(key);
-    }
-  });
-}, 15 * 60 * 1000);
+// PRODUCTION SAFETY: Only start cleanup interval when observability is enabled
+if (process.env.DISABLE_OBSERVABILITY !== "true") {
+  setInterval(() => {
+    const now = Date.now();
+    const hourAgo = now - 60 * 60 * 1000;
+    
+    Array.from(suspiciousIpStore.entries()).forEach(([key, value]) => {
+      if (value.lastAttempt.getTime() < hourAgo) {
+        suspiciousIpStore.delete(key);
+      }
+    });
+  }, 15 * 60 * 1000);
+}

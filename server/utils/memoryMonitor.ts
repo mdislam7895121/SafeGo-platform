@@ -78,6 +78,12 @@ export function startMemoryMonitor(
   intervalMs = 30000,
   thresholds: Partial<MemoryThresholds> = {}
 ): void {
+  // PRODUCTION SAFETY: Skip memory monitoring when observability is disabled
+  if (process.env.DISABLE_OBSERVABILITY === "true") {
+    console.log('[Memory Monitor] Disabled via DISABLE_OBSERVABILITY flag');
+    return;
+  }
+  
   if (monitorInterval) {
     console.log('[Memory Monitor] Already running, skipping duplicate start');
     return;

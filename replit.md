@@ -99,3 +99,63 @@ The platform features two separate RAG-based AI assistants with strict role-base
 - **Fail-Safe**: Audit failures log warnings but never crash the server or return 500 errors
 - **Coverage**: ALL route files (17) AND ALL service files (8) now use the safe wrapper (complete coverage)
 - **Purpose**: Prevents 502/500 errors if audit_logs table is missing or database issues occur
+
+### Production Memory Safety (January 2026)
+When deployed to Railway or other constrained environments, set these environment variables to minimize memory usage:
+
+**Emergency Toggle Environment Variables:**
+- `DISABLE_WEBSOCKETS=true` - Prevents WebSocket servers from initializing (lazy load pattern)
+- `DISABLE_OBSERVABILITY=true` - Disables all monitoring intervals (TelemetryService, StabilityGuard, MemoryMonitor)
+- `DISABLE_AUDIT=true` - Bypasses audit log writes entirely
+
+**What Gets Disabled:**
+1. **WebSockets** (`DISABLE_WEBSOCKETS=true`):
+   - Support Chat WebSocket
+   - Ride Chat WebSocket
+   - Food Order Notifications WebSocket
+   - Dispatch WebSocket
+   - Admin Notifications WebSocket
+   - Observability WebSocket
+
+2. **Observability/Monitoring** (`DISABLE_OBSERVABILITY=true`):
+   - TelemetryService snapshot rotation (60s interval)
+   - StabilityGuard monitoring (30s interval)
+   - MemoryMonitor (30s interval)
+   - MonitoringService cleanup (24h interval)
+   - SessionSecurityService cleanup (1h interval)
+   - DeviceSecurityService cleanup (15m interval)
+   - OTPService cleanup (1m interval)
+   - All 32 automation systems (`initializeAutomationSystems`)
+
+3. **Audit System** (`DISABLE_AUDIT=true`):
+   - All audit log writes via `safeAuditLogCreate()` wrapper
+
+**Production Mode Behavior:**
+When all DISABLE_* flags are true, the app runs as:
+- Express HTTP only (no WebSockets)
+- No background intervals or monitoring
+- No audit logging
+- Memory should remain stable under 70%
+
+**Implementation Pattern:**
+All services now use lazy imports with guards:
+```typescript
+// WebSocket modules are loaded only when needed
+if (process.env.DISABLE_WEBSOCKETS !== "true") {
+  await loadWebSocketModules();
+}
+```
+
+**Proxy-Based Lazy Loading (TelemetryService, StabilityGuard):**
+Services that would otherwise instantiate on import use JavaScript Proxy pattern:
+```typescript
+// Proxy defers instantiation until first property access
+export const telemetryService = new Proxy({} as TelemetryService, {
+  get(_target, prop) {
+    const service = getTelemetryServiceInternal(); // Returns stub if disabled
+    const value = (service as any)[prop];
+    return typeof value === 'function' ? value.bind(service) : value;
+  }
+});
+```
+This ensures singletons are never created when DISABLE_OBSERVABILITY=true, even when other modules import them.
