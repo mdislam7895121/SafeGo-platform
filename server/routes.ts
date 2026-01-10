@@ -167,6 +167,11 @@ type DriverPublicProfile = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Railway healthcheck - minimal, no auth, no middleware
+  app.get('/healthz', (_req: Request, res: Response) => {
+    res.status(200).send('ok');
+  });
+
   // Health endpoint - returns 200 with basic status (fast, non-blocking)
   // Always returns 200 OK - payment gateway status is informational only
   app.get('/health', (_req: Request, res: Response) => {
