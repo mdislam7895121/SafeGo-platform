@@ -109,3 +109,6 @@ replit.nix
 server/public/
 vite.config.ts.*
 *.tar.gz
+.config/replit/
+.local/
+.env
