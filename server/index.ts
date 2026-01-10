@@ -22,6 +22,9 @@ try {
 }
 console.log("=".repeat(60));
 
+// Guard: Disable Prisma observability and system metrics when env var is set
+const DISABLE_SYSTEM_METRICS = process.env.DISABLE_SYSTEM_METRICS === "true";
+
 // CRITICAL: Validate security configuration FIRST before ANY imports
 // Must be the FIRST import and call to ensure no other modules load insecure defaults
 import { guardEnvironment, logProductionStartupBanner, assertDemoModeDisabled, logPaymentGatewayStatus } from "./utils/environmentGuard";
@@ -143,11 +146,8 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   
-  // PRODUCTION SAFETY: Only start memory monitoring when observability is enabled
-  if (process.env.DISABLE_OBSERVABILITY !== "true") {
+  if (!DISABLE_SYSTEM_METRICS) {
     startMemoryMonitor(30000, { warningPercent: 70, criticalPercent: 85 });
-  } else {
-    console.log("[MemoryMonitor] DISABLED via DISABLE_OBSERVABILITY=true");
   }
 
   server.listen({
@@ -160,3 +160,4 @@ app.use((req, res, next) => {
     logPaymentGatewayStatus();
   });
 })();
+

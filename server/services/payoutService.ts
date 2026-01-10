@@ -652,9 +652,53 @@ export class PayoutService {
 
     return { batch, processedCount: batch.payouts.length };
   }
+
+  /**
+   * Create a payout account
+   */
+  async createPayoutAccount(input: any) {
+    throw new Error("createPayoutAccount: Not implemented");
+  }
+
+  /**
+   * Update a payout account
+   */
+  async updatePayoutAccount(id: string, input: any) {
+    throw new Error("updatePayoutAccount: Not implemented");
+  }
+
+  /**
+   * Set default payout account
+   */
+  async setDefaultPayoutAccount(ownerType: "driver" | "restaurant" | "shop_partner", ownerId: string, accountId: string) {
+    throw new Error("setDefaultPayoutAccount: Not implemented");
+  }
 }
 
 export const payoutService = new PayoutService();
 
 // Backwards compatibility - alias for existing code
 export const walletPayoutService = payoutService;
+
+export async function listPayoutAccounts(
+  ownerType: 'driver' | 'vendor',
+  ownerId: string
+) {
+  throw new Error('listPayoutAccounts: Not implemented');
+}
+
+export async function createPayoutAccount(input: any) {
+  throw new Error('createPayoutAccount: Not implemented');
+}
+
+export async function updatePayoutAccount(id: string, input: any) {
+  throw new Error('updatePayoutAccount: Not implemented');
+}
+
+export async function setDefaultPayoutAccount(
+  ownerType: 'driver' | 'vendor',
+  ownerId: string,
+  payoutAccountId: string
+) {
+  throw new Error('setDefaultPayoutAccount: Not implemented');
+}
