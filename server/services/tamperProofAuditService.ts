@@ -34,18 +34,44 @@ interface TamperProofAuditEntry {
   hash: string;
 }
 
-let auditLog: TamperProofAuditEntry[] = [];
+// PRODUCTION SAFETY: Check DISABLE_AUDIT at module load to avoid ANY allocations
+const AUDIT_DISABLED = process.env.DISABLE_AUDIT === "true";
+
+// Only allocate memory when audit is enabled
+let auditLog: TamperProofAuditEntry[] = AUDIT_DISABLED ? [] : [];
 let currentSequence = 0;
 let lastHash = 'GENESIS_BLOCK';
 let baseSequenceOffset = 0; // Track how many entries have been evicted for integrity checks
 let lastEvictedHash = ''; // Hash of last evicted entry for chain validation
 const MAX_AUDIT_ENTRIES = 1000; // Limit in-memory audit log to prevent memory leaks
 
-const GENESIS_HASH = crypto.createHash('sha256').update('SAFEGO_AUDIT_GENESIS').digest('hex');
+// Compute GENESIS_HASH only when audit is enabled (crypto is expensive)
+const GENESIS_HASH = AUDIT_DISABLED ? '' : crypto.createHash('sha256').update('SAFEGO_AUDIT_GENESIS').digest('hex');
+
+// Shared stub for disabled mode - single allocation, reused for all calls
+const DISABLED_STUB_ENTRY: TamperProofAuditEntry = {
+  id: '',
+  sequence: 0,
+  timestamp: new Date(0),
+  category: 'AUTH_EVENT',
+  severity: 'INFO',
+  actorId: null,
+  actorEmail: null,
+  actorRole: 'DISABLED',
+  ipAddress: '',
+  userAgent: '',
+  action: 'DISABLED',
+  entityType: 'DISABLED',
+  entityId: null,
+  description: 'Audit disabled',
+  metadata: {},
+  previousHash: '',
+  hash: '',
+};
 
 function initializeAuditLog(): void {
-  // PRODUCTION SAFETY: Skip initialization when audit is disabled
-  if (process.env.DISABLE_AUDIT === "true") {
+  // PRODUCTION SAFETY: Skip initialization entirely when audit is disabled
+  if (AUDIT_DISABLED) {
     console.log('[TamperProofAudit] DISABLED via DISABLE_AUDIT=true');
     return;
   }
@@ -94,27 +120,9 @@ export function appendAuditEntry(params: {
   description: string;
   metadata?: Record<string, any>;
 }): TamperProofAuditEntry {
-  // PRODUCTION SAFETY: Return stub entry when audit is disabled
-  if (process.env.DISABLE_AUDIT === "true") {
-    return {
-      id: '',
-      sequence: 0,
-      timestamp: new Date(),
-      category: params.category,
-      severity: params.severity,
-      actorId: null,
-      actorEmail: null,
-      actorRole: 'DISABLED',
-      ipAddress: '',
-      userAgent: '',
-      action: params.action,
-      entityType: params.entityType,
-      entityId: null,
-      description: 'Audit disabled',
-      metadata: {},
-      previousHash: '',
-      hash: '',
-    };
+  // PRODUCTION SAFETY: Return shared stub immediately - no allocations, no crypto
+  if (AUDIT_DISABLED) {
+    return DISABLED_STUB_ENTRY;
   }
   
   currentSequence++;
