@@ -1,3 +1,27 @@
+// PRODUCTION DIAGNOSTICS: Log memory and NODE_OPTIONS at startup BEFORE anything else
+import * as v8 from "v8";
+console.log("=".repeat(60));
+console.log("RAILWAY STARTUP DIAGNOSTICS");
+console.log("=".repeat(60));
+console.log("NODE_OPTIONS:", process.env.NODE_OPTIONS || "(not set)");
+console.log("NODE_ENV:", process.env.NODE_ENV || "(not set)");
+console.log("DISABLE_OBSERVABILITY:", process.env.DISABLE_OBSERVABILITY || "(not set)");
+console.log("DISABLE_WEBSOCKETS:", process.env.DISABLE_WEBSOCKETS || "(not set)");
+console.log("DISABLE_AUDIT:", process.env.DISABLE_AUDIT || "(not set)");
+const startupMem = process.memoryUsage();
+console.log("MEM:", {
+  heapUsed: Math.round(startupMem.heapUsed / 1024 / 1024) + "MB",
+  heapTotal: Math.round(startupMem.heapTotal / 1024 / 1024) + "MB",
+  rss: Math.round(startupMem.rss / 1024 / 1024) + "MB",
+});
+try {
+  const heapStats = v8.getHeapStatistics();
+  console.log("V8 heap_size_limit:", Math.round(heapStats.heap_size_limit / 1024 / 1024) + "MB");
+} catch {
+  console.log("V8 heap stats unavailable");
+}
+console.log("=".repeat(60));
+
 // CRITICAL: Validate security configuration FIRST before ANY imports
 // Must be the FIRST import and call to ensure no other modules load insecure defaults
 import { guardEnvironment, logProductionStartupBanner, assertDemoModeDisabled, logPaymentGatewayStatus } from "./utils/environmentGuard";
