@@ -4860,7 +4860,7 @@ export const safePilotService = {
    * Each response includes WHY the AI made the decision
    * Includes: confidence %, data sources, reasoning summary
    */
-  async explainDecision(
+  async explainDecisionInternal(
     decisionId: string,
     decisionType: string,
     context: Record<string, unknown>
@@ -5347,3 +5347,4 @@ export const safePilotService = {
     };
   },
 };
+
