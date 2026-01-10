@@ -37,6 +37,9 @@ interface TamperProofAuditEntry {
 let auditLog: TamperProofAuditEntry[] = [];
 let currentSequence = 0;
 let lastHash = 'GENESIS_BLOCK';
+let baseSequenceOffset = 0; // Track how many entries have been evicted for integrity checks
+let lastEvictedHash = ''; // Hash of last evicted entry for chain validation
+const MAX_AUDIT_ENTRIES = 1000; // Limit in-memory audit log to prevent memory leaks
 
 const GENESIS_HASH = crypto.createHash('sha256').update('SAFEGO_AUDIT_GENESIS').digest('hex');
 
@@ -145,6 +148,15 @@ export function appendAuditEntry(params: {
   auditLog.push(entry);
   lastHash = hash;
 
+  // MEMORY SAFETY: Enforce max entries limit to prevent unbounded growth
+  if (auditLog.length > MAX_AUDIT_ENTRIES) {
+    const evicted = auditLog.shift(); // Remove oldest entry
+    if (evicted) {
+      lastEvictedHash = evicted.hash; // Store hash for chain validation
+    }
+    baseSequenceOffset++; // Track evicted entries for integrity verification
+  }
+
   if (params.severity === 'CRITICAL') {
     console.log(`[TamperProofAudit] CRITICAL: ${params.action} - ${params.description}`);
   }
@@ -156,22 +168,40 @@ export function verifyAuditLogIntegrity(): {
   valid: boolean; 
   lastValidSequence: number;
   errors: string[];
+  entriesVerified: number;
+  entriesEvicted: number;
 } {
   const errors: string[] = [];
-  let expectedPreviousHash = GENESIS_HASH;
   let lastValidSequence = 0;
+
+  // Determine the expected previousHash for the first entry in the buffer
+  // - If no evictions: should be GENESIS_HASH
+  // - If evictions occurred: should be lastEvictedHash
+  const expectedHeadPreviousHash = baseSequenceOffset === 0 ? GENESIS_HASH : lastEvictedHash;
 
   for (let i = 0; i < auditLog.length; i++) {
     const entry = auditLog[i];
+    const expectedSequence = baseSequenceOffset + i + 1;
 
-    if (entry.sequence !== i + 1) {
-      errors.push(`Sequence mismatch at index ${i}: expected ${i + 1}, got ${entry.sequence}`);
+    if (entry.sequence !== expectedSequence) {
+      errors.push(`Sequence mismatch at index ${i}: expected ${expectedSequence}, got ${entry.sequence}`);
       break;
     }
 
-    if (entry.previousHash !== expectedPreviousHash) {
-      errors.push(`Chain broken at sequence ${entry.sequence}: previousHash mismatch`);
-      break;
+    // Validate previousHash chain
+    if (i === 0) {
+      // First entry: verify against genesis or last evicted hash
+      if (entry.previousHash !== expectedHeadPreviousHash) {
+        errors.push(`Chain head broken at sequence ${entry.sequence}: previousHash mismatch`);
+        break;
+      }
+    } else {
+      // Subsequent entries: verify against previous entry's hash
+      const previousEntry = auditLog[i - 1];
+      if (entry.previousHash !== previousEntry.hash) {
+        errors.push(`Chain broken at sequence ${entry.sequence}: previousHash mismatch`);
+        break;
+      }
     }
 
     const { hash: _, ...entryWithoutHash } = entry;
@@ -182,14 +212,15 @@ export function verifyAuditLogIntegrity(): {
       break;
     }
 
-    expectedPreviousHash = entry.hash;
     lastValidSequence = entry.sequence;
   }
 
   return {
     valid: errors.length === 0,
     lastValidSequence,
-    errors
+    errors,
+    entriesVerified: auditLog.length,
+    entriesEvicted: baseSequenceOffset,
   };
 }
 

@@ -4,7 +4,15 @@
  */
 
 import { logAuditEvent, ActionType, EntityType } from "../utils/audit";
-import { telemetryService } from "./telemetry";
+// PRODUCTION SAFETY: Lazy import telemetryService to prevent eager instantiation
+// This prevents memory leaks when DISABLE_OBSERVABILITY=true
+let _lazyTelemetryService: any = null;
+function getTelemetryService() {
+  if (!_lazyTelemetryService) {
+    _lazyTelemetryService = require("./telemetry").telemetryService;
+  }
+  return _lazyTelemetryService;
+}
 
 interface StabilityThresholds {
   errorRatePercent: number;
@@ -75,9 +83,10 @@ class StabilityGuard {
    */
   private async checkStability() {
     try {
-      const metrics = await telemetryService.getCurrentMetrics();
-      const trafficOverview = await telemetryService.getTrafficOverview(1); // Last hour
-      const dbStats = await telemetryService.getDatabaseStats();
+      const telemetry = getTelemetryService();
+      const metrics = await telemetry.getCurrentMetrics();
+      const trafficOverview = await telemetry.getTrafficOverview(1); // Last hour
+      const dbStats = await telemetry.getDatabaseStats();
 
       // Check error rate
       const errorRate = parseFloat(trafficOverview.errorRate);
