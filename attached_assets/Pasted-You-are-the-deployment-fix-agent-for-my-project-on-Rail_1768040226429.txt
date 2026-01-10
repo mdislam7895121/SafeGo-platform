@@ -1,0 +1,77 @@
+You are the deployment-fix agent for my project on Railway.
+
+Project:
+- Service: SafeGo-platform
+- Environment: production
+- Repo: mdislam7895121/SafeGo-platform
+- Platform: Railway (Railpack builder, Node 22.x)
+
+Goal:
+Fix ALL current Railway failures and make the deployment stable.
+
+What you MUST do (no guessing):
+1) Open Railway → SafeGo-platform → production.
+2) Check BOTH:
+   - Build Logs (latest FAILED)
+   - Deploy Logs (latest ACTIVE after deploy)
+3) Extract and paste back EXACT error lines (verbatim) for:
+   a) "secret DISABLE_OBSERVABILITY: not found" (or any missing secret)
+   b) any "context canceled" build error
+   c) any "CRITICAL: Memory usage exceeds threshold" / heap limit lines
+
+Env var verification (must be exact):
+4) Verify where each variable is defined:
+   - Shared Variables (Project Settings)
+   - Service Variables (SafeGo-platform → Variables)
+   - Environment-level (production)
+5) For EACH key below, confirm it exists in the SAME scope the build reads from, and confirm it is attached to the service:
+   - DATABASE_URL
+   - JWT_SECRET
+   - SESSION_SECRET
+   - ENCRYPTION_KEY
+   - GOOGLE_MAPS_API_KEY
+   - STRIPE_SECRET_KEY
+   - DISABLE_OBSERVABILITY
+   - DISABLE_AUDIT
+   - DISABLE_WEBSOCKETS
+   - NODE_OPTIONS
+6) If any of DISABLE_* keys are missing in the scope used during build, fix by adding them at the correct scope with these values:
+   - DISABLE_OBSERVABILITY=true
+   - DISABLE_AUDIT=true
+   - DISABLE_WEBSOCKETS=true
+(Do NOT leave them only in a different scope—ensure the build can see them.)
+
+Memory diagnosis (do not hand-wave):
+7) Explain why logs show Heap ~64/65MB (very small) even though Railway resource limit shows large memory.
+8) Check if NODE_OPTIONS is actually applied at runtime:
+   - Confirm NODE_OPTIONS value is exactly: --max-old-space-size=2048
+9) If NODE_OPTIONS is not being applied, update the start command / start script so node is started with the memory flag explicitly:
+   Example:
+   - node --max-old-space-size=2048 <entry>
+   or
+   - NODE_OPTIONS="--max-old-space-size=2048" node <entry>
+
+Code-level verification (repo required):
+10) Open repo and identify the actual entry point used in production:
+    - package.json scripts (start, build)
+    - the file used by start (server.js / index.js / dist/index.js etc.)
+11) Add these two startup logs (exactly) at the very top of the server entry (before app starts):
+    - console.log("NODE_OPTIONS:", process.env.NODE_OPTIONS);
+    - console.log("MEM:", process.memoryUsage());
+    (If v8 is available, also print heap_size_limit.)
+
+Build stability fixes:
+12) If build fails with "context canceled" while installing packages, propose the most likely Railway-side cause and the ONE best mitigation (e.g., retry build, switch build environment, reduce apt packages, ensure no huge download steps). Keep it minimal.
+
+Deliverable format (mandatory):
+13) Reply with:
+   A) Root cause summary (bullet list)
+   B) Exact fixes needed in Railway UI (which tab, which scope, exact key/value)
+   C) Exact code changes needed (file paths + code block)
+   D) Final redeploy steps and what logs must show when fixed
+
+Rules:
+- Do NOT ask me questions.
+- Do NOT give multiple alternative plans.
+- Give ONE clear plan that will work.
+- Do NOT reveal secrets; only confirm presence/absence and variable names.
