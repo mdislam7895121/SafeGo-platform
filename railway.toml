@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build"
+buildCommand = "npm install && npm run prisma:generate && npm run prisma:migrate && npm run build"
 
 [deploy]
 startCommand = "npm run start"

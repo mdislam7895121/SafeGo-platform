@@ -1,0 +1,67 @@
+You are working on SafeGo-platform backend deployment issue.
+
+Goal:
+Fix Railway deploy crash and push the fix to GitHub.
+
+What we see in Deploy Logs:
+Prisma error: The table `public.system_job_runs` does not exist in the current database.
+Then memory monitor warnings due to crash loop.
+
+Rules:
+- Do not refactor unrelated code.
+- Keep changes minimal and non-breaking.
+- Do not change existing APIs/routes.
+- Fix must work in production (Railway) and locally.
+
+Tasks:
+
+1) Confirm ORM:
+   - Check package.json and server code to confirm whether this project uses Prisma or Drizzle.
+   - If Prisma exists, locate prisma/schema.prisma and migrations.
+   - If Drizzle exists, locate drizzle config and migration files.
+
+2) Fix missing table issue in a correct, production-safe way:
+   A) If Prisma:
+      - Ensure `system_job_runs` model exists in schema.prisma.
+      - If model exists but table missing in prod:
+        - Create/ensure migrations exist.
+        - Add Railway build/start step or release step to run:
+          `npx prisma migrate deploy`
+      - If the model was recently added but migration not created:
+        - Create migration locally:
+          `npx prisma migrate dev --name add_system_job_runs`
+        - Commit migration files.
+
+   B) If Drizzle:
+      - Ensure schema defines system_job_runs.
+      - Ensure migrations include creation of system_job_runs table.
+      - Ensure Railway deploy runs:
+        `npx drizzle-kit push`
+        (or the project’s configured migration command)
+
+3) Prevent crash loop from killing the service:
+   - Add a guard so that if system metrics/job runner tries to write to system_job_runs before migrations, it won’t crash the entire server.
+   - The guard must be minimal:
+     - Wrap the job-run insertion in try/catch and log one line error.
+     - Do not spam logs in a tight loop.
+   - Keep behavior otherwise unchanged.
+
+4) Update Railway config if needed:
+   - Ensure the production start process runs migrations once at boot (preferred) OR as a separate deploy step supported by the repo.
+   - Do not add new services.
+
+5) Verify:
+   - Run locally:
+     - `npm run check`
+     - start server
+     - confirm no Prisma missing-table error
+   - Confirm deploy will not exceed memory due to crash loop.
+
+6) Git:
+   - Create a branch: fix/railway-migrations
+   - Commit with message: "Fix production migrations for system_job_runs"
+   - Push to GitHub.
+
+Deliverables:
+- List exactly which files changed and why.
+- Provide the exact commands to deploy on Railway after merge.

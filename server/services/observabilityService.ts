@@ -1,6 +1,20 @@
 import { prisma } from "../db";
 import os from "os";
 
+let JOB_TABLE_MISSING_LOGGED = false;
+
+function isJobTableMissingError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('does not exist') || msg.includes('relation') || msg.includes('P2021');
+}
+
+function logJobTableMissingOnce(operation: string) {
+  if (!JOB_TABLE_MISSING_LOGGED) {
+    console.warn(`[Observability] system_job_runs table not available - ${operation} skipped.`);
+    JOB_TABLE_MISSING_LOGGED = true;
+  }
+}
+
 type LogCategory = "API" | "AUTH" | "FRAUD" | "DRIVER" | "ERROR" | "PAYMENT" | "SYSTEM";
 type LogSeverity = "DEBUG" | "INFO" | "WARN" | "ERROR" | "CRITICAL";
 
@@ -94,12 +108,17 @@ export const observabilityService = {
     const freeMem = os.freemem();
     const memoryUsage = ((totalMem - freeMem) / totalMem) * 100;
     
-    const [jobQueueDepth, websocketEstimate] = await Promise.all([
-      prisma.systemJobRun.count({
+    let jobQueueDepth = 0;
+    try {
+      jobQueueDepth = await prisma.systemJobRun.count({
         where: { status: "RUNNING" }
-      }),
-      Promise.resolve(Math.floor(Math.random() * 50) + 10),
-    ]);
+      });
+    } catch (error) {
+      if (isJobTableMissingError(error)) {
+        logJobTableMissingOnce('collectSystemMetrics');
+      }
+    }
+    const websocketEstimate = Math.floor(Math.random() * 50) + 10;
 
     const dbConnections = 10;
 
@@ -487,10 +506,18 @@ export const observabilityService = {
   },
 
   async getRecentJobs(limit: number = 20): Promise<any[]> {
-    return prisma.systemJobRun.findMany({
-      orderBy: { startedAt: "desc" },
-      take: limit,
-    });
+    try {
+      return await prisma.systemJobRun.findMany({
+        orderBy: { startedAt: "desc" },
+        take: limit,
+      });
+    } catch (error) {
+      if (isJobTableMissingError(error)) {
+        logJobTableMissingOnce('getRecentJobs');
+        return [];
+      }
+      throw error;
+    }
   },
 
   async getRecentErrors(limit: number = 20): Promise<any[]> {
