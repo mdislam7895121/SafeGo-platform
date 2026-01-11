@@ -1,0 +1,45 @@
+You are working on the repo: SafeGo-platform (GitHub: mdislam7895121/SafeGo-platform).
+
+Goal:
+Fix the Railway build + healthcheck failures and push a clean working commit to GitHub.
+
+Current symptoms (from logs/screenshots):
+1) Build fails with "spawn vite ENOENT" and sometimes "Cannot find package 'vite' imported from dist/index.js".
+2) Running build shows "NODE_ENV=production vite build" and PowerShell on Windows says 'NODE_ENV' is not recognized (so scripts are not cross-platform).
+3) Deploy healthcheck fails on /healthz because server never becomes healthy.
+4) There were errors like "Cannot find package 'uuid' imported from dist/index.js" earlier, so runtime deps must be correct.
+
+What you must do (A to Z, no questions):
+1) Open package.json and fix scripts to be cross-platform (Linux/Railway). Use cross-env instead of NODE_ENV=production inline.
+   - Add devDependency: cross-env
+   - Update scripts:
+     - "build": "cross-env NODE_ENV=production vite build"
+     - "start": "node dist/index.js"
+     - If "dev" exists keep it, but don’t break.
+2) Ensure Vite exists in devDependencies and is installed during Railway build.
+3) Ensure uuid is in dependencies (NOT devDependencies) because dist/index.js imports it at runtime.
+4) Ensure dist is produced by build and NOT required at runtime unless built.
+5) Ensure Express server binds to Railway port:
+   - Use const port = Number(process.env.PORT || 5000)
+   - Listen on 0.0.0.0
+6) Implement a lightweight /healthz route that returns 200 immediately and is registered BEFORE heavy init.
+7) Add Railway-friendly start:
+   - Railway should run: npm run start (after build)
+   - If railway.toml exists, ensure it uses:
+     - buildCommand = "npm install && npm run build"
+     - startCommand = "npm run start"
+8) Clean up repo:
+   - Remove any *.bak files and junk backups from git tracking.
+   - Add/confirm .gitignore entries for *.bak and dist if needed (dist can be ignored; Railway builds it).
+9) Run in Replit shell:
+   - rm -rf node_modules dist package-lock.json
+   - npm install
+   - npm run build
+   - npm run start
+   - curl http://localhost:$PORT/healthz (or default 5000) returns 200
+10) Commit with a clear message and push to GitHub main.
+
+Output required:
+- Tell me exactly which files you changed and what.
+- Paste the final successful build and start logs (key lines only).
+- Confirm the exact GitHub commit hash after push.
