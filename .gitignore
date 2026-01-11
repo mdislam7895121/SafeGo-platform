@@ -29,7 +29,6 @@ coverage
 
 # TypeScript
 *.tsbuildinfo
-dist/
 build/
 out/
 *.js.map
