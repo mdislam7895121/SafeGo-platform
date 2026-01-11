@@ -1,3 +1,9 @@
+import express from "express";
+const app = express();
+app.get("/healthz", (_req, res) => {
+  res.status(200).send("ok");
+});
+
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
   process.env.DISABLE_SYSTEM_METRICS === "true";
@@ -383,6 +389,10 @@ export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
 
+const PORT = Number(process.env.PORT) || 3000;
 
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server listening on port " + PORT);
+});
 
 
