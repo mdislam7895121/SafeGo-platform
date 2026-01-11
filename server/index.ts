@@ -1,5 +1,9 @@
 import express from "express";
 const app = express();
+
+app.get("/", (_req, res) => {
+  res.status(200).send("SafeGo API is running");
+});
 app.get("/healthz", (_req, res) => {
   res.status(200).send("ok");
 });
@@ -388,6 +392,7 @@ const PORT = Number(process.env.PORT || 8080);
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Server listening on port " + PORT);
 });
+
 
 
 
