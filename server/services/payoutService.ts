@@ -652,6 +652,33 @@ export class PayoutService {
 
     return { batch, processedCount: batch.payouts.length };
   }
+
+  /**
+   * Update payout account details
+   */
+  async updatePayoutAccount(id: string, data: any) {
+    return prisma.payoutAccount.update({
+      where: { id },
+      data,
+    });
+  }
+
+  /**
+   * Set default payout account for driver/restaurant
+   */
+  async setDefaultPayoutAccount(type: "driver" | "restaurant", ownerId: string, accountId: string) {
+    // Unset all other defaults for this owner
+    await prisma.payoutAccount.updateMany({
+      where: type === "driver" ? { driverId: ownerId } : { restaurantId: ownerId },
+      data: { isDefault: false },
+    });
+
+    // Set the new default
+    return prisma.payoutAccount.update({
+      where: { id: accountId },
+      data: { isDefault: true },
+    });
+  }
 }
 
 export const payoutService = new PayoutService();
