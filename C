@@ -1,0 +1,8 @@
+
+const port = Number(process.env.PORT || 8080);
+
+
+// Healthcheck endpoint for deploy platform
+app.get("/healthz", (_req, res) => {
+  res.status(200).send("ok");
+});

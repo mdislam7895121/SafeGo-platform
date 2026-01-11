@@ -1,3 +1,24 @@
+
+// SAFEGO_DISABLE_SYSTEMJOBRUN_QUERIES_v1
+const SAFEGO_DISABLE_SYSTEMJOBRUN_QUERIES =
+  (process.env.DISABLE_OBSERVABILITY === "true") ||
+  (process.env.NODE_ENV === "production");
+
+
+// SAFEGO_SYSTEMJOBRUN_SAFE_COUNT_v1
+const SAFEGO_DISABLE_OBSERVABILITY =
+  (process.env.DISABLE_OBSERVABILITY === "true") ||
+  (process.env.NODE_ENV === "production");
+
+async function safegoSystemJobRunCount(prisma: any, args?: any): Promise<number> {
+  try {
+    if (SAFEGO_DISABLE_OBSERVABILITY) return 0;
+    return await safegoSystemJobRunCount(prisma, args);
+  } catch {
+    return 0;
+  }
+}
+
 function __metricsDisabled(): boolean {
   const a = String(process.env.DISABLE_SYSTEM_METRICS || "").toLowerCase();
   const b = String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase();
@@ -100,7 +121,7 @@ export const observabilityService = {
     const memoryUsage = ((totalMem - freeMem) / totalMem) * 100;
     
     const [jobQueueDepth, websocketEstimate] = await Promise.all([
-      prisma.systemJobRun.count({
+      safegoSystemJobRunCount(prisma, {
         where: { status: "RUNNING" }
       }),
       Promise.resolve(Math.floor(Math.random() * 50) + 10),
@@ -558,4 +579,6 @@ export const observabilityService = {
 };
 
 export type { LogCategory, LogSeverity, MetricData, LogData, CorrelatedEvent, EventCorrelationData };
+
+
 

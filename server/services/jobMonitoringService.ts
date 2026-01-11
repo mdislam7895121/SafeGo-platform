@@ -1,6 +1,12 @@
 import { prisma } from '../db';
 import { SystemJobStatus } from '@prisma/client';
 
+// SAFEGO_DISABLE_SYSTEMJOBRUN_QUERIES_v1
+const SAFEGO_DISABLE_SYSTEMJOBRUN_QUERIES =
+  (process.env.DISABLE_OBSERVABILITY === "true") ||
+  (process.env.NODE_ENV === "production");
+
+
 interface JobStartResult {
   id: string;
   startedAt: Date;
@@ -260,3 +266,4 @@ export async function cleanupOldJobs(daysToKeep: number = 30): Promise<number> {
   console.log(`[JobMonitor] Cleaned up ${result.count} old jobs`);
   return result.count;
 }
+
