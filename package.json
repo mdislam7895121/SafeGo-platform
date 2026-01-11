@@ -7,10 +7,12 @@
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
+    "start:prod": "cross-env NODE_ENV=production bash scripts/start-prod.sh",
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:migrate": "prisma migrate deploy",
+    "deploy:build": "npm run prisma:generate && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -1,0 +1,34 @@
+# Render.com deployment configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: safego-platform
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run deploy:build
+    startCommand: npm run start:prod
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=1536"
+      - key: DISABLE_OBSERVABILITY
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: safego-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+databases:
+  - name: safego-db
+    plan: starter
+    databaseName: safego
+    user: safego

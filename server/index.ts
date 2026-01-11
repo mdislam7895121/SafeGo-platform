@@ -63,6 +63,15 @@ app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), cs
 // Parse cookies for refresh token handling
 app.use(cookieParser());
 
+// CRITICAL: Register healthcheck EARLY before heavy imports for fast startup response
+// This ensures Railway/Render/Fly.io healthchecks pass while the rest of the app loads
+app.get('/healthz', (_req, res) => {
+  res.status(200).send('ok');
+});
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
