@@ -1,3 +1,8 @@
+function __metricsDisabled(): boolean {
+  const a = String(process.env.DISABLE_SYSTEM_METRICS || "").toLowerCase();
+  const b = String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase();
+  return a === "true" || a === "1" || b === "true" || b === "1";
+}
 import { prisma } from "../db";
 import os from "os";
 
@@ -553,3 +558,4 @@ export const observabilityService = {
 };
 
 export type { LogCategory, LogSeverity, MetricData, LogData, CorrelatedEvent, EventCorrelationData };
+

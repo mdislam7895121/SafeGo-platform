@@ -1,3 +1,15 @@
+console.log("[ENV] DISABLE_SYSTEM_METRICS =", process.env.DISABLE_SYSTEM_METRICS);
+console.log("[ENV] DISABLE_OBSERVABILITY  =", process.env.DISABLE_OBSERVABILITY);
+console.log("[ENV] NODE_ENV              =", process.env.NODE_ENV);
+
+const __DISABLE_SYSTEM_METRICS__ =
+  String(process.env.DISABLE_SYSTEM_METRICS || "").toLowerCase() === "true" ||
+  String(process.env.DISABLE_SYSTEM_METRICS || "").toLowerCase() === "1";
+
+const __DISABLE_OBSERVABILITY__ =
+  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "true" ||
+  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "1";
+
 // PRODUCTION DIAGNOSTICS: Log memory and NODE_OPTIONS at startup BEFORE anything else
 import * as v8 from "v8";
 console.log("=".repeat(60));
@@ -160,4 +172,5 @@ app.use((req, res, next) => {
     logPaymentGatewayStatus();
   });
 })();
+
 

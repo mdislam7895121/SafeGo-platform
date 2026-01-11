@@ -1,3 +1,6 @@
+const __DISABLE_OBSERVABILITY__ =
+  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "true" ||
+  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "1";
 import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../db";
@@ -480,3 +483,4 @@ router.get("/dashboard", requireObservabilityAccess, async (req: AuthRequest, re
 });
 
 export default router;
+

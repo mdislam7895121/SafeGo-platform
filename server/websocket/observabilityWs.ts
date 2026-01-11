@@ -1,3 +1,6 @@
+const __DISABLE_OBSERVABILITY__ =
+  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "true" ||
+  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "1";
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
@@ -373,3 +376,4 @@ export function broadcastLogUpdate(log: {
 export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
+
