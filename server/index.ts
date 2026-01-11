@@ -1,176 +1,398 @@
-console.log("[ENV] DISABLE_SYSTEM_METRICS =", process.env.DISABLE_SYSTEM_METRICS);
-console.log("[ENV] DISABLE_OBSERVABILITY  =", process.env.DISABLE_OBSERVABILITY);
-console.log("[ENV] NODE_ENV              =", process.env.NODE_ENV);
+const DISABLE_OBSERVABILITY =
+  process.env.DISABLE_OBSERVABILITY === "true" ||
+  process.env.DISABLE_SYSTEM_METRICS === "true";
+import { Server as HTTPServer } from "http";
+import { WebSocketServer, WebSocket } from "ws";
+import jwt from "jsonwebtoken";
+import { prisma } from "../db";
+import { observabilityService } from "../services/observabilityService";
 
-const __DISABLE_SYSTEM_METRICS__ =
-  String(process.env.DISABLE_SYSTEM_METRICS || "").toLowerCase() === "true" ||
-  String(process.env.DISABLE_SYSTEM_METRICS || "").toLowerCase() === "1";
+const JWT_SECRET = process.env.JWT_SECRET;
+const ALLOWED_ROLES = ["SUPER_ADMIN", "INFRA_ADMIN"];
 
-const __DISABLE_OBSERVABILITY__ =
-  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "true" ||
-  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "1";
-
-// PRODUCTION DIAGNOSTICS: Log memory and NODE_OPTIONS at startup BEFORE anything else
-import * as v8 from "v8";
-console.log("=".repeat(60));
-console.log("RAILWAY STARTUP DIAGNOSTICS");
-console.log("=".repeat(60));
-console.log("NODE_OPTIONS:", process.env.NODE_OPTIONS || "(not set)");
-console.log("NODE_ENV:", process.env.NODE_ENV || "(not set)");
-console.log("DISABLE_OBSERVABILITY:", process.env.DISABLE_OBSERVABILITY || "(not set)");
-console.log("DISABLE_WEBSOCKETS:", process.env.DISABLE_WEBSOCKETS || "(not set)");
-console.log("DISABLE_AUDIT:", process.env.DISABLE_AUDIT || "(not set)");
-const startupMem = process.memoryUsage();
-console.log("MEM:", {
-  heapUsed: Math.round(startupMem.heapUsed / 1024 / 1024) + "MB",
-  heapTotal: Math.round(startupMem.heapTotal / 1024 / 1024) + "MB",
-  rss: Math.round(startupMem.rss / 1024 / 1024) + "MB",
-});
-try {
-  const heapStats = v8.getHeapStatistics();
-  console.log("V8 heap_size_limit:", Math.round(heapStats.heap_size_limit / 1024 / 1024) + "MB");
-} catch {
-  console.log("V8 heap stats unavailable");
+interface AuthenticatedObservabilitySocket extends WebSocket {
+  adminId?: string;
+  adminEmail?: string;
+  adminRole?: string;
+  isAlive?: boolean;
+  subscriptions?: Set<string>;
 }
-console.log("=".repeat(60));
 
-// Guard: Disable Prisma observability and system metrics when env var is set
-const DISABLE_SYSTEM_METRICS = process.env.DISABLE_SYSTEM_METRICS === "true";
-
-// CRITICAL: Validate security configuration FIRST before ANY imports
-// Must be the FIRST import and call to ensure no other modules load insecure defaults
-import { guardEnvironment, logProductionStartupBanner, assertDemoModeDisabled, logPaymentGatewayStatus } from "./utils/environmentGuard";
-guardEnvironment();
-assertDemoModeDisabled();
-logProductionStartupBanner();
-
-// Now safe to import other modules (they will throw if secrets missing, but guard already validated)
-import express, { type Request, Response, NextFunction } from "express";
-import { startMemoryMonitor } from "./utils/memoryMonitor";
-import cookieParser from "cookie-parser";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { securityHeaders, corsMiddleware, csrfProtection, landingRateLimiter, httpsRedirect, notFoundProbeDetector, cspViolationHandler } from "./middleware/securityHeaders";
-import { secureErrorHandler, notFoundHandler } from "./middleware/errorHandler";
-import { compressionMiddleware, staticAssetCaching, cdnHeaders, earlyHints } from "./middleware/performance";
-
-const app = express();
-
-// Force HTTPS redirect first (production only)
-app.use(httpsRedirect);
-
-// Performance optimizations - compression and caching
-app.use(compressionMiddleware);
-app.use(staticAssetCaching);
-app.use(cdnHeaders);
-app.use(earlyHints);
-
-// Apply CORS, security headers, CSRF protection, and landing page rate limiting globally
-app.use(corsMiddleware);
-app.use(securityHeaders);
-app.use(csrfProtection);
-app.use(landingRateLimiter);
-app.use(notFoundProbeDetector);
-
-// CSP violation reporting endpoint
-app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), cspViolationHandler);
-
-// Parse cookies for refresh token handling
-app.use(cookieParser());
-
-declare module 'http' {
-  interface IncomingMessage {
-    rawBody: unknown
-  }
+interface MetricsUpdate {
+  type: "metrics_update";
+  payload: {
+    timestamp: string;
+    cpu: number;
+    memory: number;
+    dbConnections: number;
+    jobQueueDepth: number;
+    websocketConnections: number;
+  };
 }
-app.use(express.json({
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-app.use(express.urlencoded({ extended: false }));
 
-// Serve uploaded files statically
-app.use("/uploads", express.static("uploads"));
+interface LogUpdate {
+  type: "log_update";
+  payload: {
+    id: string;
+    category: string;
+    severity: string;
+    message: string;
+    source: string;
+    createdAt: string;
+  };
+}
 
-// Serve attached assets (demo images, stock photos) statically
-app.use("/attached_assets", express.static("attached_assets"));
+interface AlertUpdate {
+  type: "alert_update";
+  payload: {
+    metricType: string;
+    alertSeverity: string;
+    alertMessage: string;
+    currentValue: number;
+    thresholdValue: number;
+    triggeredAt: string;
+  };
+}
 
-// Serve SEO files with appropriate caching
-app.get("/sitemap.xml", (_req, res) => {
-  res.setHeader("Content-Type", "application/xml");
-  res.setHeader("Cache-Control", "public, max-age=86400");
-  res.sendFile("sitemap.xml", { root: "./client/public" });
-});
+type ObservabilityEvent = MetricsUpdate | LogUpdate | AlertUpdate | { type: "connected" | "error"; payload: any };
 
-app.get("/robots.txt", (_req, res) => {
-  res.setHeader("Content-Type", "text/plain");
-  res.setHeader("Cache-Control", "public, max-age=86400");
-  res.sendFile("robots.txt", { root: "./client/public" });
-});
+const observabilityConnections = new Map<string, AuthenticatedObservabilitySocket>();
+let wss: WebSocketServer | null = null;
+let metricsInterval: NodeJS.Timeout | null = null;
+const MAX_OBSERVABILITY_CONNECTIONS = 20;
 
-app.use((req, res, next) => {
-  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|webp|svg|ico|woff2|woff|ttf|eot|map)$/)) {
-    return next();
+export function setupObservabilityWebSocket(server: HTTPServer) {
+  if (wss) {
+    console.log('[Observability WebSocket] Already initialized, skipping duplicate setup');
+    return;
   }
   
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  wss = new WebSocketServer({ server, path: "/api/admin/observability/ws" });
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+  wss.on("connection", async (ws: AuthenticatedObservabilitySocket, req) => {
+    if (wss!.clients.size > MAX_OBSERVABILITY_CONNECTIONS) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "Server at capacity" } }));
+      ws.close();
+      return;
+    }
+    
+    ws.isAlive = true;
+    ws.subscriptions = new Set(["metrics", "logs", "alerts"]);
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api") && (duration > 50 || res.statusCode >= 400)) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse && res.statusCode >= 400) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse).slice(0, 100)}`;
+    const url = new URL(req.url || "", `http://${req.headers.host}`);
+    const token = url.searchParams.get("token");
+
+    if (!token) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "No token provided" } }));
+      ws.close();
+      return;
+    }
+
+    if (!JWT_SECRET) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "Server configuration error" } }));
+      ws.close();
+      return;
+    }
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+
+      const admin = await prisma.adminProfile.findUnique({
+        where: { userId: decoded.id },
+        select: {
+          id: true,
+          adminRole: true,
+          user: { select: { email: true } },
+        },
+      });
+
+      if (!admin) {
+        ws.send(JSON.stringify({ type: "error", payload: { message: "Admin account not found" } }));
+        ws.close();
+        return;
       }
-      log(logLine);
+
+      if (!ALLOWED_ROLES.includes(admin.adminRole)) {
+        ws.send(JSON.stringify({ type: "error", payload: { message: "Insufficient permissions for observability access" } }));
+        ws.close();
+        return;
+      }
+
+      ws.adminId = admin.id;
+      ws.adminEmail = admin.user.email;
+      ws.adminRole = admin.adminRole;
+
+      observabilityConnections.set(admin.id, ws);
+
+      ws.send(JSON.stringify({
+        type: "connected",
+        payload: {
+          adminId: admin.id,
+          adminRole: admin.adminRole,
+          subscriptions: Array.from(ws.subscriptions),
+        },
+      }));
+
+      const initialMetrics = await observabilityService.if (!DISABLE_OBSERVABILITY) {
+  collectSystemMetrics();
+}
+      ws.send(JSON.stringify({
+        type: "metrics_update",
+        payload: {
+          timestamp: new Date().toISOString(),
+          ...initialMetrics,
+        },
+      }));
+
+    } catch (error) {
+      ws.send(JSON.stringify({ type: "error", payload: { message: "Invalid token" } }));
+      ws.close();
+      return;
+    }
+
+    ws.on("pong", () => {
+      ws.isAlive = true;
+    });
+
+    ws.on("message", async (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        await handleObservabilityMessage(ws, message);
+      } catch (error) {
+        console.error("[ObservabilityWS] Error handling message:", error);
+      }
+    });
+
+    ws.on("close", () => {
+      if (ws.adminId) {
+        observabilityConnections.delete(ws.adminId);
+      }
+    });
+  });
+
+  const pingInterval = setInterval(() => {
+    wss?.clients.forEach((ws: AuthenticatedObservabilitySocket) => {
+      if (ws.isAlive === false) {
+        if (ws.adminId) {
+          observabilityConnections.delete(ws.adminId);
+        }
+        return ws.terminate();
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  metricsInterval = setInterval(async () => {
+    try {
+      const metrics = await observabilityService.if (!DISABLE_OBSERVABILITY) {
+  collectSystemMetrics();
+}
+      const metricsUpdate: MetricsUpdate = {
+        type: "metrics_update",
+        payload: {
+          timestamp: new Date().toISOString(),
+          ...metrics,
+        },
+      };
+
+      await observabilityService.recordMetric({
+        metricType: "cpu_usage",
+        value: metrics.cpu,
+        unit: "percent",
+        windowMinutes: 1,
+      });
+      await observabilityService.recordMetric({
+        metricType: "memory_usage",
+        value: metrics.memory,
+        unit: "percent",
+        windowMinutes: 1,
+      });
+
+      broadcastToSubscribers("metrics", metricsUpdate);
+      
+      await checkThresholdAlerts(metrics);
+    } catch (error) {
+      console.error("[ObservabilityWS] Error collecting metrics:", error);
+    }
+  }, 60000);
+
+  wss.on("close", () => {
+    clearInterval(pingInterval);
+    if (metricsInterval) {
+      clearInterval(metricsInterval);
     }
   });
 
-  next();
+  console.log("Observability WebSocket server initialized at /api/admin/observability/ws");
+}
+
+async function handleObservabilityMessage(ws: AuthenticatedObservabilitySocket, message: any) {
+  switch (message.type) {
+    case "subscribe":
+      if (message.channel && typeof message.channel === "string") {
+        ws.subscriptions?.add(message.channel);
+        ws.send(JSON.stringify({
+          type: "subscribed",
+          payload: { channel: message.channel },
+        }));
+      }
+      break;
+
+    case "unsubscribe":
+      if (message.channel && typeof message.channel === "string") {
+        ws.subscriptions?.delete(message.channel);
+        ws.send(JSON.stringify({
+          type: "unsubscribed",
+          payload: { channel: message.channel },
+        }));
+      }
+      break;
+
+    case "request_metrics":
+      const metrics = await observabilityService.if (!DISABLE_OBSERVABILITY) {
+  collectSystemMetrics();
+}
+      ws.send(JSON.stringify({
+        type: "metrics_update",
+        payload: {
+          timestamp: new Date().toISOString(),
+          ...metrics,
+        },
+      }));
+      break;
+
+    case "request_logs":
+      const { logs } = await observabilityService.getLogs({
+        limit: message.limit || 50,
+        category: message.category,
+        severity: message.severity,
+      });
+      ws.send(JSON.stringify({
+        type: "logs_batch",
+        payload: { logs },
+      }));
+      break;
+  }
+}
+
+function broadcastToSubscribers(channel: string, event: ObservabilityEvent) {
+  observabilityConnections.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN && ws.subscriptions?.has(channel)) {
+      ws.send(JSON.stringify(event));
+    }
+  });
+}
+
+async function checkThresholdAlerts(metrics: { cpu: number; memory: number; dbConnections: number; jobQueueDepth: number }) {
+  const alerts = await prisma.metricThresholdAlert.findMany({
+    where: { isEnabled: true },
+  });
+
+  for (const alert of alerts) {
+    let currentValue: number | undefined;
+    
+    switch (alert.metricType) {
+      case "cpu_usage":
+        currentValue = metrics.cpu;
+        break;
+      case "memory_usage":
+        currentValue = metrics.memory;
+        break;
+      case "db_connections":
+        currentValue = metrics.dbConnections;
+        break;
+      case "job_queue_depth":
+        currentValue = metrics.jobQueueDepth;
+        break;
+    }
+
+    if (currentValue === undefined) continue;
+
+    const thresholdValue = Number(alert.thresholdValue);
+    let shouldTrigger = false;
+
+    switch (alert.thresholdType) {
+      case "ABOVE":
+        shouldTrigger = currentValue > thresholdValue;
+        break;
+      case "BELOW":
+        shouldTrigger = currentValue < thresholdValue;
+        break;
+      case "EQUALS":
+        shouldTrigger = currentValue === thresholdValue;
+        break;
+    }
+
+    if (shouldTrigger) {
+      const now = new Date();
+      const lastTriggered = alert.lastTriggeredAt;
+      const cooldownMs = alert.cooldownMinutes * 60 * 1000;
+
+      if (!lastTriggered || (now.getTime() - lastTriggered.getTime()) > cooldownMs) {
+        await prisma.metricThresholdAlert.update({
+          where: { id: alert.id },
+          data: {
+            lastTriggeredAt: now,
+            triggerCount: { increment: 1 },
+          },
+        });
+
+        if (alert.notifyWebSocket) {
+          const alertUpdate: AlertUpdate = {
+            type: "alert_update",
+            payload: {
+              metricType: alert.metricType,
+              alertSeverity: alert.alertSeverity,
+              alertMessage: alert.alertMessage,
+              currentValue,
+              thresholdValue,
+              triggeredAt: now.toISOString(),
+            },
+          };
+          broadcastToSubscribers("alerts", alertUpdate);
+        }
+      }
+    }
+  }
+}
+
+export function broadcastLogUpdate(log: {
+  id: string;
+  category: string;
+  severity: string;
+  message: string;
+  source: string;
+  createdAt: Date;
+}) {
+  const logUpdate: LogUpdate = {
+    type: "log_update",
+    payload: {
+      id: log.id,
+      category: log.category,
+      severity: log.severity,
+      message: log.message,
+      source: log.source,
+      createdAt: log.createdAt.toISOString(),
+    },
+  };
+  broadcastToSubscribers("logs", logUpdate);
+}
+
+export function getConnectedAdminCount(): number {
+  return observabilityConnections.size;
+}
+
+
+
+
+const PORT = Number(process.env.PORT) || 5000;
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server listening on port ${PORT}`);
 });
 
-(async () => {
-  const server = await registerRoutes(app);
 
-  app.use(secureErrorHandler);
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  
-  if (!DISABLE_SYSTEM_METRICS) {
-    startMemoryMonitor(30000, { warningPercent: 70, criticalPercent: 85 });
-  }
-
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-    // Log payment gateway status AFTER server is listening (non-blocking)
-    logPaymentGatewayStatus();
-  });
-})();
-
+app.get("/healthz", (_req, res) => {
+  res.status(200).send("ok");
+});
 
