@@ -1,6 +1,3 @@
-const __DISABLE_OBSERVABILITY__ =
-  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "true" ||
-  String(process.env.DISABLE_OBSERVABILITY || "").toLowerCase() === "1";
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
@@ -9,6 +6,11 @@ import { observabilityService } from "../services/observabilityService";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ALLOWED_ROLES = ["SUPER_ADMIN", "INFRA_ADMIN"];
+
+// Treat either flag as a global kill-switch for observability/metrics
+const DISABLE_OBSERVABILITY =
+  process.env.DISABLE_OBSERVABILITY === "true" ||
+  process.env.DISABLE_SYSTEM_METRICS === "true";
 
 interface AuthenticatedObservabilitySocket extends WebSocket {
   adminId?: string;
@@ -54,19 +56,52 @@ interface AlertUpdate {
   };
 }
 
-type ObservabilityEvent = MetricsUpdate | LogUpdate | AlertUpdate | { type: "connected" | "error"; payload: any };
+type ObservabilityEvent =
+  | MetricsUpdate
+  | LogUpdate
+  | AlertUpdate
+  | { type: "connected" | "error"; payload: any };
 
 const observabilityConnections = new Map<string, AuthenticatedObservabilitySocket>();
 let wss: WebSocketServer | null = null;
 let metricsInterval: NodeJS.Timeout | null = null;
+
 const MAX_OBSERVABILITY_CONNECTIONS = 20;
+
+// Safe fallback metrics when observability is disabled (or when collection fails)
+function emptyMetrics() {
+  return {
+    cpu: 0,
+    memory: 0,
+    dbConnections: 0,
+    jobQueueDepth: 0,
+    websocketConnections: wss ? wss.clients.size : 0,
+  };
+}
+
+async function safeCollectMetrics() {
+  if (DISABLE_OBSERVABILITY) return emptyMetrics();
+
+  try {
+    // Assumes your service exposes collectSystemMetrics()
+    // If your method name differs, rename it here.
+    const m = await observabilityService.collectSystemMetrics();
+    return {
+      ...m,
+      websocketConnections: wss ? wss.clients.size : 0,
+    };
+  } catch (e) {
+    console.error("[ObservabilityWS] collectSystemMetrics failed:", e);
+    return emptyMetrics();
+  }
+}
 
 export function setupObservabilityWebSocket(server: HTTPServer) {
   if (wss) {
-    console.log('[Observability WebSocket] Already initialized, skipping duplicate setup');
+    console.log("[Observability WebSocket] Already initialized, skipping duplicate setup");
     return;
   }
-  
+
   wss = new WebSocketServer({ server, path: "/api/admin/observability/ws" });
 
   wss.on("connection", async (ws: AuthenticatedObservabilitySocket, req) => {
@@ -75,7 +110,7 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
       ws.close();
       return;
     }
-    
+
     ws.isAlive = true;
     ws.subscriptions = new Set(["metrics", "logs", "alerts"]);
 
@@ -113,7 +148,12 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
       }
 
       if (!ALLOWED_ROLES.includes(admin.adminRole)) {
-        ws.send(JSON.stringify({ type: "error", payload: { message: "Insufficient permissions for observability access" } }));
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            payload: { message: "Insufficient permissions for observability access" },
+          })
+        );
         ws.close();
         return;
       }
@@ -124,24 +164,29 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
 
       observabilityConnections.set(admin.id, ws);
 
-      ws.send(JSON.stringify({
-        type: "connected",
-        payload: {
-          adminId: admin.id,
-          adminRole: admin.adminRole,
-          subscriptions: Array.from(ws.subscriptions),
-        },
-      }));
+      ws.send(
+        JSON.stringify({
+          type: "connected",
+          payload: {
+            adminId: admin.id,
+            adminRole: admin.adminRole,
+            subscriptions: Array.from(ws.subscriptions),
+            observabilityDisabled: DISABLE_OBSERVABILITY,
+          },
+        })
+      );
 
-      const initialMetrics = await observabilityService.collectSystemMetrics();
-      ws.send(JSON.stringify({
-        type: "metrics_update",
-        payload: {
-          timestamp: new Date().toISOString(),
-          ...initialMetrics,
-        },
-      }));
-
+      // Send initial metrics (safe even if disabled)
+      const initialMetrics = await safeCollectMetrics();
+      ws.send(
+        JSON.stringify({
+          type: "metrics_update",
+          payload: {
+            timestamp: new Date().toISOString(),
+            ...initialMetrics,
+          },
+        })
+      );
     } catch (error) {
       ws.send(JSON.stringify({ type: "error", payload: { message: "Invalid token" } }));
       ws.close();
@@ -162,18 +207,15 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
     });
 
     ws.on("close", () => {
-      if (ws.adminId) {
-        observabilityConnections.delete(ws.adminId);
-      }
+      if (ws.adminId) observabilityConnections.delete(ws.adminId);
     });
   });
 
+  // Heartbeat
   const pingInterval = setInterval(() => {
     wss?.clients.forEach((ws: AuthenticatedObservabilitySocket) => {
       if (ws.isAlive === false) {
-        if (ws.adminId) {
-          observabilityConnections.delete(ws.adminId);
-        }
+        if (ws.adminId) observabilityConnections.delete(ws.adminId);
         return ws.terminate();
       }
       ws.isAlive = false;
@@ -181,43 +223,48 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
     });
   }, 30000);
 
-  metricsInterval = setInterval(async () => {
-    try {
-      const metrics = await observabilityService.collectSystemMetrics();
-      const metricsUpdate: MetricsUpdate = {
-        type: "metrics_update",
-        payload: {
-          timestamp: new Date().toISOString(),
-          ...metrics,
-        },
-      };
+  // Metrics loop (ONLY if enabled)
+  if (!DISABLE_OBSERVABILITY) {
+    metricsInterval = setInterval(async () => {
+      try {
+        const metrics = await safeCollectMetrics();
 
-      await observabilityService.recordMetric({
-        metricType: "cpu_usage",
-        value: metrics.cpu,
-        unit: "percent",
-        windowMinutes: 1,
-      });
-      await observabilityService.recordMetric({
-        metricType: "memory_usage",
-        value: metrics.memory,
-        unit: "percent",
-        windowMinutes: 1,
-      });
+        const metricsUpdate: MetricsUpdate = {
+          type: "metrics_update",
+          payload: {
+            timestamp: new Date().toISOString(),
+            ...metrics,
+          },
+        };
 
-      broadcastToSubscribers("metrics", metricsUpdate);
-      
-      await checkThresholdAlerts(metrics);
-    } catch (error) {
-      console.error("[ObservabilityWS] Error collecting metrics:", error);
-    }
-  }, 60000);
+        // Persist some metrics only when enabled
+        await observabilityService.recordMetric({
+          metricType: "cpu_usage",
+          value: metrics.cpu,
+          unit: "percent",
+          windowMinutes: 1,
+        });
+        await observabilityService.recordMetric({
+          metricType: "memory_usage",
+          value: metrics.memory,
+          unit: "percent",
+          windowMinutes: 1,
+        });
+
+        broadcastToSubscribers("metrics", metricsUpdate);
+
+        await checkThresholdAlerts(metrics);
+      } catch (error) {
+        console.error("[ObservabilityWS] Error collecting metrics:", error);
+      }
+    }, 60000);
+  } else {
+    console.log("[ObservabilityWS] DISABLED via env, skipping metrics loop");
+  }
 
   wss.on("close", () => {
     clearInterval(pingInterval);
-    if (metricsInterval) {
-      clearInterval(metricsInterval);
-    }
+    if (metricsInterval) clearInterval(metricsInterval);
   });
 
   console.log("Observability WebSocket server initialized at /api/admin/observability/ws");
@@ -228,45 +275,37 @@ async function handleObservabilityMessage(ws: AuthenticatedObservabilitySocket, 
     case "subscribe":
       if (message.channel && typeof message.channel === "string") {
         ws.subscriptions?.add(message.channel);
-        ws.send(JSON.stringify({
-          type: "subscribed",
-          payload: { channel: message.channel },
-        }));
+        ws.send(JSON.stringify({ type: "subscribed", payload: { channel: message.channel } }));
       }
       break;
 
     case "unsubscribe":
       if (message.channel && typeof message.channel === "string") {
         ws.subscriptions?.delete(message.channel);
-        ws.send(JSON.stringify({
-          type: "unsubscribed",
-          payload: { channel: message.channel },
-        }));
+        ws.send(JSON.stringify({ type: "unsubscribed", payload: { channel: message.channel } }));
       }
       break;
 
-    case "request_metrics":
-      const metrics = await observabilityService.collectSystemMetrics();
-      ws.send(JSON.stringify({
-        type: "metrics_update",
-        payload: {
-          timestamp: new Date().toISOString(),
-          ...metrics,
-        },
-      }));
+    case "request_metrics": {
+      const metrics = await safeCollectMetrics();
+      ws.send(
+        JSON.stringify({
+          type: "metrics_update",
+          payload: { timestamp: new Date().toISOString(), ...metrics },
+        })
+      );
       break;
+    }
 
-    case "request_logs":
+    case "request_logs": {
       const { logs } = await observabilityService.getLogs({
         limit: message.limit || 50,
         category: message.category,
         severity: message.severity,
       });
-      ws.send(JSON.stringify({
-        type: "logs_batch",
-        payload: { logs },
-      }));
+      ws.send(JSON.stringify({ type: "logs_batch", payload: { logs } }));
       break;
+    }
   }
 }
 
@@ -278,14 +317,22 @@ function broadcastToSubscribers(channel: string, event: ObservabilityEvent) {
   });
 }
 
-async function checkThresholdAlerts(metrics: { cpu: number; memory: number; dbConnections: number; jobQueueDepth: number }) {
+async function checkThresholdAlerts(metrics: {
+  cpu: number;
+  memory: number;
+  dbConnections: number;
+  jobQueueDepth: number;
+}) {
+  // If disabled, do nothing
+  if (DISABLE_OBSERVABILITY) return;
+
   const alerts = await prisma.metricThresholdAlert.findMany({
     where: { isEnabled: true },
   });
 
   for (const alert of alerts) {
     let currentValue: number | undefined;
-    
+
     switch (alert.metricType) {
       case "cpu_usage":
         currentValue = metrics.cpu;
@@ -323,7 +370,7 @@ async function checkThresholdAlerts(metrics: { cpu: number; memory: number; dbCo
       const lastTriggered = alert.lastTriggeredAt;
       const cooldownMs = alert.cooldownMinutes * 60 * 1000;
 
-      if (!lastTriggered || (now.getTime() - lastTriggered.getTime()) > cooldownMs) {
+      if (!lastTriggered || now.getTime() - lastTriggered.getTime() > cooldownMs) {
         await prisma.metricThresholdAlert.update({
           where: { id: alert.id },
           data: {
@@ -376,4 +423,3 @@ export function broadcastLogUpdate(log: {
 export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
-
