@@ -28,6 +28,8 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
+    chunkSizeWarningLimit: 1500,
+    sourcemap: false,
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
@@ -38,3 +40,4 @@ export default defineConfig({
     },
   },
 });
+
