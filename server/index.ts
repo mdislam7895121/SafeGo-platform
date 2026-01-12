@@ -4,14 +4,21 @@ app.get("/healthz", (_req, res) => {
   res.status(200).send("ok");
 });
 
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "SafeGo API is running"
+  });
+});
+
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
   process.env.DISABLE_SYSTEM_METRICS === "true";
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
-import { prisma } from "../db";
-import { observabilityService } from "../services/observabilityService";
+import { prisma } from "./db";
+import { observabilityService } from "./services/observabilityService";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ALLOWED_ROLES = ["SUPER_ADMIN", "INFRA_ADMIN"];
@@ -139,9 +146,7 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
         },
       }));
 
-      const initialMetrics = await observabilityService.if (!DISABLE_OBSERVABILITY) {
-  collectSystemMetrics();
-}
+      const initialMetrics = await observabilityService.collectSystemMetrics();
       ws.send(JSON.stringify({
         type: "metrics_update",
         payload: {
@@ -191,9 +196,7 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
 
   metricsInterval = setInterval(async () => {
     try {
-      const metrics = await observabilityService.if (!DISABLE_OBSERVABILITY) {
-  collectSystemMetrics();
-}
+      const metrics = await observabilityService.collectSystemMetrics();
       const metricsUpdate: MetricsUpdate = {
         type: "metrics_update",
         payload: {
@@ -256,9 +259,7 @@ async function handleObservabilityMessage(ws: AuthenticatedObservabilitySocket, 
       break;
 
     case "request_metrics":
-      const metrics = await observabilityService.if (!DISABLE_OBSERVABILITY) {
-  collectSystemMetrics();
-}
+      const metrics = await observabilityService.collectSystemMetrics();
       ws.send(JSON.stringify({
         type: "metrics_update",
         payload: {
@@ -389,7 +390,7 @@ export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT || 8080);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Server listening on port " + PORT);
