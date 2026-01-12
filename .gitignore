@@ -112,3 +112,6 @@ vite.config.ts.*
 .config/replit/
 .local/
 .env
+
+# Local Netlify folder
+.netlify
