@@ -1,0 +1,34 @@
+const { execSync } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+const repoRoot = 'c:\\Users\\vitor\\Downloads\\Png\\SafeGo-platform\\SafeGo-platform';
+const clientDir = path.join(repoRoot, 'client');
+
+process.chdir(clientDir);
+
+try {
+  console.log('Installing dependencies...');
+  execSync('npm ci', { stdio: 'inherit' });
+  
+  console.log('\n\nBuilding...');
+  execSync('npm run build', { stdio: 'inherit' });
+  
+  console.log('\n\nBuild completed successfully!');
+  
+  // Check dist directory
+  const distPath = path.join(clientDir, 'dist');
+  if (fs.existsSync(distPath)) {
+    const indexHtml = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexHtml)) {
+      const content = fs.readFileSync(indexHtml, 'utf8');
+      console.log(`\nindex.html size: ${content.length} bytes`);
+      console.log('index.html contains /src/:', content.includes('/src/'));
+      console.log('index.html contains _redirects reference:', content.includes('_redirects'));
+    }
+  }
+  
+} catch (error) {
+  console.error('Error:', error.message);
+  process.exit(1);
+}
