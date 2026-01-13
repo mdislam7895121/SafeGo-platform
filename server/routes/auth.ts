@@ -94,6 +94,7 @@ function validateEmailFormat(email: string): boolean {
 //   - trustLevel is always "customer_basic" (set server-side)
 // ====================================================
 router.post("/signup", async (req, res) => {
+  console.log("[AUTH] Signup route hit");
   try {
     const { email, password, confirmPassword, fullName, countryCode: clientCountry } = req.body;
     
