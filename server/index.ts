@@ -4,7 +4,17 @@ import { registerRoutes } from "./routes";
 // Create Express app instance
 // CRITICAL: All routes and middleware are registered via registerRoutes()
 // which wraps this app in an HTTP server and returns it
-const app = express();
+
+
+// HEALTH CHECK (production + local)
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "SafeGo API",
+    env: process.env.NODE_ENV || "unknown",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
@@ -409,5 +419,6 @@ const PORT = Number(process.env.PORT || 8080);
     process.exit(1);
   }
 })();
+
 
 
