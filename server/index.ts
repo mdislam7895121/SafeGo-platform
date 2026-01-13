@@ -1,15 +1,21 @@
 import express from "express";
 import { registerRoutes } from "./routes";
+
+// Create Express app instance
+// CRITICAL: All routes and middleware are registered via registerRoutes()
+// which wraps this app in an HTTP server and returns it
 const app = express();
+
+// ============================================
+// MINIMAL HEALTH CHECK - BEFORE ANY MIDDLEWARE
+// Railway uses this to detect if server is alive
+// ============================================
 app.get("/healthz", (_req, res) => {
   res.status(200).send("ok");
 });
 
-app.get("/", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    message: "SafeGo API is running"
-  });
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
 const DISABLE_OBSERVABILITY =
@@ -396,12 +402,22 @@ const PORT = Number(process.env.PORT || 8080);
 // Initialize server with all registered routes and start listening
 (async () => {
   try {
+    console.log(`[STARTUP] Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[STARTUP] Port: ${PORT}`);
+    console.log(`[STARTUP] Registering routes...`);
+    
     const httpServer = await registerRoutes(app);
+    
+    console.log(`[STARTUP] Routes registered successfully`);
+    console.log(`[STARTUP] Health endpoint available at GET /api/health`);
+    console.log(`[STARTUP] Auth endpoints available at /api/auth/*`);
+    
     httpServer.listen(PORT, "0.0.0.0", () => {
-      console.log("Server listening on port " + PORT);
+      console.log(`[STARTUP] Server listening on 0.0.0.0:${PORT}`);
+      console.log(`[STARTUP] Ready to accept requests`);
     });
   } catch (error) {
-    console.error("Failed to register routes:", error);
+    console.error("[STARTUP] Failed to register routes:", error);
     process.exit(1);
   }
 })();
