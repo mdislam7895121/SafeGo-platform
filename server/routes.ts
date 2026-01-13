@@ -797,6 +797,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message || "Failed to get partner profile" });
     }
   });
+  // ====================================================
+  // SAFETY CATCH-ALL ROUTES - Ensure health endpoints always work
+  // Registered BEFORE error handlers so they take precedence
+  // ====================================================
+  
+  // Backup root route
+  app.get("/", (_req: Request, res: Response) => {
+    res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
+  });
+  
+  // Backup /api/health route (in case previous registration didn't work)
+  app.get("/api/health", (_req: Request, res: Response) => {
+    res.status(200).json({ status: "ok" });
+  });
+  
+  // Backup /healthz route
+  app.get("/healthz", (_req: Request, res: Response) => {
+    res.status(200).send("ok");
+  });
 
   // ====================================================
   // CENTRALIZED ERROR HANDLERS (always return JSON, never HTML)
