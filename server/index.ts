@@ -1,29 +1,33 @@
 import express from "express";
 import { registerRoutes } from "./routes";
-
-// Create Express app instance
-// CRITICAL: All routes and middleware are registered via registerRoutes()
-// which wraps this app in an HTTP server and returns it
-
-
-// HEALTH CHECK (production + local)
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "SafeGo API",
-    env: process.env.NODE_ENV || "unknown",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-const DISABLE_OBSERVABILITY =
-  process.env.DISABLE_OBSERVABILITY === "true" ||
-  process.env.DISABLE_SYSTEM_METRICS === "true";
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
 import { prisma } from "./db";
 import { observabilityService } from "./services/observabilityService";
+
+const app = express();
+
+// ROOT HEALTH CHECK (Railway + local)
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "SafeGo API",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Some environments hit /api/health
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "SafeGo API",
+    timestamp: new Date().toISOString(),
+  });
+});
+const DISABLE_OBSERVABILITY =
+  process.env.DISABLE_OBSERVABILITY === "true" ||
+  process.env.DISABLE_SYSTEM_METRICS === "true";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ALLOWED_ROLES = ["SUPER_ADMIN", "INFRA_ADMIN"];
@@ -419,6 +423,9 @@ const PORT = Number(process.env.PORT || 8080);
     process.exit(1);
   }
 })();
+
+
+
 
 
 
