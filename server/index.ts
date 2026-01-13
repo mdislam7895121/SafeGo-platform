@@ -6,25 +6,6 @@ import { registerRoutes } from "./routes";
 // which wraps this app in an HTTP server and returns it
 const app = express();
 
-// ============================================
-// MINIMAL HEALTH CHECK - BEFORE ANY MIDDLEWARE
-// Railway uses this to detect if server is alive
-// Note: /api/health and /healthz are also registered in registerRoutes()
-// These app-level routes serve as backup
-// ============================================
-app.get("/healthz", (_req, res) => {
-  res.status(200).send("ok");
-});
-
-app.get("/api/health", (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
-// Root route - simple health check
-app.get("/", (_req, res) => {
-  res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
-});
-
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
   process.env.DISABLE_SYSTEM_METRICS === "true";

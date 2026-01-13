@@ -168,8 +168,8 @@ type DriverPublicProfile = {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ====================================================
-  // CRITICAL: Health endpoints - must come FIRST, before any middleware
-  // These are used by load balancers and monitoring, must be fast and reliable
+  // ABSOLUTE FIRST: Health endpoints - ZERO middleware, ZERO dependencies
+  // These MUST work for Railway health checks and load balancers
   // ====================================================
 
   // Railway healthcheck - minimal, no auth, no middleware
@@ -177,11 +177,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).send('ok');
   });
 
+  // Root endpoint - simple ping
+  app.get('/', (_req: Request, res: Response) => {
+    res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
+  });
+
   // API Health endpoint - JSON response for monitoring
   // Simple endpoint that confirms server is running and API is responding
   app.get('/api/health', (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
+      timestamp: new Date().toISOString(),
     });
   });
 
@@ -796,25 +802,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[Partner] Error getting profile:", error);
       res.status(500).json({ error: error.message || "Failed to get partner profile" });
     }
-  });
-  // ====================================================
-  // SAFETY CATCH-ALL ROUTES - Ensure health endpoints always work
-  // Registered BEFORE error handlers so they take precedence
-  // ====================================================
-  
-  // Backup root route
-  app.get("/", (_req: Request, res: Response) => {
-    res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
-  });
-  
-  // Backup /api/health route (in case previous registration didn't work)
-  app.get("/api/health", (_req: Request, res: Response) => {
-    res.status(200).json({ status: "ok" });
-  });
-  
-  // Backup /healthz route
-  app.get("/healthz", (_req: Request, res: Response) => {
-    res.status(200).send("ok");
   });
 
   // ====================================================
