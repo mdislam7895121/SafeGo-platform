@@ -167,31 +167,27 @@ type DriverPublicProfile = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ====================================================
+  // CRITICAL: Health endpoints - must come FIRST, before any middleware
+  // These are used by load balancers and monitoring, must be fast and reliable
+  // ====================================================
+
   // Railway healthcheck - minimal, no auth, no middleware
   app.get('/healthz', (_req: Request, res: Response) => {
     res.status(200).send('ok');
   });
 
-  // Health endpoint - returns 200 with basic status (fast, non-blocking)
-  // Always returns 200 OK - payment gateway status is informational only
-  app.get('/health', (_req: Request, res: Response) => {
-    const paymentStatus = getPaymentGatewayStatus();
+  // API Health endpoint - JSON response for monitoring
+  // Simple endpoint that confirms server is running and API is responding
+  app.get('/api/health', (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      payments_configured: paymentStatus.configured,
-      payments: {
-        stripe: paymentStatus.providers.stripe,
-        sslcommerz: paymentStatus.providers.sslcommerz,
-        bkash: paymentStatus.providers.bkash,
-        nagad: paymentStatus.providers.nagad,
-      },
     });
   });
 
-  app.get('/api/health', (_req: Request, res: Response) => {
+  // Health endpoint - returns 200 with basic status (fast, non-blocking)
+  // Always returns 200 OK - payment gateway status is informational only
+  app.get('/health', (_req: Request, res: Response) => {
     const paymentStatus = getPaymentGatewayStatus();
     res.status(200).json({
       status: 'ok',

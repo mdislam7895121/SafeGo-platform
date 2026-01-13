@@ -2,7 +2,18 @@ import { Router, type Request, type Response } from "express";
 import { prisma } from "../db";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { DayOfWeek } from "@prisma/client";
+import type { DayOfWeek } from "@prisma/client";
+
+// Define DayOfWeek values for ESM compatibility
+const DayOfWeekValues = {
+  MONDAY: "MONDAY" as DayOfWeek,
+  TUESDAY: "TUESDAY" as DayOfWeek,
+  WEDNESDAY: "WEDNESDAY" as DayOfWeek,
+  THURSDAY: "THURSDAY" as DayOfWeek,
+  FRIDAY: "FRIDAY" as DayOfWeek,
+  SATURDAY: "SATURDAY" as DayOfWeek,
+  SUNDAY: "SUNDAY" as DayOfWeek,
+};
 
 const router = Router();
 
@@ -267,7 +278,7 @@ router.post("/seed-demo", async (_req: Request, res: Response) => {
       });
 
       // Create hours (open every day 9am-10pm)
-      const days: DayOfWeek[] = [DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY];
+      const days: DayOfWeek[] = [DayOfWeekValues.MONDAY, DayOfWeekValues.TUESDAY, DayOfWeekValues.WEDNESDAY, DayOfWeekValues.THURSDAY, DayOfWeekValues.FRIDAY, DayOfWeekValues.SATURDAY, DayOfWeekValues.SUNDAY];
       for (const day of days) {
         await prisma.restaurantHours.create({
           data: {

@@ -1,5 +1,13 @@
 import { prisma } from "../lib/prisma";
-import { BackgroundCheckStatus, BackgroundCheckResult } from "@prisma/client";
+import type { BackgroundCheckStatus, BackgroundCheckResult } from "@prisma/client";
+
+// Re-export enum values for ESM compatibility
+const BackgroundCheckResultValues = {
+  clear: 'clear' as BackgroundCheckResult,
+  consider: 'consider' as BackgroundCheckResult,
+  review: 'review' as BackgroundCheckResult,
+  not_applicable: 'not_applicable' as BackgroundCheckResult,
+};
 
 interface InitiateBackgroundCheckParams {
   driverId: string;
@@ -290,7 +298,7 @@ class BackgroundCheckService {
 
     setTimeout(async () => {
       try {
-        const result = Math.random() > 0.1 ? BackgroundCheckResult.clear : BackgroundCheckResult.consider;
+        const result = Math.random() > 0.1 ? BackgroundCheckResultValues.clear : BackgroundCheckResultValues.consider;
 
         await prisma.driverBackgroundCheck.update({
           where: { id: checkId },
@@ -299,7 +307,7 @@ class BackgroundCheckService {
             result,
             completedAt: new Date(),
             expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-            reportSummary: result === BackgroundCheckResult.clear
+            reportSummary: result === BackgroundCheckResultValues.clear
               ? "No adverse records found. Background check passed."
               : "Minor records found. Review recommended.",
           },
@@ -313,7 +321,7 @@ class BackgroundCheckService {
           await prisma.driverProfile.update({
             where: { id: check.driverId },
             data: {
-              backgroundCheckStatus: result === BackgroundCheckResult.clear ? "approved" : "needs_review",
+              backgroundCheckStatus: result === BackgroundCheckResultValues.clear ? "approved" : "needs_review",
             },
           });
         }
@@ -397,13 +405,13 @@ class BackgroundCheckService {
       let result: BackgroundCheckResult;
       switch (data.result?.toLowerCase()) {
         case "clear":
-          result = BackgroundCheckResult.clear;
+          result = BackgroundCheckResultValues.clear;
           break;
         case "consider":
-          result = BackgroundCheckResult.consider;
+          result = BackgroundCheckResultValues.consider;
           break;
         default:
-          result = BackgroundCheckResult.review;
+          result = BackgroundCheckResultValues.review;
       }
 
       await prisma.driverBackgroundCheck.update({
@@ -420,7 +428,7 @@ class BackgroundCheckService {
       await prisma.driverProfile.update({
         where: { id: check.driverId },
         data: {
-          backgroundCheckStatus: result === BackgroundCheckResult.clear ? "approved" : "needs_review",
+          backgroundCheckStatus: result === BackgroundCheckResultValues.clear ? "approved" : "needs_review",
         },
       });
 
@@ -464,7 +472,7 @@ class BackgroundCheckService {
     await prisma.driverProfile.update({
       where: { id: check.driverId },
       data: {
-        backgroundCheckStatus: result === BackgroundCheckResult.clear ? "approved" : "rejected",
+        backgroundCheckStatus: result === BackgroundCheckResultValues.clear ? "approved" : "rejected",
       },
     });
   }
@@ -476,7 +484,7 @@ class BackgroundCheckService {
     return prisma.driverBackgroundCheck.findMany({
       where: {
         status: BackgroundCheckStatus.completed,
-        result: BackgroundCheckResult.clear,
+        result: BackgroundCheckResultValues.clear,
         expiresAt: {
           lte: thresholdDate,
           gte: new Date(),
@@ -519,13 +527,13 @@ class BackgroundCheckService {
         where: { ...where, status: BackgroundCheckStatus.completed },
       }),
       prisma.driverBackgroundCheck.count({
-        where: { ...where, status: BackgroundCheckStatus.completed, result: BackgroundCheckResult.clear },
+        where: { ...where, status: BackgroundCheckStatus.completed, result: BackgroundCheckResultValues.clear },
       }),
       prisma.driverBackgroundCheck.count({
         where: {
           ...where,
           status: BackgroundCheckStatus.completed,
-          result: { in: [BackgroundCheckResult.consider, BackgroundCheckResult.review] },
+          result: { in: [BackgroundCheckResultValues.consider, BackgroundCheckResultValues.review] },
         },
       }),
       prisma.driverBackgroundCheck.count({

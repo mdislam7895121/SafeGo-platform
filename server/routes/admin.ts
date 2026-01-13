@@ -13392,7 +13392,16 @@ router.get("/analytics/top-earners", checkPermission(Permission.VIEW_REVENUE_ANA
 import { identityVerificationService } from "../services/identityVerificationService";
 import { backgroundCheckService } from "../services/backgroundCheckService";
 import { faceVerificationService } from "../services/faceVerificationService";
-import { KycDocumentType, KycVerificationStatus, BackgroundCheckResult, MobileWalletBrand } from "@prisma/client";
+import type { KycDocumentType, KycVerificationStatus, MobileWalletBrand } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+
+// Define BackgroundCheckResult for Zod validation
+const BackgroundCheckResult = {
+  clear: "clear",
+  consider: "consider",
+  review: "review",
+  not_applicable: "not_applicable",
+} as const;
 
 // GET /api/admin/kyc/stats - Get KYC verification statistics
 router.get("/kyc/stats", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {

@@ -1,0 +1,8 @@
+
+> rest-express@1.0.0 build
+> esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+  dist\index.js  21.8kb
+
+Done in 19ms
