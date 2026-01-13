@@ -316,6 +316,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
   }
 
+  // ====================================================
+  // CRITICAL MIDDLEWARE SETUP
+  // This MUST come after Stripe webhook (which needs raw body)
+  // and BEFORE all other routes
+  // ====================================================
+
+  // CORS middleware - allow Netlify frontend to call this API
+  app.use((req: Request, res: Response, next: Function) => {
+    const origin = req.get('origin');
+    
+    // Allow requests from these origins:
+    // - Netlify deploy preview domains (safego-*.netlify.app)
+    // - Custom production domain (safego-global.com, *.safego-global.com)
+    // - Localhost for development
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:8080',
+      /^https:\/\/safego-.*\.netlify\.app$/,
+      /^https:\/\/safego-global\.com$/,
+      /^https:\/\/.*\.safego-global\.com$/,
+    ];
+
+    let isAllowed = false;
+    if (origin) {
+      for (const allowed of allowedOrigins) {
+        if (typeof allowed === 'string' && origin === allowed) {
+          isAllowed = true;
+          break;
+        } else if (allowed instanceof RegExp && allowed.test(origin)) {
+          isAllowed = true;
+          break;
+        }
+      }
+    }
+
+    if (isAllowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    // Handle OPTIONS preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    next();
+  });
+
+  // JSON body parsing middleware - parse all request bodies as JSON
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  // Error handler for malformed JSON
+  app.use((err: any, req: Request, res: Response, next: Function) => {
+    if (err instanceof SyntaxError && 'body' in err) {
+      return res.status(400).json({
+        error: 'Invalid JSON in request body',
+        message: err.message,
+      });
+    }
+    next(err);
+  });
+
   // Public routes (no authentication required)
   // Public Eats endpoint for restaurant browsing (no auth required)
   app.use("/api/eats", eatsRoutes);
@@ -734,6 +800,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[Partner] Error getting profile:", error);
       res.status(500).json({ error: error.message || "Failed to get partner profile" });
     }
+  });
+
+  // ====================================================
+  // CENTRALIZED ERROR HANDLERS (always return JSON, never HTML)
+  // ====================================================
+
+  // 404 handler - return JSON instead of HTML
+  app.use((_req: Request, res: Response) => {
+    res.status(404).json({
+      error: 'Not Found',
+      message: `Endpoint ${_req.method} ${_req.path} does not exist`,
+      statusCode: 404,
+    });
+  });
+
+  // Generic error handler - catch any unhandled errors and return JSON
+  app.use((err: any, _req: Request, res: Response, _next: Function) => {
+    console.error('[ErrorHandler] Unhandled error:', err);
+    
+    const statusCode = err.status || err.statusCode || 500;
+    const message = err.message || 'Internal Server Error';
+    
+    res.status(statusCode).json({
+      error: err.name || 'Error',
+      message,
+      statusCode,
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    });
   });
 
   const httpServer = createServer(app);
