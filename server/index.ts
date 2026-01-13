@@ -71,6 +71,15 @@ app.get('/healthz', (_req, res) => {
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+// Early /api/health for debugging - works even if registerRoutes fails
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    routes_mounted: false,
+    message: 'Early health endpoint - routes may not be fully loaded'
+  });
+});
 
 declare module 'http' {
   interface IncomingMessage {
