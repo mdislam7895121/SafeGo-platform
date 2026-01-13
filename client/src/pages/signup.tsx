@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
+import { apiFetch } from "@/lib/apiClient";
 import { setAuthToken } from "@/lib/authToken";
 import { Car, Package, UtensilsCrossed, Loader2, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
 
@@ -101,9 +102,8 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/signup", {
+      await apiFetch("/api/auth/signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           email,
@@ -116,19 +116,9 @@ export default function Signup() {
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        
-        if (error.code === "EMAIL_IN_USE") {
-          throw new Error("An account with this email already exists");
-        }
-        
-        throw new Error(error.error || error.message || "Signup failed");
-      }
-
-      const loginResponse = await fetch("/api/auth/login", {
+      // Signup successful, now login
+      const loginData = await apiFetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           email,
@@ -136,16 +126,7 @@ export default function Signup() {
         }),
       });
 
-      if (!loginResponse.ok) {
-        toast({
-          title: "Account Created!",
-          description: "Your account has been created. Please sign in.",
-        });
-        setLocation("/login");
-        return;
-      }
-
-      const { token, user: loggedInUser } = await loginResponse.json();
+      const { token, user: loggedInUser } = loginData;
 
       setAuthToken(token);
       localStorage.setItem("safego_user", JSON.stringify(loggedInUser));

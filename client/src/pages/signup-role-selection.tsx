@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
 import { setAuthToken } from "@/lib/authToken";
+import { apiFetch } from "@/lib/apiClient";
 import { 
   Car, 
   UtensilsCrossed, 
@@ -159,9 +160,8 @@ export default function SignupRoleSelection() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/signup", {
+      await apiFetch("/api/auth/signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           email: pendingSignup.email,
@@ -171,23 +171,10 @@ export default function SignupRoleSelection() {
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        const errorMessage = error.error || "Signup failed";
-        
-        if (errorMessage.includes("already exists")) {
-          throw new Error(isBD 
-            ? "এই ইমেইল দিয়ে SafeGo অ্যাকাউন্ট আছে। অনুগ্রহ করে সাইন ইন করুন।" 
-            : "You already have a SafeGo account with this email. Please sign in instead.");
-        }
-        throw new Error(errorMessage);
-      }
-
       clearPendingSignup();
 
-      const loginResponse = await fetch("/api/auth/login", {
+      const loginData = await apiFetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           email: pendingSignup.email,
@@ -195,13 +182,7 @@ export default function SignupRoleSelection() {
         }),
       });
 
-      if (!loginResponse.ok) {
-        throw new Error(isBD 
-          ? "অ্যাকাউন্ট তৈরি হয়েছে কিন্তু লগইন ব্যর্থ। অনুগ্রহ করে সাইন ইন করুন।"
-          : "Account created but login failed. Please try logging in.");
-      }
-
-      const { token, user: loggedInUser } = await loginResponse.json();
+      const { token, user: loggedInUser } = loginData;
 
       setAuthToken(token);
       localStorage.setItem("safego_user", JSON.stringify(loggedInUser));

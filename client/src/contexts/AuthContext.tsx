@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useLocation } from "wouter";
 import { getPostLoginPath } from "@/lib/roleRedirect";
 import { getAuthToken, setAuthToken, clearAllLegacyTokens } from "@/lib/authToken";
+import { apiFetch } from "@/lib/apiClient";
 
 interface User {
   id: string;
@@ -36,25 +37,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedToken && storedUser) {
         try {
           // Validate the token with the backend (works for ALL user types)
-          const response = await fetch("/api/auth/validate", {
+          await apiFetch("/api/auth/validate", {
+            method: "GET",
+            credentials: "include",
             headers: {
               "Authorization": `Bearer ${storedToken}`,
             },
-            credentials: "include",
           });
 
-          if (response.ok) {
-            // Token is valid, use the stored data
-            setToken(storedToken);
-            setUser(JSON.parse(storedUser));
-          } else {
-            // Token is invalid/expired, clear the stored data
-            setAuthToken(null);
-            localStorage.removeItem("safego_user");
-            setToken(null);
-            setUser(null);
-          }
+          // Token is valid, use the stored data
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
         } catch (error) {
+          // Token is invalid/expired, clear the stored data
+          setAuthToken(null);
+          localStorage.removeItem("safego_user");
+          setToken(null);
+          setUser(null);
           // Network error, use stored data but mark as potentially stale
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
@@ -67,19 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await fetch("/api/auth/login", {
+    const data = await apiFetch("/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ email, password }),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Invalid credentials");
-    }
-
-    const data = await response.json();
     
     // Store auth data FIRST before any state updates
     setAuthToken(data.token);
@@ -95,17 +86,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signup = async (email: string, password: string, role: string, countryCode: string) => {
-    const signupResponse = await fetch("/api/auth/signup", {
+    await apiFetch("/api/auth/signup", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ email, password, role, countryCode }),
     });
-
-    if (!signupResponse.ok) {
-      const error = await signupResponse.json();
-      throw new Error(error.error || "Signup failed");
-    }
 
     // Signup successful, now login to get token
     await login(email, password);
