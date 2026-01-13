@@ -1,0 +1,54 @@
+You must fix SafeGo backend route mounting on Railway (api.safegoglobal.com) WITHOUT breaking anything.
+
+Context / Symptoms (must reproduce first):
+1) GET https://api.safegoglobal.com/api/health returns HTML: "Cannot GET /api/health"
+2) POST https://api.safegoglobal.com/api/auth/signup returns HTML: "Cannot POST /api/auth/signup"
+3) The server responds with headers like "X-Powered-By: Express" and "railway-edge", so Express is running but routes are not mounted.
+
+Root cause hypothesis:
+The Express app is starting but the file that registers routes (e.g., registerRoutes(app) or app.use("/api", routes)) is not being executed in production, or Railway is running the wrong entrypoint/build output.
+
+Hard rules (non-breaking):
+- Do NOT change any existing API paths.
+- Keep /api/auth/signup and /api/auth/login exactly the same.
+- Do NOT modify database schema.
+- Do NOT refactor business logic.
+- Make only minimal, additive changes to ensure routes mount reliably in production.
+- Add a minimal GET /api/health that returns JSON: { "status": "ok" } with Content-Type: application/json.
+- Ensure JSON body parsing is enabled (express.json()).
+- Ensure CORS allows the Netlify frontend origin(s) and localhost for dev.
+- Ensure errors return JSON, not HTML, for API routes.
+
+What you must do (step-by-step):
+A) Locate the actual server entrypoint used in production:
+   - Check package.json scripts (start, build) and Railway settings.
+   - Identify whether it runs dist/index.js, build/index.js, server.js, etc.
+B) Ensure route registration is called BEFORE listen():
+   - If there is a function like registerRoutes(app), it MUST be imported and executed.
+   - If routes are in a router file, ensure app.use("/api", router) is executed.
+C) Add GET /api/health safely:
+   - Implement app.get("/api/health", ...) returning JSON.
+D) Add minimal diagnostics logs (one-time):
+   - Log the mounted base path and environment at startup.
+   - Log "Routes mounted" after route registration.
+E) Commit and push to main so Railway redeploys.
+
+Verification (must provide exact commands and expected outputs):
+1) PowerShell (use curl.exe explicitly):
+   - curl.exe -i https://api.safegoglobal.com/api/health
+   Expected: HTTP 200 and JSON {"status":"ok"}
+2) Signup (POST):
+   - curl.exe -i -X POST https://api.safegoglobal.com/api/auth/signup `
+     -H "Content-Type: application/json" `
+     -d "{\"email\":\"test+railway@safego.com\",\"password\":\"123456\"}"
+   Expected: JSON response (either success or a JSON error), but NOT HTML "Cannot POST".
+3) Login (POST):
+   - curl.exe -i -X POST https://api.safegoglobal.com/api/auth/login `
+     -H "Content-Type: application/json" `
+     -d "{\"email\":\"test+railway@safego.com\",\"password\":\"123456\"}"
+   Expected: JSON response, not HTML.
+
+Deliverables you must output:
+- The exact files changed, with small diffs.
+- Why each change is safe/non-breaking.
+- The final test results (status codes + JSON snippet).

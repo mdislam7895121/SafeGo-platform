@@ -133,39 +133,38 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  try {
+    console.log("[Startup] Registering API routes...");
+    const server = await registerRoutes(app);
+    console.log("[Startup] API routes registered successfully");
 
-  app.use(secureErrorHandler);
+    app.use(secureErrorHandler);
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    if (app.get("env") === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+
+    const port = parseInt(process.env.PORT || '5000', 10);
+    
+    if (process.env.DISABLE_OBSERVABILITY !== "true") {
+      startMemoryMonitor(30000, { warningPercent: 70, criticalPercent: 85 });
+    } else {
+      console.log("[MemoryMonitor] DISABLED via DISABLE_OBSERVABILITY=true");
+    }
+
+    server.listen({
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      log(`serving on port ${port}`);
+      logPaymentGatewayStatus();
+    });
+  } catch (error) {
+    console.error("[FATAL] Server startup failed:", error);
+    console.error("[FATAL] Routes could not be registered. Exiting...");
+    process.exit(1);
   }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  
-  // PRODUCTION SAFETY: Only start memory monitoring when observability is enabled
-  if (process.env.DISABLE_OBSERVABILITY !== "true") {
-    startMemoryMonitor(30000, { warningPercent: 70, criticalPercent: 85 });
-  } else {
-    console.log("[MemoryMonitor] DISABLED via DISABLE_OBSERVABILITY=true");
-  }
-
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-    // Log payment gateway status AFTER server is listening (non-blocking)
-    logPaymentGatewayStatus();
-  });
 })();
