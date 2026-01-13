@@ -1,4 +1,5 @@
 import express from "express";
+import { registerRoutes } from "./routes";
 const app = express();
 app.get("/healthz", (_req, res) => {
   res.status(200).send("ok");
@@ -392,8 +393,17 @@ export function getConnectedAdminCount(): number {
 
 const PORT = Number(process.env.PORT || 8080);
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server listening on port " + PORT);
-});
+// Initialize server with all registered routes and start listening
+(async () => {
+  try {
+    const httpServer = await registerRoutes(app);
+    httpServer.listen(PORT, "0.0.0.0", () => {
+      console.log("Server listening on port " + PORT);
+    });
+  } catch (error) {
+    console.error("Failed to register routes:", error);
+    process.exit(1);
+  }
+})();
 
 
