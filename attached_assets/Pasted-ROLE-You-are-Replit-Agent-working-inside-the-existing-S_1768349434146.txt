@@ -1,0 +1,110 @@
+ROLE: You are Replit Agent working inside the existing SafeGo-platform repo. Your job is to FIX production routing issues so Railway health checks and API requests stop returning 404. You must NOT create a new project. You must work ONLY in the existing repo and push the fix to GitHub.
+
+NON-NEGOTIABLE RULES
+1) Do not refactor unrelated code. Do not rename routes, folders, or existing APIs.
+2) Only additive, non-breaking changes are allowed.
+3) No “fixed/ok/done” claims without proof: you must provide logs + curl outputs.
+4) After fix, commit and push to GitHub with a clear message.
+
+WHAT I AM SEEING (PROOF OF BUG)
+- Railway HTTP logs show repeated 404 for:
+  - GET /health
+  - GET /api/health
+  - OPTIONS /api/auth/login
+- Root path GET / returns 200 sometimes.
+This means server runs but health + API routes are not mounted or not reachable in production build (dist).
+
+GOAL (DEFINITION OF DONE)
+A) These commands must return HTTP 200 in Railway production:
+   - curl -i https://api.safegoglobal.com/health
+   - curl -i https://api.safegoglobal.com/api/health
+B) Auth preflight must not 404:
+   - curl -i -X OPTIONS https://api.safegoglobal.com/api/auth/login \
+       -H "Origin: https://<your-frontend-domain>" \
+       -H "Access-Control-Request-Method: POST"
+   Expected: 204 or 200 with correct CORS headers (no 404).
+C) The compiled build MUST contain the routes:
+   - dist output must include "/health" and "/api/health".
+D) Changes are committed and pushed to GitHub.
+
+STEP 0 — DISCOVER CURRENT SERVER ENTRY + ROUTER MOUNTS
+1) Identify the production entry file and router mounting.
+   Run:
+   - ls -la
+   - ls -la server
+   - ls -la server/src || true
+   - ls -la src || true
+   - cat package.json
+   - cat server/package.json || true
+   - rg -n "express\\(" -S .
+   - rg -n "app\\.use\\(" -S server src .
+   - rg -n "createServer|http\\.createServer|listen\\(" -S server src .
+2) Locate where routes are defined:
+   - rg -n "router\\.(get|post|use)" -S server src .
+   - rg -n "\"/api\"" -S server src .
+3) Print the exact server bootstrapping file content (the one that calls app.listen).
+
+STEP 1 — ADD HEALTH ENDPOINTS (NON-BREAKING, ADDITIVE)
+In the SAME Express app instance that is actually used in production (not a dev-only file):
+1) Add:
+   - GET /health  -> 200 JSON { status:"ok", uptime, timestamp }
+   - GET /api/health -> 200 JSON { status:"ok" }
+2) Ensure they are registered BEFORE any “not found” handler or catch-all.
+
+Example (adjust file/path to real entry):
+   app.get("/health", (req,res)=>res.status(200).json({
+     status:"ok",
+     uptime: process.uptime(),
+     timestamp: new Date().toISOString()
+   }));
+   app.get("/api/health", (req,res)=>res.status(200).json({ status:"ok" }));
+
+STEP 2 — FIX CORS PREFLIGHT FOR /api/auth/login (NO 404)
+1) Ensure CORS middleware is mounted globally BEFORE routes:
+   - Use `cors` package if already present.
+   - If not present, add it ONLY to the relevant package.json (server or root) where Express runs.
+2) Configure to allow:
+   - Methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+   - Headers: Content-Type, Authorization
+   - Credentials: true (only if the existing system needs cookies)
+3) Add an explicit preflight handler (safe fallback) for all /api routes:
+   app.options("/api/*", cors(corsOptions));
+
+CRITICAL: Do NOT change existing auth route paths. Just ensure OPTIONS is handled and routes are actually mounted.
+
+STEP 3 — VERIFY ROUTES EXIST IN BUILD OUTPUT (DIST)
+1) Run the same build command Railway runs:
+   - npm run build (or the project’s build script)
+2) After build:
+   - node -e "const fs=require('fs'); const p='dist'; console.log('dist exists',fs.existsSync(p))"
+   - rg -n "\"/health\"|'/health'|/health" dist -S
+   - rg -n "\"/api/health\"|'/api/health'|/api/health" dist -S
+If not found, you edited the wrong file (not the real server entry) or build doesn’t include it.
+
+STEP 4 — LOCAL RUN + CURL PROOF
+1) Start server locally (same command as production start):
+   - npm run start (or `node dist/index.js`, etc.)
+2) Run:
+   - curl -i http://localhost:<PORT>/health
+   - curl -i http://localhost:<PORT>/api/health
+   - curl -i -X OPTIONS http://localhost:<PORT>/api/auth/login \
+       -H "Origin: http://localhost:3000" \
+       -H "Access-Control-Request-Method: POST"
+3) Paste outputs in the report.
+
+STEP 5 — PUSH TO GITHUB
+1) git status
+2) git diff
+3) git add -A
+4) git commit -m "fix(api): add health endpoints + handle CORS preflight for auth"
+5) git push
+
+FINAL REPORT (MANDATORY)
+Provide:
+1) Files changed (full paths)
+2) Exact snippets added (health + CORS)
+3) Local curl outputs (200/204 proof)
+4) Build proof that dist contains the routes
+5) Git commit hash + pushed branch
+
+DO NOT STOP UNTIL ALL DONE ITEMS ARE VERIFIED WITH OUTPUTS.
