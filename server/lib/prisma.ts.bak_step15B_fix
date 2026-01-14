@@ -1,0 +1,32 @@
+import { PrismaClient } from "@prisma/client";
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma__: PrismaClient | null | undefined;
+}
+
+function safeCreatePrismaClient(): PrismaClient | null {
+  try {
+    // If DATABASE_URL is missing, don't crash the whole app.
+    if (!process.env.DATABASE_URL) {
+      console.warn("[Prisma] DATABASE_URL not set. Running without DB.");
+      return null;
+    }
+
+    const client = new PrismaClient();
+    return client;
+  } catch (err) {
+    console.error("[Prisma] Failed to initialize PrismaClient. Running without DB.", err);
+    return null;
+  }
+}
+
+export const prisma: PrismaClient | null =
+  global.__prisma__ ?? (global.__prisma__ = safeCreatePrismaClient());
+
+export function requirePrisma(): PrismaClient {
+  if (!prisma) {
+    throw new Error("DB_UNAVAILABLE");
+  }
+  return prisma;
+}

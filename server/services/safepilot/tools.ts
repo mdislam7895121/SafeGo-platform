@@ -495,7 +495,7 @@ export async function getTopVerificationRejectionReasons(
       }, {} as Record<string, number>);
 
     const sorted = Object.entries(allReasons)
-      .sort(([, a], [, b]) => b - a)
+      .sort(([, a], [, b]) => Number(b) - Number(a))
       .slice(0, 10)
       .map(([reason, count]) => ({ reason, count }));
 

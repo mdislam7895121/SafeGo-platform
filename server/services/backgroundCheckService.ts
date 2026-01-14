@@ -1,7 +1,15 @@
 import { prisma } from "../lib/prisma";
-import type { BackgroundCheckStatus, BackgroundCheckResult } from "@prisma/client";
+import { BackgroundCheckStatus, BackgroundCheckResult } from "@prisma/client";
 
 // Re-export enum values for ESM compatibility
+const BackgroundCheckStatusValues = {
+  not_started: 'not_started' as any,
+  pending: 'pending' as any,
+  in_progress: 'in_progress' as any,
+  completed: 'completed' as any,
+  failed: 'failed' as any,
+};
+
 const BackgroundCheckResultValues = {
   clear: 'clear' as BackgroundCheckResult,
   consider: 'consider' as BackgroundCheckResult,

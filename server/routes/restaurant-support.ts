@@ -605,7 +605,7 @@ import { restaurantCallbackService } from "../services/GenericSupportCallbackSer
 router.post("/support-center/callbacks", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { phoneNumber, preferredTime, reason } = req.body;
+    const { phoneNumber, preferredTime, timezone, reason } = req.body;
 
     if (!phoneNumber || !preferredTime || !reason) {
       return res.status(400).json({ error: "Phone number, preferred time, and reason are required" });

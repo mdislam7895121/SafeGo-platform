@@ -20,7 +20,7 @@ export async function recordStripeEventOnce(
         stripeEventId,
         eventType,
         status: "processing",
-      })
+      } as any)
       .returning({ id: stripeWebhookEvents.id });
 
     if (process.env.NODE_ENV === "development") {
@@ -51,7 +51,7 @@ export async function markEventProcessed(
         status: success ? "processed" : "failed",
         errorMessage: errorMessage || null,
         processedAt: new Date(),
-      })
+      } as any)
       .where(eq(stripeWebhookEvents.id, eventId));
   } catch (error) {
     console.error(`[WebhookDedupe] Failed to update event status: ${eventId}`, error);

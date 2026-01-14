@@ -398,8 +398,8 @@ export async function updateConversation(conversationId: string, input: UpdateCo
       }
 
       // Check if admin has required permission using role permissions
-      const { rolePermissions, Permission } = await import("../utils/permissions");
-      const adminPermissions = rolePermissions[targetAdmin.adminRole];
+      const { getRolePermissions, Permission } = await import("../utils/permissions");
+      const adminPermissions = getRolePermissions(targetAdmin.adminRole);
       const hasReplyPermission = adminPermissions?.has(Permission.REPLY_SUPPORT_CONVERSATIONS) ?? false;
       if (!hasReplyPermission) {
         throw new Error("Cannot assign conversation to admin without REPLY_SUPPORT_CONVERSATIONS permission");

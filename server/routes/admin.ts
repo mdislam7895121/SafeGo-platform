@@ -16,7 +16,7 @@ import { scheduleAutomaticPayouts, runManualPayout } from "../services/payoutSch
 import { reconcileWalletTransactions } from "../services/reconciliationService";
 import { driverVehicleService } from "../services/driverVehicleService";
 import { format } from "date-fns";
-import analyticsRouter, { getRBACFilter } from "./analytics";
+import analyticsRouter, { getRBACFilter, safeNumber, safeString } from "./analytics";
 import performanceRouter from "./performance";
 
 const router = Router();
@@ -2657,7 +2657,8 @@ router.patch("/vehicles/:vehicleId/category/approve", checkPermission(Permission
     });
 
     await logAuditEvent({
-      adminId: req.adminUser?.id,
+      actorId: req.adminUser?.id ?? req.user?.id ?? req.user?.userId,
+      actorEmail: req.adminUser?.email,
       actionType: ActionType.UPDATE,
       entityType: EntityType.VEHICLE,
       entityId: vehicleId,
@@ -2726,7 +2727,8 @@ router.patch("/vehicles/:vehicleId/category/reject", checkPermission(Permission.
     });
 
     await logAuditEvent({
-      adminId: req.adminUser?.id,
+      actorId: req.adminUser?.id ?? req.user?.id ?? req.user?.userId,
+      actorEmail: req.adminUser?.email,
       actionType: ActionType.UPDATE,
       entityType: EntityType.VEHICLE,
       entityId: vehicleId,
@@ -2861,7 +2863,8 @@ router.patch("/vehicles/:vehicleId/category-approval", checkPermission(Permissio
       });
 
       await logAuditEvent({
-        adminId: req.adminUser?.id,
+        actorId: req.adminUser?.id ?? req.user?.id ?? req.user?.userId,
+        actorEmail: req.adminUser?.email,
         actionType: ActionType.UPDATE,
         entityType: EntityType.VEHICLE,
         entityId: vehicleId,
@@ -2894,7 +2897,8 @@ router.patch("/vehicles/:vehicleId/category-approval", checkPermission(Permissio
       });
 
       await logAuditEvent({
-        adminId: req.adminUser?.id,
+        actorId: req.adminUser?.id ?? req.user?.id ?? req.user?.userId,
+        actorEmail: req.adminUser?.email,
         actionType: ActionType.UPDATE,
         entityType: EntityType.VEHICLE,
         entityId: vehicleId,
@@ -2964,7 +2968,8 @@ router.patch("/vehicles/:vehicleId/category/override", checkPermission(Permissio
     });
 
     await logAuditEvent({
-      adminId: req.adminUser?.id,
+      actorId: req.adminUser?.id ?? req.user?.id ?? req.user?.userId,
+      actorEmail: req.adminUser?.email,
       actionType: ActionType.UPDATE,
       entityType: EntityType.VEHICLE,
       entityId: vehicleId,
@@ -3004,7 +3009,8 @@ router.patch("/vehicles/:vehicleId/reset-preferences", checkPermission(Permissio
     }
 
     await logAuditEvent({
-      adminId: req.adminUser?.id,
+      actorId: req.adminUser?.id ?? req.user?.id ?? req.user?.userId,
+      actorEmail: req.adminUser?.email,
       actionType: ActionType.UPDATE,
       entityType: EntityType.VEHICLE,
       entityId: vehicleId,
@@ -5015,7 +5021,7 @@ router.get("/drivers/:id/wallet-summary", checkPermission(Permission.VIEW_WALLET
     const countryBreakdown: Record<string, { trips: number; earnings: number; commission: number }> = {};
 
     ridesByCountry.forEach(r => {
-      const country = customerCountryMap.get(r.customerId) || 'UNKNOWN';
+      const country = (customerCountryMap.get(r.customerId) || 'UNKNOWN') as string;
       if (!countryBreakdown[country]) {
         countryBreakdown[country] = { trips: 0, earnings: 0, commission: 0 };
       }
@@ -5025,7 +5031,7 @@ router.get("/drivers/:id/wallet-summary", checkPermission(Permission.VIEW_WALLET
     });
 
     deliveriesByCountry.forEach(d => {
-      const country = deliveryCountryMap.get(d.customerId) || 'UNKNOWN';
+      const country = (deliveryCountryMap.get(d.customerId) || 'UNKNOWN') as string;
       if (!countryBreakdown[country]) {
         countryBreakdown[country] = { trips: 0, earnings: 0, commission: 0 };
       }
@@ -5035,7 +5041,7 @@ router.get("/drivers/:id/wallet-summary", checkPermission(Permission.VIEW_WALLET
     });
 
     foodByCountry.forEach(f => {
-      const country = foodCountryMap.get(f.customerId) || 'UNKNOWN';
+      const country = (foodCountryMap.get(f.customerId) || 'UNKNOWN') as string;
       if (!countryBreakdown[country]) {
         countryBreakdown[country] = { trips: 0, earnings: 0, commission: 0 };
       }
@@ -13392,7 +13398,7 @@ router.get("/analytics/top-earners", checkPermission(Permission.VIEW_REVENUE_ANA
 import { identityVerificationService } from "../services/identityVerificationService";
 import { backgroundCheckService } from "../services/backgroundCheckService";
 import { faceVerificationService } from "../services/faceVerificationService";
-import type { KycDocumentType, KycVerificationStatus, MobileWalletBrand } from "@prisma/client";
+import { KycDocumentType, KycVerificationStatus, MobileWalletBrand } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 // Define BackgroundCheckResult for Zod validation
@@ -14832,5 +14838,23 @@ router.get("/ticket-bookings", checkPermission(Permission.VIEW_DASHBOARD), async
     res.status(500).json({ error: error.message || "Failed to fetch ticket bookings" });
   }
 });
+
+// Simple audit logging wrapper for admin actions
+async function logAudit(params: any): Promise<void> {
+  try {
+    await logAuditEvent({
+      category: "ADMIN_ACTION" as any,
+      severity: "INFO" as any,
+      actorId: params.actorId || "",
+      actorEmail: "",
+      actorRole: "admin",
+      ipAddress: "",
+      action: params.action || "",
+      metadata: { ...params.metadata, actionType: params.actionType },
+    } as any);
+  } catch (error) {
+    console.warn("[Admin] Audit log failed:", error);
+  }
+}
 
 export default router;

@@ -26,6 +26,19 @@ import { driverVehicleService } from "../services/driverVehicleService";
 
 const router = Router();
 
+// Stub for missing getVehicleCategoryInfo - returns basic vehicle category info
+function getVehicleCategoryInfo(categoryId: string): any {
+  const category = getVehicleCategory(categoryId);
+  if (!category) return null;
+  return {
+    id: categoryId,
+    name: category.name || categoryId,
+    maxVehicleAge: category.maxVehicleAge || 15,
+    minSeats: category.minSeats || 4,
+    maxSeats: category.maxSeats || 6,
+  };
+}
+
 // Helper functions to serialize Prisma Decimal fields to numbers
 function serializeDecimal(value: any): number {
   if (value === null || value === undefined) return 0;

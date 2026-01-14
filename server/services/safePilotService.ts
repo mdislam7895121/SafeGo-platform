@@ -3427,8 +3427,8 @@ export const safePilotService = {
         });
       }
 
-      const revenue7d = totalRevenue7d._sum.finalFare?.toNumber() || 0;
-      const refunds7d = totalRefunds7d._sum.amount?.toNumber() || 0;
+      const revenue7d = Number(totalRevenue7d) || 0;
+      const refunds7d = Number(totalRefunds7d) || 0;
 
       const report = {
         timestamp: new Date().toISOString(),
@@ -3482,7 +3482,7 @@ export const safePilotService = {
     decision: string;
     reasoning: string[];
     dataPoints: Array<{ source: string; value: string | number; weight: string }>;
-    confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+    confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' | 'CRITICAL';
     alternatives: string[];
     appealGuidance: string;
   }> {
@@ -4875,7 +4875,7 @@ export const safePilotService = {
     explanation: {
       reasoning: string[];
       confidencePercent: number;
-      confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+      confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' | 'CRITICAL';
       dataSources: Array<{ source: string; weight: number; dataPoints: number }>;
       alternatives: Array<{ option: string; reason: string; rejectedBecause: string }>;
       uncertainties: string[];

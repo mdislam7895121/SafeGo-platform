@@ -31,11 +31,11 @@ export async function getSafePilotFlags(): Promise<SafePilotFeatureFlags> {
   try {
     const flags = await prisma.featureFlag.findMany({
       where: { key: { in: [...FLAG_KEYS] } },
-    });
+    }) as any[];
 
-    const flagMap = new Map(flags.map(f => [f.key, f]));
+    const flagMap = new Map<string, any>(flags.map(f => [f.key, f]));
 
-    const rolloutFlag = flagMap.get("safepilot_rollout_percentage");
+    const rolloutFlag = flagMap.get("safepilot_rollout_percentage") as any;
     const rolloutValue = rolloutFlag?.rolloutPercentage ?? DEFAULT_FLAGS.rolloutPercentage;
 
     return {

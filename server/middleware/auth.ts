@@ -14,6 +14,11 @@ export interface JWTPayload {
   userId: string;
   role: string;
   countryCode: string;
+  email?: string;
+  id?: string;
+  adminProfile?: { id: string; adminRole?: any; isActive?: boolean } | null;
+  user?: { userId?: string; email?: string; countryCode?: string; role?: string } | null;
+  permissions?: string[];
 }
 
 export interface AuthRequest extends Request {
@@ -31,7 +36,10 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   try {
     const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    req.user = payload;
+    req.user = {
+      ...payload,
+      id: payload.id ?? payload.userId,
+    };
     next();
   } catch (error) {
     return res.status(403).json({ error: "Invalid or expired token" });

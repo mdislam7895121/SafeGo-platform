@@ -2224,6 +2224,10 @@ export class FareCalculationService {
     // 8. DETECT TOLLS (Step 6I - After Out-of-Town, Before Service Fee)
     // ============================================
     // First, detect NYC TLC toll facilities with direction-aware pricing
+    // Determine borough codes for toll detection (if available)
+    const pickupBoroughCode = matchedPickupZones.find(z => z.zoneType === 'borough')?.zoneId;
+    const dropoffBoroughCode = matchedDropoffZones.find(z => z.zoneType === 'borough')?.zoneId;
+    
     const tlcTolls = detectNYCTLCTolls(
       route.tollSegments || [],
       isPeakHour,

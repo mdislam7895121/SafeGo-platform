@@ -505,11 +505,11 @@ export const customerRetentionAI = {
 
     for (const customer of customers) {
       const customerId = customer.userId;
-      const last60dOrders = last60dMap.get(customerId) || 0;
-      const last30dOrders = last30dMap.get(customerId) || 0;
-      const refunds = refundMap.get(customerId) || 0;
-      const complaints = complaintMap.get(customerId) || 0;
-      const lowRatings = lowRatingsMap.get(customerId) || 0;
+      const last60dOrders = Number(last60dMap.get(customerId) ?? 0);
+      const last30dOrders = Number(last30dMap.get(customerId) ?? 0);
+      const refunds = Number(refundMap.get(customerId) ?? 0);
+      const complaints = Number(complaintMap.get(customerId) ?? 0);
+      const lowRatings = Number(lowRatingsMap.get(customerId) ?? 0);
 
       if (last60dOrders < 2) continue;
 
@@ -540,7 +540,7 @@ export const customerRetentionAI = {
       }
 
       if (churnProbability >= 40) {
-        const retentionValue = last60dOrders * 25 * 6;
+        const retentionValue = Number(last60dOrders) * 25 * 6;
 
         predictions.push({
           customerId,

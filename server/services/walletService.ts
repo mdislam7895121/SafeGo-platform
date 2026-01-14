@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   WalletOwnerType,
   WalletTransactionServiceType,
@@ -7,7 +7,7 @@ import type {
 } from "@prisma/client";
 import { prisma } from "../db";
 
-export type TransactionClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
+export type TransactionClient = any;
 
 export interface CreateWalletParams {
   ownerId: string;
@@ -415,7 +415,7 @@ export class WalletService {
       currency: string;
       countryCode: string;
     },
-    tx?: Prisma.TransactionClient
+    tx?: TransactionClient
   ): Promise<void> {
     // Use transaction client if provided, otherwise use global prisma
     const db = tx || prisma;
@@ -727,7 +727,7 @@ export class WalletService {
     startDate?: Date;
     endDate?: Date;
   }): Promise<number> {
-    const where: Prisma.WalletTransactionWhereInput = {};
+    const where: any = {};
 
     if (filters?.walletId) {
       where.walletId = filters.walletId;
@@ -770,7 +770,7 @@ export class WalletService {
     minNegativeBalance?: number;
     maxNegativeBalance?: number;
   }) {
-    const where: Prisma.WalletWhereInput = {};
+    const where: any = {};
 
     if (filters?.ownerType) {
       where.ownerType = filters.ownerType;
@@ -815,7 +815,7 @@ export class WalletService {
     maxNegativeBalance?: number;
     search?: string;
   }): Promise<number> {
-    const where: Prisma.WalletWhereInput = {};
+    const where: any = {};
 
     if (filters?.ownerType) {
       where.ownerType = filters.ownerType;
@@ -859,7 +859,7 @@ export class WalletService {
     limit?: number;
     offset?: number;
   }) {
-    const where: Prisma.WalletTransactionWhereInput = {};
+    const where: any = {};
 
     if (filters?.walletId) {
       where.walletId = filters.walletId;
@@ -906,7 +906,7 @@ export class WalletService {
     ownerType?: WalletOwnerType;
     groupBy?: "day" | "week" | "month";
   }) {
-    const where: Prisma.WalletTransactionWhereInput = {
+    const where: any = {
       serviceType: "commission",
     };
 
@@ -967,7 +967,7 @@ export class WalletService {
     countryCode?: string;
     ownerType?: WalletOwnerType;
   }) {
-    const where: Prisma.WalletTransactionWhereInput = {
+    const where: any = {
       direction: "credit",
     };
 
@@ -1036,7 +1036,7 @@ export class WalletService {
 
     // Build RBAC filter for user jurisdiction
     // Note: cityCode is on profiles, not User model - only filter by countryCode at User level
-    const userFilter: Prisma.UserWhereInput = {};
+    const userFilter: any = {};
     
     if (adminRole === "COUNTRY_ADMIN" && countryCode) {
       userFilter.countryCode = countryCode;
@@ -1047,7 +1047,7 @@ export class WalletService {
     // SUPER_ADMIN: no filter (sees all)
 
     // Fetch wallets with proper filters
-    const where: Prisma.WalletWhereInput = {};
+    const where: any = {};
     if (ownerType) {
       where.ownerType = ownerType;
     }

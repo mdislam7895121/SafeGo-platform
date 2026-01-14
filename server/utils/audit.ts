@@ -178,7 +178,15 @@ export const ActionType = {
   CREATE: "CREATE",
   UPDATE: "UPDATE",
   DELETE: "DELETE",
+  
+  // Finance & Settlement
+  SETTLEMENT_CREATED: "SETTLEMENT_CREATED",
+  SETTLEMENT_UPDATED: "SETTLEMENT_UPDATED",
+  SETTLEMENT_PROCESSED: "SETTLEMENT_PROCESSED",
 } as const;
+
+// Type for ActionType values
+export type ActionTypeValue = typeof ActionType[keyof typeof ActionType];
 
 // Entity type constants
 export const EntityType = {
@@ -213,22 +221,30 @@ export const EntityType = {
   ADMIN_RBAC: "admin_rbac",
   // Vehicle type management
   VEHICLE_TYPE: "vehicle_type",
+  VEHICLE: "vehicle",
+  // Finance & Settlement
+  SETTLEMENT: "settlement",
+  // System entities
+  USER: "user",
+  SYSTEM: "system",
 } as const;
 
 interface AuditLogParams {
   actorId?: string | null;
-  actorEmail: string;
-  actorRole: string;
+  actorEmail?: string | null;
+  actorRole?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
   countryCode?: string | null;
-  actionType: string;
-  entityType: string;
+  actionType?: string | null;
+  entityType?: string | null;
   entityId?: string | null;
-  description: string;
-  metadata?: Record<string, any> | null;
+  description?: string | null;
+  metadata?: Record<string, unknown> | null;
   success?: boolean;
-  environment?: string;
+  environment?: string | null;
+  // Allow extra fields for compatibility with various call sites
+  [key: string]: any;
 }
 
 /**

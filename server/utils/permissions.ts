@@ -907,6 +907,7 @@ export interface AdminUser {
   id: string;
   email: string;
   role: string;
+  name?: string;
   adminProfile?: {
     adminRole: AdminRole;
     isActive: boolean;

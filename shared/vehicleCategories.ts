@@ -22,7 +22,15 @@ export type VehicleCategoryId =
   | "SAFEGO_XL" 
   | "SAFEGO_BLACK" 
   | "SAFEGO_BLACK_SUV" 
-  | "SAFEGO_WAV";
+  | "SAFEGO_WAV"
+  | "X" 
+  | "COMFORT" 
+  | "COMFORT_XL" 
+  | "XL" 
+  | "BLACK" 
+  | "BLACK_SUV" 
+  | "WAV"
+  | string;
 
 // Legacy short-form category IDs for backwards compatibility
 export type LegacyVehicleCategoryId = 

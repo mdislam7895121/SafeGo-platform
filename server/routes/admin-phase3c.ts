@@ -4,7 +4,7 @@ import { AuthRequest, loadAdminProfile, checkPermission } from "../middleware/au
 import { authenticateToken, requireAdmin } from "../middleware/authz";
 import { Permission } from "../utils/permissions";
 import { z } from "zod";
-import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
+import { logAuditEvent, ActionType, ActionTypeValue, EntityType, getClientIp } from "../utils/audit";
 import os from "os";
 
 const router = Router();
@@ -492,7 +492,7 @@ router.post("/intelligence/actions/:actionType", checkPermission(Permission.MANA
     await logAuditEvent(prisma, {
       adminId: req.adminProfile!.id,
       userId: req.user!.id,
-      action: `QUICK_ACTION_${actionType.toUpperCase()}` as ActionType,
+      action: `QUICK_ACTION_${actionType.toUpperCase()}` as ActionTypeValue,
       entityType: EntityType.USER,
       entityId: targetId,
       details: { actionType, reason, insightId, result },

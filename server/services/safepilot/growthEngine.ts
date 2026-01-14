@@ -106,7 +106,7 @@ export const growthEngine = {
     const rideGrid = this.aggregateToGrid(
       rides.map(r => ({ lat: r.pickupLat?.toNumber() || 0, lng: r.pickupLng?.toNumber() || 0, time: r.createdAt })),
       gridSize
-    );
+    ) as Record<string, { count: number; timestamps: Date[] }>;
 
     for (const [key, data] of Object.entries(rideGrid)) {
       const [lat, lng] = key.split(',').map(Number);
@@ -129,7 +129,7 @@ export const growthEngine = {
     const foodGrid = this.aggregateToGrid(
       foodOrders.map(o => ({ lat: o.deliveryLat?.toNumber() || 0, lng: o.deliveryLng?.toNumber() || 0, time: o.createdAt })),
       gridSize
-    );
+    ) as Record<string, { count: number; timestamps: Date[] }>;
 
     for (const [key, data] of Object.entries(foodGrid)) {
       const [lat, lng] = key.split(',').map(Number);

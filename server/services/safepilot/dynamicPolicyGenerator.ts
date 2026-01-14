@@ -120,7 +120,7 @@ export async function getDynamicPolicyDashboard(countryCode?: string): Promise<D
       defaultConditions: [
         { field: "document_verification_score", operator: ">", value: 95 },
         { field: "face_match_score", operator: ">", value: 90 },
-        { field: "fraud_check_passed", operator: "==", value: true },
+        { field: "fraud_check_passed", operator: "==", value: "true" },
       ],
       defaultActions: [
         { type: "approve_kyc", value: "auto" },
@@ -307,7 +307,7 @@ export async function generatePolicyFromDescription(description: string): Promis
     name: description.substring(0, 50),
     category,
     description,
-    conditions: [{ field: "auto_generated", operator: "==", value: true }],
+    conditions: [{ field: "auto_generated", operator: "==", value: "true" }],
     actions: [{ type: "notify_admin", value: "review_required" }],
     status: "DRAFT",
     priority: 50,
