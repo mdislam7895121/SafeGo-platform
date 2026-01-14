@@ -10,9 +10,10 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "postinstall": "prisma generate",
-    "clean:win": "powershell -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 2; Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue\"",
+    "clean:win": "powershell -NoProfile -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 2; Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue\"",
     "reinstall:win": "npm run clean:win && npm ci",
-    "verify:health": "node -e \"const http = require('http'); ['healthz', 'health', 'api/health'].forEach(p => { http.get('http://localhost:8080/' + p, r => { console.log(p + ': HTTP ' + r.statusCode); r.resume(); }); })\""
+    "verify:health": "node -e \"const http = require('http'); const port = process.env.PORT || 8080; ['healthz', 'health', 'api/health'].forEach(p => { http.get('http://localhost:' + port + '/' + p, r => { console.log(p + ': HTTP ' + r.statusCode); r.resume(); }); })\"",
+    "test:railway": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/win-verify.ps1"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
