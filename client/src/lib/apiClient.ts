@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 /**
  * Centralized API client for SafeGo
  * Ensures all API calls use a consistent, safe URL construction pattern

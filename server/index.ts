@@ -25,6 +25,15 @@ app.get("/api/health", (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Legacy plaintext health endpoint expected by some platforms
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "SafeGo API",
+    timestamp: new Date().toISOString(),
+  });
+});
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
   process.env.DISABLE_SYSTEM_METRICS === "true";
@@ -411,7 +420,7 @@ const PORT = Number(process.env.PORT || 8080);
     const httpServer = await registerRoutes(app);
     
     console.log(`[STARTUP] Routes registered successfully`);
-    console.log(`[STARTUP] Health endpoint available at GET /api/health`);
+    console.log(`[STARTUP] Health endpoints: GET /health, GET /api/health, GET /healthz`);
     console.log(`[STARTUP] Auth endpoints available at /api/auth/*`);
     
     httpServer.listen(PORT, "0.0.0.0", () => {
