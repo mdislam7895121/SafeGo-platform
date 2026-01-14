@@ -81,6 +81,32 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Diagnostic endpoint - shows all registered routes (DEVELOPMENT ONLY)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/debug/routes', (_req, res) => {
+    const routes: string[] = [];
+    app._router.stack.forEach((middleware: any) => {
+      if (middleware.route) {
+        const methods = Object.keys(middleware.route.methods).join(',').toUpperCase();
+        routes.push(`${methods} ${middleware.route.path}`);
+      } else if (middleware.name === 'router') {
+        middleware.handle.stack.forEach((handler: any) => {
+          if (handler.route) {
+            const methods = Object.keys(handler.route.methods).join(',').toUpperCase();
+            routes.push(`${methods} ${handler.route.path}`);
+          }
+        });
+      }
+    });
+    res.json({ 
+      total_routes: routes.length,
+      routes: routes.slice(0, 50),
+      node_env: process.env.NODE_ENV,
+      port: process.env.PORT
+    });
+  });
+}
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
