@@ -43,9 +43,9 @@ app.get("/healthz", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
 
-// TEMPORARY SANITY TEST: Check if /api routes work at all
-app.get("/api/sanity-check", (_req, res) => {
-  res.status(200).json({ ok: true, message: "API prefix works" });
+// TEMPORARY TEST: Direct /api/auth/signup to verify /api prefix works
+app.post("/api/auth/signup", (_req, res) => {
+  res.status(200).json({ message: "Signup route works", routed_from: "server/index.ts direct" });
 });
 
 const DISABLE_OBSERVABILITY =
