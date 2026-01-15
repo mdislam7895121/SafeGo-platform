@@ -43,9 +43,14 @@ app.get("/healthz", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
 
-// TEST: simple root-level endpoint without /api prefix
-app.post("/test-signup", (_req, res) => {
-  res.status(200).json({ message: "Test signup works" });
+// TEST: simple root-level GET endpoint
+app.get("/test-get", (_req, res) => {
+  res.status(200).json({ message: "GET test works" });
+});
+
+// TEST: simple root-level POST endpoint
+app.post("/test-post", (_req, res) => {
+  res.status(200).json({ message: "POST test works" });
 });
 
 const DISABLE_OBSERVABILITY =
