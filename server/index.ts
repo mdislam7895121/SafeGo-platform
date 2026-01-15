@@ -43,9 +43,9 @@ app.get("/healthz", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
 
-// TEMPORARY TEST: Direct /api/auth/signup to verify /api prefix works
-app.post("/api/auth/signup", (_req, res) => {
-  res.status(200).json({ message: "Signup route works", routed_from: "server/index.ts direct" });
+// TEST: simple root-level endpoint without /api prefix
+app.post("/test-signup", (_req, res) => {
+  res.status(200).json({ message: "Test signup works" });
 });
 
 const DISABLE_OBSERVABILITY =
