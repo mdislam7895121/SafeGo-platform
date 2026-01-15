@@ -43,15 +43,10 @@ app.get("/healthz", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
 
-// TEST: simple root-level GET endpoint
-app.get("/test-get", (_req, res) => {
-  res.status(200).json({ message: "GET test works" });
-});
-
-// TEST: simple root-level POST endpoint
-app.post("/test-post", (_req, res) => {
-  res.status(200).json({ message: "POST test works" });
-});
+// Import and mount auth routes directly here (before registerRoutes)
+// This ensures signup works even if registerRoutes route registration fails
+import authRoutes from "./routes/auth";
+app.use("/api/auth", authRoutes);
 
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
