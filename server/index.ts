@@ -44,6 +44,7 @@ app.get("/healthz", (_req, res) => {
     status: "ok",
     service: "SafeGo API",
     timestamp: new Date().toISOString(),
+    commit: "f7a52aa-cors-enabled", // Deployment verification marker
   });
 });
 const DISABLE_OBSERVABILITY =
