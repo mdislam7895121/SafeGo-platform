@@ -431,6 +431,17 @@ export function getConnectedAdminCount(): number {
 
 const PORT = Number(process.env.PORT || 8080);
 
+// Global error handlers to prevent silent crashes
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Uncaught Exception:", err);
+  // Do NOT exit; allow graceful degradation
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[FATAL] Unhandled Rejection at promise:", promise, "reason:", reason);
+  // Do NOT exit; allow graceful degradation
+});
+
 // Initialize server with all registered routes and start listening
 (async () => {
   try {
@@ -449,10 +460,12 @@ const PORT = Number(process.env.PORT || 8080);
       console.log(`[STARTUP] Server listening on port ${PORT}`);
       console.log(`[STARTUP] Ready to accept requests`);
       console.log(`[STARTUP] Server running and stable`);
+      console.log("[STARTUP] Process will remain alive and awaiting connections");
     });
   } catch (error) {
     console.error("[STARTUP] Failed to register routes:", error);
-    process.exit(1);
+    console.error("[STARTUP] Retaining process alive for debugging. Manual restart required.");
+    // Do NOT call process.exit(); keep alive for diagnostics
   }
 })();
 
