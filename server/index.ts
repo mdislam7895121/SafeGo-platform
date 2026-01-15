@@ -42,6 +42,12 @@ app.get("/api/health", (_req, res) => {
 app.get("/healthz", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
+
+// TEMPORARY SANITY TEST: Check if /api routes work at all
+app.get("/api/sanity-check", (_req, res) => {
+  res.status(200).json({ ok: true, message: "API prefix works" });
+});
+
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
   process.env.DISABLE_SYSTEM_METRICS === "true";
