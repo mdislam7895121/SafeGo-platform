@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -7,6 +8,17 @@ import { prisma } from "./db";
 import { observabilityService } from "./services/observabilityService";
 
 const app = express();
+
+// Global CORS for production frontend
+const corsOptions = {
+  origin: ["https://safegoglobal.com", "https://www.safegoglobal.com"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // ROOT HEALTH CHECK (Railway + local)
 app.get("/health", (_req, res) => {
@@ -409,6 +421,17 @@ export function getConnectedAdminCount(): number {
 }
 
 const PORT = Number(process.env.PORT || 8080);
+
+// Global error handlers to prevent silent crashes
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Uncaught Exception:", err);
+  // Do NOT exit; allow graceful degradation
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[FATAL] Unhandled Rejection at promise:", promise, "reason:", reason);
+  // Do NOT exit; allow graceful degradation
+});
 
 // Initialize server with all registered routes and start listening
 (async () => {
