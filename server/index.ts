@@ -26,6 +26,7 @@ app.get("/health", (_req, res) => {
     status: "ok",
     service: "SafeGo API",
     timestamp: new Date().toISOString(),
+    version: "1.0.1-cors-enabled",
   });
 });
 
@@ -35,6 +36,7 @@ app.get("/api/health", (_req, res) => {
     status: "ok",
     service: "SafeGo API",
     timestamp: new Date().toISOString(),
+    version: "1.0.1-cors-enabled",
   });
 });
 
@@ -44,6 +46,7 @@ app.get("/healthz", (_req, res) => {
     status: "ok",
     service: "SafeGo API",
     timestamp: new Date().toISOString(),
+    version: "1.0.1-cors-enabled",
   });
 });
 const DISABLE_OBSERVABILITY =
