@@ -42,17 +42,6 @@ app.get("/api/health", (_req, res) => {
 app.get("/healthz", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
-
-// UNIQUE TIMESTAMP TEST
-app.get("/timestamp-test-jan-15-1639", (_req, res) => {
-  res.status(200).json({ timestamp: "jan-15-1639", deployed: true });
-});
-
-// Import and mount auth routes directly here (before registerRoutes)
-// This ensures signup works even if registerRoutes route registration fails
-import authRoutes from "./routes/auth";
-app.use("/api/auth", authRoutes);
-
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
   process.env.DISABLE_SYSTEM_METRICS === "true";
