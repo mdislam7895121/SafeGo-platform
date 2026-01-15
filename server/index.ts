@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -7,6 +8,17 @@ import { prisma } from "./db";
 import { observabilityService } from "./services/observabilityService";
 
 const app = express();
+
+// Global CORS for production frontend
+const corsOptions = {
+  origin: ["https://safegoglobal.com", "https://www.safegoglobal.com"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // ROOT HEALTH CHECK (Railway + local)
 app.get("/health", (_req, res) => {
@@ -28,11 +40,7 @@ app.get("/api/health", (_req, res) => {
 
 // Legacy plaintext health endpoint expected by some platforms
 app.get("/healthz", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "SafeGo API",
-    timestamp: new Date().toISOString(),
-  });
+  res.status(200).type("text/plain").send("ok");
 });
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
@@ -97,7 +105,14 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
     console.log('[Observability WebSocket] Already initialized, skipping duplicate setup');
     return;
   }
+
+  // PRODUCTION SAFETY: Guard metrics collection by DATABASE_URL availability
+  const OBSERVABILITY_DB_DISABLED = !process.env.DATABASE_URL || DISABLE_OBSERVABILITY;
+  if (OBSERVABILITY_DB_DISABLED && !process.env.DATABASE_URL) {
+    console.log('[Observability WebSocket] DATABASE_URL not set - metrics collection DISABLED (server will still listen)');
+  }
   
+
   wss = new WebSocketServer({ server, path: "/api/admin/observability/ws" });
 
   wss.on("connection", async (ws: AuthenticatedObservabilitySocket, req) => {
@@ -212,37 +227,43 @@ export function setupObservabilityWebSocket(server: HTTPServer) {
     });
   }, 30000);
 
-  metricsInterval = setInterval(async () => {
-    try {
-      const metrics = await observabilityService.collectSystemMetrics();
-      const metricsUpdate: MetricsUpdate = {
-        type: "metrics_update",
-        payload: {
-          timestamp: new Date().toISOString(),
-          ...metrics,
-        },
-      };
+  // PRODUCTION SAFETY: Only start metrics collection if DATABASE_URL is available
+  // This prevents boot-time Prisma errors from crashing the server
+  if (!OBSERVABILITY_DB_DISABLED) {
+    metricsInterval = setInterval(async () => {
+      try {
+        const metrics = await observabilityService.collectSystemMetrics();
+        const metricsUpdate: MetricsUpdate = {
+          type: "metrics_update",
+          payload: {
+            timestamp: new Date().toISOString(),
+            ...metrics,
+          },
+        };
 
-      await observabilityService.recordMetric({
-        metricType: "cpu_usage",
-        value: metrics.cpu,
-        unit: "percent",
-        windowMinutes: 1,
-      });
-      await observabilityService.recordMetric({
-        metricType: "memory_usage",
-        value: metrics.memory,
-        unit: "percent",
-        windowMinutes: 1,
-      });
+        await observabilityService.recordMetric({
+          metricType: "cpu_usage",
+          value: metrics.cpu,
+          unit: "percent",
+          windowMinutes: 1,
+        });
+        await observabilityService.recordMetric({
+          metricType: "memory_usage",
+          value: metrics.memory,
+          unit: "percent",
+          windowMinutes: 1,
+        });
 
-      broadcastToSubscribers("metrics", metricsUpdate);
-      
-      await checkThresholdAlerts(metrics);
-    } catch (error) {
-      console.error("[ObservabilityWS] Error collecting metrics:", error);
-    }
-  }, 60000);
+        broadcastToSubscribers("metrics", metricsUpdate);
+        
+        await checkThresholdAlerts(metrics);
+      } catch (error) {
+        console.error("[ObservabilityWS] Error collecting metrics:", error);
+      }
+    }, 60000);
+  } else {
+    console.log("[ObservabilityWS] Metrics interval DISABLED (DATABASE_URL not set)");
+  }
 
   wss.on("close", () => {
     clearInterval(pingInterval);
@@ -425,7 +446,9 @@ const PORT = Number(process.env.PORT || 8080);
     
     httpServer.listen(PORT, "0.0.0.0", () => {
       console.log(`[STARTUP] Server listening on 0.0.0.0:${PORT}`);
+      console.log(`[STARTUP] Server listening on port ${PORT}`);
       console.log(`[STARTUP] Ready to accept requests`);
+      console.log(`[STARTUP] Server running and stable`);
     });
   } catch (error) {
     console.error("[STARTUP] Failed to register routes:", error);
