@@ -2,5 +2,8 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "npx tsx server/index.ts"
+startCommand = "node dist/server/index.js"
 preDeploy = "npx prisma migrate deploy && npx prisma generate"
+
+[service]
+start = "node dist/server/index.js"
