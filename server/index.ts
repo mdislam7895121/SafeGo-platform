@@ -10,6 +10,9 @@ import { corsMiddleware } from "./middleware/securityHeaders";
 const app = express();
 app.use(corsMiddleware);
 
+// Global preflight handler - ensure ALL OPTIONS requests return 204 before route matching
+app.options('*', (_req, res) => res.sendStatus(204));
+
 // Lightweight health/readiness probes
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 app.get("/readyz", (_req, res) => res.status(200).send("ready"));
