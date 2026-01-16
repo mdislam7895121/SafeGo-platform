@@ -10,6 +10,14 @@ import { corsMiddleware } from "./middleware/securityHeaders";
 const app = express();
 app.use(corsMiddleware);
 
+// Global preflight handler - ensure ALL OPTIONS requests return 204 before any route matching
+app.options('*', (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.sendStatus(204);
+});
+
 // Lightweight health/readiness probes
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 app.get("/readyz", (_req, res) => res.status(200).send("ready"));
