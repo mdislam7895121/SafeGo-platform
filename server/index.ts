@@ -1,24 +1,18 @@
 import express from "express";
-import cors from "cors";
 import { registerRoutes } from "./routes";
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
 import { prisma } from "./db";
 import { observabilityService } from "./services/observabilityService";
+import { corsMiddleware } from "./middleware/securityHeaders";
 
 const app = express();
+app.use(corsMiddleware);
 
-// Global CORS for production frontend
-const corsOptions = {
-  origin: ["https://safegoglobal.com", "https://www.safegoglobal.com"],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// Lightweight health/readiness probes
+app.get("/healthz", (_req, res) => res.status(200).send("ok"));
+app.get("/readyz", (_req, res) => res.status(200).send("ready"));
 
 // ROOT HEALTH CHECK (Railway + local)
 app.get("/health", (_req, res) => {
@@ -32,16 +26,6 @@ app.get("/health", (_req, res) => {
 
 // Some environments hit /api/health
 app.get("/api/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    service: "SafeGo API",
-    timestamp: new Date().toISOString(),
-    version: "1.0.1-cors-enabled",
-  });
-});
-
-// Legacy plaintext health endpoint expected by some platforms
-app.get("/healthz", (_req, res) => {
   res.status(200).json({
     status: "ok",
     service: "SafeGo API",

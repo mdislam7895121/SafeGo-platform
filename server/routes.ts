@@ -322,52 +322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL MIDDLEWARE SETUP
   // This MUST come after Stripe webhook (which needs raw body)
   // and BEFORE all other routes
+  // CORS is handled globally in server/index.ts
   // ====================================================
-
-  // CORS middleware - allow Netlify frontend to call this API
-  app.use((req: Request, res: Response, next: Function) => {
-    const origin = req.get('origin');
-    
-    // Allow requests from these origins:
-    // - Netlify deploy preview domains (safego-*.netlify.app)
-    // - Custom production domain (safego-global.com, *.safego-global.com)
-    // - Localhost for development
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://localhost:8080',
-      /^https:\/\/safego-.*\.netlify\.app$/,
-      /^https:\/\/safego-global\.com$/,
-      /^https:\/\/.*\.safego-global\.com$/,
-    ];
-
-    let isAllowed = false;
-    if (origin) {
-      for (const allowed of allowedOrigins) {
-        if (typeof allowed === 'string' && origin === allowed) {
-          isAllowed = true;
-          break;
-        } else if (allowed instanceof RegExp && allowed.test(origin)) {
-          isAllowed = true;
-          break;
-        }
-      }
-    }
-
-    if (isAllowed) {
-      res.setHeader('Access-Control-Allow-Origin', origin || '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-
-    // Handle OPTIONS preflight requests
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
-
-    next();
-  });
 
   // JSON body parsing middleware - parse all request bodies as JSON
   app.use(express.json({ limit: '50mb' }));
