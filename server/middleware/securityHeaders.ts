@@ -82,9 +82,28 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-const ALLOWED_ORIGINS = isProduction
-  ? [process.env.FRONTEND_URL || 'https://safego.replit.app']
-  : ['http://localhost:5000', 'http://0.0.0.0:5000'];
+const PRODUCTION_ALLOWED_ORIGINS = [
+  'https://safegoglobal.com',
+  'https://www.safegoglobal.com',
+];
+
+const NETLIFY_PATTERN = /^https:\/\/[a-z0-9-]+\.netlify\.app$/;
+
+function isAllowedOrigin(origin: string | undefined, isProductionEnv: boolean): boolean {
+  if (!origin) return false;
+
+  if (!isProductionEnv) {
+    return (
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://0.0.0.0:') ||
+      origin.startsWith('http://127.0.0.1:')
+    );
+  }
+
+  if (PRODUCTION_ALLOWED_ORIGINS.includes(origin)) return true;
+  if (NETLIFY_PATTERN.test(origin)) return true;
+  return false;
+}
 
 const LANDING_ROUTES = ['/', '/ride', '/drive', '/business', '/safety', '/support', '/privacy', '/terms', '/cookies'];
 
@@ -150,13 +169,14 @@ export function httpsRedirect(req: Request, res: Response, next: NextFunction): 
 
 export function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
   const origin = req.headers.origin;
-  
-  if (origin && (ALLOWED_ORIGINS.includes(origin) || !isProduction)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  const isProductionEnv = process.env.NODE_ENV === 'production';
+
+  if (isAllowedOrigin(origin, isProductionEnv)) {
+    res.setHeader('Access-Control-Allow-Origin', origin as string);
   }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token');
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
 
