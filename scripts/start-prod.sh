@@ -29,16 +29,19 @@ run_migrations() {
 }
 if [ "$SKIP_MIGRATIONS" != "true" ]; then
   if ! run_migrations "Prisma" "npx prisma migrate deploy"; then
-    echo "[Deploy] FATAL: Prisma migrations failed. Aborting startup."
-    exit 1
+    echo "[Deploy] WARNING: Prisma migrations failed but continuing server startup."
+    echo "[Deploy] REASON: Production API must stay available even during migration issues."
+    echo "[Deploy] ACTION REQUIRED: Resolve migration state in database and redeploy."
+    echo "[Deploy] RUN IN RAILWAY: npx prisma migrate status && npx prisma migrate resolve --applied <migration_name>"
   fi
 
   if ! run_migrations "Drizzle" "npm run db:push"; then
-    echo "[Deploy] FATAL: Drizzle schema sync failed. Aborting startup."
-    exit 1
+    echo "[Deploy] WARNING: Drizzle schema sync failed but continuing server startup."
+    echo "[Deploy] REASON: Production API must stay available even during schema sync issues."
+    echo "[Deploy] ACTION REQUIRED: Manually verify database schema state."
   fi
 
-  echo "[Deploy] All migrations complete"
+  echo "[Deploy] Migration phase complete (with possible warnings - see above)"
 else
   echo "[Deploy] Skipping migrations (SKIP_MIGRATIONS=true)"
 fi
