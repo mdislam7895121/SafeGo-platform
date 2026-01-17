@@ -1,6 +1,8 @@
 # Proxy all /api/* requests to backend API server
-# The :splat captures everything after /api/ and forwards it as-is
-/api/*  https://api.safegoglobal.com/:splat  200!
+# Special handling: Backend has both /healthz AND /api/* routes
+# For /api/* frontend calls, forward to backend root and let backend handle the /api/* path
+/api/healthz  https://api.safegoglobal.com/healthz  200!
+/api/*        https://api.safegoglobal.com/api/:splat  200!
 
 # SPA fallback - serve index.html for all other routes
 /*  /index.html  200
