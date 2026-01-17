@@ -210,6 +210,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // DIAGNOSTIC: Routes registered endpoint - for debugging only
+  app.get('/routes-debug', (_req: Request, res: Response) => {
+    res.status(200).json({
+      message: 'All routes should be registered below',
+      routes_registered: {
+        auth: 'app.use("/api/auth", authRoutes)',
+        eats: 'app.use("/api/eats", eatsRoutes)',
+        driver: 'app.use("/api/driver", driverRoutes)',
+      },
+      note: 'If you see this endpoint, routing is working. If /api/auth/* returns 404, the auth routes may not be mounted.',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   app.get('/health/memory', (_req: Request, res: Response) => {
     const mem = process.memoryUsage();
     const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
