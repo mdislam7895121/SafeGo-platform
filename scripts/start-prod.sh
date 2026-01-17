@@ -6,6 +6,7 @@ echo "=============================================="
 echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo "NODE_ENV: ${NODE_ENV:-production}"
 echo "=============================================="
+
 run_migrations() {
   local tool=$1
   local cmd=$2
@@ -27,6 +28,18 @@ run_migrations() {
   echo "[Deploy] $tool migrations complete"
   return 0
 }
+
+# CRITICAL FIX: Resolve any stuck migrations from add_primary_vehicle_constraint
+echo "[Deploy] Checking for stuck migrations..."
+if npx prisma migrate status 2>&1 | grep -i "failed"; then
+  echo "[Deploy] Found failed migrations - attempting resolution"
+  if npx prisma migrate resolve --rolled-back "add_primary_vehicle_constraint" 2>&1 | grep -q "Resolved migration"; then
+    echo "[Deploy] Successfully resolved failed migration"
+  else
+    echo "[Deploy] WARNING: Could not mark migration resolved, attempting deploy anyway"
+  fi
+fi
+
 if [ "$SKIP_MIGRATIONS" != "true" ]; then
   if ! run_migrations "Prisma" "npx prisma migrate deploy"; then
     echo "[Deploy] WARNING: Prisma migrations failed but continuing server startup."

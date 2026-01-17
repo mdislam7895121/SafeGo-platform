@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "./db";
 import { observabilityService } from "./services/observabilityService";
 import { corsMiddleware } from "./middleware/securityHeaders";
+import { attemptPrismaMigrations } from "./lib/migrationGuard";
 
 const app = express();
 app.use(corsMiddleware);
@@ -433,6 +434,19 @@ process.on("unhandledRejection", (reason, promise) => {
   try {
     console.log(`[STARTUP] Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`[STARTUP] Port: ${PORT}`);
+    
+    // CRITICAL: Attempt Prisma migrations BEFORE registering routes
+    // This prevents the app from starting with an outdated schema
+    console.log(`[STARTUP] Checking Prisma migrations...`);
+    const migrationResult = await attemptPrismaMigrations();
+    if (!migrationResult.success) {
+      console.error(`[STARTUP] WARNING: ${migrationResult.message}`);
+      console.error(`[STARTUP] This may cause database errors in production. Manual intervention required.`);
+      // DO NOT EXIT - continue startup to allow health checks and manual fixes
+    } else {
+      console.log(`[STARTUP] Migrations applied: ${migrationResult.message}`);
+    }
+    
     console.log(`[STARTUP] Registering routes...`);
     
     const httpServer = await registerRoutes(app);

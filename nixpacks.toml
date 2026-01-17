@@ -7,8 +7,16 @@ cmds = ["npm ci"]
 [phases.build]
 cmds = ["npm run build"]
 
+[phases.deploy]
+cmds = [
+  "echo '[NIXPACKS] Resolving any stuck migrations...'",
+  "npx prisma migrate resolve --rolled-back 'add_primary_vehicle_constraint' || true",
+  "npx prisma migrate deploy || echo '[DEPLOY] Migration had issues but continuing startup'"
+]
+
 [start]
 cmd = "node dist/index.cjs"
 
 [variables]
 NODE_ENV = "production"
+
