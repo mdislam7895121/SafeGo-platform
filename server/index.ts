@@ -422,7 +422,7 @@ export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
 
-const PORT = Number(process.env.PORT || 8080);
+const PORT = Number(process.env.PORT || 3000);
 
 // Global error handlers to prevent silent crashes
 process.on("uncaughtException", (err) => {
