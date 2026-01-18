@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -14,6 +17,10 @@ import {
   revokeRefreshToken,
   revokeAllUserTokens 
 } from "../services/refreshTokenService";
+
+// Load .env from server directory
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const router = Router();
 

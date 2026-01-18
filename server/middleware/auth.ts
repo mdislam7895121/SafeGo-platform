@@ -1,7 +1,14 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { requirePermission, Permission, AdminUser } from "../utils/permissions";
 import { prisma } from "../db";
+
+// Load .env from server directory
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 // SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
 // This ensures tokens cannot be forged even if environment guard is bypassed
