@@ -1,14 +1,13 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
 import { db } from "../db";
 
 // Load .env from server directory
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '../.env') });
+const __dirname = process.cwd();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const prisma = db;
 
