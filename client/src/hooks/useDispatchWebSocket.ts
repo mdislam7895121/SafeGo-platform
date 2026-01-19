@@ -155,44 +155,87 @@ export function useDispatchWebSocket(options: UseDispatchWebSocketOptions) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/dispatch/ws?token=${encodeURIComponent(token)}`;
     
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setState(prev => ({ ...prev, isConnected: true, error: undefined }));
-      
-      heartbeatIntervalRef.current = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping', payload: {} }));
-        }
-      }, 25000);
-    };
-
-    ws.onmessage = (event) => {
+    // Defensive check: Pre-flight HTTP GET to verify dispatch WS availability
+    // This prevents "404" or "503" errors from breaking the connection attempt
+    const preflightCheck = async () => {
       try {
-        const message = JSON.parse(event.data);
-        handleMessage(message);
+        const response = await fetch(`${window.location.protocol}//${window.location.host}/api/dispatch/ws`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        // If service returns 503 (disabled), don't attempt WS connection
+        if (response.status === 503) {
+          const errorData = await response.json();
+          setState(prev => ({
+            ...prev,
+            isConnected: false,
+            error: `Dispatch service unavailable: ${errorData.reason || 'Service disabled'}`,
+          }));
+          if (onError) onError('Dispatch WebSocket service is temporarily unavailable');
+          return false;
+        }
+        
+        // Any other error (except 426 which means "upgrade required"), abort
+        if (!response.ok && response.status !== 426) {
+          setState(prev => ({
+            ...prev,
+            isConnected: false,
+            error: `Dispatch service error: HTTP ${response.status}`,
+          }));
+          if (onError) onError(`Dispatch service error: ${response.status}`);
+          return false;
+        }
       } catch (err) {
-        console.error('Failed to parse WebSocket message:', err);
+        // Network error - still allow WS attempt, could be transient
+        console.warn('[Dispatch WS] Preflight check failed (network error), retrying with WS:', err);
       }
+      return true;
     };
 
-    ws.onclose = () => {
-      setState(prev => ({ ...prev, isConnected: false }));
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-      }
+    // Run preflight before attempting WebSocket
+    preflightCheck().then((canProceed) => {
+      if (!canProceed) return;
       
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
-      }, 3000);
-    };
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setState(prev => ({ ...prev, error: 'Connection error' }));
-      onError?.('Connection error');
-    };
+      ws.onopen = () => {
+        setState(prev => ({ ...prev, isConnected: true, error: undefined }));
+        
+        heartbeatIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping', payload: {} }));
+          }
+        }, 25000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          handleMessage(message);
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        setState(prev => ({ ...prev, isConnected: false }));
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+        }
+        
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 3000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setState(prev => ({ ...prev, error: 'Connection error' }));
+        onError?.('Connection error');
+      };
+    });
   }, [token, onError]);
 
   const handleMessage = useCallback((message: { type: string; payload: Record<string, unknown> }) => {

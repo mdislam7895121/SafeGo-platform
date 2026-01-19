@@ -14,6 +14,8 @@ import { observabilityService } from "./services/observabilityService";
 import { corsMiddleware } from "./middleware/securityHeaders";
 import { attemptPrismaMigrations } from "./lib/migrationGuard";
 
+const QA_MODE = process.env.QA_MODE === "true";
+
 const app = express();
 app.use(corsMiddleware);
 
@@ -463,14 +465,18 @@ process.on("unhandledRejection", (reason, promise) => {
     
     // CRITICAL: Attempt Prisma migrations BEFORE registering routes
     // This prevents the app from starting with an outdated schema
-    console.log(`[STARTUP] Checking Prisma migrations...`);
-    const migrationResult = await attemptPrismaMigrations();
-    if (!migrationResult.success) {
-      console.error(`[STARTUP] WARNING: ${migrationResult.message}`);
-      console.error(`[STARTUP] This may cause database errors in production. Manual intervention required.`);
-      // DO NOT EXIT - continue startup to allow health checks and manual fixes
+    if (QA_MODE) {
+      console.log(`[STARTUP] QA_MODE=true -> skipping Prisma migrations for fast local runs`);
     } else {
-      console.log(`[STARTUP] Migrations applied: ${migrationResult.message}`);
+      console.log(`[STARTUP] Checking Prisma migrations...`);
+      const migrationResult = await attemptPrismaMigrations();
+      if (!migrationResult.success) {
+        console.error(`[STARTUP] WARNING: ${migrationResult.message}`);
+        console.error(`[STARTUP] This may cause database errors in production. Manual intervention required.`);
+        // DO NOT EXIT - continue startup to allow health checks and manual fixes
+      } else {
+        console.log(`[STARTUP] Migrations applied: ${migrationResult.message}`);
+      }
     }
     
     console.log(`[STARTUP] Registering routes...`);

@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import QaDebugPanel from "@/components/qa/QaDebugPanel";
 const SafePilotButton = lazy(() => import("@/components/safepilot/SafePilotButton").then(m => ({ default: m.SafePilotButton })));
 const SafePilotChat = lazy(() => import("@/components/safepilot/SafePilotChat").then(m => ({ default: m.SafePilotChat })));
 const CustomerSafePilotWrapper = lazy(() => import("@/components/safepilot/CustomerSafePilotWrapper").then(m => ({ default: m.CustomerSafePilotWrapper })));
@@ -657,6 +658,7 @@ export default function App() {
                   <ErrorBoundary>
                     <Router />
                   </ErrorBoundary>
+                  <QaDebugPanel />
                   <Suspense fallback={null}>
                     <SafePilotButton />
                   </Suspense>

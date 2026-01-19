@@ -115,3 +115,6 @@ vite.config.ts.*
 
 # Local Netlify folder
 .netlify
+# local scratch (do not commit)
+_local_notes/
+_local_scripts/
