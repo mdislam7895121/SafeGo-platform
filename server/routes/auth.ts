@@ -108,11 +108,38 @@ function validateEmailFormat(email: string): boolean {
 router.post("/signup", async (req, res) => {
   console.log("[AUTH] Signup route hit");
   try {
-    const { email, password, confirmPassword, fullName, countryCode: clientCountry } = req.body;
+    const { 
+      email, 
+      password, 
+      confirmPassword, 
+      confirm_password,  // Backward-compatible: accept both confirmPassword and confirm_password
+      fullName, 
+      countryCode: clientCountryCode,
+      country: clientCountry 
+    } = req.body;
     
-    // Validate and default countryCode (only BD or US allowed)
-    const validCountries = ["BD", "US"];
-    const countryCode = validCountries.includes(clientCountry) ? clientCountry : "BD";
+    // Normalize confirmPassword - accept both camelCase and snake_case
+    const normalizedConfirmPassword = confirmPassword || confirm_password;
+    
+    // Normalize country input (accept both 'country' and 'countryCode')
+    // Priority: countryCode > country
+    // Mappings: "US"|"United States" -> "US", "BD"|"Bangladesh" -> "BD"
+    let countryCode = "BD"; // fallback default
+    
+    if (clientCountryCode) {
+      // If countryCode is provided directly
+      if (clientCountryCode === "US" || clientCountryCode === "BD") {
+        countryCode = clientCountryCode;
+      }
+    } else if (clientCountry) {
+      // If 'country' field is provided, normalize it
+      const normalized = clientCountry.trim().toUpperCase();
+      if (normalized === "US" || normalized === "UNITED STATES") {
+        countryCode = "US";
+      } else if (normalized === "BD" || normalized === "BANGLADESH") {
+        countryCode = "BD";
+      }
+    }
 
     // Basic field validation with Bangla error messages
     if (!email || !password) {
@@ -120,7 +147,7 @@ router.post("/signup", async (req, res) => {
     }
 
     // Confirm password is required for web signup
-    if (!confirmPassword) {
+    if (!normalizedConfirmPassword) {
       return sendAuthError(res, "MISSING_CONFIRM_PASSWORD");
     }
 
@@ -136,7 +163,7 @@ router.post("/signup", async (req, res) => {
     }
 
     // Confirm password must match
-    if (password !== confirmPassword) {
+    if (password !== normalizedConfirmPassword) {
       return sendAuthError(res, "PASSWORD_MISMATCH");
     }
 
