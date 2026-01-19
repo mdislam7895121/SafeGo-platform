@@ -432,11 +432,15 @@ export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
 
-// Railway injects PORT automatically. If missing in local dev, default to 5000.
-// CRITICAL: Never default to 3000 in production - Railway routes to 8080+
-const PORT = Number(process.env.PORT || 5000);
-if (isNaN(PORT)) {
-  console.error("[FATAL] PORT is not a valid number:", process.env.PORT);
+// Railway injects PORT automatically. If missing, use safe fallback.
+// Parse PORT with explicit logging for diagnostics
+const rawPort = process.env.PORT;
+const PORT = rawPort ? Number(rawPort) : 3000;
+const HOST = "0.0.0.0";
+
+// Validate if PORT was provided but not numeric
+if (rawPort && Number.isNaN(PORT)) {
+  console.error("[FATAL] PORT is not numeric:", rawPort);
   process.exit(1);
 }
 
@@ -477,9 +481,11 @@ process.on("unhandledRejection", (reason, promise) => {
     console.log(`[STARTUP] Health endpoints: GET /health, GET /api/health, GET /healthz`);
     console.log(`[STARTUP] Auth endpoints available at /api/auth/*`);
 
-    console.log(`[BOOT] Listening on PORT = ${PORT}`);
-    httpServer.listen(PORT, "0.0.0.0", () => {
-      console.log(`[STARTUP] Server listening on 0.0.0.0:${PORT}`);
+    // Explicit boot log for diagnostics
+    console.log(`[BOOT] runtime=${process.argv[1]} host=${HOST} rawPort=${rawPort || "null"} port=${PORT}`);
+    
+    httpServer.listen(PORT, HOST, () => {
+      console.log(`[STARTUP] Server listening on ${HOST}:${PORT}`);
       console.log(`[STARTUP] Ready to accept requests`);
     });
   } catch (error) {
