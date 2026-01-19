@@ -432,9 +432,11 @@ export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
 
-const PORT = Number(process.env.PORT);
-if (!PORT || isNaN(PORT)) {
-  console.error("[FATAL] PORT environment variable is missing or invalid:", process.env.PORT);
+// Railway injects PORT automatically. If missing in local dev, default to 5000.
+// CRITICAL: Never default to 3000 in production - Railway routes to 8080+
+const PORT = Number(process.env.PORT || 5000);
+if (isNaN(PORT)) {
+  console.error("[FATAL] PORT is not a valid number:", process.env.PORT);
   process.exit(1);
 }
 
