@@ -433,6 +433,10 @@ export function getConnectedAdminCount(): number {
 }
 
 const PORT = Number(process.env.PORT);
+if (!PORT || isNaN(PORT)) {
+  console.error("[FATAL] PORT environment variable is missing or invalid:", process.env.PORT);
+  process.exit(1);
+}
 
 // Global error handlers to prevent silent crashes
 process.on("uncaughtException", (err) => {
