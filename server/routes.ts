@@ -111,6 +111,11 @@ import cmsRoutes from "./routes/cms"; // CMS Pages for Company/Legal/Support con
 import landingCmsRoutes from "./routes/landing-cms"; // Landing Page CMS
 import { db } from "./db";
 
+const QA_MODE = process.env.QA_MODE === "true";
+const QA_UNKNOWN_ROUTE_LOG_INTERVAL_MS = 60000;
+let qaUnknownRouteCount = 0;
+let qaUnknownRouteLastLog = 0;
+
 // PRODUCTION SAFETY: WebSocket modules are loaded lazily to prevent memory allocation
 // when DISABLE_WEBSOCKETS=true is set. This is critical for Railway stability.
 type WebSocketSetupFn = (server: import("http").Server) => void;
@@ -339,6 +344,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CORS is handled globally in server/index.ts
   // ====================================================
 
+  // ====================================================
+  // WEBSOCKET ENDPOINTS: Dispatch
+  // Must respond with 426 to non-upgrade requests (HTTP)
+  // So they don't return 404 before ws library processes them
+  // ====================================================
+  
+  const isDispatchWSDisabled = process.env.DISABLE_WEBSOCKETS === "true";
+  
+  app.get('/api/dispatch/ws', (_req: Request, res: Response) => {
+    // If we get here, it's an HTTP GET (not a WebSocket upgrade)
+    
+    // If dispatch WS is disabled, return controlled response (not 404)
+    if (isDispatchWSDisabled) {
+      console.log('[Dispatch WS Fallback] GET request while DISABLE_WEBSOCKETS=true');
+      return res.status(503).json({
+        ok: false,
+        code: 'SERVICE_UNAVAILABLE',
+        feature: 'dispatch_ws',
+        status: 'disabled',
+        reason: 'Real-time dispatch is temporarily unavailable',
+        message: 'WebSocket dispatch service is not available. Please refresh or try again later.',
+      });
+    }
+    
+    if (_req.headers.upgrade !== 'websocket') {
+      return res.status(426).json({
+        ok: false,
+        code: 'UPGRADE_REQUIRED',
+        message: 'WebSocket upgrade required. Use ws:// or wss:// connection.',
+      });
+    }
+    res.status(426).json({
+      ok: false,
+      code: 'UPGRADE_FAILED',
+      message: 'WebSocket upgrade failed. Please try reconnecting.',
+    });
+  });
+  
   // JSON body parsing middleware - parse all request bodies as JSON
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -780,6 +823,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 404 handler - return JSON instead of HTML
   app.use((_req: Request, res: Response) => {
+    if (QA_MODE) {
+      qaUnknownRouteCount += 1;
+      const now = Date.now();
+      const sinceLast = now - qaUnknownRouteLastLog;
+
+      if (sinceLast >= QA_UNKNOWN_ROUTE_LOG_INTERVAL_MS) {
+        console.log("[QA][404] Unknown route sample", {
+          method: _req.method,
+          path: _req.path,
+          countSinceLastLog: qaUnknownRouteCount,
+        });
+
+        qaUnknownRouteLastLog = now;
+        qaUnknownRouteCount = 0;
+      }
+    }
+
     res.status(404).json({
       error: 'Not Found',
       message: `Endpoint ${_req.method} ${_req.path} does not exist`,
@@ -816,6 +876,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } else {
     console.log("[WebSocket] Skipping WebSocket initialization (DISABLE_WEBSOCKETS=true)");
   }
+
+  // ====================================================
+  // GLOBAL FALLBACK: No 404 allowed in production
+  // All unknown routes return 501 (not implemented) instead
+  // This ensures graceful degradation, not broken UI
+  // ====================================================
+  let unknownRouteLogTime = 0;
+  app.use((req: Request, res: Response) => {
+    // Rate-limit logging to once per 5 minutes per unique path
+    const now = Date.now();
+    if (now - unknownRouteLogTime > 5 * 60 * 1000) {
+      console.warn(`[Unknown Route] ${req.method} ${req.path} - returning 501 instead of 404`);
+      unknownRouteLogTime = now;
+    }
+
+    // Return 501 (Not Implemented) instead of 404
+    // This tells clients the route exists but isn't implemented yet
+    res.status(501).json({
+      ok: false,
+      code: 'NOT_IMPLEMENTED',
+      path: req.path,
+      method: req.method,
+      message: 'This endpoint is not yet implemented. Please check back later.',
+    });
+  });
 
   return httpServer;
 }
