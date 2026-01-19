@@ -129,6 +129,18 @@ export const AUTH_ERRORS = {
       "MISSING_CONFIRM_PASSWORD",
       "Please confirm your password"
     ),
+
+  ACCOUNT_PENDING: () =>
+    createAuthError(
+      "ACCOUNT_PENDING",
+      "Your account is pending verification. Please check your email or contact support."
+    ),
+
+  EMAIL_EXISTS_PENDING: () =>
+    createAuthError(
+      "EMAIL_EXISTS_PENDING",
+      "This email already has an account pending verification. Please verify your account or contact support."
+    ),
 };
 
 /**
@@ -161,7 +173,11 @@ export function getHttpStatusForError(code: string): number {
     case "ADMIN_PROFILE_NOT_FOUND":
     case "ADMIN_ACCOUNT_DEACTIVATED":
     case "TWO_FACTOR_REQUIRED":
+    case "ACCOUNT_PENDING":
       return 403; // Forbidden
+
+    case "EMAIL_EXISTS_PENDING":
+      return 409; // Conflict
 
     case "SERVICE_UNAVAILABLE":
       return 503; // Service Unavailable

@@ -51,13 +51,17 @@ export async function apiFetch(
     // Check if response is OK
     if (!response.ok) {
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      let errorCode = undefined;
 
       // Try to parse error body as JSON
       try {
         const contentType = response.headers.get("content-type");
         if (contentType?.includes("application/json")) {
           const errorBody = await response.json();
-          errorMessage = errorBody.error || errorBody.message || errorMessage;
+          // Support both error.error and error object formats
+          const error = errorBody.error || errorBody;
+          errorMessage = error.message || errorBody.message || errorMessage;
+          errorCode = error.code || errorBody.code;
         } else if (contentType?.includes("text/html")) {
           // API returned HTML (likely 404 or error page)
           throw new Error(
@@ -71,7 +75,10 @@ export async function apiFetch(
         }
       }
 
-      throw new Error(errorMessage);
+      // Create error with code property for structured handling
+      const error = new Error(errorMessage);
+      (error as any).code = errorCode;
+      throw error;
     }
 
     // Parse response text first to check for HTML

@@ -143,6 +143,15 @@ router.post("/signup", async (req, res) => {
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
+      // If user exists, check if it's a pending customer account
+      if (existingUser.role === 'customer') {
+        const existingProfile = await prisma.customerProfile.findUnique({
+          where: { userId: existingUser.id },
+        });
+        if (existingProfile && (existingProfile.verificationStatus === 'pending' || existingProfile.verificationStatus === 'draft' || existingProfile.isVerified === false)) {
+          return res.status(409).json({ ok: false, code: 'EMAIL_EXISTS_PENDING', message: 'This email already has an account pending verification. Please verify your account or contact support.' });
+        }
+      }
       return sendAuthError(res, "EMAIL_IN_USE");
     }
 
@@ -408,6 +417,45 @@ router.post("/login", async (req, res, next) => {
           temporaryLockUntil: null,
         },
       });
+    }
+
+    // Check account verification status for customers
+    if (user.role === 'customer') {
+      const customerProfile = await prisma.customerProfile.findUnique({
+        where: { userId: user.id },
+      });
+
+      if (!customerProfile) {
+        console.error(`[AUTH] Customer profile not found for user ${user.id}`);
+        await logAuditEvent({
+          actorId: user.id,
+          actorEmail: user.email,
+          actorRole: user.role,
+          ipAddress: getClientIp(req),
+          actionType: ActionType.LOGIN_FAILED,
+          entityType: EntityType.AUTH,
+          entityId: user.id,
+          description: `Login failed - customer profile not found for ${user.email}`,
+          success: false,
+        });
+        return res.status(500).json({ ok: false, code: 'PROFILE_MISSING', message: 'Account configuration error. Please contact support.' });
+      }
+
+      // Check if account is pending or not verified
+      if (customerProfile.isVerified === false || customerProfile.verificationStatus === 'pending' || customerProfile.verificationStatus === 'draft') {
+        await logAuditEvent({
+          actorId: user.id,
+          actorEmail: user.email,
+          actorRole: user.role,
+          ipAddress: getClientIp(req),
+          actionType: ActionType.LOGIN_FAILED,
+          entityType: EntityType.AUTH,
+          entityId: user.id,
+          description: `Login denied - account pending verification (status: ${customerProfile.verificationStatus})`,
+          success: false,
+        });
+        return res.status(403).json({ ok: false, code: 'ACCOUNT_PENDING', message: 'Your account is pending verification. Please check your email or contact support.' });
+      }
     }
 
     // For admin users, verify 2FA if enabled

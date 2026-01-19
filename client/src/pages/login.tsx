@@ -43,12 +43,52 @@ export default function Login() {
       });
       // Redirect is handled by AuthContext.login()
     } catch (error: any) {
-      // Show error in Bangla for BD users, English fallback
-      const errorMessage = error.message === "Invalid credentials" 
-        ? "ভুল ইমেইল অথবা পাসওয়ার্ড। আবার চেষ্টা করুন।"
-        : error.message || "লগইন ব্যর্থ হয়েছে";
+      // Map backend error codes to user-friendly messages
+      let errorTitle = "লগইন ব্যর্থ";
+      let errorMessage = "লগইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।";
+
+      // Check if error has structured code from backend
+      if (error.code) {
+        switch (error.code) {
+          case "ACCOUNT_PENDING":
+            errorTitle = "অ্যাকাউন্ট অপেক্ষমাণ";
+            errorMessage = "আপনার অ্যাকাউন্ট যাচাইয়ের জন্য অপেক্ষমাণ। আপনার ইমেইল চেক করুন বা সাপোর্টের সাথে যোগাযোগ করুন।";
+            break;
+          case "EMAIL_EXISTS_PENDING":
+            errorTitle = "যাচাইয়ের জন্য অপেক্ষমাণ";
+            errorMessage = "এই ইমেইলের জন্য ইতিমধ্যে একটি অ্যাকাউন্ট রয়েছে যা যাচাইয়ের জন্য অপেক্ষমাণ। আপনার ইমেইল যাচাই করুন বা সাপোর্টের সাথে যোগাযোগ করুন।";
+            break;
+          case "EMAIL_EXISTS":
+            errorTitle = "ইমেইল বিদ্যমান";
+            errorMessage = "এই ইমেইল দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট রয়েছে। লগইন করুন।";
+            break;
+          case "INVALID_CREDENTIALS":
+            errorTitle = "লগইন ব্যর্থ";
+            errorMessage = "ভুল ইমেইল অথবা পাসওয়ার্ড। আবার চেষ্টা করুন।";
+            break;
+          case "ACCOUNT_LOCKED":
+            errorTitle = "অ্যাকাউন্ট লক";
+            errorMessage = "অনেক ব্যর্থ লগইন প্রচেষ্টা। ১৫ মিনিটের পর পুনরায় চেষ্টা করুন।";
+            break;
+          case "ACCOUNT_BLOCKED":
+            errorTitle = "অ্যাকাউন্ট ব্লক";
+            errorMessage = "আপনার অ্যাকাউন্ট ব্লক করা হয়েছে। সাপোর্টের সাথে যোগাযোগ করুন।";
+            break;
+          default:
+            errorMessage = error.message || "লগইন ব্যর্থ হয়েছে।";
+        }
+      } else if (error.message) {
+        // Fallback to error message if no code
+        if (error.message.includes("Invalid credentials")) {
+          errorTitle = "লগইন ব্যর্থ";
+          errorMessage = "ভুল ইমেইল অথবা পাসওয়ার্ড। আবার চেষ্টা করুন।";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       toast({
-        title: "লগইন ব্যর্থ",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
       });
