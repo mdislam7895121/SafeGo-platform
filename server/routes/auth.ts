@@ -222,10 +222,34 @@ router.post("/signup", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Signup error:", error);
+    console.error("[AUTH] Signup error:", error);
+    
+    // Check for specific database errors
+    if (error instanceof Error) {
+      // Unique constraint violation (shouldn't happen due to check above, but defensive)
+      if (error.message.includes('unique') || error.message.includes('duplicate')) {
+        return res.status(400).json({ 
+          code: "EMAIL_IN_USE",
+          error: "User with this email already exists",
+          message: "এই ইমেইল দিয়ে আগে থেকেই একাউন্ট আছে।"
+        });
+      }
+      
+      // Database connection errors
+      if (error.message.includes('connect') || error.message.includes('ECONNREFUSED')) {
+        console.error("[AUTH] Database connection failed during signup");
+        return res.status(503).json({ 
+          code: "SERVICE_UNAVAILABLE",
+          error: "Service temporarily unavailable",
+          message: "সেবা সাময়িকভাবে বন্ধ আছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।"
+        });
+      }
+    }
+    
+    // Generic fallback - don't expose internal details
     res.status(500).json({ 
       code: "SERVER_ERROR",
-      error: "Failed to create user",
+      error: "Failed to create user. Please try again later.",
       message: "একাউন্ট তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।"
     });
   }
@@ -569,8 +593,34 @@ router.post("/login", async (req, res, next) => {
 
     res.json(response);
   } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Failed to login" });
+    console.error("[AUTH] Login error:", error);
+    
+    // Specific error handling for common issues
+    if (error instanceof Error) {
+      // JWT_SECRET missing
+      if (error.message.includes('JWT_SECRET')) {
+        console.error("[AUTH] FATAL: JWT_SECRET environment variable not set");
+        return res.status(500).json({ 
+          error: "Authentication service unavailable",
+          code: "AUTH_CONFIG_ERROR"
+        });
+      }
+      
+      // Token generation errors
+      if (error.message.includes('jwt') || error.message.includes('token')) {
+        console.error("[AUTH] Token generation failed:", error.message);
+        return res.status(500).json({ 
+          error: "Authentication failed",
+          code: "TOKEN_ERROR"
+        });
+      }
+    }
+    
+    // Generic fallback - don't expose internal errors
+    res.status(500).json({ 
+      error: "Login failed. Please try again later.",
+      code: "SERVER_ERROR"
+    });
   }
 });
 
@@ -650,9 +700,14 @@ router.post("/refresh", async (req, res) => {
 
     res.json({ token: newAccessToken });
   } catch (error) {
-    console.error("Token refresh error:", error);
+    console.error("[AUTH] Token refresh error:", error);
     clearRefreshTokenCookie(res);
-    res.status(500).json({ error: "Failed to refresh token" });
+    
+    // Don't expose internal errors
+    res.status(500).json({ 
+      error: "Session refresh failed. Please log in again.",
+      code: "REFRESH_ERROR"
+    });
   }
 });
 
@@ -696,7 +751,7 @@ router.post("/logout", authenticateToken, async (req: AuthRequest, res) => {
     
     res.json({ message: "Logout successful" });
   } catch (error) {
-    console.error("Logout error:", error);
+    console.error("[AUTH] Logout error:", error);
     // Still return success - don't block logout even if audit fails
     clearRefreshTokenCookie(res);
     res.json({ message: "Logout recorded" });
@@ -729,8 +784,11 @@ router.get("/me", authenticateToken, loadAdminProfile, async (req: AuthRequest, 
       capabilities,
     });
   } catch (error) {
-    console.error("Error fetching user info:", error);
-    res.status(500).json({ error: "Failed to fetch user info" });
+    console.error("[AUTH] Error fetching user info:", error);
+    res.status(500).json({ 
+      error: "Failed to fetch user information",
+      code: "USER_INFO_ERROR"
+    });
   }
 });
 
@@ -752,8 +810,12 @@ router.get("/validate", authenticateToken, async (req: AuthRequest, res) => {
       countryCode,
     });
   } catch (error) {
-    console.error("Token validation error:", error);
-    res.status(401).json({ valid: false, error: "Invalid token" });
+    console.error("[AUTH] Token validation error:", error);
+    res.status(401).json({ 
+      valid: false, 
+      error: "Invalid or expired token",
+      code: "TOKEN_INVALID"
+    });
   }
 });
 
@@ -778,8 +840,11 @@ router.get("/feature-flags", async (req, res) => {
     });
     res.json(flags);
   } catch (error) {
-    console.error("Error fetching public feature flags:", error);
-    res.status(500).json({ error: "Failed to fetch feature flags" });
+    console.error("[AUTH] Error fetching feature flags:", error);
+    res.status(500).json({ 
+      error: "Failed to fetch feature flags",
+      code: "FEATURE_FLAGS_ERROR"
+    });
   }
 });
 
