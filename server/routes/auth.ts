@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { prisma } from "../lib/prisma";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
+import { AUTH_ERRORS, sendAuthError, createAuthError, getHttpStatusForError } from "../utils/authErrors";
 import { getAdminCapabilities } from "../utils/permissions";
 import { loadAdminProfile, AuthRequest, authenticateToken, JWTPayload } from "../middleware/auth";
 import { rateLimitAdminLogin, resetLoginAttempts } from "../middleware/rateLimit";
@@ -115,58 +116,34 @@ router.post("/signup", async (req, res) => {
 
     // Basic field validation with Bangla error messages
     if (!email || !password) {
-      return res.status(400).json({ 
-        code: "MISSING_FIELDS",
-        error: "Email and password are required",
-        message: "ইমেইল এবং পাসওয়ার্ড প্রয়োজন।"
-      });
+      return sendAuthError(res, "MISSING_FIELDS");
     }
 
     // Confirm password is required for web signup
     if (!confirmPassword) {
-      return res.status(400).json({ 
-        code: "MISSING_CONFIRM_PASSWORD",
-        error: "Please confirm your password",
-        message: "অনুগ্রহ করে পাসওয়ার্ড নিশ্চিত করুন।"
-      });
+      return sendAuthError(res, "MISSING_CONFIRM_PASSWORD");
     }
 
     // Email format validation
     if (!validateEmailFormat(email)) {
-      return res.status(400).json({ 
-        code: "INVALID_EMAIL",
-        error: "Please enter a valid email address",
-        message: "সঠিক ইমেইল ঠিকানা দিন।"
-      });
+      return sendAuthError(res, "INVALID_EMAIL");
     }
 
     // Strong password validation
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.isValid) {
-      return res.status(400).json({ 
-        code: "WEAK_PASSWORD",
-        error: passwordValidation.error,
-        message: "পাসওয়ার্ড কমপক্ষে ৮ অক্ষর, একটি বড় হাতের অক্ষর, একটি ছোট হাতের অক্ষর এবং একটি সংখ্যা থাকতে হবে।"
-      });
+      return sendAuthError(res, "WEAK_PASSWORD", passwordValidation.error);
     }
 
     // Confirm password must match
     if (password !== confirmPassword) {
-      return res.status(400).json({ 
-        code: "PASSWORD_MISMATCH",
-        error: "Passwords do not match",
-        message: "পাসওয়ার্ড মিলছে না।"
-      });
+      return sendAuthError(res, "PASSWORD_MISMATCH");
     }
 
-    // Check if user already exists - return Bangla error
+    // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ 
-        code: "EMAIL_IN_USE",
-        error: "User with this email already exists",
-        message: "এই ইমেইল দিয়ে আগে থেকেই একাউন্ট আছে।"
-      });
+      return sendAuthError(res, "EMAIL_IN_USE");
     }
 
     // Hash password
@@ -228,30 +205,19 @@ router.post("/signup", async (req, res) => {
     if (error instanceof Error) {
       // Unique constraint violation (shouldn't happen due to check above, but defensive)
       if (error.message.includes('unique') || error.message.includes('duplicate')) {
-        return res.status(400).json({ 
-          code: "EMAIL_IN_USE",
-          error: "User with this email already exists",
-          message: "এই ইমেইল দিয়ে আগে থেকেই একাউন্ট আছে।"
-        });
+        return sendAuthError(res, "EMAIL_IN_USE");
       }
       
       // Database connection errors
       if (error.message.includes('connect') || error.message.includes('ECONNREFUSED')) {
         console.error("[AUTH] Database connection failed during signup");
-        return res.status(503).json({ 
-          code: "SERVICE_UNAVAILABLE",
-          error: "Service temporarily unavailable",
-          message: "সেবা সাময়িকভাবে বন্ধ আছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।"
-        });
+        return sendAuthError(res, "SERVICE_UNAVAILABLE");
       }
     }
     
     // Generic fallback - don't expose internal details
-    res.status(500).json({ 
-      code: "SERVER_ERROR",
-      error: "Failed to create user. Please try again later.",
-      message: "একাউন্ট তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।"
-    });
+    console.error("[AUTH] Unexpected error in signup:", error);
+    return sendAuthError(res, "INTERNAL_ERROR");
   }
 });
 
@@ -265,7 +231,7 @@ router.post("/login", async (req, res, next) => {
     const { email, password, twoFactorCode } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+      return sendAuthError(res, "MISSING_FIELDS");
     }
 
     // Find user first to determine if admin (for rate limiting)
@@ -307,7 +273,7 @@ router.post("/login", async (req, res, next) => {
         success: false,
       });
 
-      return res.status(401).json({ error: "Invalid credentials" });
+      return sendAuthError(res, "INVALID_CREDENTIALS");
     }
 
     // Check if user is blocked
@@ -325,7 +291,7 @@ router.post("/login", async (req, res, next) => {
         success: false,
       });
 
-      return res.status(403).json({ error: "Your account has been blocked. Please contact support." });
+      return sendAuthError(res, "ACCOUNT_BLOCKED");
     }
 
     // Check for temporary lockout from too many failed attempts (15-minute window)
@@ -347,11 +313,7 @@ router.post("/login", async (req, res, next) => {
         success: false,
       });
 
-      return res.status(429).json({ 
-        error: `Too many failed attempts. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''} or lock your account from profile and contact support if this wasn't you.`,
-        code: "TEMPORARY_LOCKOUT",
-        retryAfter: minutesRemaining * 60
-      });
+      return sendAuthError(res, "ACCOUNT_LOCKED", `Too many failed login attempts. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`, { retryAfterSeconds: minutesRemaining * 60 });
     }
 
     // For admin users, check if their admin account is active
@@ -368,7 +330,7 @@ router.post("/login", async (req, res, next) => {
           description: `Failed login attempt for ${user.email} - admin profile not found`,
           success: false,
         });
-        return res.status(403).json({ error: "Admin profile not found. Please contact support." });
+        return sendAuthError(res, "ADMIN_PROFILE_NOT_FOUND");
       }
 
       if (!user.adminProfile.isActive) {
@@ -383,7 +345,7 @@ router.post("/login", async (req, res, next) => {
           description: `Failed login attempt for deactivated admin ${user.email}`,
           success: false,
         });
-        return res.status(403).json({ error: "Your admin account has been deactivated. Please contact support." });
+        return sendAuthError(res, "ADMIN_ACCOUNT_DEACTIVATED");
       }
     }
 
@@ -430,14 +392,10 @@ router.post("/login", async (req, res, next) => {
 
       // Show lockout message if this attempt triggered the lockout
       if (currentAttempts >= MAX_FAILED_ATTEMPTS) {
-        return res.status(429).json({ 
-          error: "Too many failed attempts. Please try again in 15 minutes or lock your account from profile and contact support if this wasn't you.",
-          code: "TEMPORARY_LOCKOUT",
-          retryAfter: 15 * 60
-        });
+        return sendAuthError(res, "ACCOUNT_LOCKED", `Too many failed login attempts. Please try again in 15 minutes.`, { retryAfterSeconds: 15 * 60 });
       }
 
-      return res.status(401).json({ error: "Invalid credentials" });
+      return sendAuthError(res, "INVALID_CREDENTIALS");
     }
 
     // Successful password verification - reset failed attempt counter
@@ -458,10 +416,7 @@ router.post("/login", async (req, res, next) => {
       
       if (twoFactorRequired) {
         if (!twoFactorCode) {
-          return res.status(403).json({ 
-            error: "Two-factor authentication code required",
-            requiresTwoFactor: true 
-          });
+          return sendAuthError(res, "TWO_FACTOR_REQUIRED");
         }
 
         const secret = await getTwoFactorSecret(user.adminProfile.id);
@@ -477,7 +432,7 @@ router.post("/login", async (req, res, next) => {
             description: `2FA verification failed for ${user.email} - secret not found`,
             success: false,
           });
-          return res.status(500).json({ error: "2FA configuration error" });
+          return sendAuthError(res, "INTERNAL_ERROR");
         }
 
         const isValid2FA = verifyTwoFactorToken(twoFactorCode, secret);
@@ -496,7 +451,7 @@ router.post("/login", async (req, res, next) => {
             success: false,
           });
 
-          return res.status(401).json({ error: "Invalid two-factor authentication code" });
+          return sendAuthError(res, "INVALID_TWO_FACTOR_CODE");
         }
 
         // Log successful 2FA verification (audit)
@@ -600,27 +555,18 @@ router.post("/login", async (req, res, next) => {
       // JWT_SECRET missing
       if (error.message.includes('JWT_SECRET')) {
         console.error("[AUTH] FATAL: JWT_SECRET environment variable not set");
-        return res.status(500).json({ 
-          error: "Authentication service unavailable",
-          code: "AUTH_CONFIG_ERROR"
-        });
+        return sendAuthError(res, "SERVICE_UNAVAILABLE");
       }
       
       // Token generation errors
       if (error.message.includes('jwt') || error.message.includes('token')) {
         console.error("[AUTH] Token generation failed:", error.message);
-        return res.status(500).json({ 
-          error: "Authentication failed",
-          code: "TOKEN_ERROR"
-        });
+        return sendAuthError(res, "SERVICE_UNAVAILABLE");
       }
     }
     
     // Generic fallback - don't expose internal errors
-    res.status(500).json({ 
-      error: "Login failed. Please try again later.",
-      code: "SERVER_ERROR"
-    });
+    return sendAuthError(res, "INTERNAL_ERROR");
   }
 });
 
