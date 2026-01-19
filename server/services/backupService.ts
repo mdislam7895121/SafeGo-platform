@@ -1,5 +1,14 @@
 import { prisma } from '../db';
-import { v4 as uuidv4 } from 'uuid';
+
+// CJS-safe dynamic import for uuid (ESM-only module in CommonJS runtime)
+let _uuidv4: (() => string) | null = null;
+async function getUuidv4Generator() {
+  if (!_uuidv4) {
+    const m = await import('uuid');
+    _uuidv4 = m.v4;
+  }
+  return _uuidv4;
+}
 
 export type BackupType = 'FULL_DB' | 'PARTIAL_ANALYTICS' | 'FILES_ONLY' | 'CONFIG_ONLY';
 export type BackupStatus = 'CREATED' | 'VERIFIED' | 'FAILED' | 'IN_PROGRESS';
@@ -194,6 +203,7 @@ class BackupService {
           });
         } else {
           const sizeMb = Math.floor(Math.random() * 5000) + 500;
+          const uuidv4Gen = await getUuidv4Generator();
           
           await prisma.backupSnapshot.update({
             where: { id: snapshotId },
@@ -202,7 +212,7 @@ class BackupService {
               sizeMb,
               metadata: {
                 completedAt: new Date().toISOString(),
-                checksum: `sha256:${uuidv4().replace(/-/g, '')}`,
+                checksum: `sha256:${uuidv4Gen().replace(/-/g, '')}`,
                 tablesIncluded: ['users', 'drivers', 'orders', 'rides', 'transactions'],
                 compressionRatio: (Math.random() * 0.3 + 0.6).toFixed(2),
               },
@@ -313,7 +323,8 @@ class BackupService {
       throw new Error('Cannot restore from a failed backup');
     }
 
-    const confirmationToken = uuidv4().split('-')[0].toUpperCase();
+    const uuidv4Gen = await getUuidv4Generator();
+    const confirmationToken = uuidv4Gen().split('-')[0].toUpperCase();
 
     const operation = await prisma.restoreOperation.create({
       data: {
