@@ -3,7 +3,7 @@
  * Central source of truth for API URLs and settings
  */
 
-const DEFAULT_API_BASE = "https://api.safegoglobal.com";
+const DEFAULT_API_BASE = "http://localhost:3000";
 
 export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE;

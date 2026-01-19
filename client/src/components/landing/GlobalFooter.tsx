@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { HealthIndicator } from "@/components/ui/HealthIndicator";
 
 type Region = "BD" | "US";
 
@@ -268,6 +269,9 @@ const GlobalFooter = memo(function GlobalFooter({
           </div>
           
           <div className="mt-6 pt-4 border-t border-gray-800/50">
+            <div className="flex items-center justify-between mb-3">
+              <HealthIndicator />
+            </div>
             <div className="bg-amber-900/20 border border-amber-800/30 rounded-lg p-3">
               <p className="text-center text-xs text-amber-200/80">
                 <strong className="text-amber-300">Testing Mode:</strong> SafeGo is currently in development preview. 

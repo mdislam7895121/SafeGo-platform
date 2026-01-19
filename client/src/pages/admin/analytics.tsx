@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HealthIndicator } from "@/components/ui/HealthIndicator";
 import {
   BarChart,
   Bar,
@@ -250,6 +251,9 @@ export default function AnalyticsDashboard() {
               <p className="text-muted-foreground mt-1">
                 Comprehensive platform analytics and performance insights
               </p>
+              <div className="mt-2">
+                <HealthIndicator />
+              </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <Select value={dateRange} onValueChange={setDateRange}>
