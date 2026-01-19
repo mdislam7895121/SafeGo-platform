@@ -48,6 +48,16 @@ app.get("/api/health", (_req, res) => {
     version: "1.0.1-cors-enabled",
   });
 });
+
+// Railway-specific healthcheck endpoint (JSON, always 200)
+app.get("/api/healthz", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "SafeGo-platform",
+    env: process.env.NODE_ENV || "unknown",
+    ts: new Date().toISOString(),
+  });
+});
 const DISABLE_OBSERVABILITY =
   process.env.DISABLE_OBSERVABILITY === "true" ||
   process.env.DISABLE_SYSTEM_METRICS === "true";
@@ -422,7 +432,7 @@ export function getConnectedAdminCount(): number {
   return observabilityConnections.size;
 }
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT);
 
 // Global error handlers to prevent silent crashes
 process.on("uncaughtException", (err) => {
@@ -460,7 +470,8 @@ process.on("unhandledRejection", (reason, promise) => {
     console.log(`[STARTUP] Routes registered successfully`);
     console.log(`[STARTUP] Health endpoints: GET /health, GET /api/health, GET /healthz`);
     console.log(`[STARTUP] Auth endpoints available at /api/auth/*`);
-    
+
+    console.log(`[BOOT] Listening on PORT = ${PORT}`);
     httpServer.listen(PORT, "0.0.0.0", () => {
       console.log(`[STARTUP] Server listening on 0.0.0.0:${PORT}`);
       console.log(`[STARTUP] Ready to accept requests`);
