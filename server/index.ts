@@ -482,7 +482,8 @@ process.on("unhandledRejection", (reason, promise) => {
     console.log(`[STARTUP] Auth endpoints available at /api/auth/*`);
 
     // Explicit boot log for diagnostics
-    console.log(`[BOOT] runtime=${process.argv[1]} host=${HOST} rawPort=${rawPort || "null"} port=${PORT}`);
+    const nodeEnv = process.env.NODE_ENV || "development";
+    console.log(`[BOOT] runtime=${process.argv[1]} host=${HOST} rawPort=${rawPort || "null"} port=${PORT} nodeEnv=${nodeEnv}`);
     
     httpServer.listen(PORT, HOST, () => {
       console.log(`[STARTUP] Server listening on ${HOST}:${PORT}`);
