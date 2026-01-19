@@ -3,39 +3,34 @@
  * Central source of truth for API URLs and settings
  */
 
-interface ApiConfig {
-  baseUrl: string;
-  timeout: number;
-  retryAttempts: number;
-}
+const DEFAULT_API_BASE = "https://api.safegoglobal.com";
 
-function getApiConfig(): ApiConfig {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+export const API_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE;
 
-  // Validation: ensure baseUrl is set
-  if (!baseUrl) {
-    console.warn(
-      "[API Config] VITE_API_BASE_URL is not set. Using relative paths."
-    );
+/**
+ * Join base URL with path safely
+ * - ensures a single slash between base and path
+ * - rejects fully-qualified URLs in path
+ */
+export function apiUrl(path: string): string {
+  if (!path) {
+    throw new Error("[apiUrl] path is required");
   }
 
-  // Validation: warn if using localhost in production
-  if (import.meta.env.PROD && baseUrl?.includes("localhost")) {
-    console.error(
-      "[API Config] WARNING: Using localhost in production build! This will not work."
-    );
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://")) {
+    throw new Error("[apiUrl] path must be relative, not a full URL");
   }
 
-  return {
-    baseUrl: baseUrl || "",
-    timeout: 30000, // 30 seconds
-    retryAttempts: 3,
-  };
+  const cleanBase = API_BASE_URL.endsWith("/")
+    ? API_BASE_URL.slice(0, -1)
+    : API_BASE_URL;
+
+  return `${cleanBase}${normalizedPath}`;
 }
 
-export const API_CONFIG = getApiConfig();
-
-// Health check endpoint
 export const HEALTH_ENDPOINT = "/api/healthz";
 
 // Common API paths (for reference)

@@ -1,51 +1,43 @@
-import { buildApiUrl } from "./apiClient";
-import { HEALTH_ENDPOINT } from "../config/api";
+import { apiUrl, HEALTH_ENDPOINT } from "../config/api";
 
 export interface HealthStatus {
   ok: boolean;
-  service?: string;
-  env?: string;
-  ts?: string;
+  status: number;
+  data?: any;
+  error?: string;
 }
 
 /**
- * Check backend health status
- * @returns Health status or null if unreachable
+ * Check backend health status (graceful on failure)
  */
-export async function checkBackendHealth(): Promise<HealthStatus | null> {
+export async function checkApiHealth(): Promise<HealthStatus> {
+  const url = apiUrl(HEALTH_ENDPOINT);
+
   try {
-    const url = buildApiUrl(HEALTH_ENDPOINT);
     const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      return data as HealthStatus;
+    const contentType = response.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+    const data = isJson ? await response.json() : undefined;
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: data?.error || data?.message || response.statusText,
+        data,
+      };
     }
 
-    return null;
+    return { ok: true, status: response.status, data };
   } catch (error) {
-    console.error("[HealthCheck] Backend unreachable:", error);
-    return null;
-  }
-}
-
-/**
- * Verify backend connection on app startup
- * Logs result but does not block app
- */
-export async function verifyBackendConnection(): Promise<void> {
-  const health = await checkBackendHealth();
-
-  if (health?.ok) {
-    console.log(
-      `[HealthCheck] ✓ Backend connected: ${health.service} (${health.env})`
-    );
-  } else {
-    console.warn(
-      "[HealthCheck] ⚠ Backend not responding. Some features may not work."
-    );
+    return {
+      ok: false,
+      status: 0,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }

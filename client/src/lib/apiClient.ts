@@ -5,6 +5,7 @@
  * Ensures all API calls use a consistent, safe URL construction pattern
  * Uses VITE_API_BASE_URL environment variable for the base URL
  */
+import { API_BASE_URL, apiUrl } from "../config/api";
 
 /**
  * Build a safe API URL by joining base + path
@@ -13,36 +14,13 @@
  * @throws Error if path contains full URL
  */
 export function buildApiUrl(path: string): string {
-  // Get base URL from environment, default to relative path behavior
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
-
-  // Ensure path starts with /
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-
-  // Safety check: reject if path contains http:// or https://
-  if (normalizedPath.includes("http://") || normalizedPath.includes("https://")) {
-    throw new Error(
-      `[buildApiUrl] Path contains full URL, which is not allowed. Path: ${normalizedPath}`
-    );
-  }
-
-  // If no base URL configured, use relative paths (for local dev / SPA proxy)
-  if (!baseUrl) {
+  // If base URL is empty, default to relative paths (dev proxy)
+  if (!API_BASE_URL) {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     return normalizedPath;
   }
 
-  // Remove trailing slash from baseUrl
-  const cleanBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
-
-  // Combine base + path
-  const fullUrl = `${cleanBase}${normalizedPath}`;
-
-  // Log in dev for debugging (no secrets)
-  if (import.meta.env.DEV) {
-    console.debug("[buildApiUrl] Final URL:", fullUrl);
-  }
-
-  return fullUrl;
+  return apiUrl(path);
 }
 
 /**
