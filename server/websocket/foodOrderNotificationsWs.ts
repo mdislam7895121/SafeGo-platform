@@ -40,7 +40,6 @@ export function setupFoodOrderNotificationsWebSocket(server: HTTPServer) {
     return;
   }
   
-  const secret = getJwtSecret();
   const wss = new WebSocketServer({ server, path: "/api/food-orders/notifications/ws" });
   wssInstance = wss;
 
@@ -52,6 +51,8 @@ export function setupFoodOrderNotificationsWebSocket(server: HTTPServer) {
     }
     
     ws.isAlive = true;
+    
+    const secret = getJwtSecret();
 
     const url = new URL(req.url || "", `http://${req.headers.host}`);
     const token = url.searchParams.get("token");

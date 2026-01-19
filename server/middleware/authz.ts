@@ -36,11 +36,11 @@ export async function authenticateToken(
       return;
     }
 
-    // SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
-    if (!process.env.JWT_SECRET) {
+    // SECURITY: Check JWT_SECRET only when needed (lazy validation)
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
       throw new Error("FATAL: JWT_SECRET environment variable is not set.");
     }
-    const jwtSecret = process.env.JWT_SECRET;
 
     const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
 

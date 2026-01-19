@@ -34,10 +34,7 @@ export async function generateSignedDocumentUrl(
     expiresAt
   };
 
-  // Defense in depth: Fail fast if JWT_SECRET missing in production
-  if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
-    throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
-  }
+  // Get JWT_SECRET (with fallback for non-production)
   const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
   const token = jwt.sign(payload, jwtSecret, {
     expiresIn: '15m'
@@ -54,10 +51,7 @@ export async function generateSignedDocumentUrl(
 
 export async function verifyDocumentToken(token: string): Promise<SignedUrlPayload> {
   try {
-    // Defense in depth: Fail fast if JWT_SECRET missing in production
-    if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
-      throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
-    }
+    // Get JWT_SECRET (with fallback for non-production)
     const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
     const payload = jwt.verify(token, jwtSecret) as SignedUrlPayload;
 

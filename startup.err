@@ -1,0 +1,3 @@
+[Dispatch WebSocket] WARNING: JWT_SECRET not set, WebSocket authentication will fail
+[MigrationGuard] Migration stderr: Environment variables loaded from .env
+

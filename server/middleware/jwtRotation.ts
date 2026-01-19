@@ -3,19 +3,27 @@ import { prisma } from "../db";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
+let cachedJwtSecret: string | null = null;
+
 function getJwtSecret(): string {
+  if (cachedJwtSecret) return cachedJwtSecret;
+  
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("[FATAL] JWT_SECRET is required in production");
     }
     console.warn("[jwtRotation] WARNING: JWT_SECRET not set - using temporary key for development only");
-    return "dev-only-temporary-jwt-secret-key-32chars";
+    cachedJwtSecret = "dev-only-temporary-jwt-secret-key-32chars";
+  } else {
+    cachedJwtSecret = secret;
   }
-  return secret;
+  return cachedJwtSecret;
 }
 
-const JWT_SECRET = getJwtSecret();
+// LAZY: Don't call getJwtSecret() at module level - defer to first request
+// This allows health endpoints to respond even if JWT_SECRET is missing
+const JWT_SECRET_LAZY = () => getJwtSecret();
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "7d";
 const ACCESS_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
@@ -70,8 +78,8 @@ export async function createTokenPair(
     type: "refresh",
   };
 
-  const accessToken = jwt.sign(accessPayload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
-  const refreshToken = jwt.sign(refreshPayload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  const accessToken = jwt.sign(accessPayload, JWT_SECRET_LAZY(), { expiresIn: ACCESS_TOKEN_EXPIRY });
+  const refreshToken = jwt.sign(refreshPayload, JWT_SECRET_LAZY(), { expiresIn: REFRESH_TOKEN_EXPIRY });
 
   const accessExpiresAt = new Date(Date.now() + ACCESS_TOKEN_EXPIRY_MS);
   const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
@@ -108,7 +116,7 @@ export async function refreshTokenPair(
   }
 ): Promise<{ accessToken: string; refreshToken: string } | null> {
   try {
-    const decoded = jwt.verify(refreshToken, JWT_SECRET) as TokenPayload;
+    const decoded = jwt.verify(refreshToken, JWT_SECRET_LAZY()) as TokenPayload;
 
     if (decoded.type !== "refresh") {
       console.warn("[JWTRotation] Invalid token type for refresh");
@@ -249,8 +257,8 @@ export async function refreshTokenPair(
       type: "refresh",
     };
 
-    const newAccessToken = jwt.sign(newAccessPayload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
-    const newRefreshToken = jwt.sign(newRefreshPayload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+    const newAccessToken = jwt.sign(newAccessPayload, JWT_SECRET_LAZY(), { expiresIn: ACCESS_TOKEN_EXPIRY });
+    const newRefreshToken = jwt.sign(newRefreshPayload, JWT_SECRET_LAZY(), { expiresIn: REFRESH_TOKEN_EXPIRY });
 
     const accessExpiresAt = new Date(Date.now() + ACCESS_TOKEN_EXPIRY_MS);
     const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
@@ -328,7 +336,7 @@ export async function revokeTokenFamily(
 
 export async function validateAccessToken(accessToken: string): Promise<TokenPayload | null> {
   try {
-    const decoded = jwt.verify(accessToken, JWT_SECRET) as TokenPayload;
+    const decoded = jwt.verify(accessToken, JWT_SECRET_LAZY()) as TokenPayload;
 
     if (decoded.type !== "access") {
       return null;

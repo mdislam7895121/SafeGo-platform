@@ -11,11 +11,14 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const prisma = db;
 
-// SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
-if (!process.env.JWT_SECRET) {
-  throw new Error("FATAL: JWT_SECRET environment variable is not set. WebSocket authentication cannot function.");
+// LAZY: Check JWT_SECRET only when first WebSocket connection occurs
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("FATAL: JWT_SECRET environment variable is not set. WebSocket authentication cannot function.");
+  }
+  return secret;
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: string;
@@ -67,7 +70,7 @@ export function setupRideChatWebSocket(server: HTTPServer) {
     }
 
     try {
-      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const decoded: any = jwt.verify(token, getJWTSecret());
       ws.userId = decoded.id;
       ws.userType = decoded.role;
       ws.rideId = rideId;

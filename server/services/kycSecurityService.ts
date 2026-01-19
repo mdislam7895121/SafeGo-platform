@@ -3,19 +3,27 @@ import crypto from 'crypto';
 import { getClientIp } from '../utils/ip';
 import { Request } from 'express';
 
+let cachedEncryptionKey: string | null = null;
+
 function getEncryptionKey(): string {
+  if (cachedEncryptionKey) return cachedEncryptionKey;
+  
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("[FATAL] ENCRYPTION_KEY is required in production");
     }
     console.warn("[kycSecurityService] WARNING: ENCRYPTION_KEY not set - using temporary key for development only");
-    return crypto.randomBytes(32).toString('hex');
+    cachedEncryptionKey = crypto.randomBytes(32).toString('hex');
+  } else {
+    cachedEncryptionKey = key;
   }
-  return key;
+  return cachedEncryptionKey;
 }
 
-const ENCRYPTION_KEY = getEncryptionKey();
+// LAZY: Don't call getEncryptionKey() at module level
+// This allows health endpoints to respond even if ENCRYPTION_KEY is missing
+const ENCRYPTION_KEY_LAZY = () => getEncryptionKey();
 const IV_LENGTH = 16;
 const SIGNED_URL_EXPIRY_MS = 5 * 60 * 1000;
 
@@ -87,7 +95,7 @@ export function generateSignedUrl(
   const expiresAt = new Date(Date.now() + expiryMs);
   const payload = `${documentPath}:${adminId}:${expiresAt.getTime()}`;
   
-  const hmac = crypto.createHmac('sha256', ENCRYPTION_KEY);
+  const hmac = crypto.createHmac('sha256', ENCRYPTION_KEY_LAZY());
   hmac.update(payload);
   const signature = hmac.digest('hex');
   
@@ -110,8 +118,7 @@ export function verifySignedUrl(
     return { valid: false, reason: 'URL has expired' };
   }
   
-  const payload = `${path}:${adminId}:${expires}`;
-  const hmac = crypto.createHmac('sha256', ENCRYPTION_KEY);
+  const hmac = crypto.createHmac('sha256', ENCRYPTION_KEY_LAZY());
   hmac.update(payload);
   const expectedSignature = hmac.digest('hex');
   
@@ -123,7 +130,7 @@ export function verifySignedUrl(
 }
 
 export function encryptKycData(plaintext: string): string {
-  const key = Buffer.from(ENCRYPTION_KEY.substring(0, 64), 'hex');
+  const key = Buffer.from(ENCRYPTION_KEY_LAZY().substring(0, 64), 'hex');
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   
@@ -145,8 +152,7 @@ export function decryptKycData(ciphertext: string): string {
   const encrypted = parts[1];
   const authTag = Buffer.from(parts[2], 'hex');
   
-  const key = Buffer.from(ENCRYPTION_KEY.substring(0, 64), 'hex');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  const key = Buffer.from(ENCRYPTION_KEY_LAZY().substring(0, 64), 'hex');
   decipher.setAuthTag(authTag);
   
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');

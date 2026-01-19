@@ -23,15 +23,20 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const router = Router();
 
-// SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
-// This ensures tokens cannot be forged even if environment guard is bypassed
-if (!process.env.JWT_SECRET) {
-  throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+// LAZY: Get JWT_SECRET only when needed (function-level check)
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+  }
+  return secret;
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 
-// Separate secret for refresh tokens (derived from JWT_SECRET for simplicity)
-const REFRESH_SECRET = crypto.createHash('sha256').update(JWT_SECRET + '-refresh').digest('hex');
+// Lazy getter for REFRESH_SECRET
+function getRefreshSecret(): string {
+  const jwtSecret = getJWTSecret();
+  return crypto.createHash('sha256').update(jwtSecret + '-refresh').digest('hex');
+}
 
 // Token expiry configuration
 const ACCESS_TOKEN_EXPIRY = '15m';  // Short-lived access token
@@ -39,12 +44,12 @@ const REFRESH_TOKEN_EXPIRY = '30d'; // Long-lived refresh token
 
 // Generate access token (short-lived)
 function generateAccessToken(payload: { userId: string; role: string; countryCode: string }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  return jwt.sign(payload, getJWTSecret(), { expiresIn: ACCESS_TOKEN_EXPIRY });
 }
 
 // Generate refresh token (long-lived)
 function generateRefreshToken(userId: string): string {
-  return jwt.sign({ userId, type: 'refresh' }, REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  return jwt.sign({ userId, type: 'refresh' }, getRefreshSecret(), { expiresIn: REFRESH_TOKEN_EXPIRY });
 }
 
 // Set refresh token in HTTP-only cookie

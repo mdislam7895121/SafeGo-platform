@@ -9,12 +9,15 @@ import { prisma } from "../db";
 const __dirname = process.cwd();
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-// SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
-// This ensures tokens cannot be forged even if environment guard is bypassed
-if (!process.env.JWT_SECRET) {
-  throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+// LAZY: Check JWT_SECRET only when first auth operation occurs
+// This allows health endpoints to respond even if JWT_SECRET is temporarily missing during startup
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+  }
+  return secret;
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 
 export interface JWTPayload {
   userId: string;
@@ -36,7 +39,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const payload = jwt.verify(token, getJWTSecret()) as JWTPayload;
     req.user = payload;
     next();
   } catch (error) {
@@ -192,7 +195,7 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
   }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const payload = jwt.verify(token, getJWTSecret()) as JWTPayload;
     req.user = payload;
   } catch {
     // Invalid token, proceed without user (don't fail)
